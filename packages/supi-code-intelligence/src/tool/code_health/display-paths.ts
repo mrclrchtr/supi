@@ -1,4 +1,5 @@
 import type { DiagnosticEvidenceSummary } from "@mrclrchtr/supi-lsp/api";
+import { formatProjectServerRoot } from "../../analysis/health/server-status.ts";
 import { toDisplayPath } from "../../analysis/search/paths.ts";
 import type {
   HealthData,
@@ -6,7 +7,7 @@ import type {
   HealthRefreshAttempt,
 } from "../../session/health-types.ts";
 
-/** Project source/navigation paths only; runtime ownership roots and session facts stay unchanged. */
+/** Clone source navigation and recovery labels for display; retain observed ownership identities and stored session facts. */
 export function displayHealthPaths(input: HealthData, cwd: string): HealthData {
   const display = (file: string) => toDisplayPath(cwd, file);
   const scope = (value: HealthDiagnosticScope): HealthDiagnosticScope =>
@@ -20,6 +21,28 @@ export function displayHealthPaths(input: HealthData, cwd: string): HealthData {
   const attempt = (value: HealthRefreshAttempt): HealthRefreshAttempt => ({
     ...value,
     requestedDiagnosticScope: scope(value.requestedDiagnosticScope),
+    ...(value.processCrashRecovery
+      ? {
+          processCrashRecovery: {
+            ...value.processCrashRecovery,
+            entries: value.processCrashRecovery.entries.map((entry) => ({
+              ...entry,
+              root: formatProjectServerRoot(cwd, entry.root),
+            })),
+          },
+        }
+      : {}),
+    ...(value.startupRetry
+      ? {
+          startupRetry: {
+            ...value.startupRetry,
+            entries: value.startupRetry.entries.map((entry) => ({
+              ...entry,
+              root: formatProjectServerRoot(cwd, entry.root),
+            })),
+          },
+        }
+      : {}),
     ...("diagnosticEvidence" in value && value.diagnosticEvidence
       ? { diagnosticEvidence: evidence(value.diagnosticEvidence) }
       : {}),

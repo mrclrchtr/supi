@@ -434,6 +434,11 @@ export class LspManager {
       detected.filter((entry) => this.automaticPathPolicy.isEligible(entry.root, "directory")),
     );
   }
+  /** Check configured routing only, independently of executable availability or startup state. */
+  hasConfiguredServerForFile(filePath: string): boolean {
+    return getServerForFile(this.config, resolveSessionPath(this.cwd, filePath)) !== null;
+  }
+
   /** Check whether a file path has an available LSP server for explicit semantic operations. */
   canServeFile(filePath: string): boolean {
     const route = this.resolveFileRoute(filePath);

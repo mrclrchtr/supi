@@ -309,7 +309,7 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
       const processCrashRecovery = this.manager.getProcessCrashRecoveryReportForFile(resolvedPath);
       return {
         kind: "unavailable",
-        reason: "No LSP client can serve this file",
+        reason: this.fileUnavailableReason(resolvedPath, "No LSP client can serve this file"),
         ...(processCrashRecovery ? { processCrashRecovery } : {}),
       };
     }
@@ -347,12 +347,21 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
     if (!client) {
       return {
         kind: "unavailable",
-        reason: "The routed LSP client could not be started for this file",
+        reason: this.fileUnavailableReason(
+          resolvedPath,
+          "The routed LSP client could not be started for this file",
+        ),
         ...startup,
         ...recovery,
       };
     }
     return { kind: "ready", ...startup, ...recovery };
+  }
+
+  private fileUnavailableReason(filePath: string, configuredRouteReason: string): string {
+    return this.manager.hasConfiguredServerForFile(filePath)
+      ? configuredRouteReason
+      : "No compatible LSP server is configured for this file";
   }
 
   /**

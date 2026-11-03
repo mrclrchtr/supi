@@ -308,7 +308,7 @@ describe("/supi-ci-status command", () => {
           entries: [
             {
               name: "rust",
-              root: "engine",
+              root: "../external/engine-alias",
               outcome: "retry-failed",
               nextAction: "refresh",
               failureMessage: "launch failed",
@@ -333,7 +333,9 @@ describe("/supi-ci-status command", () => {
     await vi.waitFor(() => expect(status.render()).toContain("Refresh health: completed"));
     const rendered = status.render().replace(/\s+/g, " ");
     expect(rendered).toContain("python @ backend: recovery exhausted; next: refresh");
-    expect(rendered).toContain("rust @ engine: retry failed; next: refresh; launch failed");
+    expect(rendered).toContain(
+      "rust @ /external/engine-alias: retry failed; next: refresh; launch failed",
+    );
     expect(status.render()).toContain("source discovery: limited (file-limit)");
     expect(status.render()).toContain("50001 source files observed");
     expect(status.render()).toContain("4 deferred");

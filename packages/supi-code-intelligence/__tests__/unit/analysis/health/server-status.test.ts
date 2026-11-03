@@ -42,10 +42,15 @@ describe("LSP route status presentation", () => {
     );
   });
 
-  it("renders every route root relative to the workspace", () => {
+  it("renders contained route roots relatively and external observed roots absolutely", () => {
     expect(formatProjectServerRoot("/workspace", "/workspace")).toBe(".");
     expect(formatProjectServerRoot("/workspace", "/workspace/packages/app")).toBe("packages/app");
-    expect(formatProjectServerRoot("/workspace", "/external/app")).toBe("../external/app");
+    expect(formatProjectServerRoot("/workspace", "packages/app")).toBe("packages/app");
+    expect(formatProjectServerRoot("/workspace", "/external/app")).toBe("/external/app");
+    expect(formatProjectServerRoot("/workspace", "../external/app")).toBe("/external/app");
+    expect(formatProjectServerRoot("/workspace", "/workspace-sibling/app")).toBe(
+      "/workspace-sibling/app",
+    );
   });
 
   it("distinguishes server limits from SuPi planning limits", () => {

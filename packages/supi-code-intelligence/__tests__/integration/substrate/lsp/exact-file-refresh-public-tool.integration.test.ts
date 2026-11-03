@@ -70,7 +70,32 @@ describe("registered exact-file health refresh outside automatic scope", () => {
       );
       return (result as { structuredContent: unknown }).structuredContent;
     };
-    expect(await request(aliasFile, false)).toMatchObject({ diagnostics: { kind: "unavailable" } });
+    const failedStartup = "The routed LSP client could not be started for this file";
+    expect(await request(aliasFile, false)).toMatchObject({
+      diagnostics: { kind: "unavailable", reason: failedStartup },
+      semanticState: { kind: "unavailable", reason: failedStartup },
+    });
+    const unsupported = path.join(external, "unsupported.supilive");
+    fs.writeFileSync(unsupported, "unsupported route\n");
+    for (const refresh of [false, true]) {
+      const noRoute = "No compatible LSP server is configured for this file";
+      expect(await request(unsupported, refresh)).toMatchObject({
+        diagnostics: {
+          kind: "unavailable",
+          reason: noRoute,
+          evidence: { confirmed: 0, failed: 1 },
+        },
+        semanticState: { kind: "unavailable", reason: noRoute },
+        ...(refresh
+          ? {
+              refresh: {
+                fileReadiness: "unavailable",
+                startupRetry: { recoveredRoutes: 0, failedRoutes: 0, entries: [] },
+              },
+            }
+          : {}),
+      });
+    }
     fs.writeFileSync(gate, "ready");
     expect(await request(file, false)).toMatchObject({
       diagnostics: { kind: "completed", evidence: { confirmed: 1 } },

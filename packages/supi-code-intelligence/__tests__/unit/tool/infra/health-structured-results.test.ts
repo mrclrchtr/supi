@@ -1,6 +1,6 @@
-import { mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, relative } from "node:path";
 import { setWorkspaceLspRuntimeState, type WorkspaceLspRuntime } from "@mrclrchtr/supi-lsp/api";
 import { createPiMock, getTool, makeCtx } from "@mrclrchtr/supi-test-utils";
 import type { TSchema } from "typebox";
@@ -88,6 +88,83 @@ afterEach(() => {
 });
 
 describe("registered health structured results", () => {
+  it("displays external route roots absolutely without merging aliases or mutating retained runtime reports", async () => {
+    const external = mkdtempSync(join(tmpdir(), "health-route-roots-"));
+    try {
+      const project = join(realpathSync(external), "project");
+      const alias = join(realpathSync(external), "project-alias");
+      mkdirSync(project);
+      symlinkSync(project, alias, "dir");
+      const relativeAlias = relative(cwd, alias);
+      const crash = {
+        recoveredRoutes: 1,
+        skippedRoutes: 0,
+        failedRoutes: 0,
+        exhaustedRoutes: 0,
+        entries: [{ name: "crash", root: relativeAlias, outcome: "recovered" }],
+        omittedEntries: 0,
+      };
+      const startup = {
+        recoveredRoutes: 1,
+        failedRoutes: 0,
+        entries: [{ name: "startup", root: relativeAlias, outcome: "recovered" }],
+        omittedEntries: 0,
+      };
+      ready({
+        getProjectServers: () =>
+          [cwd, alias, project].map((root) => ({
+            name: "ts",
+            root,
+            fileTypes: ["ts"],
+            status: "running",
+            ready: true,
+          })),
+        recoverDiagnostics: async () => ({
+          attemptedClients: 3,
+          restartedClients: 0,
+          diagnosticEvidence: empty,
+          processCrashRecovery: crash,
+          startupRetry: startup,
+          staleAssessment: { suspected: false, matchedFiles: [], warning: null },
+        }),
+      });
+      const t = tool();
+      const expectedReports = {
+        processCrashRecovery: { entries: [{ root: alias }] },
+        startupRetry: { entries: [{ root: alias }] },
+      };
+      for (const refresh of [true, false]) {
+        const result = await call(t, { refresh, level: "detailed" });
+        expect(result.structuredContent).toMatchObject({
+          servers: [{ root: cwd }, { root: alias }, { root: project }],
+          refresh: refresh
+            ? { kind: "completed", ...expectedReports }
+            : { kind: "not-requested", lastAttempt: expectedReports },
+        });
+        const text = result.content[0].text;
+        expect(text).toContain(`**ts** @ \`${alias}\``);
+        expect(text).toContain(`**ts** @ \`${project}\``);
+        expect(text).toContain(`crash @ ${alias}: recovered`);
+        expect(text).toContain(`startup @ ${alias}: recovered`);
+        expect(text).not.toContain(relativeAlias);
+        expect(result.details).toMatchObject({
+          displaySections: expect.arrayContaining([
+            expect.objectContaining({
+              key: "health.servers",
+              lines: expect.arrayContaining([
+                `ts @ ${alias} (ts) — running`,
+                `ts @ ${project} (ts) — running`,
+              ]),
+            }),
+          ]),
+        });
+      }
+      expect(crash.entries[0].root).toBe(relativeAlias);
+      expect(startup.entries[0].root).toBe(relativeAlias);
+    } finally {
+      rmSync(external, { recursive: true, force: true });
+    }
+  });
   it("reports the actual wrapped compiler and actionable selection failures in structured and rendered health", async () => {
     const typescript = {
       backend: "tsserver",

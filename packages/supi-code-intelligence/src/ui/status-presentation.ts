@@ -4,6 +4,7 @@ import type {
   HealthDiagnosticObservation,
   HealthWorkflowOutcome,
 } from "../session/health-types.ts";
+import { displayHealthPaths } from "../tool/code_health/display-paths.ts";
 import {
   formatProcessCrashRecovery,
   formatSourceTracking,
@@ -72,14 +73,18 @@ export class CiHealthRefreshError extends Error {
 }
 
 /** Present this interaction's action outcome without retaining its diagnostic evidence or history. */
-export function presentHealthRefresh(outcome: HealthWorkflowOutcome, elapsedMs: number): string[] {
+export function presentHealthRefresh(
+  outcome: HealthWorkflowOutcome,
+  elapsedMs: number,
+  cwd: string,
+): string[] {
   const elapsed = `${(Math.max(0, elapsedMs) / 1_000).toFixed(1)}s`;
   const prefix = "Refresh health";
   if (outcome.kind !== "completed")
     return [
       `${prefix}: ${outcome.kind === "unavailable" ? "unavailable" : "failed"} (${elapsed}) — ${outcome.kind === "unavailable" ? outcome.reason : outcome.message}`,
     ];
-  const attempt = outcome.data.refresh;
+  const attempt = displayHealthPaths(outcome.data, cwd).refresh;
   const status =
     attempt.kind === "completed"
       ? "completed"

@@ -122,7 +122,7 @@ export function registerCiStatusCommand(
             control,
           );
           throwIfAborted(control);
-          healthRefresh = presentHealthRefresh(outcome, Date.now() - startedAt);
+          healthRefresh = presentHealthRefresh(outcome, Date.now() - startedAt, ctx.cwd);
           stage = "passive snapshot";
           const snapshot = await observe();
           throwIfAborted(control);

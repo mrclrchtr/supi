@@ -45,9 +45,13 @@ export function formatProjectServerRouteStatusCounts(
   return parts.length > 0 ? `workspace routes: ${parts.join(", ")}` : null;
 }
 
-/** Render an LSP route root relative to its workspace. */
+/** Render observed route roots relatively inside the workspace and absolutely outside, without resolving aliases. */
 export function formatProjectServerRoot(cwd: string, root: string): string {
-  const relative = path.relative(cwd, root);
+  const absolute = path.resolve(cwd, root);
+  const relative = path.relative(cwd, absolute);
+  if (relative === ".." || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
+    return absolute;
+  }
   return (relative || ".").replaceAll("\\", "/");
 }
 

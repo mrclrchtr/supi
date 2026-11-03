@@ -24,6 +24,7 @@ import { createWorkspaceLspRuntimeOwner } from "../../src/session/runtime-regist
 function makeManager(overrides: Record<string, unknown>): Manager {
   return {
     getCwd: () => "/project",
+    hasConfiguredServerForFile: () => true,
     getScopeDecisionSummary: () => ({
       caseSensitiveFileNames: true,
       counts: { included: 0, excluded: 0, noConfig: 0, outOfTree: 0 },
