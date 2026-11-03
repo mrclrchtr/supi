@@ -97,8 +97,9 @@ describe("code_graph agent output", () => {
         }),
       ]),
     });
-    expect(result.content).toContain("5 of 42 locations shown; 37 omitted");
-    expect(result.content).toContain("Selection: one site per file per round.");
+    expect(result.content).toContain(
+      "5 of 42 locations shown; 37 omitted — Selection: one site per file per round.",
+    );
     expect(result.content).toContain("- `a.ts`: L1:1, L2:1, L3:1\n");
     expect(result.content).toContain("- `b.ts`: L1:1\n- `c.ts`: L1:1");
     expect(result.details?.data).toMatchObject({

@@ -35,7 +35,7 @@ function renderSection(section: AssembledGraphSection, assembly: GraphResultAsse
   );
   lines.push(
     section.rel === "references" && section.selectionNote
-      ? `${summary} ${section.selectionNote}`
+      ? `${summary} — ${section.selectionNote}`
       : summary,
     "",
   );
