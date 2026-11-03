@@ -1,4 +1,5 @@
 import * as path from "node:path";
+import { toDisplayPath } from "../../analysis/search/paths.ts";
 import type { InventoryEntry, WorkspaceObservation } from "../../analysis/workspace/types.ts";
 import {
   type WorkspaceOrientationFacts,
@@ -13,7 +14,7 @@ import { code, plain, sourcePath, tableSection } from "./workspace-format.ts";
 import { workspaceCollectionStatus } from "./workspace-observations.ts";
 import { projectSections } from "./workspace-projects.ts";
 
-/** Build output facts from one captured observation, with no filesystem reads. */
+/** Project one captured observation without collecting new workspace facts. */
 export function workspaceSections(
   data: OrientationResultData,
   limit: number,
@@ -228,5 +229,5 @@ function inventorySections(
 }
 
 export function display(cwd: string, target: string): string {
-  return path.relative(cwd, target).replaceAll(path.sep, "/") || ".";
+  return toDisplayPath(cwd, target);
 }

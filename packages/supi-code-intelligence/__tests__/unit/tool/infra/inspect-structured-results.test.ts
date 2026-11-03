@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -46,6 +46,57 @@ async function execute(registered: Tool, args: unknown, signal?: AbortSignal) {
 const point = { file: "index.ts", line: 1, character: 17 };
 
 describe("registered inspect structured results", () => {
+  it("uses one canonical external path for the point, definitions and recovery on every surface", async () => {
+    const externalDir = mkdtempSync(join(tmpdir(), "inspect-external-"));
+    const file = join(realpathSync(externalDir), "source.ts");
+    const alias = join(externalDir, "source-link.ts");
+    writeFileSync(file, "export function widget() {}\n");
+    symlinkSync(file, alias);
+    const range = { start: { line: 0, character: 16 }, end: { line: 0, character: 22 } };
+    registerMockProvider(cwd, {
+      nodeAt: async () => ({
+        kind: "partial",
+        file: alias,
+        reason: "Recovered syntax",
+        errorRanges: [range],
+        data: {
+          type: "identifier",
+          text: "widget",
+          startLine: 1,
+          startCharacter: 17,
+          endLine: 1,
+          endCharacter: 23,
+          ancestry: [],
+        },
+      }),
+      definition: async () => completedCodeQuery([{ uri: pathToFileURL(alias).href, range }]),
+    });
+    try {
+      const result = await execute(tool(), { point: { file: alias, line: 1, character: 17 } });
+      expect(result.structuredContent).toMatchObject({
+        point: { file, line: 1, character: 17 },
+        sections: {
+          node: { kind: "partial", recovery: { file } },
+          definition: { data: [{ file, line: 1, character: 17 }] },
+        },
+      });
+      expect(result).toMatchObject({
+        details: {
+          data: {
+            focusTarget: `${file}:1:17`,
+            sections: expect.arrayContaining([
+              expect.objectContaining({ key: "node", recovery: expect.objectContaining({ file }) }),
+            ]),
+          },
+        },
+      });
+      expect(result.content[0]?.text).toContain(`# Inspect: ${file}:1:17`);
+      expect(result.content[0]?.text).not.toContain(alias);
+    } finally {
+      rmSync(externalDir, { recursive: true, force: true });
+    }
+  });
+
   it("distinguishes completed-empty, partial-empty and unavailable sections", async () => {
     registerMockProvider(cwd, {
       hover: async () => completedCodeQuery(null),

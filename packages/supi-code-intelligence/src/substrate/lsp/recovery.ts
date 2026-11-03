@@ -62,16 +62,16 @@ function getFilePathFromToolResult(event: ToolResultEvent): string | null {
   return pathValue;
 }
 
-/** Extract changed file paths emitted by a successful code_refactor_apply result. */
+/** Extract original document identities, never display paths, from a successful Apply. */
 function getRefactorApplyPaths(event: ToolResultEvent): string[] {
   const details = (event as { details?: unknown }).details as
-    | { data?: { changedFiles?: unknown } }
+    | { data?: { recoveryFiles?: unknown } }
     | undefined;
-  const changedFiles = details?.data?.changedFiles;
-  if (!Array.isArray(changedFiles)) return [];
+  const recoveryFiles = details?.data?.recoveryFiles;
+  if (!Array.isArray(recoveryFiles)) return [];
   return [
     ...new Set(
-      changedFiles.filter((file): file is string => typeof file === "string" && file.length > 0),
+      recoveryFiles.filter((file): file is string => typeof file === "string" && file.length > 0),
     ),
   ];
 }

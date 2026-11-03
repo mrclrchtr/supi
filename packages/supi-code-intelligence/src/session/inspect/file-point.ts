@@ -1,8 +1,7 @@
 /** Filesystem and UTF-16 validation for exact point inspection. */
 
 import { existsSync, readFileSync, statSync } from "node:fs";
-import { relative } from "node:path";
-import { normalizePath } from "../../analysis/search/paths.ts";
+import { normalizePath, toDisplayPath } from "../../analysis/search/paths.ts";
 import type { InputValidation } from "../input/common.ts";
 import type { SourcePointInput } from "../target-input.ts";
 
@@ -60,7 +59,7 @@ export function validateInspectPoint(
     kind: "valid",
     value: {
       file,
-      relPath: relative(cwd, file) || point.file,
+      relPath: toDisplayPath(cwd, file),
       line: point.line,
       character: point.character,
       lineCount: lines.length,

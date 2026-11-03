@@ -76,10 +76,25 @@ const Observation = Type.Union([
 ]);
 const ContextDefinitionEntries = {
   entries: Type.Array(
-    Type.Object(
-      { uri: Type.String(), range: RecoveryRangeSchema },
-      { additionalProperties: false },
-    ),
+    Type.Union([
+      Type.Object(
+        { file: Type.String(), range: RecoveryRangeSchema },
+        { additionalProperties: false },
+      ),
+      Type.Object(
+        {
+          uri: Type.String(),
+          range: RecoveryRangeSchema,
+          navigation: Type.Literal("unavailable"),
+          reason: Type.String(),
+        },
+        {
+          additionalProperties: false,
+          description:
+            "Retained provider observation; this URI is not a local filesystem navigation target.",
+        },
+      ),
+    ]),
   ),
   collectedCount: Type.Integer({
     description: "Collected locations; a partial observation may have an unknown remainder.",

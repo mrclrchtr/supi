@@ -4,6 +4,7 @@ import {
   createPartialEvidenceList,
   type EvidenceListMetadata,
 } from "../../analysis/evidence.ts";
+import { toDisplayPath } from "../../analysis/search/paths.ts";
 import type { FindMode, FindWorkflowOutcome } from "../../session/find-types.ts";
 import {
   assembledNextQueries,
@@ -24,8 +25,10 @@ export interface FindResultAssembly {
 
 /** Assemble one completed code-aware search outcome before presentation. */
 export function assembleFindWorkflowResult(
-  outcome: Extract<FindWorkflowOutcome, { kind: "completed" }>,
+  input: Extract<FindWorkflowOutcome, { kind: "completed" }>,
+  cwd: string,
 ): FindResultAssembly {
+  const outcome = withDisplayPaths(input, cwd);
   const evidence = createFindEvidence(outcome);
   const confidence: ConfidenceMode = outcome.data.kind === "semantic" ? "semantic" : "structural";
   const nextQueries = findNextQueries(outcome);
@@ -82,6 +85,57 @@ export function assembleFindWorkflowResult(
       ...(outcome.data.kind === "semantic" && outcome.data.partialMetadata?.automaticPathExclusion
         ? { automaticPathExclusion: outcome.data.partialMetadata.automaticPathExclusion }
         : {}),
+    },
+  };
+}
+
+/** Clone source-path projections for all output adapters without changing workflow facts. */
+function withDisplayPaths(
+  outcome: Extract<FindWorkflowOutcome, { kind: "completed" }>,
+  cwd: string,
+): Extract<FindWorkflowOutcome, { kind: "completed" }> {
+  const display = (file: string) => toDisplayPath(cwd, file);
+  const { data } = outcome;
+  if (data.kind === "semantic") {
+    const exclusion = data.partialMetadata?.automaticPathExclusion;
+    return {
+      ...outcome,
+      data: {
+        ...data,
+        symbols: data.symbols.map((symbol) => ({ ...symbol, file: display(symbol.file) })),
+        ...(exclusion
+          ? {
+              partialMetadata: {
+                ...data.partialMetadata,
+                automaticPathExclusion: { ...exclusion, examples: exclusion.examples.map(display) },
+              },
+            }
+          : {}),
+      },
+    };
+  }
+  const { result } = data;
+  return {
+    ...outcome,
+    data: {
+      ...data,
+      result: {
+        ...result,
+        matches: result.matches.map((match) => ({ ...match, file: display(match.file) })),
+        failures: result.failures.map((failure) => ({ ...failure, file: display(failure.file) })),
+        scan: {
+          ...result.scan,
+          roots: result.scan.roots.map(display),
+          exclusions: result.scan.exclusions.map((entry) => ({
+            ...entry,
+            examples: entry.examples.map(display),
+          })),
+          limitations: result.scan.limitations.map((entry) => ({
+            ...entry,
+            examples: entry.examples.map(display),
+          })),
+        },
+      },
     },
   };
 }
@@ -207,7 +261,7 @@ export function finishFindResult(
     };
   }
 
-  const assembly = assembleFindWorkflowResult(outcome);
+  const assembly = assembleFindWorkflowResult(outcome, cwd);
   return {
     content: renderFindResult(assembly),
     structuredContent: structuredFindResult(assembly, cwd),

@@ -207,7 +207,7 @@ describe("code_health result assembly", () => {
     try {
       const text = result.content[0].text;
       expect(text.length).toBeLessThanOrEqual(8000);
-      expect(text).toContain("Diagnostics: partial; tracked-file snapshot; filter=/repo/src");
+      expect(text).toContain("Diagnostics: partial; tracked-file snapshot; filter=src");
       expect(text).toContain("not workspace-wide verification");
       expect(text).toContain("requested=1, confirmed=0, unconfirmed=1, failed=0, removed=0");
       expect(text).toContain("Fresh diagnostics were not confirmed");

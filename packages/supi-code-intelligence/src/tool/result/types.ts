@@ -105,8 +105,10 @@ export interface SearchDetails {
   omittedCount: number;
   evidenceLists?: EvidenceListMetadata[];
   nextQueries: string[];
-  /** Paths successfully changed by `code_refactor_apply`. */
+  /** Display paths successfully changed by `code_refactor_apply`; never use as document identities. */
   changedFiles?: readonly string[];
+  /** Original provider document paths for post-Apply synchronization; never render or canonicalize. */
+  recoveryFiles?: readonly string[];
   /** Present for AST mode; declares the operation-specific source-file universe and completeness. */
   scan?: StructuredScanSummary;
   /** Source-mapped structural matches returned by AST mode. */

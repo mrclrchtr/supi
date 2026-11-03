@@ -1,10 +1,13 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createPiMock, getTool, makeCtx } from "@mrclrchtr/supi-test-utils";
+import { pathToFileURL } from "node:url";
+import { createPiMock, getHandlerOrThrow, getTool, makeCtx } from "@mrclrchtr/supi-test-utils";
 import type { TSchema } from "typebox";
 import { Value } from "typebox/value";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { registerWorkspaceRecoveryHandler } from "../../../../src/substrate/lsp/recovery.ts";
+import { createLspAdapterState } from "../../../../src/substrate/lsp/state.ts";
 import { registerCodeIntelligenceTools } from "../../../../src/tool/register.ts";
 import { sessionCache } from "../../../helpers/execute-action.ts";
 import { clearMockRuntime, registerMockProvider } from "../../../helpers/register-mock-runtime.ts";
@@ -48,6 +51,56 @@ afterEach(() => {
 });
 
 describe("registered refactor structured results", () => {
+  it("keeps the original document URI for recovery after applying through a directory alias", async () => {
+    const source = join(cwd, "src");
+    const directoryAlias = join(cwd, "link");
+    mkdirSync(source);
+    symlinkSync(source, directoryAlias, "dir");
+    const file = join(directoryAlias, "index.ts");
+    writeFileSync(file, original);
+    registerMockProvider(cwd, {
+      refactor: async () => ({
+        kind: "precise",
+        authorizedMutationRoots: [cwd],
+        edits: {
+          edits: [
+            {
+              file,
+              range: { start: { line: 0, character: 16 }, end: { line: 0, character: 22 } },
+              newText: "gadget",
+            },
+          ],
+        },
+      }),
+    });
+    const { plan, apply } = tools();
+    const planned = await call(plan, {
+      ...input,
+      target: { anchor: { file, line: 1, character: 17 } },
+    });
+    const applied = await call(apply, { planId: planned.structuredContent.planId });
+    expect(applied.structuredContent).toMatchObject({
+      kind: "applied",
+      files: [{ file: "src/index.ts" }],
+    });
+    expect(applied.details.data).toMatchObject({
+      changedFiles: ["src/index.ts"],
+      recoveryFiles: [file],
+    });
+    expect(readFileSync(join(source, "index.ts"), "utf8")).toContain("function gadget()");
+    const pi = createPiMock();
+    const noteWorkspaceWrites = vi.fn();
+    const state = createLspAdapterState();
+    state.controller = { cwd, workspaceRuntime: { noteWorkspaceWrites } } as never;
+    registerWorkspaceRecoveryHandler(pi as never, state);
+    await getHandlerOrThrow(pi, "tool_result")(
+      { toolName: "code_refactor_apply", isError: false, details: applied.details },
+      makeCtx({ cwd }),
+    );
+    expect(noteWorkspaceWrites).toHaveBeenCalledExactlyOnceWith([
+      { uri: pathToFileURL(file).href, type: 2 },
+    ]);
+  });
   it("returns every exact edit independently of the preview and applies the stored plan", async () => {
     const file = join(cwd, "index.ts");
     const otherFile = join(cwd, "other.ts");
@@ -104,7 +157,7 @@ describe("registered refactor structured results", () => {
       fileCount: 2,
       editCount: 7,
     });
-    expect(applied.details.data.changedFiles).toEqual([file, otherFile]);
+    expect(applied.details.data.changedFiles).toEqual(["index.ts", "other.ts"]);
     expect(readFileSync(file, "utf8")).toContain("gadget5();");
     expect(readFileSync(otherFile, "utf8")).toBe("other();\n");
     const reused = await call(apply, { planId: planned.structuredContent.planId });

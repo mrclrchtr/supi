@@ -184,7 +184,7 @@ describe("mixed-language diagnostics through public code_health", () => {
     };
     expect(directoryDetails.data.refresh).toMatchObject({
       operationScope: "workspace-runtime",
-      requestedDiagnosticScope: { kind: "tracked-files", filter: sourceDir },
+      requestedDiagnosticScope: { kind: "tracked-files", filter: "src" },
       diagnosticEvidence: {
         requested: 3,
         confirmed: 3,
@@ -194,7 +194,7 @@ describe("mixed-language diagnostics through public code_health", () => {
       },
     });
     expect(directoryDetails.data.diagnosticObservation).toMatchObject({
-      scope: { kind: "tracked-files", filter: sourceDir },
+      scope: { kind: "tracked-files", filter: "src" },
       evidence: {
         requested: 2,
         confirmed: 2,
@@ -202,7 +202,7 @@ describe("mixed-language diagnostics through public code_health", () => {
         failed: 0,
         removed: 0,
       },
-      entries: [{ file: inside, errors: 1, warnings: 0 }],
+      entries: [{ file: "src/inside.ts", errors: 1, warnings: 0 }],
     });
     expect(directoryDetails.data.diagnosticObservation.entries).toHaveLength(1);
 

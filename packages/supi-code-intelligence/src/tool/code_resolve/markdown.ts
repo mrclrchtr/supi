@@ -1,7 +1,7 @@
 /** Markdown adapter for assembled code_resolve outcomes. */
 
-import { relative } from "node:path";
 import { renderEvidenceListMetadataDisclosure } from "../../analysis/evidence.ts";
+import { toDisplayPath } from "../../analysis/search/paths.ts";
 import type { TargetWorkflowOutcome } from "../../session/target-workflow.ts";
 import { formatPartialCandidateDisclosure } from "../result/candidate-row.ts";
 import type { ResolveDetails } from "../result/types.ts";
@@ -31,7 +31,7 @@ function renderResolved(
   cwd: string,
 ): string {
   const { entry: target, notes } = outcome;
-  const relFile = relative(cwd, target.file) || target.file;
+  const relFile = toDisplayPath(cwd, target.file);
   const displayKind = target.nativeKind ?? target.kind;
   const kind = displayKind ? ` \`${displayKind}\`` : "";
   const name = target.name ? ` **${target.name}**${kind}` : "";

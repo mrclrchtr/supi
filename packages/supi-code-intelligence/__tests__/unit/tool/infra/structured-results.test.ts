@@ -548,12 +548,22 @@ describe("structured navigation results", () => {
         {
           relation: "references",
           source: "semantic",
-          status: "partial",
+          status: "complete",
           items: [{ file: "use.ts", line: 1, character: 1 }],
-          evidence: { totalCount: 2, shownCount: 1, omittedCount: 1 },
+          evidence: { totalCount: 2, shownCount: 1, omittedCount: 1, partialReason: null },
         },
         { relation: "implements", status: "unavailable", items: [], message: expect.any(String) },
       ],
+    });
+    expect(result).toMatchObject({
+      details: {
+        data: {
+          sections: [
+            { rel: "references", status: "complete" },
+            { rel: "implements", status: "unavailable" },
+          ],
+        },
+      },
     });
     expect(Value.Check(graph.outputSchema, result.structuredContent)).toBe(true);
     expect(result.content[0]?.text).toContain("1 omitted");

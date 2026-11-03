@@ -1,3 +1,4 @@
+import { toDisplayPath } from "../../analysis/search/paths.ts";
 import type { HealthDiagnosticObservation } from "../../session/health-types.ts";
 
 /** Render the tsconfig coverage result for a single-file health request. */
@@ -37,7 +38,7 @@ function formatConfigPath(configPath: string | null, cwd: string): string {
   return `\`${makeRelative(cwd, configPath)}\``;
 }
 
-/** Format a workspace path without exposing an absolute root. */
+/** Format a diagnostic source with the shared workspace/external path policy. */
 export function makeRelative(cwd: string, file: string): string {
-  return file.startsWith(cwd) ? file.slice(cwd.length + 1) : file;
+  return toDisplayPath(cwd, file);
 }

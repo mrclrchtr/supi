@@ -262,7 +262,7 @@ describe.skipIf(!HAS_TEXLAB)("LaTeX targets through real Texlab and Tree-sitter"
     };
     const edits = planDetails.displaySections?.flatMap((section) => section.lines) ?? [];
 
-    expect(edits).toEqual([`${headingFile} L3:10 → L3:15: NewHeading`]);
+    expect(edits).toEqual(["heading.tex L3:10 → L3:15: NewHeading"]);
     expect(planDetails.data.confidence).toBe("structural");
     expect(heading).toMatchObject({
       name: "Intro",
@@ -390,8 +390,12 @@ describe.skipIf(!HAS_TEXLAB)("LaTeX targets through real Texlab and Tree-sitter"
     const edits = details.displaySections?.flatMap((section) => section.lines) ?? [];
     expect(edits).toHaveLength(3);
     expect(
-      new Set(edits.map((line) => [mainFile, bodyFile].find((file) => line.startsWith(file)))),
-    ).toEqual(new Set([mainFile, bodyFile]));
+      new Set(
+        edits.map((line) =>
+          ["main.tex", "chapters/body.tex"].find((file) => line.startsWith(file)),
+        ),
+      ),
+    ).toEqual(new Set(["main.tex", "chapters/body.tex"]));
     expect(edits.every((line) => line.endsWith("sec:overview"))).toBe(true);
   });
 });

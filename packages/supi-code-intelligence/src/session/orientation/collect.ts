@@ -15,6 +15,7 @@ import {
   readNextEnclosingScope,
   readNextTarget,
 } from "../../analysis/read-next.ts";
+import { isNonFileUri, toDisplayPath } from "../../analysis/search/paths.ts";
 import { diagnosticMessageString } from "../../substrate/lsp/utils.ts";
 import type {
   OrientationDeps,
@@ -142,7 +143,7 @@ async function buildRequestedSection(options: {
   switch (section) {
     case "defs": {
       const result = await buildEnrichedDefsSection(target, deps, treeContext, limit);
-      const contextFacts = targetContextFacts(treeContext, limit);
+      const contextFacts = targetContextFacts(treeContext, limit, deps.cwd);
       const operations = treeContext?.operations;
       const semanticObserved =
         result.hasSemanticEvidence ||
@@ -177,10 +178,11 @@ async function buildRequestedSection(options: {
   }
 }
 
-/** Select the independently gathered source observations without rendering them. */
+/** Select independent source observations with public locations and unchanged evidence status. */
 function targetContextFacts(
   treeContext: Awaited<ReturnType<typeof maybeGatherTreeContext>>,
   limit: number,
+  cwd: string,
 ) {
   return treeContext
     ? {
@@ -217,7 +219,7 @@ function targetContextFacts(
           : null,
         recovery: treeContext.recovery.map(({ operation, file, reason, errorRanges }) => ({
           operation,
-          file,
+          file: toDisplayPath(cwd, file),
           reason,
           errorRanges: errorRanges.map(publicRange),
         })),
@@ -225,9 +227,16 @@ function targetContextFacts(
           ...treeContext.operations.definition,
           ...(treeContext.definition !== null
             ? {
-                entries: treeContext.definition
-                  .slice(0, limit)
-                  .map(({ uri, range }) => ({ uri, range: publicRange(range) })),
+                entries: treeContext.definition.slice(0, limit).map(({ uri, range }) => ({
+                  ...(isNonFileUri(uri)
+                    ? {
+                        uri,
+                        navigation: "unavailable" as const,
+                        reason: "Provider URI is not a local filesystem source.",
+                      }
+                    : { file: toDisplayPath(cwd, uri) }),
+                  range: publicRange(range),
+                })),
                 collectedCount: treeContext.definition.length,
                 omittedCount: Math.max(0, treeContext.definition.length - limit),
               }
@@ -379,7 +388,7 @@ async function collectDefinitionTargets(
       };
     }
     const locations = result.data.map((definition) => ({
-      file: path.relative(deps.cwd, uriToFile(definition.uri)),
+      file: toDisplayPath(deps.cwd, uriToFile(definition.uri)),
       range: publicRange(definition.range),
     }));
     const evidence =
@@ -398,7 +407,7 @@ async function collectDefinitionTargets(
     return {
       items: evidence.items.map((location) => ({
         kind: "paragraph",
-        text: `\`${location.file}:${location.range.start.line + 1}:${location.range.start.character + 1}\``,
+        text: `\`${location.file}:${location.range.start.line + 1}:${location.range.start.character + 1}\`${isNonFileUri(location.file) ? " (provider URI; filesystem navigation unavailable)" : ""}`,
       })),
       facts: { definitions: evidence.items },
       hasSemanticEvidence: true,
@@ -722,7 +731,7 @@ function buildDefinitionItems(
     const suffix = locations.length > 0 ? ` Errors: ${locations.join(", ")}.` : "";
     items.push({
       kind: "paragraph",
-      text: `Partial ${recovery.operation} evidence in \`${recovery.file}\`: ${recovery.reason}.${suffix}`,
+      text: `Partial ${recovery.operation} evidence in \`${toDisplayPath(cwd, recovery.file)}\`: ${recovery.reason}.${suffix}`,
     });
   }
   if (treeContext?.hover?.contents) {
@@ -809,7 +818,7 @@ function hoverBodyItems(lines: readonly string[]): OrientationItem[] {
 }
 
 function formatFocusTarget(target: Readonly<TargetStoreEntry>, cwd: string): string {
-  const relPath = path.relative(cwd, target.file) || target.file;
+  const relPath = toDisplayPath(cwd, target.file);
   return `${relPath}:${target.displayLine}:${target.displayCharacter}`;
 }
 
@@ -819,7 +828,7 @@ function buildNextQueries(
 ): string[] {
   if (!target) return ["Use `code_orientation` for a neutral orientation summary."];
 
-  const relPath = path.relative(cwd, target.file) || target.file;
+  const relPath = toDisplayPath(cwd, target.file);
   return [
     `\`code_graph\` with \`target: { anchor: { file: "${relPath}", line: ${target.displayLine}, character: ${target.displayCharacter} } }\` for relation follow-up`,
   ];
@@ -831,7 +840,7 @@ function buildReadNextGuidance(
   cwd: string,
 ): ReadNextItem[] {
   if (!target) return [];
-  const relPath = path.relative(cwd, target.file) || target.file;
+  const relPath = toDisplayPath(cwd, target.file);
   const enclosing = findEnclosingOutlineItem(target, treeContext);
   if (enclosing) {
     return [readNextEnclosingScope(relPath, enclosing, target.displayLine)];

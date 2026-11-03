@@ -24,7 +24,7 @@ export function finishRefactorApplyResult(
     };
   }
 
-  const assembly = assembleRefactorApplyDetails(outcome.result, outcome.plan);
+  const assembly = assembleRefactorApplyDetails(outcome.result, outcome.plan, cwd);
   return {
     content: renderRefactorApplyResult(assembly),
     structuredContent: structuredRefactorApply(outcome, cwd),

@@ -12,6 +12,7 @@ import type { WorkspaceLspRuntimeState } from "@mrclrchtr/supi-lsp/api";
 import type { EvidenceListMetadata, EvidencePartialReason } from "../../analysis/evidence.ts";
 import { createEvidenceList } from "../../analysis/evidence.ts";
 import type { CodeProvider } from "../../analysis/provider.ts";
+import { toDisplayPath } from "../../analysis/search/paths.ts";
 import type {
   OrientationProvenance,
   OrientationResultData,
@@ -381,9 +382,7 @@ export function filesystemProvenance(cwd: string, target: string): OrientationPr
 }
 
 export function displayPath(cwd: string, target: string): string {
-  const relative = path.relative(cwd, path.resolve(target)).replaceAll(path.sep, "/");
-  if (relative.length === 0) return ".";
-  return relative.startsWith("../") || relative === ".." ? target : relative;
+  return toDisplayPath(cwd, target);
 }
 
 export function formatManifestValue(value: unknown): string {

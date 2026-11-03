@@ -14,6 +14,7 @@ export interface GraphFileGroup {
 export interface GraphSectionDetails {
   rel: GraphRelationKind;
   source: "semantic" | "structural";
+  /** Collection completeness; display caps are disclosed by the evidence-list counts. */
   status: "complete" | "partial" | "unavailable";
   message: string | null;
   externalCount: number;

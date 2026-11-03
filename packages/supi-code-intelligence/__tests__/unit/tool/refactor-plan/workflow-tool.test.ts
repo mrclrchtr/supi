@@ -351,7 +351,7 @@ describe("code_refactor_plan / code_refactor_apply workflow wrappers", () => {
     };
 
     expect(applyResult.content[0].text).toContain("applied");
-    expect(applyResult.details?.data.changedFiles).toEqual([file]);
+    expect(applyResult.details?.data.changedFiles).toEqual(["src/index.ts"]);
     expect(readFileSync(file, "utf-8")).toBe("newName();\n");
   });
 

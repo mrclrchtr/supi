@@ -1,7 +1,6 @@
 /** Session-owned Orientation workflow. */
 
 import { existsSync, statSync } from "node:fs";
-import { relative } from "node:path";
 import { buildArchitectureModel } from "../analysis/architecture/discovery.ts";
 import type { ArchitectureModel } from "../analysis/architecture/model.ts";
 import {
@@ -10,7 +9,7 @@ import {
 } from "../analysis/instruction-files.ts";
 import { createStructuralCodeProvider, withSemanticRequestControl } from "../analysis/provider.ts";
 import { SEMANTIC_READINESS_TIMEOUT_REASON } from "../analysis/readiness.ts";
-import { normalizePath } from "../analysis/search/paths.ts";
+import { normalizePath, toDisplayPath } from "../analysis/search/paths.ts";
 import { loadCodeIntelligenceConfig } from "../config.ts";
 import type { CapabilityAdapter } from "./capability-adapter.ts";
 import { parseOrientationWorkflowInput } from "./input/workflows.ts";
@@ -249,7 +248,12 @@ function addInstructionFiles(
     surfacedDirectories: deps.surfacedInstructionDirs,
     projectTrusted: deps.projectTrusted,
   });
-  const collected = collectInstructionFiles(matches);
+  const collected = collectInstructionFiles(
+    matches.map((match) => ({
+      ...match,
+      relativePath: toDisplayPath(deps.cwd, match.absolutePath),
+    })),
+  );
   if (!collected) return result;
   const items: OrientationItem[] = [];
   for (const file of collected.files) {
@@ -309,7 +313,7 @@ function addTargetSummary(
   const name = entry.name ? ` ${entry.name}` : "";
   const summaryNotes = [
     ...notes.map((note) => `Note: ${note}`),
-    `Resolved target${name}: ${relative(cwd, entry.file) || entry.file}:${entry.displayLine}:${entry.displayCharacter} — Target ID: ${entry.targetId}`,
+    `Resolved target${name}: ${toDisplayPath(cwd, entry.file)}:${entry.displayLine}:${entry.displayCharacter} — Target ID: ${entry.targetId}`,
   ];
   return { ...result, notes: [...summaryNotes, ...result.notes], target: { ...entry } };
 }

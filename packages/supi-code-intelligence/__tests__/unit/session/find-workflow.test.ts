@@ -134,7 +134,7 @@ describe("runFindWorkflow", () => {
     });
     if (outcome.kind !== "completed") return;
 
-    const rendered = renderFindResult(assembleFindWorkflowResult(outcome));
+    const rendered = renderFindResult(assembleFindWorkflowResult(outcome, tmpDir));
     expect(rendered).toContain("No LSP workspace-symbol results found");
     expect(rendered).not.toContain("did not become ready within the wait window");
   });
@@ -228,7 +228,7 @@ describe("runFindWorkflow", () => {
       exclusions: [{ reason: "unsupported-operation", pathCount: 1, examples: ["gamma.sql"] }],
     });
 
-    const assembly = assembleFindWorkflowResult(outcome);
+    const assembly = assembleFindWorkflowResult(outcome, tmpDir);
     expect(assembly.details.evidenceLists).toContainEqual({
       key: "find.astMatches",
       totalCount: 2,
@@ -301,7 +301,7 @@ describe("runFindWorkflow", () => {
       },
     };
 
-    const assembly = assembleFindWorkflowResult(outcome);
+    const assembly = assembleFindWorkflowResult(outcome, tmpDir);
 
     expect(assembly.details.evidenceLists).toContainEqual({
       key: "find.astMatches",

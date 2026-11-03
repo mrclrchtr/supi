@@ -23,7 +23,8 @@ describe("workspace LSP recovery", () => {
           type: "search",
           data: {
             confidence: "semantic",
-            changedFiles: ["/workspace/src/a.ts", "/workspace/src/b.ts", "/workspace/src/a.ts"],
+            changedFiles: ["src/a.ts", "src/b.ts"],
+            recoveryFiles: ["/workspace/link/a.ts", "/workspace/link/b.ts", "/workspace/link/a.ts"],
           },
         },
       },
@@ -32,10 +33,10 @@ describe("workspace LSP recovery", () => {
 
     expect(noteWorkspaceWrites).toHaveBeenCalledTimes(2);
     expect(noteWorkspaceWrites).toHaveBeenNthCalledWith(1, [
-      { uri: "file:///workspace/src/a.ts", type: 2 },
+      { uri: "file:///workspace/link/a.ts", type: 2 },
     ]);
     expect(noteWorkspaceWrites).toHaveBeenNthCalledWith(2, [
-      { uri: "file:///workspace/src/b.ts", type: 2 },
+      { uri: "file:///workspace/link/b.ts", type: 2 },
     ]);
   });
 });

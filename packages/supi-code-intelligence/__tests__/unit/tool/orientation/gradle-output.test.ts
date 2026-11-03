@@ -94,7 +94,7 @@ function setup(query: GradleModelQuery = async (selectedRoot) => model(selectedR
   session.setProjectTrusted(true);
   session.setGradleObserver(service);
   const orient = async (input: object = {}, deadline?: number) =>
-    finishOrientationResult(await session.orient(input, { deadline }));
+    finishOrientationResult(await session.orient(input, { deadline }), root);
   return { pi, ctx, service, orient };
 }
 function capture(text: string): string {

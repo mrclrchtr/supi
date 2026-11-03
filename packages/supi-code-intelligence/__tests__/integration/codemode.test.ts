@@ -1,6 +1,7 @@
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import {
   type Api,
   type AssistantMessage,
@@ -208,9 +209,11 @@ it("routes all five native tools through Pi default codemode, preserves recovery
       ]),
     );
     expect(readFileSync(file, "utf8")).toBe("export function gadget() {}\n");
-    expect(noteWorkspaceWrites).toHaveBeenCalledTimes(1);
+    expect(noteWorkspaceWrites).toHaveBeenCalledExactlyOnceWith([
+      { uri: pathToFileURL(file).href, type: 2 },
+    ]);
     expect(results.find((event) => event.toolName === "code_refactor_apply")).toMatchObject({
-      details: { data: { changedFiles: [file] } },
+      details: { data: { changedFiles: ["index.ts"] } },
       structuredContent: { kind: "applied" },
     });
     const names = [

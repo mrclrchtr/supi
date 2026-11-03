@@ -1,6 +1,7 @@
 import type { FileEdit } from "@mrclrchtr/supi-code-runtime/api";
 import { createEvidenceList, type EvidenceList } from "../../analysis/evidence.ts";
 import type { ApplyResult } from "../../analysis/refactor/apply.ts";
+import { toDisplayPath } from "../../analysis/search/paths.ts";
 import type { RefactorPlan } from "../../session/refactor-plans.ts";
 import { assembledNextQueries, assembleToolResult, type ToolResultAssembly } from "./assembly.ts";
 import { createToolDisplaySection } from "./display.ts";
@@ -29,10 +30,10 @@ export interface RefactorApplyResultAssembly {
   readonly displaySections: readonly ToolDisplaySection[];
 }
 
-function formatEdit(edit: FileEdit): string {
+function formatEdit(edit: FileEdit, cwd: string): string {
   const range = edit.range;
   const replacement = edit.newText.replace(/\n/g, " ↵ ");
-  return `${edit.file} L${range.start.line + 1}:${range.start.character + 1} → L${range.end.line + 1}:${range.end.character + 1}: ${replacement}`;
+  return `${toDisplayPath(cwd, edit.file)} L${range.start.line + 1}:${range.start.character + 1} → L${range.end.line + 1}:${range.end.character + 1}: ${replacement}`;
 }
 
 /** Assemble a bounded refactor plan and all facts needed by its renderers. */
@@ -82,7 +83,7 @@ export function assembleRefactorPlanDetails(
         totalCount: edits.metadata.totalCount,
         omittedCount: edits.metadata.omittedCount,
         partialReason: edits.metadata.partialReason,
-        format: formatEdit,
+        format: (edit) => formatEdit(edit, cwd),
       }),
     ],
     details: {
@@ -100,6 +101,7 @@ export function assembleRefactorPlanDetails(
 export function assembleRefactorApplyDetails(
   applyResult: ApplyResult,
   plan: Readonly<RefactorPlan>,
+  cwd: string,
 ): RefactorApplyResultAssembly {
   const candidateCount = applyResult.kind === "applied" ? applyResult.totalEdits : 0;
   const evidenceSource = plan.evidenceSource ?? "semantic";
@@ -133,7 +135,8 @@ export function assembleRefactorApplyDetails(
     provenance,
   });
 
-  const changedFiles = [...new Set(plan.edits.edits.map((edit) => edit.file))];
+  const recoveryFiles = [...new Set(plan.edits.edits.map((edit) => edit.file))];
+  const changedFiles = recoveryFiles.map((file) => toDisplayPath(cwd, file));
 
   return {
     assembled,
@@ -156,7 +159,7 @@ export function assembleRefactorApplyDetails(
       omittedCount: assembled.totals.omittedCount,
       evidenceLists: [...assembled.evidenceLists],
       nextQueries: assembledNextQueries(assembled),
-      ...(applyResult.kind === "applied" ? { changedFiles } : {}),
+      ...(applyResult.kind === "applied" ? { changedFiles, recoveryFiles } : {}),
     },
   };
 }

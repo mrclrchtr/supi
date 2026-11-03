@@ -22,7 +22,11 @@ export const GraphOutputSchema = Type.Object(
         {
           relation: Type.Enum(["references", "callees", "implements"], { type: "string" }),
           source: Type.Enum(["semantic", "structural"], { type: "string" }),
-          status: Type.Enum(["complete", "partial", "unavailable"], { type: "string" }),
+          status: Type.Enum(["complete", "partial", "unavailable"], {
+            type: "string",
+            description:
+              "Completeness of collected relation evidence; display caps are reported separately in evidence counts.",
+          }),
           message: Type.Union([Type.String(), Type.Null()]),
           items: Type.Array(
             Type.Object(

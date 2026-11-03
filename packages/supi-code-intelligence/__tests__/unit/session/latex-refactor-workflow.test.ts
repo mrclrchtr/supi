@@ -163,7 +163,8 @@ async function runRenameCycle(
   if (applyOutcome.kind !== "completed")
     throw new Error(`Rename apply failed: ${applyOutcome.kind}`);
   expect(
-    assembleRefactorApplyDetails(applyOutcome.result, applyOutcome.plan).details.confidence,
+    assembleRefactorApplyDetails(applyOutcome.result, applyOutcome.plan, deps.cwd).details
+      .confidence,
   ).toBe("structural");
   return applyOutcome.plan;
 }

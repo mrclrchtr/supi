@@ -1,5 +1,6 @@
 /** Result assembly for code_refactor_plan. */
 
+import { toDisplayPath } from "../../analysis/search/paths.ts";
 import type { CodeIntelResult, CodeIntelToolExecCtx } from "../../types/index.ts";
 import { renderRefactorPlanResult } from "../refactor-markdown.ts";
 import { searchErrorResult } from "../result/errors.ts";
@@ -27,7 +28,7 @@ export function finishRefactorPlanResult(
     const candidates = outcome.candidates
       .map(
         (candidate, index) =>
-          `${index + 1}. ${candidate.description} (${candidate.file}:${candidate.line})`,
+          `${index + 1}. ${candidate.description} (${candidate.file === undefined ? candidate.file : toDisplayPath(cwd, candidate.file)}:${candidate.line})`,
       )
       .join("\n");
     return {

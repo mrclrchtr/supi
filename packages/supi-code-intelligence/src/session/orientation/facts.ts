@@ -75,7 +75,15 @@ export interface OrientationFacts {
   readonly definitions?: readonly { readonly file: string; readonly range: SourceRange }[];
   /** Independent context query; unavailable observations have no manufactured entries or counts. */
   readonly contextDefinitions?: import("./gather.ts").ContextObservationStatus & {
-    readonly entries?: readonly { readonly uri: string; readonly range: SourceRange }[];
+    readonly entries?: readonly (
+      | { readonly file: string; readonly range: SourceRange }
+      | {
+          readonly uri: string;
+          readonly range: SourceRange;
+          readonly navigation: "unavailable";
+          readonly reason: string;
+        }
+    )[];
     readonly collectedCount?: number;
     readonly omittedCount?: number;
   };

@@ -1,4 +1,5 @@
 import * as path from "node:path";
+import { toDisplayPath } from "../../analysis/search/paths.ts";
 import type { ProjectDeclaration } from "../../analysis/workspace/types.ts";
 import { within } from "../../session/orientation/workspace-context.ts";
 import type { OrientationResultData } from "../../session/orientation-types.ts";
@@ -61,7 +62,7 @@ export function workspaceFacts(data: OrientationResultData) {
   });
   return {
     root: observation.root,
-    focus: root,
+    focus: toDisplayPath(facts.cwd, root),
     directFiles: inventory.directFiles.slice(0, limit),
     directories: inventory.directories.slice(0, limit),
     extensions: inventory.extensions.slice(0, limit),

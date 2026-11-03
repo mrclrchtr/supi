@@ -1,6 +1,6 @@
-import { existsSync } from "node:fs";
+import { existsSync, realpathSync } from "node:fs";
 import * as path from "node:path";
-import { resolveToolPath } from "@mrclrchtr/supi-core/path";
+import { resolveToolPath, uriToFile } from "@mrclrchtr/supi-core/path";
 
 /** Check whether a path is within the project rather than a dependency store. */
 export function isInProjectPath(filePath: string, cwd: string): boolean {
@@ -58,7 +58,7 @@ export function resolveScopeSet(
   return {
     kind: "ok",
     paths,
-    display: paths.map((resolved) => byPath.get(resolved) ?? resolved).join(", "),
+    display: paths.map((resolved) => toDisplayPath(cwd, resolved)).join(", "),
   };
 }
 
@@ -73,16 +73,39 @@ export function normalizePath(input: string, cwd: string): string {
   return resolveToolPath(cwd, input);
 }
 
-/** Render a path relative to a base, retaining absolute paths outside it. */
+/** Render filesystem locations canonically; preserve virtual provider URIs without inventing files. */
 export function relativeDisplayPath(basePath: string, filePath: string, samePath = "."): string {
-  const relativePath = path.relative(basePath, filePath);
+  if (isNonFileUri(filePath)) return filePath;
+  const base = canonicalDisplayPath(path.resolve(basePath));
+  const file = canonicalDisplayPath(path.resolve(basePath, uriToFile(filePath)));
+  const relativePath = path.relative(base, file);
   if (!relativePath || relativePath === ".") return samePath;
-  if (relativePath.startsWith(`..${path.sep}`) || relativePath === "..") return filePath;
+  if (relativePath.startsWith(`..${path.sep}`) || relativePath === "..") return file;
   return relativePath.replaceAll("\\", "/");
 }
 
-/** Render an absolute path relative to cwd when it is inside the workspace. */
+/** Identify provider URIs that cannot be navigated as local filesystem paths. */
+export function isNonFileUri(value: string): boolean {
+  return !path.isAbsolute(value) && /^[a-z][a-z\d+.-]*:/iu.test(value) && !/^file:/iu.test(value);
+}
+
+/** Display filesystem sources relatively inside the workspace and absolutely outside; preserve other URIs. */
 export function toDisplayPath(cwd: string, filePath: string): string {
-  if (!path.isAbsolute(filePath)) return filePath.replaceAll("\\", "/");
-  return relativeDisplayPath(cwd, filePath, filePath);
+  return relativeDisplayPath(cwd, filePath);
+}
+
+/** Resolve existing ancestors too, so missing provider files retain the workspace's canonical spelling. */
+function canonicalDisplayPath(absolutePath: string): string {
+  let current = absolutePath;
+  const suffix: string[] = [];
+  while (true) {
+    try {
+      return path.join(realpathSync(current), ...suffix.reverse());
+    } catch {
+      const parent = path.dirname(current);
+      if (parent === current) return absolutePath;
+      suffix.push(path.basename(current));
+      current = parent;
+    }
+  }
 }

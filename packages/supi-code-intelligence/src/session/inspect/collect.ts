@@ -76,7 +76,10 @@ async function collectNode(
           kind: "partial",
           data,
           reason: result.reason,
-          recovery: { file: result.file, errorRanges: result.errorRanges },
+          recovery: {
+            file: relativeDisplayPath(input.cwd, result.file),
+            errorRanges: result.errorRanges,
+          },
         }
       : { kind: "completed", data };
   } catch (error) {
@@ -103,7 +106,10 @@ async function collectEnclosingSymbol(
           kind: "partial",
           data: symbol,
           reason: result.reason,
-          recovery: { file: result.file, errorRanges: result.errorRanges },
+          recovery: {
+            file: relativeDisplayPath(input.cwd, result.file),
+            errorRanges: result.errorRanges,
+          },
         }
       : { kind: "completed", data: symbol };
   } catch (error) {

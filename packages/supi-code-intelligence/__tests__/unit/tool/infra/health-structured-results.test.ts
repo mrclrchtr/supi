@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { setWorkspaceLspRuntimeState, type WorkspaceLspRuntime } from "@mrclrchtr/supi-lsp/api";
@@ -240,15 +240,59 @@ describe("registered health structured results", () => {
     expect(result.structuredContent).toMatchObject({
       diagnostics: {
         kind: "partial",
-        scope: { kind: "file", path: file },
+        scope: { kind: "file", path: "index.ts" },
         scopeStatus: { status: "no-config", basis: null },
         evidence: { unconfirmed: 1 },
         entries: [
-          { file, warnings: 1, messages: [{ line: 1, severity: "warning", source: "test" }] },
+          {
+            file: "index.ts",
+            warnings: 1,
+            messages: [{ line: 1, severity: "warning", source: "test" }],
+          },
         ],
       },
       serverInventoryScope: "workspace",
     });
+  });
+  it("projects external diagnostic and evidence paths canonically across output surfaces", async () => {
+    const external = mkdtempSync(join(tmpdir(), "health-external-"));
+    try {
+      const file = join(realpathSync(external), "source.ts");
+      const alias = join(cwd, "linked.ts");
+      writeFileSync(file, "const value = 1;\n");
+      symlinkSync(file, alias);
+      ready({
+        fileDiagnostics: async () => ({
+          kind: "completed",
+          data: [
+            {
+              severity: 1,
+              message: "test diagnostic",
+              range: { start: { line: 0, character: 0 }, end: { line: 0, character: 5 } },
+            },
+          ],
+        }),
+      });
+      const result = await call(tool(), { scope: alias, level: "detailed" });
+      expect(result.structuredContent).toMatchObject({
+        diagnostics: {
+          scope: { kind: "file", path: file },
+          entries: [{ file }],
+          evidence: { documents: [{ file }] },
+        },
+      });
+      for (const output of [
+        result.content[0].text,
+        JSON.stringify(result.structuredContent),
+        JSON.stringify(result.details),
+      ]) {
+        expect(output).toContain(file);
+        expect(output).not.toContain(alias);
+        expect(output).not.toContain("linked.ts");
+      }
+    } finally {
+      rmSync(external, { recursive: true, force: true });
+    }
   });
   it("reports unavailable diagnostics and unattempted refresh without inventing confirmation", async () => {
     setWorkspaceLspRuntimeState(cwd, { kind: "unavailable", reason: "offline" });

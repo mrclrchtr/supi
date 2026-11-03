@@ -67,7 +67,9 @@ export function assembleGraphResult(input: {
   maxResults: number;
   cwd: string;
 }): GraphResultAssembly {
-  const sections = input.sections.map((section) => assembleGraphSection(section, input.maxResults));
+  const sections = input.sections.map((section) =>
+    assembleGraphSection(section, input.maxResults, input.cwd),
+  );
   const evidenceLists = sections.flatMap((section) =>
     section.kind === "ok" ? [section.evidence.metadata] : [],
   );
@@ -134,12 +136,18 @@ function graphSectionDetails(
       ? { ...calls.enclosingScope, file: toDisplayPath(cwd, calls.enclosingScope.file) }
       : null,
     depth: calls?.depth ?? null,
-    recovery: calls?.recovery ?? null,
+    recovery: calls?.recovery
+      ? { ...calls.recovery, file: toDisplayPath(cwd, calls.recovery.file) }
+      : null,
     fileGroups,
   };
 }
 
-function assembleGraphSection(section: GraphSection, maxResults: number): AssembledGraphSection {
+function assembleGraphSection(
+  section: GraphSection,
+  maxResults: number,
+  cwd: string,
+): AssembledGraphSection {
   if (section.kind === "unavailable") return section;
   switch (section.rel) {
     case "references": {
@@ -183,7 +191,7 @@ function assembleGraphSection(section: GraphSection, maxResults: number): Assemb
               ...evidence,
               metadata: {
                 ...evidence.metadata,
-                partialMessage: recoveryMessage(section.data.recovery),
+                partialMessage: recoveryMessage(section.data.recovery, cwd),
               },
             }
           : evidence,
@@ -225,12 +233,15 @@ function createRelationEvidenceList<T>(params: {
   };
 }
 
-function recoveryMessage(recovery: NonNullable<CalleeGraphSection["data"]["recovery"]>): string {
+function recoveryMessage(
+  recovery: NonNullable<CalleeGraphSection["data"]["recovery"]>,
+  cwd: string,
+): string {
   const locations = recovery.errorRanges.map(
     (range) => `L${range.start.line + 1}:${range.start.character + 1}`,
   );
   const suffix = locations.length > 0 ? ` Error locations: ${locations.join(", ")}.` : "";
-  return `${recovery.file}: ${recovery.reason}${suffix}`;
+  return `${toDisplayPath(cwd, recovery.file)}: ${recovery.reason}${suffix}`;
 }
 
 function evidenceTotal(evidence: EvidenceList<unknown>): number {
@@ -238,9 +249,7 @@ function evidenceTotal(evidence: EvidenceList<unknown>): number {
 }
 
 function evidenceStatus(evidence: EvidenceList<unknown>): "complete" | "partial" {
-  return evidence.metadata.partialReason !== null || (evidence.metadata.omittedCount ?? 0) > 0
-    ? "partial"
-    : "complete";
+  return evidence.metadata.partialReason !== null ? "partial" : "complete";
 }
 
 function sectionConfidence(section: AssembledGraphSection): ConfidenceMode {
@@ -293,7 +302,7 @@ export function finishGraphResult(outcome: GraphOutcome, cwd: string): CodeIntel
     };
   }
   if (outcome.kind === "disambiguation" || outcome.kind === "kind-mismatch") {
-    return finishGraphCandidates(outcome);
+    return finishGraphCandidates(outcome, cwd);
   }
 
   const assembly = assembleGraphResult({
@@ -318,8 +327,16 @@ export function finishGraphResult(outcome: GraphOutcome, cwd: string): CodeIntel
 }
 
 function finishGraphCandidates(
-  outcome: Extract<GraphOutcome, { kind: "disambiguation" | "kind-mismatch" }>,
+  input: Extract<GraphOutcome, { kind: "disambiguation" | "kind-mismatch" }>,
+  cwd: string,
 ): CodeIntelResult {
+  const outcome = {
+    ...input,
+    candidates: input.candidates.map((candidate) => ({
+      ...candidate,
+      file: toDisplayPath(cwd, candidate.file),
+    })),
+  };
   const lines = [
     outcome.kind === "kind-mismatch"
       ? `**No target matched provider kind \`${outcome.requestedKind}\`. Near matches:**`

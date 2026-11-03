@@ -21,7 +21,7 @@ export async function executeOrientationTool(
     params as OrientationWorkflowInput,
     toWorkflowControl(ctx),
   );
-  const result = finishOrientationResult(outcome);
+  const result = finishOrientationResult(outcome, ctx.cwd);
   if (result.details?.type === "context") {
     const supplied = result.details.data.instructions?.files ?? [];
     ctx.session.markInstructionDirsSurfaced(

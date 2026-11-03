@@ -199,7 +199,7 @@ describe("code_orientation instruction files", () => {
     extensionWithIsolatedHome(pi);
 
     const result = await orientDirectory(pi, "packages/foo");
-    expect(result.text).toContain("### packages/foo/CLAUDE.md");
+    expect(result.text).toContain("### shared/CLAUDE.md");
     expect(result.text).toContain("Shared workspace rules");
   });
 

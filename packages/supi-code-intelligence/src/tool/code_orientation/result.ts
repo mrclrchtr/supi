@@ -4,6 +4,7 @@ import {
   renderEvidenceListMetadataDisclosure,
 } from "../../analysis/evidence.ts";
 import type { ReadNextItem } from "../../analysis/read-next.ts";
+import { toDisplayPath } from "../../analysis/search/paths.ts";
 import type {
   OrientationCandidate,
   OrientationItem,
@@ -277,11 +278,14 @@ import { prepareWorkspaceOutput } from "./workspace-output.ts";
 type OrientationOutcome = Awaited<ReturnType<CodeIntelToolExecCtx["session"]["orient"]>>;
 
 /** Assemble the final model-visible code_orientation result for one workflow outcome. */
-export function finishOrientationResult(outcome: OrientationOutcome): CodeIntelResult {
+export function finishOrientationResult(outcome: OrientationOutcome, cwd: string): CodeIntelResult {
   if (outcome.kind === "unavailable") throw new Error(outcome.reason);
   if (outcome.kind === "invalid-input") return invalidOrientationResult(outcome);
   if (outcome.kind === "disambiguation" || outcome.kind === "kind-mismatch") {
-    const candidates = outcome.candidates;
+    const candidates = outcome.candidates.map((candidate) => ({
+      ...candidate,
+      file: toDisplayPath(cwd, candidate.file),
+    }));
     const lines = [
       outcome.kind === "kind-mismatch"
         ? `# No Orientation target matched provider kind \`${outcome.requestedKind}\``
@@ -317,7 +321,7 @@ export function finishOrientationResult(outcome: OrientationOutcome): CodeIntelR
     });
     return {
       content: lines.join("\n"),
-      structuredContent: structuredOrientation(outcome),
+      structuredContent: structuredOrientation({ ...outcome, candidates }),
       details: {
         type: "context",
         data: details,
@@ -327,7 +331,7 @@ export function finishOrientationResult(outcome: OrientationOutcome): CodeIntelR
       },
     };
   }
-  return finishCompletedOrientation(outcome.data);
+  return finishCompletedOrientation(outcome.data, cwd);
 }
 
 function invalidOrientationResult(
@@ -347,7 +351,16 @@ function invalidOrientationResult(
   };
 }
 
-function finishCompletedOrientation(data: OrientationResultData): CodeIntelResult {
+function finishCompletedOrientation(input: OrientationResultData, cwd: string): CodeIntelResult {
+  const data = {
+    ...input,
+    ...(input.target
+      ? { target: { ...input.target, file: toDisplayPath(cwd, input.target.file) } }
+      : {}),
+    ...((input.workspace || input.focusKind === "file") && input.focusTarget !== null
+      ? { focusTarget: toDisplayPath(cwd, input.focusTarget) }
+      : {}),
+  };
   const navigation = data.workspace ? prepareWorkspaceOutput(data) : null;
   const assembly = assembleOrientationResult(navigation?.data ?? data);
   return {

@@ -636,7 +636,7 @@ describe("orientation structured results", () => {
             contextDefinitions: {
               status: "complete",
               reason: null,
-              entries: [{ uri: pathToFileURL(join(cwd, "index.ts")).href, range }],
+              entries: [{ file: "index.ts", range }],
               collectedCount: 1,
               omittedCount: 0,
             },

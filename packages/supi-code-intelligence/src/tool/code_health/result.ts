@@ -15,6 +15,7 @@ import {
 } from "../result/assembly.ts";
 import { createToolDisplaySection, truncateDisplayText } from "../result/display.ts";
 import type { HealthDetails, HealthSectionDetails, ToolDisplaySection } from "../result/types.ts";
+import { displayHealthPaths } from "./display-paths.ts";
 
 export type {
   HealthData,
@@ -44,7 +45,8 @@ const SECTION_TITLES: Record<HealthSection, string> = {
 };
 
 /** Assemble public code_health evidence and details before presentation adapters render it. */
-export function assembleHealthResult(data: HealthData, cwd?: string): HealthResultAssembly {
+export function assembleHealthResult(input: HealthData, cwd?: string): HealthResultAssembly {
+  const data = cwd === undefined ? input : displayHealthPaths(input, cwd);
   const projections = data.includedSections.map((section) => projectSection(section, data));
   const sections = projections.map((projection) => projection.section);
   const sectionDetails = projections.map((projection) => projection.details);
@@ -282,7 +284,7 @@ export function finishHealthResult(outcome: HealthOutcome, cwd: string): CodeInt
   const assembly = assembleHealthResult(outcome.data, cwd);
   return {
     content: renderHealthResult(assembly, cwd),
-    structuredContent: structuredHealthResult(outcome.data),
+    structuredContent: structuredHealthResult(assembly.data),
     details: {
       type: "health",
       data: assembly.details,

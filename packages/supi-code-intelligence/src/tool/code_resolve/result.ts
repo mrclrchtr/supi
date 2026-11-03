@@ -1,7 +1,7 @@
-import { relative } from "node:path";
 import type { ConfidenceMode } from "@mrclrchtr/supi-code-runtime/api";
 import type { EvidenceListMetadata } from "../../analysis/evidence.ts";
 import { createEvidenceList } from "../../analysis/evidence.ts";
+import { toDisplayPath } from "../../analysis/search/paths.ts";
 import type { ResolveTargetInput } from "../../session/target-input.ts";
 import type { TargetStoreEntry } from "../../session/target-store.ts";
 import type { TargetWorkflowOutcome } from "../../session/target-workflow.ts";
@@ -89,7 +89,7 @@ function projectResolveOutcome(outcome: TargetWorkflowOutcome, cwd: string): Res
       return projectTargetGroup(outcome, cwd);
     case "disambiguation":
     case "kind-mismatch":
-      return projectCandidateOutcome(outcome);
+      return projectCandidateOutcome(outcome, cwd);
     case "invalid-input":
     case "unavailable":
       return projectFailure(outcome);
@@ -146,7 +146,7 @@ function projectTargetGroup(
     evidence: evidence.metadata,
     details: {
       resultKind: "target-group",
-      groupFile: relative(cwd, outcome.file) || outcome.file,
+      groupFile: toDisplayPath(cwd, outcome.file),
       groupDiscoveryProvenance: [...outcome.discoveryProvenance],
       groupUnknownNestingCount: outcome.unknownNestingCount,
       groupPartialReason: outcome.partial?.reason ?? null,
@@ -166,6 +166,7 @@ function projectTargetGroup(
 
 function projectCandidateOutcome(
   outcome: Extract<TargetWorkflowOutcome, { kind: "disambiguation" | "kind-mismatch" }>,
+  cwd: string,
 ): ResolveProjection {
   const evidence: EvidenceListMetadata = {
     key: "resolve.candidates",
@@ -197,7 +198,7 @@ function projectCandidateOutcome(
         name: candidate.name,
         kind: candidate.kind,
         container: candidate.container,
-        file: candidate.file,
+        file: toDisplayPath(cwd, candidate.file),
         line: candidate.line,
         character: candidate.character,
         rank: candidate.rank,
@@ -244,7 +245,7 @@ function toTargetDetails(
   return {
     targetId: target.targetId,
     spanId: target.spanId,
-    file: relative(cwd, target.file) || target.file,
+    file: toDisplayPath(cwd, target.file),
     displayLine: target.displayLine,
     displayCharacter: target.displayCharacter,
     name: target.name,

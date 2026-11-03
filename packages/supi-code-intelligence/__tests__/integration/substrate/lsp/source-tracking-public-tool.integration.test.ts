@@ -106,7 +106,7 @@ describe("registered public code_health source tracking", () => {
     const exactData = healthData(exactResult);
     expect(exactData.diagnosticObservation).toMatchObject({
       kind: "completed",
-      entries: [{ file: excluded, errors: 1, warnings: 0 }],
+      entries: [{ file: "excluded.js", errors: 1, warnings: 0 }],
       evidence: { requested: 1, confirmed: 1, unconfirmed: 0, failed: 0, removed: 0 },
     });
     expect(resultText(exactResult)).toContain("JavaScript syntax error.");

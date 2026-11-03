@@ -1,4 +1,5 @@
 import * as path from "node:path";
+import { toDisplayPath } from "../../analysis/search/paths.ts";
 import type { WorkspaceOrientationFacts } from "../../session/orientation/workspace-context.ts";
 import type { OrientationSectionData } from "../../session/orientation-types.ts";
 
@@ -29,11 +30,7 @@ export function code(value: string): string {
 
 /** Return paths that remain usable from the session working directory for explicit outside focuses. */
 export function sourcePath(facts: WorkspaceOrientationFacts, relative: string): string {
-  return (
-    path
-      .relative(facts.cwd, path.resolve(facts.observation.root, relative))
-      .replaceAll(path.sep, "/") || "."
-  );
+  return toDisplayPath(facts.cwd, path.resolve(facts.observation.root, relative));
 }
 
 /** One list cap applies to evidence rows, not to table framing. */
