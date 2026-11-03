@@ -372,12 +372,13 @@ function buildResolutionNotes(
 ): readonly string[] {
   const notes: string[] = [];
   if (resolution?.snapped) {
+    const requested = `${resolution.requested.line}:${resolution.requested.character}`;
+    const resolved = `${resolution.resolved.line}:${resolution.resolved.character}`;
     notes.push(
-      `Resolved from a declaration header and snapped to the identifier (${resolution.source}).`,
+      `Requested coordinate snapped from ${requested} to name anchor ${resolved} (evidence: ${resolution.source}).`,
     );
-  }
-  if (resolution?.source === "structural-identifier") {
-    notes.push("Resolved from provider-backed structural identifier evidence.");
+  } else if (resolution && resolution.source !== "semantic") {
+    notes.push(`Resolved from ${resolution.source} evidence.`);
   }
   return Object.freeze(notes);
 }

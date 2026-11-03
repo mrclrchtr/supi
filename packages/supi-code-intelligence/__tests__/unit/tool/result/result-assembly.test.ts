@@ -196,7 +196,7 @@ describe("canonical Tool result assembly", () => {
     expect(markdown.match(/\*\*Error:\*\*/g)).toHaveLength(1);
   });
 
-  it("renders one note for structural identifier resolution", () => {
+  it("preserves workflow notes without synthesizing or rewriting resolution notes", () => {
     const assembly = assembleResolveResult(
       {
         kind: "resolved",
@@ -232,7 +232,7 @@ describe("canonical Tool result assembly", () => {
     const markdown = renderResolveResult(assembly);
 
     expect(markdown.match(/_Note:/g)).toHaveLength(2);
-    expect(markdown).toContain("structural-identifier evidence");
+    expect(markdown).toContain("Resolved from provider-backed structural identifier evidence.");
     expect(markdown).toContain("Independent workflow note");
   });
 

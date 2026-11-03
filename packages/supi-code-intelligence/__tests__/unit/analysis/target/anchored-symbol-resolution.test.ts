@@ -68,7 +68,7 @@ describe("resolveAnchoredSymbolTarget — exact identifier hit", () => {
     teardown();
   });
 
-  it("treats a coordinate in the middle of the identifier as an exact (non-snapped) hit", async () => {
+  it("normalizes an interior identifier coordinate without changing the selected symbol", async () => {
     const dir = setup();
     const file = path.join(dir, "widget.ts");
     writeFileSync(file, WIDGET_SOURCE);
@@ -80,7 +80,12 @@ describe("resolveAnchoredSymbolTarget — exact identifier hit", () => {
     if (result.kind !== "resolved") return;
     expect(result.target.name).toBe("widget");
     expect(result.target.displayCharacter).toBe(17);
-    expect(result.target.resolution?.snapped).toBe(false);
+    expect(result.target.resolution).toEqual({
+      requested: { line: 1, character: 20 },
+      resolved: { line: 1, character: 17 },
+      snapped: true,
+      source: "semantic",
+    });
     teardown();
   });
 });

@@ -10,6 +10,7 @@ import {
   type DeclarationOccurrenceCandidate,
   declarationOccurrenceFor,
 } from "./identity.ts";
+import { createAnchoredResolution } from "./resolution.ts";
 import type { ResolvedTargetData } from "./types.ts";
 
 interface SectionCandidate extends DeclarationOccurrenceCandidate {
@@ -67,12 +68,11 @@ export async function resolveLatexSectionTargetAtAnchor(input: {
       provenance: ["structural"],
       anchorKind: "name",
       container: selected.container,
-      resolution: {
-        requested: { line: input.line, character: input.character },
-        resolved: { line: anchor.line, character: anchor.character },
-        snapped: anchor.line !== input.line || anchor.character !== input.character,
-        source: "structural",
-      },
+      resolution: createAnchoredResolution(
+        { line: input.line, character: input.character },
+        anchor,
+        "structural",
+      ),
     };
   } catch (error) {
     if (isCodeRequestInterruption(error, input.control)) throw error;

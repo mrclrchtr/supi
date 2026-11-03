@@ -80,7 +80,9 @@ export type AnchoredResolutionSource = "semantic" | "structural" | "structural-i
  *
  * Records the requested coordinate, the resolved anchor coordinate, whether
  * the resolved anchor differs from the request (a snap), and the
- * provider-backed evidence source. Structured details always carry this when
+ * provider-backed evidence source. Normalizing an interior identifier position
+ * to its name anchor is a snap even when the symbol match is exact.
+ * Structured details always carry this when
  * a target was resolved from coordinates; markdown surfaces a note only when
  * the resolution was non-obvious (snapped or degraded).
  */

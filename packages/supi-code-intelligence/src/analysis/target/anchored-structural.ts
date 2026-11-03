@@ -6,8 +6,8 @@ import {
   type NodeAtData,
   type StructuralProvider,
 } from "@mrclrchtr/supi-code-runtime/api";
-import type { AnchoredResolutionMetadata } from "../../types/index.ts";
 import { resolveLatexTargetAtAnchor } from "./latex-target-anchor.ts";
+import { createAnchoredResolution } from "./resolution.ts";
 import type { TargetOutcome } from "./types.ts";
 
 type Anchor = { line: number; character: number };
@@ -129,12 +129,7 @@ export async function resolveFromStructural(
       provenance: ["structural"],
       anchorKind: "name",
       container: null,
-      resolution: {
-        requested: { ...requested },
-        resolved: anchor,
-        snapped: anchor.line !== requested.line || anchor.character !== requested.character,
-        source: "structural-identifier",
-      } satisfies AnchoredResolutionMetadata,
+      resolution: createAnchoredResolution(requested, anchor, "structural-identifier"),
     },
   };
 }

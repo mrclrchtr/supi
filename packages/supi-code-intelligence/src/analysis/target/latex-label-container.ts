@@ -11,6 +11,7 @@ import {
   type DeclarationOccurrenceCandidate,
   declarationOccurrenceFor,
 } from "./identity.ts";
+import { createAnchoredResolution } from "./resolution.ts";
 import type { ResolvedTargetData, TargetOutcome } from "./types.ts";
 
 type LabelOutlineCandidate = DeclarationOccurrenceCandidate & {
@@ -110,12 +111,11 @@ export async function resolveLatexLabelTargetAtAnchor(input: {
     provenance: ["structural"],
     anchorKind: "name",
     container: label.container,
-    resolution: {
-      requested: { line: input.line, character: input.character },
-      resolved: { line: anchor.line, character: anchor.character },
-      snapped: anchor.line !== input.line || anchor.character !== input.character,
-      source: "structural-identifier",
-    },
+    resolution: createAnchoredResolution(
+      { line: input.line, character: input.character },
+      anchor,
+      "structural-identifier",
+    ),
   };
 }
 

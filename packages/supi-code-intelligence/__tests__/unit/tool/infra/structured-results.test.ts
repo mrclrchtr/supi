@@ -3,6 +3,8 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { completedCodeQuery } from "@mrclrchtr/supi-code-runtime/api";
 import { createPiMock, getTool, makeCtx } from "@mrclrchtr/supi-test-utils";
+import { createTreeSitterSession } from "@mrclrchtr/supi-tree-sitter/api";
+import { createTreeSitterProvider } from "@mrclrchtr/supi-tree-sitter/provider/tree-sitter-provider";
 import type { TSchema } from "typebox";
 import { Value } from "typebox/value";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -123,6 +125,123 @@ describe("structured navigation results", () => {
     const secondTarget = (second.structuredContent.targets as Array<{ handle: string }>)[0];
     expect(secondTarget.handle).toBe(firstTarget.handle);
     expect(first).toEqual(firstSnapshot);
+  });
+
+  it.each([
+    {
+      provider: "semantic",
+      file: "index.ts",
+      source: "export function widget() {}\n",
+      anchor: { line: 1, character: 17 },
+      interior: { line: 1, character: 20 },
+      evidence: "semantic",
+    },
+    {
+      provider: "structural identifier",
+      file: "index.ts",
+      source: "export function widget() {}\n",
+      anchor: { line: 1, character: 17 },
+      interior: { line: 1, character: 20 },
+      evidence: "structural-identifier",
+    },
+    {
+      provider: "LaTeX label",
+      file: "paper.tex",
+      source: String.raw`\label{widget}`,
+      anchor: { line: 1, character: 8 },
+      interior: { line: 1, character: 10 },
+      evidence: "structural-identifier",
+    },
+    {
+      provider: "LaTeX section",
+      file: "paper.tex",
+      source: String.raw`\section{widget}`,
+      anchor: { line: 1, character: 10 },
+      interior: { line: 1, character: 12 },
+      evidence: "structural",
+    },
+    {
+      provider: "multiline LaTeX section",
+      file: "paper.tex",
+      source: "\\section{widget\n         title}",
+      anchor: { line: 1, character: 10 },
+      interior: { line: 2, character: 10 },
+      evidence: "structural",
+    },
+  ])("keeps snap metadata and single notes consistent for $provider", async (fixture) => {
+    writeFileSync(join(cwd, fixture.file), fixture.source);
+    const treeSitter = createTreeSitterSession(cwd);
+    const structural = createTreeSitterProvider(treeSitter);
+    try {
+      registerMockProvider(cwd, {
+        ...(fixture.provider === "semantic"
+          ? {}
+          : {
+              documentSymbols: async () => completedCodeQuery([]),
+            }),
+        nodeAt: structural.nodeAt.bind(structural),
+        outline: structural.outline.bind(structural),
+      });
+      const pi = createPiMock();
+      registerCodeIntelligenceTools(pi as never, sessionCache.getOrCreate);
+      const resolve = getTool(pi, "code_resolve") as unknown as StructuredTool;
+      const orient = getTool(pi, "code_orientation") as unknown as StructuredTool;
+      let handle: string | undefined;
+      for (const [point, snapped] of [
+        [fixture.anchor, false],
+        [fixture.interior, true],
+      ] as const) {
+        const target = { anchor: { file: fixture.file, ...point } };
+        const result = await resolve.execute(
+          "resolve",
+          { target },
+          undefined,
+          undefined,
+          makeCtx({ cwd }),
+        );
+        expect(result.structuredContent).toMatchObject({ kind: "resolved" });
+        const resolved = (result.structuredContent.targets as Array<{ handle: string }>)[0];
+        handle ??= resolved.handle;
+        const expectedTarget = {
+          handle,
+          line: fixture.anchor.line,
+          character: fixture.anchor.character,
+          resolution: {
+            requested: point,
+            resolved: fixture.anchor,
+            snapped,
+            source: fixture.evidence,
+          },
+        };
+        expect(result.structuredContent.targets).toMatchObject([expectedTarget]);
+        expect(Value.Check(resolve.outputSchema, result.structuredContent)).toBe(true);
+        const notes = result.structuredContent.notes as string[];
+        expect(notes).toHaveLength(snapped || fixture.evidence !== "semantic" ? 1 : 0);
+        const orientation = await orient.execute(
+          "orientation",
+          { focus: { target } },
+          undefined,
+          undefined,
+          makeCtx({ cwd }),
+        );
+        expect(orientation.structuredContent).toMatchObject({
+          kind: "completed",
+          targets: [expectedTarget],
+        });
+        expect(Value.Check(orient.outputSchema, orientation.structuredContent)).toBe(true);
+        if (snapped) {
+          expect(notes[0]).toContain(`${point.line}:${point.character}`);
+          expect(notes[0]).toContain(`${fixture.anchor.line}:${fixture.anchor.character}`);
+        }
+        for (const note of notes) {
+          expect(note).not.toContain("declaration header");
+          expect(result.content[0]?.text.split(note)).toHaveLength(2);
+          expect(orientation.content[0]?.text.split(note)).toHaveLength(2);
+        }
+      }
+    } finally {
+      await treeSitter.dispose();
+    }
   });
 
   it("does not replay anchored resolution for symbol or file discovery", async () => {

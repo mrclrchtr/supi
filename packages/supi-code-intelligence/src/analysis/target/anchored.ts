@@ -17,7 +17,7 @@ import {
   type StructuralProvider,
 } from "@mrclrchtr/supi-code-runtime/api";
 import type { AnchorKind } from "../../session/target-store.ts";
-import type { AnchoredResolutionMetadata, AnchoredResolutionSource } from "../../types/index.ts";
+import type { AnchoredResolutionSource } from "../../types/index.ts";
 import { resolveFromStructural } from "./anchored-structural.ts";
 import {
   canonicalFileDeclarationKind,
@@ -25,6 +25,7 @@ import {
   type DeclarationOccurrenceIdentity,
 } from "./identity.ts";
 import { resolveTexlabSectionLabelCollision } from "./latex-label-container.ts";
+import { createAnchoredResolution } from "./resolution.ts";
 import type { DisambiguationCandidateData, ResolvedTargetData, TargetOutcome } from "./types.ts";
 
 /** 1-based symbol anchor position (mirrors the runtime `SymbolAnchor`). */
@@ -93,25 +94,10 @@ function matchSymbolAt(s: CodeSymbol, line: number, character: number): "exact" 
   return null;
 }
 
-function buildResolution(
-  requested: Anchor,
-  resolvedAnchor: Anchor,
-  snapped: boolean,
-  source: AnchoredResolutionSource,
-): AnchoredResolutionMetadata {
-  return {
-    requested: { line: requested.line, character: requested.character },
-    resolved: { line: resolvedAnchor.line, character: resolvedAnchor.character },
-    snapped,
-    source,
-  };
-}
-
 function resolvedFromSymbol(
   file: string,
   s: CodeSymbol,
   opts: {
-    snapped: boolean;
     requested: Anchor;
     source: AnchoredResolutionSource;
     identity: DeclarationOccurrenceIdentity;
@@ -135,7 +121,7 @@ function resolvedFromSymbol(
       provenance: opts.identity.structuralEvidence ? ["semantic", "structural"] : ["semantic"],
       anchorKind: (s.nameAnchor ? "name" : "declaration") as AnchorKind,
       container: s.container ?? null,
-      resolution: buildResolution(opts.requested, a, opts.snapped, opts.source),
+      resolution: createAnchoredResolution(opts.requested, a, opts.source),
     },
   };
 }
@@ -213,7 +199,6 @@ async function resolveFromSemantic(
   const resolveIdentity = createCodeSymbolIdentityResolver(file, symbols, structural, control);
   if (exact.length === 1) {
     return resolvedFromSymbol(file, exact[0], {
-      snapped: false,
       requested,
       source: "semantic",
       identity: await resolveIdentity(exact[0]),
@@ -222,7 +207,6 @@ async function resolveFromSemantic(
   if (exact.length > 1) return candidatesFromSymbols(file, exact, resolveIdentity);
   if (snap.length === 1) {
     return resolvedFromSymbol(file, snap[0], {
-      snapped: true,
       requested,
       source: "semantic",
       identity: await resolveIdentity(snap[0]),

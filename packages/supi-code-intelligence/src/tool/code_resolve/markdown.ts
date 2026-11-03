@@ -4,7 +4,7 @@ import { relative } from "node:path";
 import { renderEvidenceListMetadataDisclosure } from "../../analysis/evidence.ts";
 import type { TargetWorkflowOutcome } from "../../session/target-workflow.ts";
 import { formatPartialCandidateDisclosure } from "../result/candidate-row.ts";
-import type { AnchoredResolutionMetadata, ResolveDetails } from "../result/types.ts";
+import type { ResolveDetails } from "../result/types.ts";
 import type { ResolveResultAssembly } from "./result.ts";
 
 /** Render an assembled resolve result into markdown. */
@@ -30,7 +30,7 @@ function renderResolved(
   outcome: Extract<TargetWorkflowOutcome, { kind: "resolved" }>,
   cwd: string,
 ): string {
-  const { entry: target, notes, resolution } = outcome;
+  const { entry: target, notes } = outcome;
   const relFile = relative(cwd, target.file) || target.file;
   const displayKind = target.nativeKind ?? target.kind;
   const kind = displayKind ? ` \`${displayKind}\`` : "";
@@ -41,20 +41,10 @@ function renderResolved(
     `confidence: ${target.confidence}; provenance: ${target.provenance.join("+")}`,
   ];
 
-  const resolutionNote = renderAnchoredResolutionNote(resolution);
-  if (resolutionNote) lines.push("", resolutionNote);
   for (const note of notes) {
-    if (resolutionNote && isResolutionMetadataNote(note)) continue;
     lines.push("", `_Note: ${note}_`);
   }
   return lines.join("\n");
-}
-
-function isResolutionMetadataNote(note: string): boolean {
-  return (
-    note.startsWith("Resolved from a declaration header and snapped to the identifier") ||
-    note === "Resolved from provider-backed structural identifier evidence."
-  );
 }
 
 function renderTargetGroup(details: ResolveDetails): string {
@@ -112,21 +102,6 @@ function appendUnknownHierarchyDisclosure(lines: string[], count: number): void 
   lines.push(
     `- Hierarchy: ${count} ${declaration} unknown hierarchy; only provider-proven top-level declarations were prioritized.`,
   );
-}
-
-function renderAnchoredResolutionNote(
-  resolution: AnchoredResolutionMetadata | undefined,
-): string | null {
-  if (!resolution) return null;
-  const degraded = resolution.source !== "semantic";
-  if (!resolution.snapped && !degraded) return null;
-
-  const requested = `${resolution.requested.line}:${resolution.requested.character}`;
-  const resolved = `${resolution.resolved.line}:${resolution.resolved.character}`;
-  if (resolution.snapped) {
-    return `_Note: snapped from requested coordinate ${requested} to name anchor ${resolved} (evidence: ${resolution.source})._`;
-  }
-  return `_Note: resolved from ${resolution.source} evidence; use code_inspect for point-level facts._`;
 }
 
 function renderDisambiguation(details: ResolveDetails): string {
