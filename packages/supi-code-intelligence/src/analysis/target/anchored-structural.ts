@@ -143,7 +143,7 @@ function coordinateNotOnSymbolMessage(file: string, requested: Anchor, detail: s
   const at = `${basename(file)}:${requested.line}:${requested.character}`;
   return (
     `No symbol target resolved at \`${at}\` (on \`${detail}\`). ` +
-    "`code_resolve` resolves real symbol targets from provider-backed evidence; " +
+    "Target resolution requires a real symbol backed by provider evidence; " +
     "use `code_inspect` for point-level facts at this coordinate, or pass the identifier coordinate of a declaration."
   );
 }

@@ -296,7 +296,7 @@ function coordinateNotOnSymbolMessage(
   const reason = detail ? ` (on \`${detail}\`)` : "";
   return (
     `No symbol target resolved at \`${at}\`${reason}. ` +
-    "`code_resolve` resolves real symbol targets from provider-backed evidence; " +
+    "Target resolution requires a real symbol backed by provider evidence; " +
     "use `code_inspect` for point-level facts at this coordinate, or pass the identifier coordinate of a declaration."
   );
 }

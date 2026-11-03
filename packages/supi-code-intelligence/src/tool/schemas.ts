@@ -85,7 +85,7 @@ export const ResolveTargetParam = exactOneSelector(
 
 export const GraphTargetParam = exactOneSelector(
   {
-    handle: Type.String({ description: "Target handle returned by code_resolve." }),
+    handle: Type.String({ description: "Target handle from a previous code tool result." }),
     anchor: SourcePointParam,
     symbol: SymbolTargetParam,
   },
@@ -94,7 +94,7 @@ export const GraphTargetParam = exactOneSelector(
 
 const OrientationTargetParam = exactOneSelector(
   {
-    handle: Type.String({ description: "Target handle returned by code_resolve." }),
+    handle: Type.String({ description: "Target handle from a previous code tool result." }),
     anchor: SourcePointParam,
     symbol: SymbolTargetParam,
   },
@@ -114,7 +114,7 @@ export const OrientationFocusParam = exactOneSelector(
 
 export const RefactorTargetParam = exactOneSelector(
   {
-    handle: Type.String({ description: "Target handle returned by code_resolve." }),
+    handle: Type.String({ description: "Target handle from a previous code tool result." }),
     anchor: SourcePointParam,
   },
   "Exactly one refactor target.",
