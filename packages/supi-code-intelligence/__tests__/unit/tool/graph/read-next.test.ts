@@ -20,6 +20,62 @@ afterEach(() => {
 });
 
 describe("code_graph read-next guidance", () => {
+  it("reads selected references in other files before revisiting the target file", async () => {
+    writeFileSync(path.join(tmpDir, "a.ts"), `function foo() {}\n${"foo();\n".repeat(200)}`);
+    writeFileSync(path.join(tmpDir, "b.ts"), "foo();\n");
+    writeFileSync(path.join(tmpDir, "c.ts"), "foo();\n");
+    registerMockProvider(tmpDir, {
+      references: async () =>
+        completedCodeQuery(
+          [
+            { file: "a.ts", line: 99 },
+            { file: "a.ts", line: 149 },
+            { file: "a.ts", line: 199 },
+            { file: "b.ts", line: 0 },
+            { file: "c.ts", line: 0 },
+          ].map(({ file, line }) => ({
+            uri: `file://${path.join(tmpDir, file)}`,
+            range: { start: { line, character: 0 }, end: { line, character: 3 } },
+          })),
+        ),
+    });
+
+    const result = await executeGraphTool(
+      {
+        target: { anchor: { file: "a.ts", line: 1, character: 10 } },
+        relations: ["references"],
+        maxResults: 4,
+      },
+      { cwd: tmpDir, session: sessionCache.getOrCreate(tmpDir) },
+    );
+    const expectedReads = [
+      { file: "a.ts", startLine: 1, endLine: 41 },
+      { file: "b.ts", startLine: 1, endLine: 41 },
+      { file: "c.ts", startLine: 1, endLine: 41 },
+    ];
+    expect(result.structuredContent).toMatchObject({ readNext: expectedReads });
+    expect(result.details?.data).toMatchObject({ readNext: expectedReads });
+    const guidance = result.content.split("## Read Next")[1];
+    expect(guidance?.match(/`a.ts`/g)).toHaveLength(1);
+    expect(guidance).toContain("`b.ts` L1–L41");
+    expect(guidance).toContain("`c.ts` L1–L41");
+
+    const capped = await executeGraphTool(
+      {
+        target: { anchor: { file: "a.ts", line: 1, character: 10 } },
+        relations: ["references"],
+        maxResults: 1,
+      },
+      { cwd: tmpDir, session: sessionCache.getOrCreate(tmpDir) },
+    );
+    expect(capped.structuredContent).toMatchObject({
+      readNext: [
+        { file: "a.ts", startLine: 1, endLine: 41 },
+        { file: "a.ts", startLine: 95, endLine: 140 },
+      ],
+    });
+  });
+
   it("uses neutral guidance when a reference range extends the enclosing scope", async () => {
     writeFileSync(path.join(tmpDir, "index.ts"), "function foo() {\n  bar();\n}\n\nfoo();\n");
     registerMockProvider(tmpDir, {

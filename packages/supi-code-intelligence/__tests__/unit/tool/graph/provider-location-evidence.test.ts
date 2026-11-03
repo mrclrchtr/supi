@@ -51,6 +51,7 @@ describe("code_graph provider location completeness", () => {
       const result = partialCodeQuery(
         [
           location(`file://${tmpDir}/consumer-a.ts`),
+          location(`file://${tmpDir}/consumer-a.ts`, 1),
           location(`file://${tmpDir}/consumer-b.ts`),
           location(`file://${tmpDir}/bad%ZZ.ts`),
         ],
@@ -64,16 +65,33 @@ describe("code_graph provider location completeness", () => {
         {
           target: { anchor: { file: "test.ts", line: 1, character: 17 } },
           relations: [relation],
-          maxResults: 1,
+          maxResults: 2,
         },
         makeTestCtx(tmpDir),
+      );
+      expect(output.structuredContent).toMatchObject({
+        kind: "completed",
+        sections: [
+          {
+            relation,
+            items: [
+              { file: "consumer-a.ts", line: 1, character: 1 },
+              relation === "references"
+                ? { file: "consumer-b.ts", line: 1, character: 1 }
+                : { file: "consumer-a.ts", line: 2, character: 1 },
+            ],
+          },
+        ],
+      });
+      expect(output.content.includes("Selection: one site per file per round.")).toBe(
+        relation === "references",
       );
       expect(output.content).toContain("more may exist — provider-limited");
       expect(output.content).toContain("1 collected omitted");
       expect(output.content).toContain("1 invalid provider location omitted");
       expect(output.details?.data).toMatchObject({
         evidenceLists: [
-          { totalCount: null, shownCount: 1, omittedCount: 1, invalidLocationCount: 1 },
+          { totalCount: null, shownCount: 2, omittedCount: 1, invalidLocationCount: 1 },
         ],
       });
     },

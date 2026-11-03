@@ -10,7 +10,6 @@ import {
   readNextAround,
   readNextEnclosingScope,
   readNextTarget,
-  readNextTopSites,
 } from "../../analysis/read-next.ts";
 import { collectCallees } from "../../analysis/relations/callees.ts";
 import { collectImplementations } from "../../analysis/relations/implementations.ts";
@@ -96,14 +95,6 @@ async function collectReferences(options: CollectRelationOptions): Promise<Graph
         toDisplayPath(options.cwd, options.file),
         targetLine,
         "inspect the resolved target before editing",
-      ),
-      ...readNextTopSites(
-        references.slice(0, options.maxResults).map((reference) => ({
-          file: toDisplayPath(options.cwd, reference.file),
-          line: reference.line,
-        })),
-        2,
-        "reference",
       ),
     ],
   };

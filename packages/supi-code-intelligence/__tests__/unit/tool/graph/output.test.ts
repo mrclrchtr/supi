@@ -4,6 +4,7 @@ import * as path from "node:path";
 import { completedCodeQuery } from "@mrclrchtr/supi-code-runtime/api";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { executeGraphTool } from "../../../../src/tool/code_graph/execute.ts";
+import type { structuredGraphResult } from "../../../../src/tool/code_graph/structured.ts";
 import { makeTestCtx } from "../../../helpers/execute-action.ts";
 import { clearMockRuntime, registerMockProvider } from "../../../helpers/register-mock-runtime.ts";
 
@@ -41,10 +42,10 @@ afterEach(() => {
   rmSync(cwd, { recursive: true, force: true });
 });
 
-function location(file: string, character: number) {
+function location(file: string, character: number, line = 0) {
   return {
     uri: `file://${path.join(cwd, file)}`,
-    range: { start: { line: 0, character }, end: { line: 0, character: character + 3 } },
+    range: { start: { line, character }, end: { line, character: character + 3 } },
   };
 }
 
@@ -60,6 +61,133 @@ function execute(maxResults?: number) {
 }
 
 describe("code_graph agent output", () => {
+  it("distributes capped references across files consistently in all result representations", async () => {
+    writeFileSync(path.join(cwd, "a.ts"), "foo();\n".repeat(40));
+    writeFileSync(path.join(cwd, "b.ts"), "foo();\n");
+    writeFileSync(path.join(cwd, "c.ts"), "foo();\n");
+    registerMockProvider(cwd, {
+      references: async () =>
+        completedCodeQuery([
+          ...Array.from({ length: 40 }, (_, line) => location("a.ts", 0, line)),
+          location("b.ts", 0),
+          location("c.ts", 0),
+        ]),
+    });
+
+    const result = await execute(5);
+    expect(result.structuredContent).toMatchObject({
+      kind: "completed",
+      sections: expect.arrayContaining([
+        expect.objectContaining({
+          relation: "references",
+          items: [
+            { file: "a.ts", line: 1, character: 1, name: "foo" },
+            { file: "a.ts", line: 2, character: 1, name: "foo" },
+            { file: "a.ts", line: 3, character: 1, name: "foo" },
+            { file: "b.ts", line: 1, character: 1, name: "foo" },
+            { file: "c.ts", line: 1, character: 1, name: "foo" },
+          ],
+          evidence: {
+            key: "references.locations",
+            totalCount: 42,
+            shownCount: 5,
+            omittedCount: 37,
+            partialReason: null,
+          },
+        }),
+      ]),
+    });
+    expect(result.content).toContain("5 of 42 locations shown; 37 omitted");
+    expect(result.content).toContain("Selection: one site per file per round.");
+    expect(result.content).toContain("- `a.ts`: L1:1, L2:1, L3:1\n");
+    expect(result.content).toContain("- `b.ts`: L1:1\n- `c.ts`: L1:1");
+    expect(result.details?.data).toMatchObject({
+      sections: expect.arrayContaining([
+        expect.objectContaining({
+          rel: "references",
+          fileGroups: [
+            { file: "a.ts", count: 3 },
+            { file: "b.ts", count: 1 },
+            { file: "c.ts", count: 1 },
+          ],
+        }),
+      ]),
+    });
+    expect(
+      result.details?.displaySections?.find((section) => section.key === "graph.references")?.lines,
+    ).toEqual(["L1:1", "L2:1", "L3:1", "L1:1", "L1:1"]);
+  });
+
+  it("expands file coverage monotonically without changing implementation selection", async () => {
+    const locations = [
+      location("c.ts", 0, 5),
+      location("a.ts", 0, 9),
+      location("a.ts", 0),
+      location("b.ts", 0, 1),
+      location("c.ts", 0),
+      location("a.ts", 0, 4),
+    ];
+    registerMockProvider(cwd, {
+      references: async () => completedCodeQuery(locations),
+      implementation: async () => completedCodeQuery(locations),
+    });
+    const cases = [
+      { limit: 1, expected: ["a.ts:1"] },
+      { limit: 2, expected: ["a.ts:1", "b.ts:2"] },
+      { limit: 3, expected: ["a.ts:1", "b.ts:2", "c.ts:1"] },
+      { limit: 4, expected: ["a.ts:1", "a.ts:5", "b.ts:2", "c.ts:1"] },
+      { limit: 5, expected: ["a.ts:1", "a.ts:5", "b.ts:2", "c.ts:1", "c.ts:6"] },
+      { limit: 6, expected: ["a.ts:1", "a.ts:5", "a.ts:10", "b.ts:2", "c.ts:1", "c.ts:6"] },
+      { limit: 8, expected: ["a.ts:1", "a.ts:5", "a.ts:10", "b.ts:2", "c.ts:1", "c.ts:6"] },
+    ];
+    for (const { limit, expected } of cases) {
+      const result = await execute(limit);
+      const native = result.structuredContent as ReturnType<typeof structuredGraphResult>;
+      expect(native.kind).toBe("completed");
+      const references = native.sections.find((section) => section.relation === "references");
+      expect(references?.items.map((item) => `${item.file}:${item.line}`)).toEqual(expected);
+      expect(references?.evidence).toMatchObject({
+        totalCount: 6,
+        shownCount: expected.length,
+        omittedCount: 6 - expected.length,
+        partialReason: null,
+      });
+      expect(
+        native.sections
+          .find((section) => section.relation === "implements")
+          ?.items.map((item) => `${item.file}:${item.line}`),
+      ).toEqual(["a.ts:1", "a.ts:5", "a.ts:10", "b.ts:2", "c.ts:1", "c.ts:6"].slice(0, limit));
+      expect(result.content.includes("Selection: one site per file per round.")).toBe(limit < 6);
+    }
+  });
+
+  it.each([0, 2])(
+    "does not explain file distribution for %s collected single-file references",
+    async (count) => {
+      registerMockProvider(cwd, {
+        references: async () =>
+          completedCodeQuery(
+            [location("consumer.ts", 0), location("consumer.ts", 7)].slice(0, count),
+          ),
+      });
+      const result = await execute(1);
+      expect(result.structuredContent).toMatchObject({
+        kind: "completed",
+        sections: expect.arrayContaining([
+          expect.objectContaining({
+            relation: "references",
+            items: count === 0 ? [] : [{ file: "consumer.ts", line: 1, character: 1, name: "foo" }],
+            evidence: expect.objectContaining({
+              totalCount: count,
+              shownCount: count === 0 ? 0 : 1,
+            }),
+          }),
+        ]),
+      });
+      expect(result.content).not.toContain("Selection:");
+    },
+  );
+
   it("bounds call sites before grouping repeated names", async () => {
     const { content } = await execute(2);
     expect(content).toContain("2 of 3 call sites shown; 1 omitted");

@@ -26,6 +26,7 @@ import type { GraphDetails, GraphFileGroup, GraphSectionDetails } from "./detail
 import { graphDisplaySection } from "./display.ts";
 import { formatGraphEvidence } from "./format.ts";
 import { graphReadNext } from "./read-next.ts";
+import { selectReferenceLocations } from "./reference-selection.ts";
 import { structuredGraphCandidates, structuredGraphResult } from "./structured.ts";
 
 export type { GraphRelationKind, GraphSection } from "../../session/graph-types.ts";
@@ -38,7 +39,10 @@ type ImplementationGraphSection = Extract<GraphSection, { kind: "ok"; rel: "impl
 /** A relation section after canonical evidence bounding. */
 export type AssembledGraphSection =
   | UnavailableGraphSection
-  | (ReferenceGraphSection & { readonly evidence: EvidenceList<ReferenceEntry> })
+  | (ReferenceGraphSection & {
+      readonly evidence: EvidenceList<ReferenceEntry>;
+      readonly selectionNote: string | null;
+    })
   | (CalleeGraphSection & { readonly evidence: EvidenceList<CallEntry> })
   | (ImplementationGraphSection & {
       readonly evidence: EvidenceList<ImplementationEntry>;
@@ -85,7 +89,7 @@ export function assembleGraphResult(input: {
     })),
     evidenceLists,
     nextQueries: [],
-    readNext: graphReadNext(sections),
+    readNext: graphReadNext(sections, input.cwd),
     candidateCount,
     confidence,
     provenance,
@@ -138,17 +142,27 @@ function graphSectionDetails(
 function assembleGraphSection(section: GraphSection, maxResults: number): AssembledGraphSection {
   if (section.kind === "unavailable") return section;
   switch (section.rel) {
-    case "references":
+    case "references": {
+      const evidence = createRelationEvidenceList({
+        key: "references.locations",
+        items: [...section.data.references],
+        maxResults,
+        invalidLocationCount: section.data.invalidLocationCount,
+        partialReason: section.data.partialReason,
+      });
       return {
         ...section,
-        evidence: createRelationEvidenceList({
-          key: "references.locations",
-          items: [...section.data.references],
-          maxResults,
-          invalidLocationCount: section.data.invalidLocationCount,
-          partialReason: section.data.partialReason,
-        }),
+        evidence: {
+          ...evidence,
+          items: selectReferenceLocations(section.data.references, evidence.metadata.shownCount),
+        },
+        selectionNote:
+          (evidence.metadata.omittedCount ?? 0) > 0 &&
+          section.data.references.some((site) => site.file !== section.data.references[0]?.file)
+            ? "Selection: one site per file per round."
+            : null,
       };
+    }
     case "callees": {
       const evidence = section.data.recovery
         ? createPartialEvidenceList({

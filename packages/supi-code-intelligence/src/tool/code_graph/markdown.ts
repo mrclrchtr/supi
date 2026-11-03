@@ -28,12 +28,15 @@ function renderSection(section: AssembledGraphSection, assembly: GraphResultAsse
   const depth = section.kind === "ok" && section.rel === "callees" ? `, ${section.data.depth}` : "";
   const lines = [`## ${section.rel} (${source}${depth})`];
   if (section.kind === "unavailable") return [...lines, `Unavailable — ${section.message}`];
+  const summary = formatGraphEvidence(
+    section.evidence.metadata,
+    section.rel === "callees" ? "call sites" : "locations",
+    section.rel === "callees" ? 0 : section.data.externalCount,
+  );
   lines.push(
-    formatGraphEvidence(
-      section.evidence.metadata,
-      section.rel === "callees" ? "call sites" : "locations",
-      section.rel === "callees" ? 0 : section.data.externalCount,
-    ),
+    section.rel === "references" && section.selectionNote
+      ? `${summary} ${section.selectionNote}`
+      : summary,
     "",
   );
   if (section.rel !== "callees") return [...lines, ...formatLocations(section, assembly.cwd)];
