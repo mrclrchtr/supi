@@ -6,6 +6,12 @@
     ":automergeMinor",
     ":semanticCommitTypeAll(fix)"
   ],
+  "internalChecksFilter": "strict",
+  "minimumReleaseAgeBehaviour": "timestamp-required",
+  "vulnerabilityAlerts": {
+    "automerge": false,
+    "minimumReleaseAge": null
+  },
   "lockFileMaintenance": {
     "enabled": true
   },
@@ -48,6 +54,12 @@
   ],
   "packageRules": [
     {
+      "description": "Wait one week before proposing npm version updates; pnpm enforces the same cooldown for transitive dependencies.",
+      "matchDatasources": ["npm"],
+      "matchUpdateTypes": ["major", "minor", "patch"],
+      "minimumReleaseAge": "7 days"
+    },
+    {
       "description": "Batch routine updates; later rules preserve dedicated dependency groups and review policies.",
       "groupName": "routine non-major dependencies",
       "matchUpdateTypes": ["minor", "patch", "pin", "pinDigest", "digest"],
@@ -56,6 +68,12 @@
     {
       "matchManagers": ["github-actions"],
       "groupName": "github actions"
+    },
+    {
+      "description": "Review GitHub Actions digest changes: a moved tag can retain its original release timestamp.",
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["digest", "pinDigest"],
+      "automerge": false
     },
     {
       "groupName": "earendil-works",

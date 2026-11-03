@@ -83,4 +83,10 @@ gh workflow run ci.yml --repo mrclrchtr/supi --ref main -f publish_tag=v1.2.3
 
 ## Dependency maintenance
 
-Routine Renovate minor, patch, pin, and digest updates share a group unless a later dedicated-group rule applies. Upstream skills remain separate and manually reviewed; Pi remains manually upgraded. Existing schedules and automerge policies are retained.
+- Routine Renovate minor, patch, pin, and digest updates share a group unless a later dedicated-group rule applies. Existing schedules and routine automerge remain enabled.
+- npm major, minor, and patch updates must be at least 7 days old before Renovate proposes them. Strict internal checks and required release timestamps prevent missing metadata from bypassing the cooldown.
+- Security-alert PRs bypass Renovate's cooldown but require manual merge. pnpm's install-time cooldown still applies; urgent fixes need a reviewed, version-specific `minimumReleaseAgeExclude` exception rather than disabling the policy globally.
+- GitHub Actions digest and digest-pin changes require manual merge: release timestamps cannot reliably age a moved tag. Upstream skills remain separate and manually reviewed; Pi remains manually upgraded.
+- `pnpm-workspace.yaml` enforces the same 7-day cooldown for direct and transitive npm packages, including frozen-lockfile installs and lockfile maintenance. Resolution fails rather than accepting too-new versions or missing publication dates.
+- pnpm rejects publisher-trust downgrades, verifies locked packages against the install policy, blocks exotic transitive sources, and rejects unreviewed dependency build scripts. Keep the existing explicit build allowlist; do not enable all builds.
+- Save new dependencies as exact versions. Root Pi dev dependencies are pinned; published Pi peer ranges remain `*`. Release-age exceptions must identify reviewed versions, not entire packages.
