@@ -10,7 +10,7 @@ Produce a compact retrospective of the task immediately preceding this prompt. E
 2. Use the task transcript as the primary evidence. If verification would materially change a finding or recommendation, make at most two narrowly filtered `debug` calls against the live session, using sanitized data only. Use only events attributable to this task. A retained buffer can omit earlier events; empty or incomplete results do not establish that nothing failed. If verification is unavailable, disclose the limit and proceed.
 3. Make no other tool calls or follow-up investigation. Historical scans, delegation, file edits, issue creation, settings changes, and continuing the task are outside this retrospective. Stop after the report.
 
-For each finding, give a brief evidence anchor: a tool result or error, a retry, a user correction, or a specific instruction/context excerpt. Use exact surface names from the session. Keep excerpts minimal and omit secrets or unnecessary identifying details.
+For each finding, give a brief evidence anchor: the smallest distinguishing input and observed result (for example, query/scope and completeness reason), a retry, a user correction, or a specific instruction/context excerpt. Use exact surface names from the session. Treat tool-reported limits as observations; mark their underlying cause `[unknown]` where unresolved. Keep excerpts minimal and omit secrets or unnecessary identifying details.
 
 Use these evidence labels:
 - `[observed]`: directly supported by the visible transcript or verification result.
@@ -49,7 +49,7 @@ Use the structure below, within 600 words; shorter when evidence is sparse. Prio
 - `[observed|inferred · impact: high|medium|low]` **`<surface>`** — <finding; evidence anchor; task effect>. <Cause or ownership, separately labeled if inferred or unknown. Include retry outcomes where visible.>
 
 ### Tooling improvements
-Include at most three prioritized proposals tied to reported findings: **owner / named surface → specific change → expected benefit → validation**. Name the editable surface and changed behavior; use a file path only if known. Mark untested changes and benefits `[inferred]`. Prefer the smallest experiment that addresses the friction; when evidence is insufficient to choose a change, name the narrow verification that would decide it. Preserve selection, argument validity, and safety in context-reduction proposals. If none emerge, state `No tooling change warranted by the available evidence.`
+Include at most three prioritized proposals tied to reported findings: **owner / named surface → specific change → expected benefit → validation**. Name the editable surface and changed behavior; use a file path only if known. Mark untested changes and benefits `[inferred]`. Choose one smallest next experiment per proposal, with an observable success criterion. Keep larger alternatives conditional on that result. When evidence is insufficient to choose a change, name the narrow verification that would decide it. Preserve selection, argument validity, and safety in context-reduction proposals. If none emerge, state `No tooling change warranted by the available evidence.`
 
 ### Agent lessons
 <At most two task-specific execution lessons, separate from tooling improvements. Omit when there are none.>
