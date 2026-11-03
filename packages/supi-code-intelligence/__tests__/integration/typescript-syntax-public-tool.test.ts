@@ -11,17 +11,23 @@ import codeIntelligenceExtension from "../../src/extension.ts";
 import { clearMockRuntime } from "../helpers/register-mock-runtime.ts";
 
 describe("public TypeScript AST completeness", () => {
-  it("returns complete call evidence through type-only re-exports and import-type arrays", async () => {
+  it("returns complete runtime call evidence through type-only re-exports and import types", async () => {
     const cwd = mkdtempSync(join(tmpdir(), "supi-typescript-public-"));
     writeFileSync(
       join(cwd, "index.ts"),
-      ['export type * from "./types.ts";', "export function first() { measure(); }"].join("\n"),
+      [
+        'export type * from "./types.ts";',
+        'export function first() { measure<import("./types").Value>(); }',
+        'export const loaded = import("./runtime");',
+      ].join("\n"),
     );
     writeFileSync(
       join(cwd, "entries.tsx"),
-      ['let entries: import("node:fs").Dirent[];', "export function second() { measure(); }"].join(
-        "\n",
-      ),
+      [
+        'let entries: import("node:fs").Dirent[];',
+        'export function second() { measure<typeof import("./types")>(); }',
+        'export const loaded = import("./runtime");',
+      ].join("\n"),
     );
     const session = createTreeSitterSession(cwd);
     getDefaultWorkspaceRuntime().registerStructural(cwd, createTreeSitterProvider(session));
@@ -50,6 +56,23 @@ describe("public TypeScript AST completeness", () => {
         .join("\n");
       expect(text).not.toContain("syntax-recovery");
       expect(text).not.toContain("total is unknown");
+      const imports = (await getTool(pi, "code_find").execute(
+        "typescript-runtime-imports",
+        { query: "import", mode: "ast", kind: "call", scope: ["."] },
+        undefined,
+        undefined,
+        makeCtx({ cwd }),
+      )) as AgentToolResult<unknown>;
+      expect(imports.structuredContent).toMatchObject({
+        kind: "completed",
+        evidenceLists: [{ totalCount: 2, shownCount: 2, omittedCount: 0, partialReason: null }],
+        scan: { complete: true, analyzedFileCount: 2, limitations: [] },
+        failures: [],
+        matches: expect.arrayContaining([
+          expect.objectContaining({ name: "import", file: "entries.tsx", line: 3 }),
+          expect.objectContaining({ name: "import", file: "index.ts", line: 3 }),
+        ]),
+      });
     } finally {
       await session.dispose();
       getDefaultWorkspaceRuntime().clearWorkspace(cwd);

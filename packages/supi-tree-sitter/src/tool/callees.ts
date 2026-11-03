@@ -6,6 +6,7 @@ import { validatePublicPositionBounds } from "../coordinates.ts";
 import { withSyntaxCompleteness } from "../syntax-errors.ts";
 import type { SyntaxNodeLike } from "../syntax-node.ts";
 import type { GrammarId, SourceRange, TreeSitterResult } from "../types.ts";
+import { isTypeOnlyImportCapture } from "../worker/call-context.ts";
 import { queryParsedFile, type TreeSitterRuntime } from "../worker/runtime.ts";
 import { normalizeCallName } from "./call-name.ts";
 import { createCalleeDisplayName, createSourceLineStarts } from "./callee-display-name.ts";
@@ -384,6 +385,7 @@ function filterCalleeCaptures(
       if (isInInner) continue;
     }
 
+    if (isTypeOnlyImportCapture(enclosingNode, capture, grammarId)) continue;
     const name = normalizeCallName(capture.text, grammarId, capture.nodeType);
     const rangeKey = sourceRangeKey(capture.range);
     if (name.length === 0 || seenRanges.has(rangeKey)) continue;

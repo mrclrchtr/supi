@@ -2,7 +2,8 @@
 
 import type { CodeRequestControl } from "@mrclrchtr/supi-code-runtime/api";
 import type { CallSiteMatch, GrammarId, TreeSitterResult } from "../types.ts";
-import type { TreeSitterRuntime } from "../worker/runtime.ts";
+import { isTypeOnlyImportCapture } from "../worker/call-context.ts";
+import { queryParsedFile, type TreeSitterRuntime } from "../worker/runtime.ts";
 import { normalizeCallName } from "./call-name.ts";
 
 // ── Per-grammar call-site queries ─────────────────────────────────────
@@ -66,33 +67,47 @@ export async function extractCallSites(
     };
   }
 
-  const queryResult = await runtime.queryFile(filePath, queryStr, control);
-  if (queryResult.kind !== "success" && queryResult.kind !== "partial") return queryResult;
-
-  const captures = queryResult.data;
-  const seen = new Set<string>();
-  const matches: CallSiteMatch[] = [];
-
-  for (const capture of captures) {
-    // Normalize: trim whitespace and collapse internal whitespace to single space
-    const name = normalizeCallName(capture.text, grammarId, capture.nodeType);
-    if (name.length === 0) continue;
-
-    // Collapse duplicate captures only when they identify the same source range.
-    const key = `${capture.range.startLine}:${capture.range.startCharacter}:${capture.range.endLine}:${capture.range.endCharacter}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-
-    matches.push({
-      name,
-      startLine: capture.range.startLine,
-      startCharacter: capture.range.startCharacter,
-      endLine: capture.range.endLine,
-      endCharacter: capture.range.endCharacter,
+  const parsed = await runtime.parseFile(filePath, control);
+  if (parsed.kind !== "success") return parsed;
+  const { tree, source } = parsed.data;
+  try {
+    const queryResult = await queryParsedFile(runtime, {
+      file: filePath,
+      grammarId,
+      tree,
+      source,
+      queryString: queryStr,
+      control,
     });
-  }
+    if (queryResult.kind !== "success" && queryResult.kind !== "partial") return queryResult;
 
-  return queryResult.kind === "partial"
-    ? { ...queryResult, data: matches }
-    : { kind: "success", data: matches };
+    const seen = new Set<string>();
+    const matches: CallSiteMatch[] = [];
+
+    for (const capture of queryResult.data) {
+      if (isTypeOnlyImportCapture(tree.rootNode, capture, grammarId)) continue;
+      // Normalize: trim whitespace and collapse internal whitespace to single space
+      const name = normalizeCallName(capture.text, grammarId, capture.nodeType);
+      if (name.length === 0) continue;
+
+      // Collapse duplicate captures only when they identify the same source range.
+      const key = `${capture.range.startLine}:${capture.range.startCharacter}:${capture.range.endLine}:${capture.range.endCharacter}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+
+      matches.push({
+        name,
+        startLine: capture.range.startLine,
+        startCharacter: capture.range.startCharacter,
+        endLine: capture.range.endLine,
+        endCharacter: capture.range.endCharacter,
+      });
+    }
+
+    return queryResult.kind === "partial"
+      ? { ...queryResult, data: matches }
+      : { kind: "success", data: matches };
+  } finally {
+    tree.delete();
+  }
 }

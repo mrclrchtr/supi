@@ -19,6 +19,70 @@ function writeSource(fileName: string, source: string): void {
 }
 
 describe("calleesAt depth filtering", () => {
+  it.each(["ts", "tsx"])(
+    "excludes type-only imports at both callee depths in %s",
+    async (extension) => {
+      const file = `type-imports.${extension}`;
+      writeSource(
+        file,
+        `function run() {
+  type Value = import("types").Value;
+  const value = read<import("types").Value>();
+  const module = read<typeof import("types")>();
+  const values = read<import("types").Value[]>();
+  const loaded = import("runtime");
+  const asserted = provide() as import("types").Value;
+  const checked = provide() satisfies import("types").Value;
+  const callback = () => {
+    const nested = read<typeof import("types")>();
+    return import("nested");
+  };
+}
+function isValue(value: unknown): value is import("types").Value { check(); return true; }
+function assertValue(value: unknown): asserts value is import("types").Value { check(); }`,
+      );
+      const session = createTreeSitterSession(tmpDir);
+      try {
+        const direct = await session.calleesAt(file, 1, 10, { depth: "direct" });
+        expect(direct.kind).toBe("success");
+        if (direct.kind !== "success") return;
+        expect(
+          direct.data.callees.map(({ name, range }) => ({ name, line: range.startLine })),
+        ).toEqual([
+          { name: "read", line: 3 },
+          { name: "read", line: 4 },
+          { name: "read", line: 5 },
+          { name: "import", line: 6 },
+          { name: "provide", line: 7 },
+          { name: "provide", line: 8 },
+        ]);
+        const deep = await session.calleesAt(file, 1, 10, { depth: "deep" });
+        expect(deep.kind).toBe("success");
+        if (deep.kind !== "success") return;
+        expect(
+          deep.data.callees.map(({ name, range }) => ({ name, line: range.startLine })),
+        ).toEqual([
+          { name: "read", line: 3 },
+          { name: "read", line: 4 },
+          { name: "read", line: 5 },
+          { name: "import", line: 6 },
+          { name: "provide", line: 7 },
+          { name: "provide", line: 8 },
+          { name: "read", line: 10 },
+          { name: "import", line: 11 },
+        ]);
+        for (const line of [14, 15]) {
+          const predicate = await session.calleesAt(file, line, 10, { depth: "direct" });
+          expect(predicate.kind).toBe("success");
+          if (predicate.kind !== "success") continue;
+          expect(predicate.data.callees.map(({ name }) => name)).toEqual(["check"]);
+        }
+      } finally {
+        await session.dispose();
+      }
+    },
+  );
+
   it("excludes Python lambda calls at direct depth", async () => {
     writeSource(
       "lambda.py",

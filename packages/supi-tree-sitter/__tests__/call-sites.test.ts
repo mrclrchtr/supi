@@ -43,6 +43,78 @@ describe("TypeScript call-site extraction (full-expression)", () => {
     }
   });
 
+  it.each(["ts", "tsx"])(
+    "excludes type-only imports but retains expression calls in %s",
+    async (extension) => {
+      const file = `type-imports.${extension}`;
+      writeFileSync(
+        path.join(tmpDir, file),
+        `type Value = import("types").Value;
+type Module = typeof import("types");
+function run() {
+  const value = read<import("types").Value>();
+  const module = read<typeof import("types")>();
+  const values = read<import("types").Value[]>();
+  const loaded = import("runtime");
+  const asserted = provide("🌲") as import("types").Value;
+  const checked = provide() satisfies import("types").Value;
+  const runtimeAssertion = import("asserted") as unknown;
+  const runtimeCheck = import("checked") satisfies unknown;
+  const runtimeTypeof = typeof import("typed");
+  let annotated: import("types").Value;
+}
+function isValue(value: unknown): value is import("types").Value {
+  check();
+  return true;
+}
+function assertValue(value: unknown): asserts value is import("types").Value {
+  check();
+}`,
+      );
+      const session = createTreeSitterSession(tmpDir);
+      try {
+        const result = await session.callSites(file);
+        expect(result.kind).toBe("success");
+        if (result.kind !== "success") return;
+        expect(result.data.map(({ name, startLine }) => ({ name, line: startLine }))).toEqual([
+          { name: "read", line: 4 },
+          { name: "read", line: 5 },
+          { name: "read", line: 6 },
+          { name: "import", line: 7 },
+          { name: "provide", line: 8 },
+          { name: "provide", line: 9 },
+          { name: "import", line: 10 },
+          { name: "import", line: 11 },
+          { name: "import", line: 12 },
+          { name: "check", line: 16 },
+          { name: "check", line: 20 },
+        ]);
+      } finally {
+        await session.dispose();
+      }
+    },
+  );
+
+  it("preserves syntax-recovery evidence after excluding type-only imports", async () => {
+    writeFileSync(
+      path.join(tmpDir, "broken.ts"),
+      `type Value = import("types").Value;
+read<import("types").Value>();
+import("runtime");
+export type *;`,
+    );
+    const session = createTreeSitterSession(tmpDir);
+    try {
+      const result = await session.callSites("broken.ts");
+      expect(result.kind).toBe("partial");
+      if (result.kind !== "partial") return;
+      expect(result.errorRanges.length).toBeGreaterThan(0);
+      expect(result.data.map(({ name }) => name)).toEqual(["read", "import"]);
+    } finally {
+      await session.dispose();
+    }
+  });
+
   it("returns full member expression for params.query.trim()", async () => {
     writeFileSync(
       path.join(tmpDir, "sample.ts"),
