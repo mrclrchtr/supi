@@ -31,9 +31,9 @@ export type TargetProviderProvenance = "semantic" | "structural";
 /**
  * A stored resolved target entry with handles and metadata.
  *
- * This is the canonical post-registration target type — all tool layers
- * (executors, renderers, details) use it directly. Computed fields like
- * relative paths are derived at the rendering boundary.
+ * Contains stable target facts only; request-local resolution metadata belongs
+ * to the Target workflow outcome. Computed fields like relative paths are
+ * derived at the rendering boundary.
  */
 export interface TargetStoreEntry {
   targetId: string;
@@ -60,12 +60,6 @@ export interface TargetStoreEntry {
   fileFingerprint: string;
   /** Named symbolic container, or null when no container name was reported. */
   container: string | null;
-  /**
-   * Resolution provenance — present when the target was resolved from
-   * anchored coordinates. Carries requested/resolved coordinates, whether
-   * the anchor was snapped, and the provider-backed evidence source.
-   */
-  resolution?: import("../types/index.ts").AnchoredResolutionMetadata;
 }
 
 /** Input shape for registering a resolved target. */
@@ -95,12 +89,6 @@ export interface TargetRegistrationInput {
   anchorKind: AnchorKind;
   /** Named symbolic container used to disambiguate same-file identity collisions, or null when unreported (ADR 0003). */
   container: string | null;
-  /**
-   * Resolution provenance — present when the target was resolved from
-   * anchored coordinates. Carries requested/resolved coordinates, whether
-   * the anchor was snapped, and the provider-backed evidence source.
-   */
-  resolution?: import("../types/index.ts").AnchoredResolutionMetadata;
   /** Reuse one verified fingerprint across a bounded registration batch. */
   fileFingerprint?: string;
 }
@@ -261,7 +249,6 @@ export function registerWorkflowTarget(
     anchorKind: input.anchorKind,
     fileFingerprint: fingerprint,
     container: input.container,
-    resolution: input.resolution,
   };
 
   const existing = store.get(targetId);
@@ -293,7 +280,6 @@ function mergeTargetRefinement(
     displayCharacter: anchorSource.displayCharacter,
     kind: displayKind,
     anchorKind: anchorSource.anchorKind,
-    resolution: anchorSource.resolution,
     confidence: strongestEvidenceSource.confidence,
     provenance: mergeProvenance(existing.provenance, incoming.provenance),
   };
@@ -305,7 +291,6 @@ function selectAnchorSource(
 ): TargetStoreEntry {
   if (existing.anchorKind === "declaration" && incoming.anchorKind === "name") return incoming;
   if (existing.anchorKind === "name" && incoming.anchorKind === "declaration") return existing;
-  if (!existing.resolution && incoming.resolution) return incoming;
   return existing;
 }
 

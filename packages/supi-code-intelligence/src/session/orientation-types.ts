@@ -10,6 +10,7 @@ import type { InstructionFilesMetadata } from "../analysis/instruction-files.ts"
 import type { CodeProvider } from "../analysis/provider.ts";
 import type { ReadNextItem } from "../analysis/read-next.ts";
 import type { TargetCandidateCompleteness } from "../analysis/target/types.ts";
+import type { AnchoredResolutionMetadata } from "../types/index.ts";
 import type { OrientationTargetInput, TargetSymbolKind } from "./target-input.ts";
 import type { AnchorKind, TargetStoreEntry } from "./target-store.ts";
 
@@ -135,6 +136,8 @@ export interface OrientationResultData {
   /** Captured generic workspace facts; absent for the unchanged file and symbol paths. */
   readonly workspace?: import("./orientation/workspace-context.ts").WorkspaceOrientationFacts;
   readonly target?: Readonly<TargetStoreEntry>;
+  /** Current anchored focus observation, separate from reusable target facts. */
+  readonly resolution?: AnchoredResolutionMetadata;
 }
 
 export type OrientationWorkflowOutcome =

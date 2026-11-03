@@ -78,6 +78,72 @@ function readyLsp(diagnostics: unknown[] = [], current = true) {
 }
 
 describe("orientation structured results", () => {
+  it.each([
+    { first: { character: 1, snapped: true }, second: { character: 14, snapped: false } },
+    { first: { character: 14, snapped: false }, second: { character: 1, snapped: true } },
+  ])(
+    "keeps target resolution local to each orientation request: $first.character → $second.character",
+    async (points) => {
+      registerMockProvider(cwd, {
+        workspaceSymbols: async () =>
+          completedCodeQuery([
+            {
+              name: "value",
+              kind: "Variable",
+              file: join(cwd, "index.ts"),
+              declarationAnchor: { line: 1, character: 1 },
+              nameAnchor: { line: 1, character: 14 },
+            },
+          ]),
+      });
+      const registered = tool();
+      const orient = (character: number) =>
+        execute(registered, {
+          focus: { target: { anchor: { file: "index.ts", line: 1, character } } },
+        });
+      const first = await orient(points.first.character);
+      const firstSnapshot = structuredClone(first);
+      const second = await orient(points.second.character);
+      const firstTarget = (first.structuredContent.targets as Array<{ handle: string }>)[0];
+
+      for (const [result, point] of [
+        [first, points.first],
+        [second, points.second],
+      ] as const) {
+        expect(result.structuredContent).toMatchObject({
+          kind: "completed",
+          targets: [
+            {
+              handle: firstTarget.handle,
+              name: "value",
+              resolution: {
+                requested: { line: 1, character: point.character },
+                resolved: { line: 1, character: 14 },
+                snapped: point.snapped,
+                source: "semantic",
+              },
+            },
+          ],
+        });
+        if (point.snapped) {
+          expect(result.content[0]?.text).toContain("snapped");
+        } else {
+          expect(result.content[0]?.text).not.toContain("snapped");
+        }
+      }
+      for (const target of [{ handle: firstTarget.handle }, { symbol: { query: "value" } }]) {
+        const result = await execute(registered, { focus: { target } });
+        expect(result.structuredContent).toMatchObject({
+          kind: "completed",
+          targets: [{ handle: firstTarget.handle, name: "value" }],
+        });
+        expect((result.structuredContent.targets as unknown[])[0]).not.toHaveProperty("resolution");
+        expect(result.content[0]?.text).not.toContain("snapped");
+      }
+      expect(first).toEqual(firstSnapshot);
+    },
+  );
+
   it("returns typed workspace inventory independent of the text budget", async () => {
     const longName = `description-${"long ".repeat(5000)}`;
     writeFileSync(

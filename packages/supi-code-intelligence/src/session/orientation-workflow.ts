@@ -195,7 +195,16 @@ async function orientTarget(options: {
   throwIfAborted(control);
   return {
     kind: "completed",
-    data: addTargetSummary({ ...result, focusKind: "symbol" }, entry, target.notes, deps.cwd),
+    data: addTargetSummary(
+      {
+        ...result,
+        focusKind: "symbol",
+        ...(target.resolution ? { resolution: target.resolution } : {}),
+      },
+      entry,
+      target.notes,
+      deps.cwd,
+    ),
   };
 }
 

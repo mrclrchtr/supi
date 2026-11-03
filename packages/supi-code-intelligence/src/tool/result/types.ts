@@ -75,7 +75,8 @@ export interface ToolDisplaySection {
 export type AnchoredResolutionSource = "semantic" | "structural" | "structural-identifier";
 
 /**
- * Resolution metadata for a target resolved from anchored coordinates.
+ * Immutable resolution metadata for the current anchored request, not target history.
+ * Symbol, file, and handle selectors do not inherit an earlier request's metadata.
  *
  * Records the requested coordinate, the resolved anchor coordinate, whether
  * the resolved anchor differs from the request (a snap), and the
@@ -85,13 +86,13 @@ export type AnchoredResolutionSource = "semantic" | "structural" | "structural-i
  */
 export interface AnchoredResolutionMetadata {
   /** The 1-based coordinate the caller requested. */
-  requested: { line: number; character: number };
+  readonly requested: { readonly line: number; readonly character: number };
   /** The 1-based anchor coordinate the target was resolved to. */
-  resolved: { line: number; character: number };
+  readonly resolved: { readonly line: number; readonly character: number };
   /** Whether the resolved anchor differs from the requested coordinate. */
-  snapped: boolean;
+  readonly snapped: boolean;
   /** Provider-backed evidence source that identified the target. */
-  source: AnchoredResolutionSource;
+  readonly source: AnchoredResolutionSource;
 }
 
 /** Structured details metadata for relationship and pattern results. */
@@ -158,7 +159,7 @@ export interface ResolveDetails {
     anchorKind: AnchorKind;
     confidence: ConfidenceMode;
     provenance: readonly TargetProviderProvenance[];
-    /** Resolution provenance — present when the target was resolved from anchored coordinates. */
+    /** Resolution observation for this anchored request only. */
     resolution?: AnchoredResolutionMetadata;
   }>;
   /** Disambiguation candidates from the resolve service. */
@@ -211,6 +212,8 @@ export interface ContextDetails {
    * File paths are absolute; compute relative paths at render time.
    */
   target?: TargetStoreEntry;
+  /** Resolution observation for this anchored focus only. */
+  resolution?: AnchoredResolutionMetadata;
   /**
    * Bounded candidates with targetIds when target selection is ambiguous or
    * has a Symbol-kind mismatch. No task sections are rendered in that case.

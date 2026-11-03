@@ -2,9 +2,9 @@
 
 import { relative } from "node:path";
 import { renderEvidenceListMetadataDisclosure } from "../../analysis/evidence.ts";
-import type { TargetStoreEntry } from "../../session/target-store.ts";
+import type { TargetWorkflowOutcome } from "../../session/target-workflow.ts";
 import { formatPartialCandidateDisclosure } from "../result/candidate-row.ts";
-import type { ResolveDetails } from "../result/types.ts";
+import type { AnchoredResolutionMetadata, ResolveDetails } from "../result/types.ts";
 import type { ResolveResultAssembly } from "./result.ts";
 
 /** Render an assembled resolve result into markdown. */
@@ -12,7 +12,7 @@ export function renderResolveResult(assembly: ResolveResultAssembly): string {
   const { outcome, cwd } = assembly;
   switch (outcome.kind) {
     case "resolved":
-      return renderResolved(outcome.entry, outcome.notes, cwd);
+      return renderResolved(outcome, cwd);
     case "target-group":
       return renderTargetGroup(assembly.details);
     case "disambiguation":
@@ -27,10 +27,10 @@ export function renderResolveResult(assembly: ResolveResultAssembly): string {
 }
 
 function renderResolved(
-  target: Readonly<TargetStoreEntry>,
-  notes: readonly string[],
+  outcome: Extract<TargetWorkflowOutcome, { kind: "resolved" }>,
   cwd: string,
 ): string {
+  const { entry: target, notes, resolution } = outcome;
   const relFile = relative(cwd, target.file) || target.file;
   const displayKind = target.nativeKind ?? target.kind;
   const kind = displayKind ? ` \`${displayKind}\`` : "";
@@ -41,7 +41,7 @@ function renderResolved(
     `confidence: ${target.confidence}; provenance: ${target.provenance.join("+")}`,
   ];
 
-  const resolutionNote = renderAnchoredResolutionNote(target);
+  const resolutionNote = renderAnchoredResolutionNote(resolution);
   if (resolutionNote) lines.push("", resolutionNote);
   for (const note of notes) {
     if (resolutionNote && isResolutionMetadataNote(note)) continue;
@@ -114,8 +114,9 @@ function appendUnknownHierarchyDisclosure(lines: string[], count: number): void 
   );
 }
 
-function renderAnchoredResolutionNote(target: Readonly<TargetStoreEntry>): string | null {
-  const resolution = target.resolution;
+function renderAnchoredResolutionNote(
+  resolution: AnchoredResolutionMetadata | undefined,
+): string | null {
   if (!resolution) return null;
   const degraded = resolution.source !== "semantic";
   if (!resolution.snapped && !degraded) return null;

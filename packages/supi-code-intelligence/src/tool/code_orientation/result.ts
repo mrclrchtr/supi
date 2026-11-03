@@ -42,6 +42,8 @@ export interface OrientationDetailsInput {
   readonly nextQueries: readonly string[];
   readonly readNext?: readonly ReadNextItem[];
   readonly target?: Readonly<TargetStoreEntry>;
+  /** Current anchored focus observation; never read from the target store. */
+  readonly resolution?: OrientationResultData["resolution"];
   readonly candidates?: readonly OrientationCandidate[];
   readonly instructions?: OrientationResultData["instructions"];
 }
@@ -95,6 +97,7 @@ export function assembleOrientationResult(data: OrientationResultData): Orientat
     nextQueries: assembledNextQueries(assembled),
     readNext: assembledReadNext(assembled),
     target: assembled.data.target,
+    resolution: assembled.data.resolution,
     instructions: assembled.data.instructions,
   });
 
@@ -119,6 +122,7 @@ export function assembleOrientationDetails(input: OrientationDetailsInput): Cont
     nextQueries: [...input.nextQueries],
     readNext: input.readNext ? [...input.readNext] : undefined,
     target: input.target ? { ...input.target } : undefined,
+    ...(input.resolution ? { resolution: input.resolution } : {}),
     instructions: input.instructions,
     candidates: input.candidates?.map((candidate) => ({
       targetId: candidate.targetId,

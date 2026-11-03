@@ -72,6 +72,100 @@ describe("structured navigation results", () => {
   });
 
   it.each([
+    { first: { character: 1, snapped: true }, second: { character: 17, snapped: false } },
+    { first: { character: 17, snapped: false }, second: { character: 1, snapped: true } },
+  ])("keeps resolution request-local for $first.character → $second.character", async (points) => {
+    const pi = createPiMock();
+    registerCodeIntelligenceTools(pi as never, sessionCache.getOrCreate);
+    const tool = getTool(pi, "code_resolve") as unknown as StructuredTool;
+    const resolve = (character: number) =>
+      tool.execute(
+        "resolve",
+        { target: { anchor: { file: "index.ts", line: 1, character } } },
+        undefined,
+        undefined,
+        makeCtx({ cwd }),
+      );
+    const first = await resolve(points.first.character);
+    const firstSnapshot = structuredClone(first);
+    const second = await resolve(points.second.character);
+
+    for (const [result, point] of [
+      [first, points.first],
+      [second, points.second],
+    ] as const) {
+      expect(result.structuredContent).toMatchObject({
+        kind: "resolved",
+        targets: [
+          {
+            handle: expect.stringMatching(/^tg-/),
+            name: "widget",
+            line: 1,
+            character: 17,
+            resolution: {
+              requested: { line: 1, character: point.character },
+              resolved: { line: 1, character: 17 },
+              snapped: point.snapped,
+              source: "semantic",
+            },
+          },
+        ],
+        notes: point.snapped ? [expect.stringContaining("snapped")] : [],
+      });
+      expect(Value.Check(tool.outputSchema, result.structuredContent)).toBe(true);
+      if (point.snapped) {
+        expect(result.content[0]?.text).toMatch(/snapped.*1:1.*1:17/u);
+      } else {
+        expect(result.content[0]?.text).not.toContain("snapped");
+      }
+    }
+    const firstTarget = (first.structuredContent.targets as Array<{ handle: string }>)[0];
+    const secondTarget = (second.structuredContent.targets as Array<{ handle: string }>)[0];
+    expect(secondTarget.handle).toBe(firstTarget.handle);
+    expect(first).toEqual(firstSnapshot);
+  });
+
+  it("does not replay anchored resolution for symbol or file discovery", async () => {
+    registerMockProvider(cwd, {
+      workspaceSymbols: async () =>
+        completedCodeQuery([
+          {
+            name: "widget",
+            kind: "Function",
+            file: join(cwd, "index.ts"),
+            declarationAnchor: { line: 1, character: 1 },
+            nameAnchor: { line: 1, character: 17 },
+          },
+        ]),
+    });
+    const pi = createPiMock();
+    registerCodeIntelligenceTools(pi as never, sessionCache.getOrCreate);
+    const tool = getTool(pi, "code_resolve") as unknown as StructuredTool;
+    const resolve = (target: unknown) =>
+      tool.execute("resolve", { target }, undefined, undefined, makeCtx({ cwd }));
+    const anchored = await resolve({ anchor: { file: "index.ts", line: 1, character: 1 } });
+    expect(anchored.structuredContent).toMatchObject({
+      kind: "resolved",
+      targets: [{ resolution: { snapped: true } }],
+    });
+    const handle = (anchored.structuredContent.targets as Array<{ handle: string }>)[0].handle;
+    for (const [target, kind] of [
+      [{ symbol: { query: "widget" } }, "resolved"],
+      [{ file: "index.ts" }, "target-group"],
+    ] as const) {
+      const result = await resolve(target);
+      expect(result.structuredContent).toMatchObject({
+        kind,
+        targets: [{ handle, name: "widget" }],
+        notes: [],
+      });
+      expect((result.structuredContent.targets as unknown[])[0]).not.toHaveProperty("resolution");
+      expect(result.content[0]?.text).not.toContain("snapped");
+      expect(Value.Check(tool.outputSchema, result.structuredContent)).toBe(true);
+    }
+  });
+
+  it.each([
     ["code_resolve", { target: { file: "missing.ts" } }],
     ["code_find", { query: "", mode: "semantic" }],
     ["code_graph", { target: { handle: "tg-missing" } }],

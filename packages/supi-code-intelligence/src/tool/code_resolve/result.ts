@@ -14,7 +14,11 @@ import {
 import { formatCandidateRow } from "../result/candidate-row.ts";
 import { createToolDisplaySection } from "../result/display.ts";
 import { scopedSymbolFailureMessage } from "../result/errors.ts";
-import type { ResolveDetails, ToolDisplaySection } from "../result/types.ts";
+import type {
+  AnchoredResolutionMetadata,
+  ResolveDetails,
+  ToolDisplaySection,
+} from "../result/types.ts";
 
 /** Presentation-neutral assembled code_resolve result. */
 export interface ResolveResultAssembly {
@@ -80,7 +84,7 @@ export function assembleResolveResult(
 function projectResolveOutcome(outcome: TargetWorkflowOutcome, cwd: string): ResolveProjection {
   switch (outcome.kind) {
     case "resolved":
-      return projectResolved(outcome.entry, cwd);
+      return projectResolved(outcome, cwd);
     case "target-group":
       return projectTargetGroup(outcome, cwd);
     case "disambiguation":
@@ -92,7 +96,11 @@ function projectResolveOutcome(outcome: TargetWorkflowOutcome, cwd: string): Res
   }
 }
 
-function projectResolved(target: Readonly<TargetStoreEntry>, cwd: string): ResolveProjection {
+function projectResolved(
+  outcome: Extract<TargetWorkflowOutcome, { kind: "resolved" }>,
+  cwd: string,
+): ResolveProjection {
+  const { entry: target, resolution } = outcome;
   const evidence = createEvidenceList({ key: "resolve.targets", items: [target] }).metadata;
   return {
     key: "resolve.targets",
@@ -107,7 +115,7 @@ function projectResolved(target: Readonly<TargetStoreEntry>, cwd: string): Resol
       targetCount: 1,
       omittedCount: 0,
       evidenceLists: [evidence],
-      targets: [toTargetDetails(target, cwd)],
+      targets: [toTargetDetails(target, cwd, resolution)],
       nextQueries: [],
     },
   };
@@ -228,7 +236,11 @@ function projectFailure(
   };
 }
 
-function toTargetDetails(target: Readonly<TargetStoreEntry>, cwd: string) {
+function toTargetDetails(
+  target: Readonly<TargetStoreEntry>,
+  cwd: string,
+  resolution?: AnchoredResolutionMetadata,
+) {
   return {
     targetId: target.targetId,
     spanId: target.spanId,
@@ -242,7 +254,7 @@ function toTargetDetails(target: Readonly<TargetStoreEntry>, cwd: string) {
     anchorKind: target.anchorKind,
     confidence: target.confidence,
     provenance: [...target.provenance],
-    resolution: target.resolution,
+    ...(resolution ? { resolution } : {}),
   };
 }
 

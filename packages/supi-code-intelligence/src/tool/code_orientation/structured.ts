@@ -81,7 +81,7 @@ function orientationProjection(
     };
   const data = outcome.data;
   const selected = data.workspace ? workspaceSections(data, data.workspace.maxResults, true) : data;
-  const target = data.target;
+  const { target, resolution } = data;
   return {
     ...base,
     kind: outcome.kind,
@@ -125,19 +125,13 @@ function orientationProjection(
             container: target.container,
             confidence: target.confidence,
             provenance: [...target.provenance],
-            ...(target.resolution
+            ...(resolution
               ? {
                   resolution: {
-                    requested: {
-                      line: target.resolution.requested.line,
-                      character: target.resolution.requested.character,
-                    },
-                    resolved: {
-                      line: target.resolution.resolved.line,
-                      character: target.resolution.resolved.character,
-                    },
-                    snapped: target.resolution.snapped,
-                    source: target.resolution.source,
+                    requested: { ...resolution.requested },
+                    resolved: { ...resolution.resolved },
+                    snapped: resolution.snapped,
+                    source: resolution.source,
                   },
                 }
               : {}),

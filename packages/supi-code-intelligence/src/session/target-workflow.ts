@@ -22,6 +22,7 @@ import type {
   TargetCandidateCompleteness,
   TargetOutcome,
 } from "../analysis/target/types.ts";
+import type { AnchoredResolutionMetadata } from "../types/index.ts";
 import type { CapabilityAdapter } from "./capability-adapter.ts";
 import { parseTargetInput } from "./input/common.ts";
 import { resolveWorkspaceSemanticDemand } from "./semantic-demand.ts";
@@ -49,7 +50,13 @@ export interface TargetWorkflowPolicy {
 
 /** Typed Target workflow outcome. */
 export type TargetWorkflowOutcome =
-  | { kind: "resolved"; entry: Readonly<TargetStoreEntry>; notes: readonly string[] }
+  | {
+      kind: "resolved";
+      entry: Readonly<TargetStoreEntry>;
+      /** Immutable observation of this anchored request, never stored with the target. */
+      readonly resolution?: AnchoredResolutionMetadata;
+      notes: readonly string[];
+    }
   | {
       kind: "target-group";
       file: string;
@@ -301,10 +308,12 @@ function toWorkflowOutcome(
       };
     }
     const registered = registerFromTargetData(outcome.target, deps);
+    const resolution = immutableResolution(outcome.target.resolution);
     return {
       kind: "resolved",
       entry: immutableEntry(registered.entry),
-      notes: buildResolutionNotes(outcome.target),
+      ...(resolution ? { resolution } : {}),
+      notes: buildResolutionNotes(resolution),
     };
   }
 
@@ -358,14 +367,16 @@ function registerTargetGroup(
   });
 }
 
-function buildResolutionNotes(target: ResolvedTargetData): readonly string[] {
+function buildResolutionNotes(
+  resolution: AnchoredResolutionMetadata | undefined,
+): readonly string[] {
   const notes: string[] = [];
-  if (target.resolution?.snapped) {
+  if (resolution?.snapped) {
     notes.push(
-      `Resolved from a declaration header and snapped to the identifier (${target.resolution.source}).`,
+      `Resolved from a declaration header and snapped to the identifier (${resolution.source}).`,
     );
   }
-  if (target.resolution?.source === "structural-identifier") {
+  if (resolution?.source === "structural-identifier") {
     notes.push("Resolved from provider-backed structural identifier evidence.");
   }
   return Object.freeze(notes);
@@ -394,7 +405,6 @@ function registerFromTargetData(
     provenance: target.provenance,
     anchorKind: target.anchorKind,
     container: target.container,
-    resolution: target.resolution,
     fileFingerprint,
   });
 }
@@ -407,12 +417,18 @@ function immutableEntry(entry: TargetStoreEntry): Readonly<TargetStoreEntry> {
     declarationPosition: entry.declarationPosition
       ? Object.freeze({ ...entry.declarationPosition })
       : entry.declarationPosition,
-    resolution: entry.resolution
-      ? Object.freeze({
-          ...entry.resolution,
-          requested: Object.freeze({ ...entry.resolution.requested }),
-          resolved: Object.freeze({ ...entry.resolution.resolved }),
-        })
-      : undefined,
   });
+}
+
+/** Keep the current request observation independent of provider and target-store state. */
+function immutableResolution(
+  resolution: AnchoredResolutionMetadata | undefined,
+): AnchoredResolutionMetadata | undefined {
+  return resolution
+    ? Object.freeze({
+        ...resolution,
+        requested: Object.freeze({ ...resolution.requested }),
+        resolved: Object.freeze({ ...resolution.resolved }),
+      })
+    : undefined;
 }

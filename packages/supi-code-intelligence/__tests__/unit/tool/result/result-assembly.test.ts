@@ -218,12 +218,12 @@ describe("canonical Tool result assembly", () => {
           provenance: ["semantic", "structural"] as const,
           anchorKind: "name",
           fileFingerprint: "fp",
-          resolution: {
-            requested: { line: 1, character: 17 },
-            resolved: { line: 1, character: 17 },
-            snapped: false,
-            source: "structural-identifier",
-          },
+        },
+        resolution: {
+          requested: { line: 1, character: 17 },
+          resolved: { line: 1, character: 17 },
+          snapped: false,
+          source: "structural-identifier",
         },
       },
       "/repo",
