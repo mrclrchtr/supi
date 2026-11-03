@@ -3,6 +3,7 @@ export interface CodeQueryPartialMetadata {
   /** Automatic path-policy evidence removed from a collected result. */
   readonly automaticPathExclusion?: {
     readonly excludedCount: number;
+    /** Observed policy paths, not canonical navigation paths; retain aliases when presenting exclusions. */
     readonly examples: readonly string[];
   };
 }

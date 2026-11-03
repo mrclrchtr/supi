@@ -17,6 +17,7 @@ import {
 import { isWithinOrEqual } from "@mrclrchtr/supi-core/project";
 import type { TargetSymbolKind } from "../../session/target-input.ts";
 import type { AnchorKind } from "../../session/target-store.ts";
+import { describePartialQuery } from "../search/exclusions.ts";
 import { normalizePath } from "../search/paths.ts";
 import type {
   DisambiguationCandidateData,
@@ -131,7 +132,7 @@ export async function resolveSymbolTarget(
       reason: `Symbol discovery for \`${symbol}\` is unavailable: ${result.reason}`,
     };
   }
-  if (result.data.length === 0) return emptySymbolOutcome(symbol, result, options?.path);
+  if (result.data.length === 0) return emptySymbolOutcome(symbol, result, cwd, options?.path);
 
   const scoped = result.data
     .filter((candidate) => (scopePath ? isWithinOrEqual(scopePath, candidate.file) : true))
@@ -139,7 +140,7 @@ export async function resolveSymbolTarget(
   const eligible = options?.exportedOnly
     ? scoped.filter((candidate) => !NON_EXPORTED_KINDS.has(candidate.kind))
     : scoped;
-  if (eligible.length === 0) return emptySymbolOutcome(symbol, result, options?.path);
+  if (eligible.length === 0) return emptySymbolOutcome(symbol, result, cwd, options?.path);
 
   const requestedKind = options?.kind;
   if (requestedKind) {
@@ -150,7 +151,7 @@ export async function resolveSymbolTarget(
       return buildCandidateOutcome({
         kind: "kind-mismatch",
         candidates: eligible,
-        ...candidateCompleteness(result, eligible.length),
+        ...candidateCompleteness(result, eligible.length, cwd),
         semantic,
         cwd,
         maxResults: options.maxResults,
@@ -160,7 +161,7 @@ export async function resolveSymbolTarget(
     }
     return resolveCandidates({
       candidates: exactKind,
-      ...candidateCompleteness(result, exactKind.length),
+      ...candidateCompleteness(result, exactKind.length, cwd),
       semantic,
       cwd,
       maxResults: options.maxResults,
@@ -170,7 +171,7 @@ export async function resolveSymbolTarget(
 
   return resolveCandidates({
     candidates: eligible,
-    ...candidateCompleteness(result, eligible.length),
+    ...candidateCompleteness(result, eligible.length, cwd),
     semantic,
     cwd,
     maxResults: options?.maxResults,
@@ -251,9 +252,14 @@ interface CandidateOutcomeBase {
 function candidateCompleteness(
   result: Exclude<CodeQueryResult<CodeSymbol[]>, { kind: "unavailable" }>,
   totalCount: number,
+  cwd: string,
 ): Omit<TargetCandidateCompleteness, "omittedCount"> {
   return result.kind === "partial"
-    ? { totalCount: null, partialReason: "provider-limited", partialMessage: result.reason }
+    ? {
+        totalCount: null,
+        partialReason: "provider-limited",
+        partialMessage: describePartialQuery(result.reason, result.metadata, cwd),
+      }
     : { totalCount, partialReason: null };
 }
 
@@ -272,12 +278,13 @@ type CandidateOutcomeOptions = CandidateOutcomeBase &
 function emptySymbolOutcome(
   symbol: string,
   result: Exclude<CodeQueryResult<CodeSymbol[]>, { kind: "unavailable" }>,
+  cwd: string,
   scope?: string,
 ): TargetOutcome {
   if (result.kind === "partial") {
     return {
       kind: "unavailable",
-      reason: `Symbol discovery for \`${symbol}\` is incomplete: ${result.reason}`,
+      reason: `Symbol discovery for \`${symbol}\` is incomplete: ${describePartialQuery(result.reason, result.metadata, cwd)}`,
     };
   }
   return {

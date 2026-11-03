@@ -161,6 +161,154 @@ const cases = [
 ];
 
 describe("registered code-tool external source paths", () => {
+  it.each([false, true])(
+    "groups equivalent recovery warnings without hiding distinct observations (distinct export: %s)",
+    async (distinctExport) => {
+      const reason = "Tree-sitter recovered syntax; structural evidence may be incomplete.";
+      const recovery = {
+        kind: "partial" as const,
+        file: alias,
+        reason,
+        errorRanges: [{ start: { line: 2, character: 0 }, end: { line: 2, character: 1 } }],
+      };
+      registerMockProvider(cwd, {
+        nodeAt: async () => ({
+          ...recovery,
+          data: {
+            type: "identifier",
+            text: "widget",
+            startLine: 1,
+            startCharacter: 17,
+            endLine: 1,
+            endCharacter: 23,
+            ancestry: [],
+          },
+        }),
+        outline: async () => ({ ...recovery, data: [] }),
+        imports: async () => ({ ...recovery, data: [] }),
+        exports: async () => ({
+          ...recovery,
+          reason: distinctExport ? "Export recovery!" : reason,
+          data: [],
+        }),
+      });
+      const pi = createPiMock();
+      registerCodeIntelligenceTools(pi as never, sessionCache.getOrCreate);
+      const tool = getTool(pi, "code_orientation") as unknown as RegisteredTool;
+      const result = await tool.execute(
+        "recovery",
+        { focus: { target: { anchor: anchor() } } },
+        undefined,
+        undefined,
+        makeCtx({ cwd }),
+      );
+      expect(Value.Check(tool.outputSchema, result.structuredContent)).toBe(true);
+      expect(result.structuredContent).toMatchObject({
+        sections: expect.arrayContaining([
+          expect.objectContaining({
+            key: "defs",
+            status: "partial",
+            facts: expect.objectContaining({
+              recovery: ["nodeAt", "outline", "imports", "exports"].map((operation) =>
+                expect.objectContaining({ operation, file, errorRanges: recovery.errorRanges }),
+              ),
+            }),
+          }),
+        ]),
+      });
+      const text = result.content.map((block) => block.text ?? "").join("\n");
+      const operations = distinctExport
+        ? "nodeAt, outline, imports"
+        : "nodeAt, outline, imports, exports";
+      const warning = `Partial ${operations} evidence in \`${file}\`: ${reason} Errors: L3:1.`;
+      expect(text).toContain(warning);
+      expect(text.split("\n").filter((line) => line.startsWith("Partial "))).toHaveLength(
+        distinctExport ? 2 : 1,
+      );
+      expect(text).not.toContain("incomplete..");
+      expect(text).not.toContain("recovery!.");
+      expect(result.details).toMatchObject({
+        displaySections: expect.arrayContaining([
+          expect.objectContaining({
+            key: "orientation.defs",
+            lines: expect.arrayContaining([warning]),
+          }),
+        ]),
+      });
+    },
+  );
+  it.each(["code_find", "code_resolve", "code_graph", "code_orientation"])(
+    "distinguishes an excluded observed alias from a retained canonical match in %s",
+    async (name) => {
+      registerMockProvider(cwd, {
+        workspaceSymbols: async () => ({
+          kind: "partial",
+          data: [
+            {
+              name: "widget",
+              kind: "Function",
+              file,
+              declarationAnchor: { line: 1, character: 1 },
+              nameAnchor: { line: 1, character: 17 },
+            },
+          ],
+          reason: "Index warming; Automatic path policy excluded 1 workspace-symbol result.",
+          metadata: { automaticPathExclusion: { excludedCount: 1, examples: [alias] } },
+        }),
+      });
+      const pi = createPiMock();
+      registerCodeIntelligenceTools(pi as never, sessionCache.getOrCreate);
+      const tool = getTool(pi, name) as unknown as RegisteredTool;
+      const symbol = { query: "widget" };
+      const input =
+        name === "code_find"
+          ? { query: "widget", mode: "semantic", scope: [file] }
+          : name === "code_orientation"
+            ? { focus: { target: { symbol } } }
+            : { target: { symbol } };
+      const result = await tool.execute(
+        "excluded-alias",
+        input,
+        undefined,
+        undefined,
+        makeCtx({ cwd }),
+      );
+      expect(Value.Check(tool.outputSchema, result.structuredContent)).toBe(true);
+      const explanation = `observed \`${alias}\` → canonical \`${file}\``;
+      const markdown = result.content.map((block) => block.text ?? "").join("\n");
+      expect(markdown).toContain(explanation);
+      expect(JSON.stringify(result.details)).toContain(explanation);
+      if (name === "code_find") {
+        expect(result.structuredContent).toMatchObject({
+          matches: [expect.objectContaining({ file })],
+          automaticPathExclusion: {
+            excludedCount: 1,
+            examples: [{ observedPath: alias, canonicalPath: file }],
+          },
+          partialReason: expect.stringContaining("Index warming"),
+          evidenceLists: [
+            expect.objectContaining({
+              totalCount: null,
+              shownCount: 1,
+              partialReason: "provider-limited",
+            }),
+          ],
+        });
+      } else {
+        expect(result.structuredContent).toMatchObject({
+          kind: "disambiguation",
+          evidenceLists: [
+            expect.objectContaining({
+              totalCount: null,
+              shownCount: 1,
+              partialMessage: expect.stringContaining(explanation),
+            }),
+          ],
+        });
+      }
+    },
+  );
+
   it("retains non-file definition observations while disclosing unavailable filesystem navigation", async () => {
     const uri = "jdt://contents/library/example.class";
     registerMockProvider(cwd, {

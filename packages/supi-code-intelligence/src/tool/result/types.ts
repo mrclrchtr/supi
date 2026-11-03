@@ -1,12 +1,9 @@
-import type {
-  CodeQueryPartialMetadata,
-  ConfidenceMode,
-  SourceRange,
-} from "@mrclrchtr/supi-code-runtime/api";
+import type { ConfidenceMode, SourceRange } from "@mrclrchtr/supi-code-runtime/api";
 import type { CapabilityWarningReport } from "../../analysis/capability/capability-warnings.ts";
 import type { EvidenceListMetadata } from "../../analysis/evidence.ts";
 import type { InstructionFilesMetadata } from "../../analysis/instruction-files.ts";
 import type { ReadNextItem } from "../../analysis/read-next.ts";
+import type { AutomaticPathExclusionDisplay } from "../../analysis/search/exclusions.ts";
 import type {
   StructuredFailure,
   StructuredMatch,
@@ -116,7 +113,7 @@ export interface SearchDetails {
   /** Per-file structural failures, including available syntax recovery ranges. */
   structuralFailures?: readonly StructuredFailure[];
   /** Structured disclosure for semantic results removed by the automatic path policy. */
-  automaticPathExclusion?: CodeQueryPartialMetadata["automaticPathExclusion"];
+  automaticPathExclusion?: AutomaticPathExclusionDisplay;
 }
 
 // Canonical disambiguation candidate — re-exported from resolution/types.ts

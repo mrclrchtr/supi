@@ -1766,7 +1766,9 @@ export class LspManager {
     if (options.retryFailedRoute) {
       this.retireMissingProjectRoots();
       const route = this.resolveFileRoute(resolvedPath);
-      if (!route || !this.automaticPathPolicy.isEligible(route.root, "directory")) {
+      // Exact-file demand, including refresh, bypasses automatic discovery exclusions.
+      // Keep the original route identity for document synchronization and bounded retries.
+      if (!route) {
         return {
           client: null,
           processCrashRecovery: emptyProcessCrashRecoveryReport(),

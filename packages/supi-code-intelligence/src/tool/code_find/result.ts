@@ -4,6 +4,11 @@ import {
   createPartialEvidenceList,
   type EvidenceListMetadata,
 } from "../../analysis/evidence.ts";
+import {
+  describeExcludedPath,
+  describePartialQuery,
+  displayAutomaticPathExclusion,
+} from "../../analysis/search/exclusions.ts";
 import { toDisplayPath } from "../../analysis/search/paths.ts";
 import type { FindMode, FindWorkflowOutcome } from "../../session/find-types.ts";
 import {
@@ -29,6 +34,10 @@ export function assembleFindWorkflowResult(
   cwd: string,
 ): FindResultAssembly {
   const outcome = withDisplayPaths(input, cwd);
+  const exclusion =
+    outcome.data.kind === "semantic"
+      ? displayAutomaticPathExclusion(outcome.data.partialMetadata?.automaticPathExclusion, cwd)
+      : undefined;
   const evidence = createFindEvidence(outcome);
   const confidence: ConfidenceMode = outcome.data.kind === "semantic" ? "semantic" : "structural";
   const nextQueries = findNextQueries(outcome);
@@ -64,6 +73,19 @@ export function assembleFindWorkflowResult(
     }),
   ];
 
+  if (exclusion?.examples.length) {
+    displaySections.push(
+      createToolDisplaySection({
+        key: "find.excludedPaths",
+        title: "Excluded path examples",
+        items: exclusion.examples,
+        totalCount: exclusion.examples.length,
+        omittedCount: 0,
+        format: describeExcludedPath,
+      }),
+    );
+  }
+
   return {
     outcome,
     assembled,
@@ -82,9 +104,7 @@ export function assembleFindWorkflowResult(
             structuralFailures: [...outcome.data.result.failures],
           }
         : {}),
-      ...(outcome.data.kind === "semantic" && outcome.data.partialMetadata?.automaticPathExclusion
-        ? { automaticPathExclusion: outcome.data.partialMetadata.automaticPathExclusion }
-        : {}),
+      ...(exclusion ? { automaticPathExclusion: exclusion } : {}),
     },
   };
 }
@@ -97,20 +117,14 @@ function withDisplayPaths(
   const display = (file: string) => toDisplayPath(cwd, file);
   const { data } = outcome;
   if (data.kind === "semantic") {
-    const exclusion = data.partialMetadata?.automaticPathExclusion;
     return {
       ...outcome,
       data: {
         ...data,
         symbols: data.symbols.map((symbol) => ({ ...symbol, file: display(symbol.file) })),
-        ...(exclusion
-          ? {
-              partialMetadata: {
-                ...data.partialMetadata,
-                automaticPathExclusion: { ...exclusion, examples: exclusion.examples.map(display) },
-              },
-            }
-          : {}),
+        partialReason: data.partialReason
+          ? describePartialQuery(data.partialReason, data.partialMetadata, cwd)
+          : null,
       },
     };
   }

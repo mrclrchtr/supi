@@ -96,10 +96,8 @@ function workspaceSymbolExclusionReason(collection: WorkspaceSymbolCollection): 
   const excludedCount = collection.excludedCount ?? 0;
   if (excludedCount === 0) return null;
   const noun = `workspace-symbol result${excludedCount === 1 ? "" : "s"}`;
-  const examples = collection.excludedExamples?.length
-    ? ` Examples: ${collection.excludedExamples.join(", ")}.`
-    : "";
-  return `Automatic path policy excluded ${excludedCount} ${noun}.${examples}`;
+  // Paths belong to typed metadata so consumers can distinguish observed aliases from navigation.
+  return `Automatic path policy excluded ${excludedCount} ${noun}.`;
 }
 
 /** Project one multi-client collection into the shared typed query contract. */

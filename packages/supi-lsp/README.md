@@ -249,7 +249,7 @@ Set `code-intelligence.exclude` in project or global SuPi configuration. A proje
 
 An old `lsp.exclude` value is a migration error. Move it to `code-intelligence.exclude`; SuPi does not edit personal configuration for you.
 
-An exact semantic request can still route an excluded file when a compatible server is available. This does not add the file to automatic work. Configured diagnostic suppression still applies to diagnostic output.
+An exact semantic request or exact-file health refresh can still route an excluded or external file when a compatible server is available. Explicit refresh can retry that file's failed route without applying automatic-discovery exclusions. Original route and document identities are preserved; display-path canonicalization does not merge alias routes. This does not add the file to automatic work. Configured diagnostic suppression still applies to diagnostic output.
 
 Tsconfig and jsconfig filtering applies only to TypeScript and JavaScript-family files (`.ts`, `.tsx`, `.mts`, `.cts`, `.js`, `.jsx`, `.mjs`, and `.cjs`). Other-language diagnostics are not filtered by a nearby TypeScript or JavaScript project config. Automatic path exclusions and configured diagnostic suppression still apply. A single-file health result omits the `Tsconfig` coverage line for other languages.
 

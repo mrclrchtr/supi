@@ -27,7 +27,7 @@ import type {
 } from "../orientation-types.ts";
 import type { TargetStoreEntry } from "../target-store.ts";
 import { collectContextOrientationFacts } from "./context-facts.ts";
-import { gatherSubstrateContext } from "./gather.ts";
+import { gatherSubstrateContext, type SubstrateContext } from "./gather.ts";
 
 interface TargetSectionCollection {
   readonly items: OrientationItem[];
@@ -263,9 +263,9 @@ async function buildEnrichedDefsSection(
   limit: number,
 ): Promise<TargetSectionCollection> {
   const items = buildDefinitionItems(target, deps.cwd, treeContext);
-  const recovery = treeContext?.recovery ?? [];
+  const recovery = groupedRecovery(treeContext?.recovery ?? [], deps.cwd);
   const recoveryReason = recovery
-    .map(({ operation, reason }) => `${operation}: ${reason}`)
+    .map(({ operations, reason }) => `${operations.join(", ")}: ${reason}`)
     .join("; ");
   const recoveryRanges = uniqueRecoveryRanges(recovery);
   const hasSemanticContext = Boolean(
@@ -699,6 +699,33 @@ function uniqueRecoveryRanges(
   return [...ranges.values()];
 }
 
+/** Group only equivalent display warnings; native per-operation observations remain untouched. */
+function groupedRecovery(recovery: SubstrateContext["recovery"], cwd: string) {
+  const groups = new Map<
+    string,
+    {
+      file: string;
+      reason: string;
+      errorRanges: readonly SourceRange[];
+      operations: string[];
+    }
+  >();
+  for (const item of recovery) {
+    const file = toDisplayPath(cwd, item.file);
+    const key = JSON.stringify([file, item.reason, item.errorRanges]);
+    const existing = groups.get(key);
+    if (existing) existing.operations.push(item.operation);
+    else
+      groups.set(key, {
+        file,
+        reason: item.reason,
+        errorRanges: item.errorRanges,
+        operations: [item.operation],
+      });
+  }
+  return [...groups.values()];
+}
+
 function buildDefinitionItems(
   target: Readonly<TargetStoreEntry> | null | undefined,
   cwd: string,
@@ -724,14 +751,16 @@ function buildDefinitionItems(
   if (treeContext?.nodeInfo?.type) {
     items.push({ kind: "list-item", text: `Node: \`${treeContext.nodeInfo.type}\`` });
   }
-  for (const recovery of treeContext?.recovery ?? []) {
+  for (const recovery of groupedRecovery(treeContext?.recovery ?? [], cwd)) {
     const locations = recovery.errorRanges.map(
       (range) => `L${range.start.line + 1}:${range.start.character + 1}`,
     );
     const suffix = locations.length > 0 ? ` Errors: ${locations.join(", ")}.` : "";
+    const reason = recovery.reason.trim();
+    const punctuation = /[.!?]$/.test(reason) ? "" : ".";
     items.push({
       kind: "paragraph",
-      text: `Partial ${recovery.operation} evidence in \`${toDisplayPath(cwd, recovery.file)}\`: ${recovery.reason}.${suffix}`,
+      text: `Partial ${recovery.operations.join(", ")} evidence in \`${recovery.file}\`: ${reason}${punctuation}${suffix}`,
     });
   }
   if (treeContext?.hover?.contents) {

@@ -36,7 +36,18 @@ export const FindOutputSchema = Type.Object(
     message: Type.Optional(Type.String()),
     partialReason: Type.Optional(Type.Union([Type.String(), Type.Null()])),
     automaticPathExclusion: Type.Optional(
-      Type.Object({ excludedCount: Type.Integer(), examples: Type.Array(Type.String()) }),
+      Type.Object({
+        excludedCount: Type.Integer(),
+        examples: Type.Array(
+          Type.Object({
+            observedPath: Type.String({
+              description:
+                "Original path observed by the exclusion policy, not a canonical navigation path.",
+            }),
+            canonicalPath: Type.String({ description: "Canonical source navigation path." }),
+          }),
+        ),
+      }),
     ),
     scan: Type.Optional(
       Type.Object({
@@ -92,7 +103,7 @@ export function structuredFindResult(
     nextQueries: assembly.details.nextQueries,
   };
   if (data.kind === "semantic") {
-    const exclusion = data.partialMetadata?.automaticPathExclusion;
+    const exclusion = assembly.details.automaticPathExclusion;
     return {
       ...base,
       matches: data.symbols.slice(0, shown).map((symbol) => {
@@ -112,7 +123,7 @@ export function structuredFindResult(
         ? {
             automaticPathExclusion: {
               excludedCount: exclusion.excludedCount,
-              examples: [...exclusion.examples],
+              examples: exclusion.examples.map((example) => ({ ...example })),
             },
           }
         : {}),

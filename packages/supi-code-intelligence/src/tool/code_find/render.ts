@@ -4,6 +4,10 @@ import {
   type EvidenceListMetadata,
   renderEvidenceListMetadataDisclosure,
 } from "../../analysis/evidence.ts";
+import {
+  type AutomaticPathExclusionDisplay,
+  describeExcludedPath,
+} from "../../analysis/search/exclusions.ts";
 import { renderStructuredEmptyState, renderStructuredMatches } from "./markdown.ts";
 import type { FindResultAssembly } from "./result.ts";
 
@@ -52,19 +56,19 @@ function renderSemantic(assembly: FindResultAssembly, evidence: EvidenceListMeta
   const disclosure = renderEvidenceListMetadataDisclosure(evidence);
   if (disclosure) lines.push(disclosure);
   const exclusionDisclosure = renderAutomaticPathExclusionDisclosure(
-    outcome.data.partialMetadata?.automaticPathExclusion,
+    assembly.details.automaticPathExclusion,
   );
   if (exclusionDisclosure) lines.push(exclusionDisclosure);
   return lines.join("\n");
 }
 
 function renderAutomaticPathExclusionDisclosure(
-  exclusion: { readonly excludedCount: number; readonly examples: readonly string[] } | undefined,
+  exclusion: AutomaticPathExclusionDisplay | undefined,
 ): string | null {
   if (!exclusion || exclusion.excludedCount <= 0) return null;
   const noun = `workspace-symbol result${exclusion.excludedCount === 1 ? "" : "s"}`;
   const examples = exclusion.examples.length
-    ? ` Examples: ${exclusion.examples.map((file) => `\`${file}\``).join(", ")}.`
+    ? ` Excluded path examples: ${exclusion.examples.map(describeExcludedPath).join(", ")}.`
     : "";
   return `_Automatic path policy excluded ${exclusion.excludedCount} ${noun}.${examples}_`;
 }
@@ -82,7 +86,7 @@ function renderEmptySemantic(assembly: FindResultAssembly, evidence: EvidenceLis
   const disclosure = renderEvidenceListMetadataDisclosure(evidence);
   if (disclosure) lines.push("", disclosure);
   const exclusionDisclosure = renderAutomaticPathExclusionDisclosure(
-    outcome.data.partialMetadata?.automaticPathExclusion,
+    assembly.details.automaticPathExclusion,
   );
   if (exclusionDisclosure) lines.push("", exclusionDisclosure);
   lines.push("", "Document-level semantic symbols can differ from the workspace index.");

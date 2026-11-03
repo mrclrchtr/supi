@@ -421,9 +421,12 @@ describe("structured navigation results", () => {
     expect(result.structuredContent).toMatchObject({
       kind: "completed",
       matches: [],
-      partialReason: "Index warming",
+      partialReason: expect.stringContaining("Index warming"),
       evidenceLists: [{ totalCount: null, partialReason: "provider-limited" }],
-      automaticPathExclusion: { excludedCount: 2, examples: ["build/index.ts"] },
+      automaticPathExclusion: {
+        excludedCount: 2,
+        examples: [{ observedPath: "build/index.ts", canonicalPath: "build/index.ts" }],
+      },
     });
     expect(Value.Check(tool.outputSchema, result.structuredContent)).toBe(true);
   });

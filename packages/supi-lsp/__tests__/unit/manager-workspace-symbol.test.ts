@@ -142,8 +142,7 @@ describe("LspManager.workspaceSymbol filtering", () => {
     expect(filtered).toMatchObject({
       kind: "partial",
       data: [symbols[2]],
-      reason:
-        "Automatic path policy excluded 2 workspace-symbol results. Examples: configured/drop.ts.",
+      reason: "Automatic path policy excluded 2 workspace-symbol results.",
       metadata: {
         automaticPathExclusion: {
           excludedCount: 2,
