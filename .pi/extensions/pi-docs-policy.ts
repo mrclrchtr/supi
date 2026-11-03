@@ -1,6 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
-const STOCK_PI_DOCS_POLICY = `- Always read pi .md files completely and follow links to related docs (e.g., tui.md for TUI API details)`;
+const STOCK_PI_DOCS_POLICY = `- Before implementing harness changes, read the relevant docs and examples in full, following related cross-references.`;
 const SUPI_PI_DOCS_POLICY = `- Read relevant sections of pi .md files; follow links to related docs (e.g., tui.md for TUI API details) when needed for the task.`;
 
 /** Replaces Pi's generic documentation-reading policy with SuPi's evidence-scaled policy. */
