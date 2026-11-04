@@ -25,6 +25,7 @@ function makeManager(overrides: Record<string, unknown>): Manager {
   return {
     getCwd: () => "/project",
     hasConfiguredServerForFile: () => true,
+    hasFailedStartupForFile: () => false,
     getScopeDecisionSummary: () => ({
       caseSensitiveFileNames: true,
       counts: { included: 0, excluded: 0, noConfig: 0, outOfTree: 0 },

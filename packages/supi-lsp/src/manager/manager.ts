@@ -439,6 +439,14 @@ export class LspManager {
     return getServerForFile(this.config, resolveSessionPath(this.cwd, filePath)) !== null;
   }
 
+  /** Observe a retained initial-start failure without retrying or conflating process-crash recovery. */
+  hasFailedStartupForFile(filePath: string): boolean {
+    const route = this.resolveFileRoute(filePath);
+    if (!route || this.processCrashRecoveries.has(route.key)) return false;
+    const reason = this.unavailable.get(route.key);
+    return reason === "start-failed" || reason === "missing-command";
+  }
+
   /** Check whether a file path has an available LSP server for explicit semantic operations. */
   canServeFile(filePath: string): boolean {
     const route = this.resolveFileRoute(filePath);

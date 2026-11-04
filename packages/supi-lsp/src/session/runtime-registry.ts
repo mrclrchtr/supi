@@ -139,6 +139,8 @@ function recordScopeDecisionEvent(manager: LspManager): void {
   }
 }
 
+const FILE_STARTUP_FAILURE_REASON = "The routed LSP client could not be started for this file";
+
 class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
   constructor(private readonly manager: LspManager) {}
 
@@ -347,10 +349,7 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
     if (!client) {
       return {
         kind: "unavailable",
-        reason: this.fileUnavailableReason(
-          resolvedPath,
-          "The routed LSP client could not be started for this file",
-        ),
+        reason: this.fileUnavailableReason(resolvedPath, FILE_STARTUP_FAILURE_REASON),
         ...startup,
         ...recovery,
       };
@@ -359,9 +358,12 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
   }
 
   private fileUnavailableReason(filePath: string, configuredRouteReason: string): string {
-    return this.manager.hasConfiguredServerForFile(filePath)
-      ? configuredRouteReason
-      : "No compatible LSP server is configured for this file";
+    if (!this.manager.hasConfiguredServerForFile(filePath)) {
+      return "No compatible LSP server is configured for this file";
+    }
+    return this.manager.hasFailedStartupForFile(filePath)
+      ? FILE_STARTUP_FAILURE_REASON
+      : configuredRouteReason;
   }
 
   /**

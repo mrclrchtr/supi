@@ -41,9 +41,10 @@ describe("registered exact-file health refresh outside automatic scope", () => {
     fs.writeFileSync(file, "source\n");
     const gate = path.join(root, "can-start");
     const launcher = path.join(root, "launcher.mjs");
+    const launches = path.join(root, "launches.log");
     fs.writeFileSync(
       launcher,
-      `import { existsSync } from "node:fs";\nif (!existsSync(${JSON.stringify(gate)})) process.exit(1);\nawait import(${JSON.stringify(pathToFileURL(FIXTURE).href)});\n`,
+      `import { appendFileSync, existsSync } from "node:fs";\nappendFileSync(${JSON.stringify(launches)}, "start\\n");\nif (!existsSync(${JSON.stringify(gate)})) process.exit(1);\nawait import(${JSON.stringify(pathToFileURL(FIXTURE).href)});\n`,
     );
     writeIsolatedFixtureConfig(cwd, {
       args: [launcher, path.join(root, "server.log"), "1", "pull"],
@@ -71,10 +72,18 @@ describe("registered exact-file health refresh outside automatic scope", () => {
       return (result as { structuredContent: unknown }).structuredContent;
     };
     const failedStartup = "The routed LSP client could not be started for this file";
-    expect(await request(aliasFile, false)).toMatchObject({
-      diagnostics: { kind: "unavailable", reason: failedStartup },
-      semanticState: { kind: "unavailable", reason: failedStartup },
-    });
+    for (const { refresh, starts } of [
+      { refresh: false, starts: 1 },
+      { refresh: false, starts: 1 },
+      { refresh: true, starts: 2 },
+      { refresh: false, starts: 2 },
+    ]) {
+      expect(await request(aliasFile, refresh)).toMatchObject({
+        diagnostics: { kind: "unavailable", reason: failedStartup },
+        semanticState: { kind: "unavailable", reason: failedStartup },
+      });
+      expect(fs.readFileSync(launches, "utf-8").trim().split("\n")).toHaveLength(starts);
+    }
     const unsupported = path.join(external, "unsupported.supilive");
     fs.writeFileSync(unsupported, "unsupported route\n");
     for (const refresh of [false, true]) {
@@ -116,6 +125,11 @@ describe("registered exact-file health refresh outside automatic scope", () => {
       diagnostics: { kind: "completed", evidence: { confirmed: 1, failed: 0 } },
       refresh: { fileReadiness: "ready", startupRetry: { recoveredRoutes: 0, failedRoutes: 0 } },
     });
+    expect(await request(aliasFile, false)).toMatchObject({
+      semanticState: { kind: "ready" },
+      diagnostics: { kind: "completed", evidence: { confirmed: 1, failed: 0 } },
+    });
+    expect(fs.readFileSync(launches, "utf-8").trim().split("\n")).toHaveLength(4);
   });
 
   it("refreshes an external file that already has confirmed diagnostic evidence", async () => {
