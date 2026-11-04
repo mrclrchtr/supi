@@ -16,7 +16,11 @@ export const codeInspectSpec = {
   parameters: Type.Object(
     {
       point: SourcePointParam,
-      maxResults: Type.Optional(MaxResultsParam),
+      maxResults: Type.Optional({
+        ...MaxResultsParam,
+        description:
+          "Maximum entries per definition or diagnostic list; does not limit syntax or hover text.",
+      }),
     },
     { additionalProperties: false },
   ),
