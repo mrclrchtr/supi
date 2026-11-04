@@ -2965,6 +2965,7 @@ export class LspManager {
     const results = collection.results.filter((result) => {
       const file = uriToFile(result.location.uri);
       if (this.isWorkspaceSymbolResultAllowed(file, scopes)) return true;
+      if (!this.isWorkspaceSymbolExclusionRelevant(file, scopes)) return false;
       excludedCount++;
       const example = displayRelativeFilePath(file, this.cwd);
       if (excludedExamples.size < 5) excludedExamples.add(example);
@@ -2976,6 +2977,26 @@ export class LspManager {
       excludedCount: (collection.excludedCount ?? 0) + excludedCount,
       excludedExamples: [...excludedExamples].slice(0, 5),
     };
+  }
+
+  /** Only proven-disjoint exclusions can be omitted from scoped completeness. */
+  private isWorkspaceSymbolExclusionRelevant(
+    filePath: string,
+    scopes: readonly string[] | undefined,
+  ): boolean {
+    if (!scopes?.length || !path.isAbsolute(filePath)) return true;
+    if (scopes.some((scope) => projectRoots.isWithinOrEqual(scope, filePath))) return true;
+    try {
+      // Observed spellings and physical identities both matter: an excluded
+      // alias may point into scope even when its spelling is outside it.
+      const physicalFile = fs.realpathSync(filePath);
+      return scopes.some((scope) =>
+        projectRoots.isWithinOrEqual(fs.realpathSync(scope), physicalFile),
+      );
+    } catch {
+      // Missing, unreadable or otherwise unresolved paths cannot prove absence.
+      return true;
+    }
   }
 
   /** Keep explicitly selected excluded scopes inspectable while filtering broad results. */

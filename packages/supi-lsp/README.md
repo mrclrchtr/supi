@@ -64,6 +64,8 @@ A configured route is not a ready server. Features depend on the active server, 
 
 The [operation-support model](src/config/operation-support.ts) separates server advertisement from SuPi planning limits. A server can advertise an action that SuPi cannot safely turn into a plan.
 
+Workspace-symbol scopes select contributing routes and bound query completeness; returned data can still contain out-of-scope rows, which consumers must filter. An automatic-policy exclusion does not make a scoped query partial when both its observed path and physical identity are proven outside every requested scope. In-scope exclusions, aliases that may overlap, unresolved paths, and contributing route failures remain partial. Unscoped queries retain all exclusion evidence. Explicitly selected excluded files and directories remain inspectable; automatic path rules and target-uniqueness checks are unchanged.
+
 ### Reference-server acceptance
 
 The [Code Intelligence acceptance suite](../supi-code-intelligence/__tests__/acceptance/language-baseline-harness.ts) exercises public tools against real servers for TypeScript, JavaScript, Python, Java, Go, Rust, C, and C++. Its [pinned Linux/macOS configuration](../../scripts/language-baseline/pins.json) is separate from the built-in route matrix. Qualification remains pending until both pinned CI jobs pass. Missing test prerequisites are failures, not skipped passes.

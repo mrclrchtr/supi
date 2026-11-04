@@ -6,3 +6,4 @@
 - Capped `code_graph` reference results distribute sites across files, with matching source-reading suggestions.
 - Fixed transient navigation failures when parallel requests first access different files, while retaining freshness checks.
 - Rename and code-action planning now coordinate concurrent first file accesses without blocking parallel reads or weakening edit freshness checks.
+- Scoped symbol queries no longer become incomplete solely because generated results were excluded outside the requested scope; ambiguous or genuinely incomplete evidence still requires explicit selection.

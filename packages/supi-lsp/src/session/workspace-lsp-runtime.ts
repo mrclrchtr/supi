@@ -143,7 +143,11 @@ export interface WorkspaceLspRuntime extends WorkspaceLspDiagnosticSurface {
     filePath: string,
     control?: CodeRequestControl,
   ): Promise<CodeQueryResult<DocumentSymbol[] | SymbolInformation[]>>;
-  /** Collect symbols from routes that can contribute within the optional path scopes. */
+  /**
+   * Collect symbols from contributing routes; completeness is relative to scopes.
+   * Data may include out-of-scope rows, which callers must filter themselves.
+   * Only policy exclusions proven outside every scope are irrelevant to completeness.
+   */
   workspaceSymbol(
     query: string,
     control?: CodeRequestControl,

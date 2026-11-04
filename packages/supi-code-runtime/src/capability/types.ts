@@ -77,7 +77,9 @@ export interface SemanticProvider {
   ): Promise<CodeQueryResult<DocumentCodeSymbol[]>>;
   /**
    * Collect workspace symbols from routes that can contribute within the
-   * optional canonical path scopes.
+   * optional path scopes. Completeness is relative to those scopes, but data
+   * may include out-of-scope rows; consumers must filter rows themselves.
+   * Policy exclusions proven outside every scope do not make the query partial.
    */
   workspaceSymbols(
     query: string,

@@ -6,6 +6,9 @@ const responseDelayMs = Number(process.argv[3] ?? 25);
 const supportsDiagnostics = process.argv[4] === "pull";
 const failWorkspaceSymbols = process.argv.includes("--workspace-symbol-error");
 const symbolsFromOpenFiles = process.argv.includes("--workspace-symbol-open-files");
+const symbolsFile = process.argv
+  .find((arg) => arg.startsWith("--workspace-symbol-results="))
+  ?.slice("--workspace-symbol-results=".length);
 const holdResponses = process.argv.includes("--hold-responses");
 const readinessDelayArg = process.argv.find((arg) => arg.startsWith("--readiness-delay="));
 const readinessDelayMs = readinessDelayArg
@@ -164,21 +167,23 @@ function handle(message) {
       });
     } else {
       const name = message.params.query;
-      const symbols = symbolsFromOpenFiles
-        ? [...documents.keys()]
-            .filter((uri) => uri.endsWith(`/${name}.tsx`))
-            .map((uri) => ({
-              name,
-              kind: 12,
-              location: {
-                uri,
-                range: {
-                  start: { line: 0, character: 16 },
-                  end: { line: 0, character: 16 + name.length },
+      const symbols = symbolsFile
+        ? JSON.parse(fs.readFileSync(symbolsFile, "utf8"))
+        : symbolsFromOpenFiles
+          ? [...documents.keys()]
+              .filter((uri) => uri.endsWith(`/${name}.tsx`))
+              .map((uri) => ({
+                name,
+                kind: 12,
+                location: {
+                  uri,
+                  range: {
+                    start: { line: 0, character: 16 },
+                    end: { line: 0, character: 16 + name.length },
+                  },
                 },
-              },
-            }))
-        : [];
+              }))
+          : [];
       if (holdResponses && symbols.length === 0) {
         // Let an empty discovery enter warm-up while another response stays held.
         send({ jsonrpc: "2.0", id: message.id, result: symbols });
