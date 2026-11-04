@@ -3,8 +3,12 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
 import { LspRuntimeController } from "@mrclrchtr/supi-lsp/api";
+import { createPiMock, getTool, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { WorkspaceCodeIntelligenceSession } from "../../src/session/session.ts";
+import { codeRefactorPlanSpec } from "../../src/tool/code_refactor_plan/spec.ts";
+import { registerCodeIntelligenceTools } from "../../src/tool/register.ts";
+import type { CodeIntelResult } from "../../src/types/index.ts";
 import { writeIsolatedFixtureConfig } from "../helpers/public-lsp-config.ts";
 
 const FIXTURE = resolve(import.meta.dirname, "../fixtures/lsp-rename-enrollment-server.mjs");
@@ -130,19 +134,38 @@ describe("rename planning across document enrollment", () => {
     });
   }, 15_000);
 
-  it("plans and applies a cross-file rename when only enrollment changes the inputs", async () => {
+  it("plans through the registered tool and applies a cross-file rename across enrollment", async () => {
     workspace = await startWorkspace();
-    const { plan } = await beginRename(workspace);
-    workspace.release();
-    const planned = await plan;
-    expect(planned.kind).toBe("completed");
-    if (planned.kind !== "completed") throw new Error(`Planning returned ${planned.kind}`);
+    const active = workspace;
+    const pi = createPiMock();
+    registerCodeIntelligenceTools(pi as never, () => active.session, undefined, [
+      codeRefactorPlanSpec,
+    ]);
+    const plan = getTool(pi, "code_refactor_plan").execute(
+      "rename-enrollment",
+      { target: { handle: active.targetId }, operation: { rename_symbol: { newName: "newName" } } },
+      undefined,
+      undefined,
+      makeCtx({ cwd: dirname(active.source) }),
+    );
+    pending = plan;
+    void plan.catch(() => {});
+    await vi.waitFor(() =>
+      expect(active.runtime.getOpenDocumentVersion(active.reference)).not.toBeNull(),
+    );
+    active.release();
+    const planned = (await plan) as CodeIntelResult;
+    expect(planned.structuredContent).toMatchObject({
+      kind: "completed",
+      fileCount: 2,
+      editCount: 2,
+      planId: expect.any(String),
+    });
+    const { planId } = planned.structuredContent as { planId: string };
     expect(readFileSync(workspace.source, "utf8")).toBe("function oldName() {}\n");
     expect(readFileSync(workspace.reference, "utf8")).toBe("oldName();\n");
 
-    await expect(
-      workspace.session.applyRefactor({ planId: planned.plan.id }),
-    ).resolves.toMatchObject({
+    await expect(workspace.session.applyRefactor({ planId })).resolves.toMatchObject({
       kind: "completed",
       result: { filesChanged: 2, totalEdits: 2 },
     });

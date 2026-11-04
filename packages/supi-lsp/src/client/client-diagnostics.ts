@@ -127,7 +127,7 @@ export class ClientDiagnostics {
     });
   }
 
-  /** Keep first enrollment outside one read-only request's acceptance region. */
+  /** Keep first enrollment outside a semantic query or refactor-planning attempt. */
   withSemanticRequest<T>(
     run: () => Promise<T>,
     control?: CodeRequestControl,

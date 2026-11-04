@@ -16,7 +16,7 @@ interface PendingInputOperation {
 }
 
 /**
- * Admit first opens between read-only request attempts on one current client.
+ * Admit first opens between semantic query and refactor-planning attempts on one client.
  * Consecutive readers run concurrently; FIFO admission prevents either new
  * readers or enrollments from overtaking a waiting operation. This is not
  * diagnostic transport ownership: an interrupted semantic attempt can release
@@ -28,7 +28,7 @@ export class SemanticInputAdmission {
   #enrolling = false;
   #disposed = false;
 
-  /** Cover synchronization, one RPC and its acceptance check, never its retry. */
+  /** Cover one attempt's synchronization, RPCs and acceptance, never its retry. */
   request<T>(run: () => Promise<T>, control?: CodeRequestControl, uri?: string): Promise<T> {
     return this.#run("request", uri, run, control);
   }

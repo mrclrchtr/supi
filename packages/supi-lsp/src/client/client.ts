@@ -1285,6 +1285,7 @@ export class LspClient {
           | undefined;
       },
       {
+        documentUri: params.textDocument.uri,
         inputRevision: options.inputRevision,
         onVerifiedSnapshot: (snapshot) => {
           inputRevision = snapshot.revision;
@@ -1336,17 +1337,22 @@ export class LspClient {
       triggerKind: context.triggerKind ?? CodeActionTriggerKind.Invoked,
       ...(context.only ? { only: [...context.only] } : {}),
     };
-    return this.runRefactorTransaction("textDocument/codeAction", control, async (transaction) => {
-      const raw = await transaction.rpc.sendRequest(
-        "textDocument/codeAction",
-        { textDocument: { uri: fileToUri(filePath) }, range, context: requestContext },
-        control,
-      );
-      if (raw === null || raw === undefined) return null;
-      if (!Array.isArray(raw)) throw new Error("LSP server returned malformed code actions.");
+    return this.runRefactorTransaction(
+      "textDocument/codeAction",
+      control,
+      async (transaction) => {
+        const raw = await transaction.rpc.sendRequest(
+          "textDocument/codeAction",
+          { textDocument: { uri: fileToUri(filePath) }, range, context: requestContext },
+          control,
+        );
+        if (raw === null || raw === undefined) return null;
+        if (!Array.isArray(raw)) throw new Error("LSP server returned malformed code actions.");
 
-      return this.resolveCodeActions(raw, transaction, control, requestContext.only);
-    });
+        return this.resolveCodeActions(raw, transaction, control, requestContext.only);
+      },
+      { documentUri: fileToUri(filePath) },
+    );
   }
 
   async implementation(
@@ -1411,9 +1417,10 @@ export class LspClient {
     control: CodeRequestControl | undefined,
     operation: (transaction: RefactorTransaction) => Promise<T | null | undefined>,
     options: {
+      readonly documentUri: string;
       readonly onVerifiedSnapshot?: (snapshot: SemanticInputSnapshot) => void;
       readonly inputRevision?: number;
-    } = {},
+    },
   ): Promise<CodeQueryResult<T | null>> {
     throwIfCodeRequestInterrupted(control);
     if (!this.rpc || this._status !== "running") {
@@ -1432,6 +1439,7 @@ export class LspClient {
         retryGuard.assertCurrent();
         const data = await this.runRefactorTransactionAttempt({
           method,
+          documentUri: options.documentUri,
           control,
           operation,
           retryGuard,
@@ -1473,9 +1481,10 @@ export class LspClient {
     }
   }
 
-  /** Run the complete prepare/request/resolve transaction for one input snapshot. */
+  /** Admit one prepare/request/resolve attempt, not retries or rename's own enrollment. */
   private async runRefactorTransactionAttempt<T>(options: {
     method: string;
+    documentUri: string;
     control?: CodeRequestControl;
     operation: (transaction: RefactorTransaction) => Promise<T | null | undefined>;
     retryGuard: SemanticInputRequestRetryGuard;
@@ -1486,27 +1495,36 @@ export class LspClient {
     throwIfCodeRequestInterrupted(control);
     retryGuard.assertCurrent();
     await this.getReady(control);
-    const inputSnapshot = await this.diagnostics.synchronizeSemanticInputs(control);
-    attempt.inputRevision = inputSnapshot.revision;
-    throwIfCodeRequestInterrupted(control);
-    retryGuard.assertCurrent();
-    const rpc = this.rpc;
-    if (!rpc || this._status !== "running") {
-      throw new Error(`LSP request ${method} is unavailable because the client is not running.`);
-    }
-    const data = await operation({
-      rpc,
-      assertCurrent: async () => {
+    return this.diagnostics.withSemanticRequest(
+      async () => {
         retryGuard.assertCurrent();
-        return this.diagnostics.assertSemanticInputsCurrent(inputSnapshot, control);
+        const inputSnapshot = await this.diagnostics.synchronizeSemanticInputs(control);
+        attempt.inputRevision = inputSnapshot.revision;
+        throwIfCodeRequestInterrupted(control);
+        retryGuard.assertCurrent();
+        const rpc = this.rpc;
+        if (!rpc || this._status !== "running") {
+          throw new Error(
+            `LSP request ${method} is unavailable because the client is not running.`,
+          );
+        }
+        const data = await operation({
+          rpc,
+          assertCurrent: async () => {
+            retryGuard.assertCurrent();
+            return this.diagnostics.assertSemanticInputsCurrent(inputSnapshot, control);
+          },
+        });
+        const verifiedSnapshot = await this.diagnostics.assertSemanticInputsCurrent(
+          inputSnapshot,
+          control,
+        );
+        onVerifiedSnapshot?.(verifiedSnapshot);
+        return data ?? null;
       },
-    });
-    const verifiedSnapshot = await this.diagnostics.assertSemanticInputsCurrent(
-      inputSnapshot,
       control,
+      options.documentUri,
     );
-    onVerifiedSnapshot?.(verifiedSnapshot);
-    return data ?? null;
   }
 
   private async query<T>(
