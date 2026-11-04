@@ -76,6 +76,23 @@ const mocks = vi.hoisted(() => {
       this.listener?.("crash");
     }
 
+    async restoreDocument(
+      file: string,
+      readContent: () => string,
+      isCurrent: () => boolean,
+    ): Promise<void> {
+      if (!isCurrent()) return;
+      try {
+        await this.openDocument(file, readContent);
+      } catch {
+        if (isCurrent()) this.markFailedFile(file);
+      }
+    }
+
+    async openDocument(file: string, readContent: () => string): Promise<void> {
+      this.didOpen(file, readContent());
+    }
+
     didOpen(file: string, content: string): void {
       if (!this.openFiles.includes(file)) this.openFiles.push(file);
       this.openContents.set(file, content);

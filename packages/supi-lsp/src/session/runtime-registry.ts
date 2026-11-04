@@ -159,6 +159,7 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
     const resolvedPath = this.resolveFilePath(filePath);
     const client = await this.manager.ensureFileOpen(resolvedPath, {
       recoverProcessCrash: true,
+      protectInputs: true,
       control,
     });
     if (!client) return unavailableFileQuery("hover", resolvedPath);
@@ -173,6 +174,7 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
     const resolvedPath = this.resolveFilePath(filePath);
     const client = await this.manager.ensureFileOpen(resolvedPath, {
       recoverProcessCrash: true,
+      protectInputs: true,
       control,
     });
     if (!client) return unavailableFileQuery("definition", resolvedPath);
@@ -187,6 +189,7 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
     const resolvedPath = this.resolveFilePath(filePath);
     const client = await this.manager.ensureFileOpen(resolvedPath, {
       recoverProcessCrash: true,
+      protectInputs: true,
       control,
     });
     if (!client) return unavailableFileQuery("references", resolvedPath);
@@ -204,6 +207,7 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
     const resolvedPath = this.resolveFilePath(filePath);
     const client = await this.manager.ensureFileOpen(resolvedPath, {
       recoverProcessCrash: true,
+      protectInputs: true,
       control,
     });
     if (!client) return unavailableFileQuery("implementation", resolvedPath);
@@ -217,6 +221,7 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
     const resolvedPath = this.resolveFilePath(filePath);
     const client = await this.manager.ensureFileOpen(resolvedPath, {
       recoverProcessCrash: true,
+      protectInputs: true,
       control,
     });
     if (!client) return unavailableFileQuery("document symbols", resolvedPath);
@@ -262,6 +267,7 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
     const resolvedPath = this.resolveFilePath(filePath);
     const client = await this.manager.ensureFileOpen(resolvedPath, {
       recoverProcessCrash: true,
+      protectInputs: true,
       control,
     });
     if (!client) return null;

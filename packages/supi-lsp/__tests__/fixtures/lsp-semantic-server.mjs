@@ -6,11 +6,20 @@ const responseDelayMs = Number(process.argv[3] ?? 25);
 const supportsDiagnostics = process.argv[4] === "pull";
 const failWorkspaceSymbols = process.argv.includes("--workspace-symbol-error");
 const symbolsFromOpenFiles = process.argv.includes("--workspace-symbol-open-files");
+const holdResponses = process.argv.includes("--hold-responses");
 const readinessDelayArg = process.argv.find((arg) => arg.startsWith("--readiness-delay="));
 const readinessDelayMs = readinessDelayArg
   ? Number(readinessDelayArg.slice("--readiness-delay=".length))
   : 1;
 const documents = new Map();
+
+if (process.argv.includes("--crash-on-file")) {
+  setInterval(() => {
+    if (!fs.existsSync(`${logPath}.crash`)) return;
+    fs.unlinkSync(`${logPath}.crash`);
+    process.exit(1);
+  }, 5);
+}
 
 function log(method, params) {
   fs.appendFileSync(logPath, `${JSON.stringify({ method, params })}\n`);
@@ -22,7 +31,14 @@ function send(message) {
 }
 
 function respond(id, result) {
-  setTimeout(() => send({ jsonrpc: "2.0", id, result }), responseDelayMs);
+  const finish = () => {
+    if (holdResponses && !fs.existsSync(`${logPath}.release`)) {
+      setTimeout(finish, 5);
+      return;
+    }
+    send({ jsonrpc: "2.0", id, result });
+  };
+  setTimeout(finish, responseDelayMs);
 }
 
 function diagnosticItems(uri) {
@@ -163,7 +179,12 @@ function handle(message) {
               },
             }))
         : [];
-      respond(message.id, symbols);
+      if (holdResponses && symbols.length === 0) {
+        // Let an empty discovery enter warm-up while another response stays held.
+        send({ jsonrpc: "2.0", id: message.id, result: symbols });
+      } else {
+        respond(message.id, symbols);
+      }
     }
     return;
   }

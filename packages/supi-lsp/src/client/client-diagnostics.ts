@@ -47,6 +47,7 @@ import {
 } from "./client-document-state.ts";
 import { clearTrackedDocumentState, synchronizeTrackedDocument } from "./client-document-sync.ts";
 import { getDiagnosticFileState } from "./client-file-state.ts";
+import { SemanticInputAdmission } from "./client-input-admission.ts";
 import { SemanticInputRequestRetryGuard } from "./client-request-enrollment.ts";
 import {
   SemanticInputBarrier,
@@ -103,6 +104,7 @@ export class ClientDiagnostics {
   /** URIs closed by a lifecycle operation: versioned pushes stay fail-closed. */
   readonly #closedVersionedBarrier = new Set<string>();
   readonly #inputBarrier: SemanticInputBarrier;
+  #inputAdmission = new SemanticInputAdmission();
   #evidenceRevision = 0;
   #nextSynchronizationId = 0;
   /** One active server refresh plus one coalesced newer demand generation. */
@@ -123,6 +125,60 @@ export class ClientDiagnostics {
       closeMissingDocument: (filePath) => this.didClose(filePath),
       markUnreadableDocument: (filePath) => this.markFailedFile(filePath),
     });
+  }
+
+  /** Keep first enrollment outside one read-only request's acceptance region. */
+  withSemanticRequest<T>(
+    run: () => Promise<T>,
+    control?: CodeRequestControl,
+    uri?: string,
+  ): Promise<T> {
+    return this.#inputAdmission.request(run, control, uri);
+  }
+
+  /** Read content only after admission; tracked-document changes never wait. */
+  async openDocument(
+    filePath: string,
+    readContent: () => string,
+    control?: CodeRequestControl,
+    protectInputs = false,
+  ): Promise<void> {
+    throwIfCodeRequestInterrupted(control);
+    const open = () => {
+      throwIfCodeRequestInterrupted(control);
+      if (!this.host.isOperational()) throw new Error("LSP client is not running.");
+      this.didOpen(filePath, readContent());
+    };
+    if (this.#openDocs.has(fileToUri(filePath))) {
+      open();
+      return;
+    }
+    await this.#inputAdmission.enroll(fileToUri(filePath), open, control, protectInputs);
+  }
+
+  /** Restore only still-retained documents; a close or replacement wins over recovery. */
+  async restoreDocument(
+    filePath: string,
+    readContent: () => string,
+    isCurrent: () => boolean,
+  ): Promise<void> {
+    const uri = fileToUri(filePath);
+    const admission = this.#inputAdmission;
+    const canRestore = () =>
+      isCurrent() &&
+      this.host.isOperational() &&
+      admission === this.#inputAdmission &&
+      !this.#closedVersionedBarrier.has(uri) &&
+      !this.#openDocs.has(uri);
+    if (!canRestore()) return;
+    try {
+      await this.openDocument(filePath, () => {
+        if (!canRestore()) throw new Error("Document restoration was superseded.");
+        return readContent();
+      });
+    } catch {
+      if (canRestore()) this.markFailedFile(filePath);
+    }
   }
 
   /** Synchronize all open document inputs, rejoining once after a new enrollment. */
@@ -222,17 +278,22 @@ export class ClientDiagnostics {
     this.#inputBarrier.forgetDocumentContent(uri);
   }
 
-  #ensureExplicitDocumentContent(
+  async #ensureExplicitDocumentContent(
     filePath: string,
     content: string,
     contentIsAuthoritative: boolean,
-  ): void {
+    control?: CodeRequestControl,
+  ): Promise<void> {
     const uri = fileToUri(filePath);
     const document = this.#openDocs.get(uri);
     if (!document) {
-      // An untracked file needs an initial protocol document before its barrier
-      // read can verify the manager's content.
-      this.didOpen(filePath, content);
+      // A manager read can predate admission. Re-read disk after the wait;
+      // explicit authoritative content retains its existing override semantics.
+      await this.openDocument(
+        filePath,
+        () => (contentIsAuthoritative ? content : readFileSync(filePath, "utf-8")),
+        control,
+      );
       return;
     }
     // Manager reads are not authoritative: an already tracked document can
@@ -260,6 +321,8 @@ export class ClientDiagnostics {
   }
 
   clear(options: { preserveFailedDocuments?: boolean } = {}): void {
+    this.#inputAdmission.dispose();
+    this.#inputAdmission = new SemanticInputAdmission();
     if (options.preserveFailedDocuments) {
       for (const uri of [...this.#openDocs.keys(), ...this.#diagnosticStore.keys()]) {
         this.#failedUris.add(uri);
@@ -336,6 +399,7 @@ export class ClientDiagnostics {
 
   /** Send a save after a disk change that the input barrier observed. */
   #noteExternalDiskChange(filePath: string, content: string): void {
+    this.#inputAdmission.invalidateRequests();
     if (!this.host.isOperational()) return;
     const documentSync = this.host.documentSync();
     if (!documentSync.save) return;
@@ -368,6 +432,7 @@ export class ClientDiagnostics {
 
   didClose(filePath: string): void {
     const uri = fileToUri(filePath);
+    this.#inputAdmission.close(uri);
     const wasOpen = this.#openDocs.has(uri);
     const hadState =
       wasOpen ||
@@ -627,7 +692,12 @@ export class ClientDiagnostics {
     throwIfCodeRequestInterrupted(control);
     const uri = fileToUri(filePath);
     const contentIsAuthoritative = options.contentIsAuthoritative !== false;
-    this.#ensureExplicitDocumentContent(filePath, content, contentIsAuthoritative);
+    try {
+      await this.#ensureExplicitDocumentContent(filePath, content, contentIsAuthoritative, control);
+    } catch (error) {
+      throwIfCodeRequestInterrupted(control);
+      return unavailableAfterEnrollmentRetry(error);
+    }
     const contentOverrides = this.#getDiagnosticContentOverrides(
       uri,
       content,
@@ -1044,6 +1114,7 @@ export class ClientDiagnostics {
     changeKind: SemanticInputChangeKind = "content",
   ): void {
     this.#inputBarrier.noteInputChange(changeKind);
+    if (changeKind !== "enrollment") this.#inputAdmission.invalidateRequests();
     if (invalidateEvidence) this.#advanceEvidenceRevision(false);
     if (cancelRequests) this.#cancelAllDiagnosticRequests();
   }

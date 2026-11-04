@@ -251,6 +251,8 @@ export interface ManagerLifecycleTransition {
 type ManagerLifecycleListener = (transition: ManagerLifecycleTransition) => void;
 
 type FileClientRequestOptions = {
+  /** Reject known input changes while this call's first open waits to dispatch original parameters. */
+  protectInputs?: boolean;
   /** Allow this request to start the route's one process-crash recovery. */
   recoverProcessCrash?: boolean;
   /** Control only this caller's wait for a shared replacement. */
@@ -1327,7 +1329,13 @@ export class LspManager {
       recovery.statusReason = undefined;
       recovery.failureMessage = undefined;
       this.publishLifecycle("recovery");
-      this.restoreTrackedDocuments(started, recovery.files);
+      await this.restoreTrackedDocuments(started, recovery.files);
+      if (
+        this.isProcessCrashRecoveryCancelled(recovery, key) ||
+        this.clients.get(key) !== started ||
+        started.status !== "running"
+      )
+        return null;
       this.recordProcessCrashRecoveryEvent(
         route.serverName,
         route.root,
@@ -1412,20 +1420,16 @@ export class LspManager {
   }
 
   /** Restore route documents from disk and retain failed-document evidence. */
-  private restoreTrackedDocuments(client: LspClient, files: readonly string[]): void {
-    const failedFiles: string[] = [];
+  private async restoreTrackedDocuments(
+    client: LspClient,
+    files: readonly string[],
+  ): Promise<void> {
+    const key = clientKey(client.name, client.root);
+    const isCurrent = () => !this.shuttingDown && this.clients.get(key) === client;
     for (const filePath of files) {
-      if (!fs.existsSync(filePath)) {
-        failedFiles.push(filePath);
-        continue;
-      }
-      try {
-        client.didOpen(filePath, fs.readFileSync(filePath, "utf-8"));
-      } catch {
-        failedFiles.push(filePath);
-      }
+      if (!isCurrent()) return;
+      await client.restoreDocument(filePath, () => fs.readFileSync(filePath, "utf-8"), isCurrent);
     }
-    for (const filePath of failedFiles) client.markFailedFile(filePath);
   }
 
   private markProcessCrashRecoveryFailed(
@@ -1669,7 +1673,15 @@ export class LspManager {
         void replacement.forceKill().catch(() => {});
         return { files, restarted: false };
       }
-      this.restoreTrackedDocuments(replacement, files);
+      await this.restoreTrackedDocuments(replacement, files);
+      if (
+        this.clients.get(key) !== replacement ||
+        this.shuttingDown ||
+        replacement.status !== "running"
+      ) {
+        void replacement.forceKill().catch(() => {});
+        return { files, restarted: false };
+      }
       this.clearUnconsumedProcessCrashState(key, client);
       return { files, restarted: true };
     } catch {
@@ -3060,15 +3072,22 @@ export class LspManager {
     const client = await this.getClientForFile(resolvedPath, options);
     if (!client) return null;
     try {
-      const content = fs.readFileSync(resolvedPath, "utf-8");
-      // Route startup can be shared. The document open belongs to this
-      // caller, so check again after the shared wait before sending didOpen.
-      throwIfCodeRequestInterrupted(options.control);
-      client.didOpen(resolvedPath, content);
+      await client.openDocument(
+        resolvedPath,
+        () => {
+          try {
+            return fs.readFileSync(resolvedPath, "utf-8");
+          } catch (error) {
+            this.closeFile(resolvedPath);
+            throw error;
+          }
+        },
+        options.control,
+        options.protectInputs,
+      );
       return client;
     } catch (error) {
       if (isCodeRequestInterruption(error, options.control)) throw error;
-      this.closeFile(resolvedPath);
       return null;
     }
   }
@@ -3111,7 +3130,7 @@ export class LspManager {
         const fileKey = `${client.name}:${path.resolve(target.file)}`;
         if (this.warmedWorkspaceSymbolFiles.has(fileKey)) continue;
 
-        const openedClient = await this.ensureFileOpen(target.file);
+        const openedClient = await this.ensureFileOpen(target.file, { control });
         if (!openedClient) continue;
 
         // A cancelled pass must not mark projects warmed on its way out.

@@ -57,13 +57,28 @@ function makeClient(overrides: Record<string, unknown> = {}) {
 
 function makeReplacement(overrides: Record<string, unknown> = {}) {
   return {
+    status: "running",
     name: "typescript",
     root: "",
     openFiles: [] as string[],
     hasDiagnosticProvider: false,
     start: vi.fn().mockResolvedValue(undefined),
     forceKill: vi.fn().mockResolvedValue(undefined),
-    didOpen: vi.fn(),
+    async restoreDocument(
+      file: string,
+      readContent: () => string,
+      isCurrent: () => boolean,
+    ): Promise<void> {
+      if (!isCurrent()) return;
+      try {
+        await this.openDocument(file, readContent);
+      } catch {
+        if (isCurrent()) this.markFailedFile(file);
+      }
+    },
+    openDocument: vi.fn(async (_file: string, readContent: () => string) => {
+      readContent();
+    }),
     markFailedFile: vi.fn(),
     notifyWorkspaceFileChanges: vi.fn(),
     getDiagnosticSnapshot: () => ({

@@ -39,7 +39,7 @@ function writeProjectConfig(cwd: string, logPath: string): void {
         servers: {
           fixture: {
             command: process.execPath,
-            args: [FIXTURE, logPath, "10", "pull"],
+            args: [FIXTURE, logPath, "10", "pull", "--crash-on-file"],
             fileTypes: ["test"],
             rootMarkers: ["project.marker"],
           },
@@ -116,7 +116,48 @@ describe("public WorkspaceLspRuntime first-access safety", () => {
     reads = undefined;
   });
 
-  it("does not rejoin after content invalidation followed by enrollment", async () => {
+  it.each(["present", "unreadable"] as const)(
+    "does not restore a %s file closed during process-crash recovery",
+    async (fileState) => {
+      workspace = await prepareControlledWorkspace();
+      const { runtime, controller, consumer, enrolled, logPath } = workspace;
+      await expect(runtime.trackFile(enrolled)).resolves.toBe(true);
+      if (fileState === "unreadable") {
+        fs.rmSync(enrolled);
+        fs.mkdirSync(enrolled);
+      }
+      let crashed = false;
+      let closedDuringRestoration = false;
+      const unsubscribe = controller.subscribeLifecycle((transition) => {
+        if (transition.kind === "crash") crashed = true;
+        if (
+          crashed &&
+          !closedDuringRestoration &&
+          transition.kind === "tracked-files" &&
+          runtime.getOpenDocumentVersion(consumer) !== null
+        ) {
+          closedDuringRestoration = true;
+          runtime.closeFile(enrolled);
+        }
+      });
+      try {
+        fs.writeFileSync(`${logPath}.crash`, "");
+        await vi.waitFor(() => expect(crashed).toBe(true));
+        await expect(runtime.documentSymbols(consumer)).resolves.toMatchObject({
+          kind: "completed",
+        });
+        expect(closedDuringRestoration).toBe(true);
+        expect(runtime.getOpenDocumentVersion(enrolled)).toBeNull();
+        expect(runtime.getWorkspaceDiagnosticSummary().evidence.documents).not.toContainEqual(
+          expect.objectContaining({ file: expect.stringMatching(/enrolled\.test$/) }),
+        );
+      } finally {
+        unsubscribe();
+      }
+    },
+  );
+
+  it("rejects content invalidation before a waiting enrollment", async () => {
     workspace = await prepareControlledWorkspace();
     const controlledReads = reads;
     if (!controlledReads) throw new Error("Controlled reads were not initialized.");
@@ -130,18 +171,20 @@ describe("public WorkspaceLspRuntime first-access safety", () => {
     workspace.runtime.noteWorkspaceChanges([
       { uri: fileToUri(workspace.consumer), type: FileChangeType.Changed },
     ]);
-    await expect(workspace.runtime.trackFile(workspace.enrolled)).resolves.toBe(true);
+    const enrollment = workspace.runtime.trackFile(workspace.enrolled);
+    pendingRequests.push(enrollment);
 
     controlledReads.resolveAll();
     controlledReads.enableAutoResolve();
     await expect(pending).resolves.toMatchObject({ kind: "unavailable" });
+    await expect(enrollment).resolves.toBe(true);
     expect(controlledReads.calls).toHaveLength(1);
     expect(readLog(workspace.logPath)).not.toContainEqual(
       expect.objectContaining({ method: "textDocument/didChange" }),
     );
   });
 
-  it("keeps enrollment supersession non-retryable after later content invalidation", async () => {
+  it("rejects content invalidation after enrollment starts waiting", async () => {
     workspace = await prepareControlledWorkspace();
     const controlledReads = reads;
     if (!controlledReads) throw new Error("Controlled reads were not initialized.");
@@ -152,7 +195,10 @@ describe("public WorkspaceLspRuntime first-access safety", () => {
     const pending = workspace.runtime.hover(workspace.consumer, { line: 0, character: 0 });
     pendingRequests.push(pending);
     await controlledReads.waitForCalls(1);
-    await expect(workspace.runtime.trackFile(workspace.enrolled)).resolves.toBe(true);
+    const enrollment = workspace.runtime.trackFile(workspace.enrolled);
+    pendingRequests.push(enrollment);
+    await nextImmediate();
+    expect(workspace.runtime.getOpenDocumentVersion(workspace.enrolled)).toBeNull();
     workspace.runtime.noteWorkspaceChanges([
       { uri: fileToUri(workspace.consumer), type: FileChangeType.Changed },
     ]);
@@ -160,10 +206,11 @@ describe("public WorkspaceLspRuntime first-access safety", () => {
     controlledReads.resolveAll();
     controlledReads.enableAutoResolve();
     await expect(pending).resolves.toMatchObject({ kind: "unavailable" });
+    await expect(enrollment).resolves.toBe(true);
     expect(controlledReads.calls).toHaveLength(1);
   });
 
-  it("preserves cancellation during enrollment rejoin and owns the old reader until settlement", async () => {
+  it("preserves cancellation with waiting enrollment and owns the old reader until settlement", async () => {
     workspace = await prepareControlledWorkspace();
     const controlledReads = reads;
     if (!controlledReads) throw new Error("Controlled reads were not initialized.");
@@ -183,7 +230,8 @@ describe("public WorkspaceLspRuntime first-access safety", () => {
     );
     pendingRequests.push(outcome);
     await controlledReads.waitForCalls(1);
-    await expect(workspace.runtime.trackFile(workspace.enrolled)).resolves.toBe(true);
+    const enrollment = workspace.runtime.trackFile(workspace.enrolled);
+    pendingRequests.push(enrollment);
     await nextImmediate();
 
     caller.abort(new Error("enrollment rejoin cancelled"));
@@ -193,13 +241,14 @@ describe("public WorkspaceLspRuntime first-access safety", () => {
     });
     expect(controlledReads.calls).toHaveLength(1);
     expect(controlledReads.activeReads).toBe(1);
+    await expect(enrollment).resolves.toBe(true);
 
     controlledReads.resolveAll();
     await nextImmediate();
     expect(controlledReads.activeReads).toBe(0);
   });
 
-  it("preserves the exact deadline during enrollment rejoin and owns the old reader until settlement", async () => {
+  it("preserves the exact deadline with waiting enrollment and owns the old reader until settlement", async () => {
     workspace = await prepareControlledWorkspace();
     const controlledReads = reads;
     if (!controlledReads) throw new Error("Controlled reads were not initialized.");
@@ -221,7 +270,8 @@ describe("public WorkspaceLspRuntime first-access safety", () => {
     );
     pendingRequests.push(outcome);
     await controlledReads.waitForCalls(1);
-    await expect(workspace.runtime.trackFile(workspace.enrolled)).resolves.toBe(true);
+    const enrollment = workspace.runtime.trackFile(workspace.enrolled);
+    pendingRequests.push(enrollment);
     await vi.runAllTicks();
     await vi.advanceTimersByTimeAsync(10);
 
@@ -231,6 +281,7 @@ describe("public WorkspaceLspRuntime first-access safety", () => {
     });
     expect(controlledReads.calls).toHaveLength(1);
     expect(controlledReads.activeReads).toBe(1);
+    await expect(enrollment).resolves.toBe(true);
 
     controlledReads.resolveAll();
     await vi.runAllTicks();

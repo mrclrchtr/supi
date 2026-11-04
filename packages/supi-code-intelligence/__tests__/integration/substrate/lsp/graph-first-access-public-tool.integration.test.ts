@@ -87,14 +87,14 @@ describe("registered public code_graph concurrent first access", () => {
     const pi = createPiMock();
     registerCodeIntelligenceTools(pi as never, () => session, undefined, [codeGraphSpec]);
     const graph = getTool(pi, "code_graph");
-    return (name: string) => {
+    return (name: string, signal?: AbortSignal) => {
       const file = path.join(cwd, `cold-${name}.test`);
       fs.writeFileSync(file, "function work() {}\nwork();\nwork();\n");
       expect(runtime.getOpenDocumentVersion(file)).toBeNull();
       const call = graph.execute(
         `graph-first-access-${name}`,
         { target: { anchor: { file, line: 1, character: 10 } }, relations: ["references"] },
-        undefined,
+        signal,
         undefined,
         makeCtx({ cwd }),
       );
@@ -105,52 +105,27 @@ describe("registered public code_graph concurrent first access", () => {
     };
   }
 
-  it("returns only the fresh retry after concurrent first-use enrollment", async () => {
+  it("finishes parallel first accesses without invalidating held references and cancels a waiting caller", async () => {
     const graph = await start();
     const first = graph("a");
     await vi.waitFor(() => expect(referenceEvents("request")).toHaveLength(1));
-    const second = graph("b");
-    await expect(second).resolves.toMatchObject({ details: { type: "graph" } });
+    const others = ["b", "c", "d", "e", "f", "g", "h"].map((name) => graph(name));
+    const caller = new AbortController();
+    const cancelled = graph("cancelled", caller.signal);
+    const timer = setTimeout(() => caller.abort(new Error("waiting Graph cancelled")), 150);
+    try {
+      await expect(cancelled).rejects.toThrow("waiting Graph cancelled");
+    } finally {
+      clearTimeout(timer);
+    }
     release(1);
-    await vi.waitFor(() => expect(referenceEvents("request")).toHaveLength(2));
-    release(2);
-    const result = await first;
-    expect(resultText(result)).toContain("L3:1");
-    expect(resultText(result)).not.toContain("L2:1");
-    expect(referenceEvents("response")).toHaveLength(2);
-    expectRetryEvents("completed");
+    for (const result of await Promise.all([first, ...others])) {
+      expect(result).toMatchObject({ details: { type: "graph" } });
+      expect(resultText(result)).toContain("L2:1");
+      expect(resultText(result)).not.toContain("L3:1");
+    }
+    expect(referenceEvents("response")).toHaveLength(1);
+    expect(referenceEvents("request")).toHaveLength(1);
+    expect(getDebugEvents({ source: "lsp", category: "request.retry" }).events).toEqual([]);
   });
-
-  it("reports the provider cause and exhausted retry after two concurrent enrollments", async () => {
-    const graph = await start();
-    const first = graph("a");
-    await vi.waitFor(() => expect(referenceEvents("request")).toHaveLength(1));
-    await graph("b");
-    release(1);
-    await vi.waitFor(() => expect(referenceEvents("request")).toHaveLength(2));
-    await graph("c");
-    release(2);
-    await expect(first).rejects.toThrow(
-      "LSP request textDocument/references failed: Semantic input changed while the request was running. Request retry exhausted after 1 retry.",
-    );
-    expect(referenceEvents("response")).toHaveLength(2);
-    expect(referenceEvents("request")).toHaveLength(2);
-    expectRetryEvents("exhausted");
-  });
-
-  function expectRetryEvents(outcome: "completed" | "exhausted"): void {
-    const events = getDebugEvents({
-      source: "lsp",
-      category: "request.retry",
-    }).events.reverse();
-    expect(events.map((event) => event.data)).toMatchObject([{ outcome: "retry" }, { outcome }]);
-    expect(events[0]?.data).toMatchObject({
-      method: "textDocument/references",
-      retryCount: 1,
-      retryReason: "enrollment",
-      changeKind: "enrollment",
-    });
-    expect(events[0]?.operationId).toMatch(/^op-/);
-    expect(events[1]?.operationId).toBe(events[0]?.operationId);
-  }
 });

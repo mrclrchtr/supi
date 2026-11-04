@@ -21,6 +21,7 @@ export async function runRoutedRename(options: {
   const { manager, file, position, newName, control } = options;
   const client = await manager.ensureFileOpen(file, {
     recoverProcessCrash: true,
+    protectInputs: true,
     control,
   });
   if (!client) return null;

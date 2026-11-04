@@ -205,7 +205,7 @@ describe("LspManager concurrency guard", () => {
     const file = join(sessionCwd, "source.ts");
     writeFileSync(file, "export {};\n");
     const client = {
-      didOpen: vi.fn(),
+      openDocument: vi.fn(),
       openFiles: [],
       status: "running",
     };
@@ -228,7 +228,7 @@ describe("LspManager concurrency guard", () => {
       resolveStart(client);
       await new Promise((resolve) => setTimeout(resolve, 0));
 
-      expect(client.didOpen).not.toHaveBeenCalled();
+      expect(client.openDocument).not.toHaveBeenCalled();
     } finally {
       resolveStart(client);
       performStartSpy.mockRestore();

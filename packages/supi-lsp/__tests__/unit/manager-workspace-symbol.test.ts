@@ -359,7 +359,9 @@ describe("LspManager.workspaceSymbol cold warm-up", () => {
     const result = await manager.workspaceSymbol("Widget");
 
     expect(result).toEqual({ kind: "completed", data: [symbol] });
-    expect(ensureFileOpen).toHaveBeenCalledWith(join(root, "src", "index.ts"));
+    expect(ensureFileOpen).toHaveBeenCalledWith(join(root, "src", "index.ts"), {
+      control: undefined,
+    });
     expect(client.documentSymbols).toHaveBeenCalledWith(join(root, "src", "index.ts"));
     expect(client.hover).toHaveBeenCalledWith(join(root, "src", "index.ts"), {
       line: 0,

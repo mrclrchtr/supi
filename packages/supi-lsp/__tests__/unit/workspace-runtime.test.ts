@@ -200,6 +200,7 @@ describe("workspace runtime behavior", () => {
     );
     expect(manager.ensureFileOpen).toHaveBeenCalledWith("/project/.pi/cache/source.ts", {
       recoverProcessCrash: true,
+      protectInputs: true,
       control: undefined,
     });
   });

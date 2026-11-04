@@ -88,6 +88,24 @@ vi.mock("../../src/client/client.ts", () => ({
       if (!this.ready) throw new Error("Client is not ready.");
     }
 
+    async restoreDocument(
+      file: string,
+      readContent: () => string,
+      isCurrent: () => boolean,
+    ): Promise<void> {
+      if (!isCurrent()) return;
+      try {
+        await this.openDocument(file, readContent);
+      } catch {
+        if (isCurrent()) this.markFailedFile(file);
+      }
+    }
+
+    async openDocument(file: string, readContent: () => string): Promise<void> {
+      readContent();
+      this.didOpen(file);
+    }
+
     didOpen(file: string): void {
       if (!this.openFiles.includes(file)) this.openFiles.push(file);
       this.listener?.("tracked-files");

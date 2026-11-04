@@ -879,6 +879,33 @@ export class LspClient {
   }
 
   // ── Document Synchronization and Diagnostics ────────────────────────
+  /**
+   * Admit a first open between semantic attempts, reading content after the wait.
+   * Semantic/refactor callers protect their original inputs; ordinary tracking
+   * can adopt fresh content after a known change instead.
+   */
+  async openDocument(
+    filePath: string,
+    readContent: () => string,
+    control?: CodeRequestControl,
+    protectInputs = false,
+  ): Promise<void> {
+    const trackedCount = this.openFiles.length;
+    await this.diagnostics.openDocument(filePath, readContent, control, protectInputs);
+    this.publishTrackedFileChange(trackedCount);
+  }
+
+  /** Restore retained state without resurrecting a closed or replaced document. */
+  async restoreDocument(
+    filePath: string,
+    readContent: () => string,
+    isCurrent: () => boolean,
+  ): Promise<void> {
+    const trackedCount = this.openFiles.length;
+    await this.diagnostics.restoreDocument(filePath, readContent, isCurrent);
+    this.publishTrackedFileChange(trackedCount);
+  }
+
   /** Open a document, or update it when it is already open. */
   didOpen(filePath: string, content: string): void {
     const trackedCount = this.openFiles.length;
@@ -1651,17 +1678,28 @@ export class LspClient {
     throwIfCodeRequestInterrupted(control);
     retryGuard.assertCurrent();
     await this.getReady(control);
-    const inputSnapshot = await this.diagnostics.synchronizeSemanticInputs(control);
-    attempt.inputRevision = inputSnapshot.revision;
-    throwIfCodeRequestInterrupted(control);
-    retryGuard.assertCurrent();
-    const rpc = this.rpc;
-    if (!rpc || this._status !== "running") {
-      throw new Error(`LSP request ${method} is unavailable because the client is not running.`);
-    }
-    const data = (await rpc.sendRequest(method, params, control)) as T | null | undefined;
-    await this.diagnostics.assertSemanticInputsCurrent(inputSnapshot, control);
-    return data ?? null;
+    // Local query methods construct the standard TextDocumentIdentifier envelope.
+    const documentUri = (params as { textDocument?: { uri: string } } | null)?.textDocument?.uri;
+    return this.diagnostics.withSemanticRequest(
+      async () => {
+        retryGuard.assertCurrent();
+        const inputSnapshot = await this.diagnostics.synchronizeSemanticInputs(control);
+        attempt.inputRevision = inputSnapshot.revision;
+        throwIfCodeRequestInterrupted(control);
+        retryGuard.assertCurrent();
+        const rpc = this.rpc;
+        if (!rpc || this._status !== "running") {
+          throw new Error(
+            `LSP request ${method} is unavailable because the client is not running.`,
+          );
+        }
+        const data = (await rpc.sendRequest(method, params, control)) as T | null | undefined;
+        await this.diagnostics.assertSemanticInputsCurrent(inputSnapshot, control);
+        return data ?? null;
+      },
+      control,
+      documentUri,
+    );
   }
 
   private handleServerRequest(method: string, params: unknown): unknown {
