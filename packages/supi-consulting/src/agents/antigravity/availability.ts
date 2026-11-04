@@ -7,8 +7,8 @@ import { CURATED_MODELS, type CuratedModel, isCuratedModel } from "./models.ts";
 import type { AntigravityProbeResult } from "./process/runner.ts";
 import { AntigravityProcessError, runAntigravityProbe } from "./process/runner.ts";
 
-/** Minimum supported Antigravity CLI version. */
-export const MINIMUM_ANTIGRAVITY_VERSION = Object.freeze({ major: 1, minor: 1, patch: 24 });
+/** Minimum CLI qualified for explicit inspection profiles, finish, and profile-free resumes. */
+export const MINIMUM_ANTIGRAVITY_VERSION = Object.freeze({ major: 1, minor: 4, patch: 9 });
 const MAX_DISCOVERY_OUTPUT_BYTES = 128 * 1024;
 
 /** Parsed Antigravity CLI version. */

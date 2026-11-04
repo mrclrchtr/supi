@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { existsSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const args = process.argv.slice(2);
 if (args.includes("--version")) {
-  process.stdout.write("1.1.25\n");
+  process.stdout.write("1.4.9\n");
   process.exit(0);
 }
 if (args[0] === "models") {
@@ -76,6 +76,25 @@ process.stdin.on("end", () => {
     }
   }
   const conversationIndex = args.indexOf("--conversation");
+  const agentIndex = args.indexOf("--agent");
+  const agentName = agentIndex < 0 ? null : args[agentIndex + 1];
+  if (conversationIndex < 0) {
+    if (!agentName) throw new Error("fixture expected an explicit inspection agent");
+    const profile = readFileSync(
+      join(process.env.HOME, ".gemini", "config", "agents", agentName, "agent.md"), "utf8",
+    );
+    const tools = [...profile.matchAll(/^  - (\w+)$/gm)].map((match) => match[1]).sort();
+    const expectedTools = [
+      "search_web", "read_url_content", "view_file", "list_dir", "find_by_name", "grep_search", "finish",
+    ].sort();
+    if (
+      JSON.stringify(tools) !== JSON.stringify(expectedTools) ||
+      !profile.includes("mainAgent: true") || !profile.includes("subagent: false")
+    ) throw new Error("fixture expected the read-only tools and structured finish capability");
+  } else if (agentName) {
+    throw new Error("fixture must resume the saved agent without an override");
+  }
+  appendFileSync(join(process.env.HOME, ".fixture-agent-calls.jsonl"), `${JSON.stringify({ agentName })}\n`);
   const conversationId =
     conversationIndex < 0 || input.includes("different-conversation")
       ? `fixture-conversation-${randomUUID()}`
@@ -243,7 +262,7 @@ process.stdin.on("end", () => {
     } else if (input.includes("workspace")) {
       emitToolPair("read_file", { path: "README.md" }, "DONE");
     } else {
-      emitToolPair("search_web", { Url: "https://nodejs.org/api/child_process.html" }, "DONE");
+      emitToolPair("read_url_content", { Url: "https://nodejs.org/api/child_process.html" }, "DONE");
     }
     const workspaceEvidence = input.includes("workspace")
       ? [{ path: "README.md", summary: "fixture file" }]

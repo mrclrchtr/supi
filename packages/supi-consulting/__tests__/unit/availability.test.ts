@@ -31,11 +31,12 @@ describe("Antigravity adapter availability", () => {
   });
 
   it("parses versions and enforces the minimum", () => {
-    expect(parseAntigravityVersion("agy 1.1.24\n")).toEqual({ major: 1, minor: 1, patch: 24 });
-    expect(isSupportedAntigravityVersion({ major: 1, minor: 1, patch: 24 })).toBe(true);
-    expect(isSupportedAntigravityVersion({ major: 1, minor: 1, patch: 23 })).toBe(false);
+    expect(parseAntigravityVersion("agy 1.4.9\n")).toEqual({ major: 1, minor: 4, patch: 9 });
+    expect(isSupportedAntigravityVersion({ major: 1, minor: 4, patch: 9 })).toBe(true);
+    expect(isSupportedAntigravityVersion({ major: 1, minor: 4, patch: 8 })).toBe(false);
+    expect(isSupportedAntigravityVersion({ major: 1, minor: 1, patch: 24 })).toBe(false);
     expect(
-      isSupportedAntigravityVersion({ major: 1, minor: 1, patch: 24, prerelease: "beta" }),
+      isSupportedAntigravityVersion({ major: 1, minor: 4, patch: 9, prerelease: "beta" }),
     ).toBe(false);
     expect(isSupportedAntigravityVersion({ major: 2, minor: 0, patch: 0 })).toBe(true);
   });
@@ -62,7 +63,7 @@ describe("Antigravity adapter availability", () => {
     cleanup = () => rm(setup.agentDir, { recursive: true, force: true });
     const runProbe = vi.fn(async (options: { args: string[] }) =>
       options.args[0] === "--version"
-        ? { exitCode: 0, signal: null, stdout: "1.1.25", stderr: "" }
+        ? { exitCode: 0, signal: null, stdout: "1.4.9", stderr: "" }
         : {
             exitCode: 0,
             signal: null,
@@ -73,7 +74,7 @@ describe("Antigravity adapter availability", () => {
     const result = await discoverAntigravityAvailability({ paths: setup.paths, runProbe });
     expect(result).toEqual({
       status: "available",
-      cliVersion: "1.1.25",
+      cliVersion: "1.4.9",
       catalogue: ["gemini-3.8-flash-medium"],
     });
     if (result.status !== "available") throw new Error("expected available result");
@@ -89,7 +90,7 @@ describe("Antigravity adapter availability", () => {
       paths: setup.paths,
       runProbe: vi.fn(async (options: { args: string[] }) =>
         options.args[0] === "--version"
-          ? { exitCode: 0, signal: null, stdout: "1.1.25", stderr: "" }
+          ? { exitCode: 0, signal: null, stdout: "1.4.9", stderr: "" }
           : {
               exitCode: 1,
               signal: null,
@@ -106,7 +107,7 @@ describe("Antigravity adapter availability", () => {
       runProbe: vi.fn(async () => ({
         exitCode: 0,
         signal: null,
-        stdout: "agy 1.1.23",
+        stdout: "agy 1.4.8",
         stderr: "",
       })),
     });

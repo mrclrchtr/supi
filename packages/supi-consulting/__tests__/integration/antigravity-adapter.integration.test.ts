@@ -64,6 +64,34 @@ async function schemaDirectories(directory = tmpdir()): Promise<string[]> {
 }
 
 describe("Antigravity Consulting Agent adapter", () => {
+  it("selects a temporary inspection agent only when starting a new conversation", async () => {
+    const paths = getIsolatedAntigravityPaths();
+    const adapter = createAntigravityAdapter(paths);
+    const agentsDirectory = join(paths.homeDir, ".gemini", "config", "agents");
+    await mkdir(agentsDirectory, { recursive: true });
+    const unrelated = join(agentsDirectory, "unrelated.md");
+    await writeFile(unrelated, "Leave this customization alone.\n");
+    const options = {
+      prompt: "begin",
+      model: "gemini-3.8-flash-low",
+      canonicalWorkingDirectory: paths.consultationWorkspace,
+      workspaceAccess: false,
+    };
+
+    const first = await adapter.execute(options);
+    expect(await readdir(agentsDirectory)).toEqual(["unrelated.md"]);
+    const second = await adapter.execute({ ...options, continuation: first.continuation });
+    expect(second.continuation).toBe(first.continuation);
+    expect(second.answer.answer).toContain("prior consultation");
+    const calls = (await readFile(join(paths.homeDir, ".fixture-agent-calls.jsonl"), "utf8"))
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line) as { agentName: string | null });
+    expect(calls).toEqual([{ agentName: expect.any(String) }, { agentName: null }]);
+    expect(await readdir(agentsDirectory)).toEqual(["unrelated.md"]);
+    expect(await readFile(unrelated, "utf8")).toBe("Leave this customization alone.\n");
+  });
+
   it("discovers and executes a bounded Consultation with opaque continuation state", async () => {
     const paths = getIsolatedAntigravityPaths();
     const adapter = createAntigravityAdapter(paths);
@@ -110,6 +138,41 @@ describe("Antigravity Consulting Agent adapter", () => {
       kind: "conversation-mismatch",
     });
   });
+
+  it.each(["legacy", "different-profile"])(
+    "rejects %s continuation state before starting even a hook probe",
+    async (scenario) => {
+      const paths = getIsolatedAntigravityPaths();
+      const adapter = createAntigravityAdapter(paths);
+      const first = await adapter.execute({
+        prompt: "begin",
+        model: "gemini-3.8-flash-low",
+        canonicalWorkingDirectory: paths.consultationWorkspace,
+        workspaceAccess: false,
+      });
+      const parts = first.continuation.split(".");
+      parts[1] = "0".repeat(64);
+      const continuation =
+        scenario === "legacy"
+          ? `agy1.${Buffer.from("fixture-old").toString("base64url")}`
+          : parts.join(".");
+      const onProcessStart = vi.fn();
+      await expect(
+        adapter.execute({
+          prompt: "follow up",
+          model: "gemini-3.8-flash-low",
+          canonicalWorkingDirectory: paths.consultationWorkspace,
+          workspaceAccess: true,
+          continuation,
+          onProcessStart,
+        }),
+      ).rejects.toMatchObject({
+        kind: "invalid-continuation",
+        message: expect.stringContaining("Start a new Consultation"),
+      });
+      expect(onProcessStart).not.toHaveBeenCalled();
+    },
+  );
 
   it.each([false, true])("isolates extra roots: %s", async (workspaceAccess) => {
     const paths = getIsolatedAntigravityPaths();
@@ -236,12 +299,29 @@ describe("Antigravity Consulting Agent adapter", () => {
     expect(String(failed)).not.toContain(paths.homeDir);
   });
 
-  it("keeps process errors, cancellation, timeouts, and temporary schemas bounded", async () => {
+  it("cleans the inspection profile when schema setup fails before process start", async () => {
     const paths = getIsolatedAntigravityPaths();
+    const notDirectory = join(roots[0] as string, "not-a-directory");
+    await writeFile(notDirectory, "fixture");
+    const onProcessStart = vi.fn();
+    await expect(
+      runRawConversation(paths, "begin", {
+        schemaDirectoryParent: notDirectory,
+        onProcessStart,
+      }),
+    ).rejects.toMatchObject({ name: "AntigravityProcessError" });
+    expect(onProcessStart).not.toHaveBeenCalled();
+    expect(await readdir(join(paths.homeDir, ".gemini", "config", "agents"))).toEqual([]);
+  });
+
+  it("cleans temporary profiles and schemas on process failure, timeout, and cancellation", async () => {
+    const paths = getIsolatedAntigravityPaths();
+    const agentsDirectory = join(paths.homeDir, ".gemini", "config", "agents");
     for (const prompt of ["malformed", "oversized", "fail"]) {
       await expect(runRawConversation(paths, prompt)).rejects.toMatchObject({
         name: "AntigravityProcessError",
       });
+      expect(await readdir(agentsDirectory)).toEqual([]);
     }
     await expect(runRawConversation(paths, "exit-nonzero")).rejects.toMatchObject({
       name: "AntigravityProcessError",
@@ -249,6 +329,7 @@ describe("Antigravity Consulting Agent adapter", () => {
       exitCode: 7,
       stderr: "fixture process failure",
     });
+    expect(await readdir(agentsDirectory)).toEqual([]);
 
     const schemaParent = roots[0] as string;
     const before = await schemaDirectories(schemaParent);
@@ -264,6 +345,7 @@ describe("Antigravity Consulting Agent adapter", () => {
     expect(
       (await schemaDirectories(schemaParent)).filter((name) => !before.includes(name)),
     ).toEqual([]);
+    expect(await readdir(agentsDirectory)).toEqual([]);
 
     const controller = new AbortController();
     const canceled = runRawConversation(paths, "delay", {
@@ -275,6 +357,8 @@ describe("Antigravity Consulting Agent adapter", () => {
       name: "AntigravityProcessError",
       kind: "cancelled",
     });
+    expect(await readdir(agentsDirectory)).toEqual([]);
+    expect(await schemaDirectories(schemaParent)).toEqual(before);
   });
 
   it("supports parallel independent processes and reports a missing executable", async () => {
@@ -296,6 +380,13 @@ describe("Antigravity Consulting Agent adapter", () => {
     ]);
     expect(parallel).toHaveLength(2);
     expect(parallel.every((facts) => facts.continuation.length > 0)).toBe(true);
+    const calls = (await readFile(join(paths.homeDir, ".fixture-agent-calls.jsonl"), "utf8"))
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line) as { agentName: string });
+    expect(calls).toHaveLength(2);
+    expect(new Set(calls.map((call) => call.agentName)).size).toBe(2);
+    expect(await readdir(join(paths.homeDir, ".gemini", "config", "agents"))).toEqual([]);
 
     vi.stubEnv("PATH", join(roots[0] as string, "missing"));
     await expect(
@@ -306,5 +397,6 @@ describe("Antigravity Consulting Agent adapter", () => {
         workspaceAccess: false,
       }),
     ).rejects.toMatchObject({ name: "ConsultingAgentError", kind: "unavailable" });
+    expect(await readdir(join(paths.homeDir, ".gemini", "config", "agents"))).toEqual([]);
   });
 });

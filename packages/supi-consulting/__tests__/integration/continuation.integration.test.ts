@@ -20,6 +20,51 @@ afterEach(async () => {
 });
 
 describe("consulting_run continuation identity", () => {
+  it("releases but does not retire an incompatible saved handle rejected before startup", async () => {
+    const root = await mkdtemp(join(tmpdir(), "supi-consulting-continuation-"));
+    roots.push(root);
+    const adapter = createAntigravityAdapter(getIsolatedAntigravityPaths(root));
+    const handles = new ConversationHandleStore();
+    const record = handles.create({
+      agent: "antigravity",
+      model: "gemini-3.8-flash-low",
+      agentVersion: "1.1.25",
+      continuation: `agy1.${Buffer.from("legacy-conversation").toString("base64url")}`,
+      canonicalWorkingDirectory: root,
+      workspaceAccess: true,
+    });
+    const pi = createPiMock();
+    registerConsultingRunTool({
+      pi: pi as never,
+      adapter,
+      availability: {
+        status: "available",
+        agent: "antigravity",
+        agentVersion: "1.4.9",
+        catalogue: ["gemini-3.8-flash-low"],
+      },
+      handles,
+      homeDir: root,
+    });
+    const tool = pi.tools[0] as { execute: (...args: unknown[]) => Promise<unknown> };
+    for (const id of ["first", "retry"]) {
+      await expect(
+        tool.execute(
+          id,
+          { prompt: "continue", continue: { handle: record.handle } },
+          undefined,
+          undefined,
+          makeCtx({ cwd: root }),
+        ),
+      ).rejects.toMatchObject({ kind: "invalid-continuation" });
+    }
+    expect(handles.get(record.handle)?.status).toBe("active");
+    expect(pi.entries).not.toContainEqual({
+      type: CONSULTING_HANDLE_ENTRY_TYPE,
+      data: expect.objectContaining({ action: "retired", handle: record.handle }),
+    });
+  });
+
   it.each([
     { prompt: "different-conversation", failure: { kind: "conversation-mismatch" } },
     { prompt: "stale-follow-up", failure: { kind: "invalid-response", reason: "unbound-answer" } },

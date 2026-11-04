@@ -3,7 +3,8 @@ const FAILURE_MESSAGES = {
   timeout: "The Consultation timed out.",
   cancelled: "The Consultation was canceled.",
   "invalid-response": "The Consulting Agent returned an invalid response.",
-  "invalid-continuation": "Invalid Conversation Handle continuation state.",
+  "invalid-continuation":
+    "The Conversation Handle has invalid or incompatible continuation state. Start a new Consultation.",
   "conversation-mismatch":
     "The Consulting Agent returned a different conversation for this handle.",
   execution: "Consultation execution failed.",

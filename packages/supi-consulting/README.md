@@ -44,7 +44,7 @@ cd "<consultation-workspace>" &&
 HOME="<isolated-home>" AGY_CLI_DISABLE_AUTO_UPDATE=true agy
 ```
 
-On macOS, the adapter creates and unlocks a private keychain inside the Isolated Antigravity Home. It exposes that keychain as the login keychain without prompting for the normal keychain password. Run the displayed command, sign in, exit Antigravity, and reload Pi. The installed `agy` version must be at least `1.1.24`.
+On macOS, the adapter creates and unlocks a private keychain inside the Isolated Antigravity Home. It exposes that keychain as the login keychain without prompting for the normal keychain password. Run the displayed command, sign in, exit Antigravity, and reload Pi. The installed `agy` version must be at least `1.4.9`.
 
 If macOS displays `antigravity.` in a warning, the final `.` is sentence punctuation, not part of a keychain name.
 
@@ -79,6 +79,16 @@ A follow-up supplies only a returned Conversation Handle:
 Supply exactly one of `new` and `continue`. Follow-ups retain the original agent, model, working directory, and Workspace Access. A handle is opaque and branch-aware. It is retired if a follow-up fails or is canceled after process work starts. Overlapping follow-ups on the same handle are rejected.
 
 Results report web use, workspace use, observed and claimed references, warnings, token use, and the Conversation Handle. An answer can claim a reference without matching tool activity; SuPi labels that reference as claimed, not observed.
+
+### Inspection tools and existing handles
+
+New Antigravity conversations use a package-owned temporary agent definition with explicit web search (`search_web`), direct URL reading (`read_url_content`), read-only file inspection (`view_file`, `list_dir`, `find_by_name`, `grep_search`), and structured completion (`finish`). The default Antigravity agent's tool selection is not used. A permission such as `read_url(*)` authorizes access; it does not itself make a URL-reading tool available.
+
+The definition lives in the Isolated Antigravity Home under a random name to avoid workspace-agent name collisions. SuPi removes it after the process, including ordinary failures, timeouts, and cancellation. A hard process crash can leave a temporary definition behind. Follow-ups resume the saved conversation without a new agent override; Antigravity retains the original definition even after its file is removed.
+
+**Start a new Consultation after upgrading from the default-agent integration.** Old Conversation Handles cannot acquire the inspection tools by resuming. SuPi rejects legacy or incompatible profile continuations before starting any Antigravity process and asks for a new Consultation. Profile compatibility is tracked privately; the calling tool's input shape is unchanged.
+
+Web activity alone does not prove a cited page was read. For research, the agent is instructed to search for sources and directly read relevant pages before citing them. SuPi still classifies references from observed activity, not from the agent's claims. The CLI's startup tool inventory is not treated as proof that a tool is active for the selected agent.
 
 Use `/supi-settings` → **Consulting** to disable the tool. Disabling it skips availability checks and removes `consulting_run` from the active tool list.
 
@@ -163,4 +173,4 @@ The live probe requires separate approval and sign-in. It never runs in normal t
 SUPI_CONSULTING_LIVE=1 pnpm exec jiti packages/supi-consulting/scripts/live-probe.ts
 ```
 
-It uses the isolated profile and checks web evidence, follow-up context, workspace evidence, and byte-identical fixture state.
+It uses the isolated profile and requires successful web search and direct URL reading, an observed source matching the fetched URL, and a schema-validated follow-up that retains context and the URL reader after the temporary definition has been removed. It also checks observed workspace evidence and byte-identical fixture state. The direct-reader checks use the private process interface; workspace checks use the Consulting Agent adapter. No paid capability checks run during normal discovery.

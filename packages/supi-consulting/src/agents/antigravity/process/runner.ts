@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { createInspectionAgent } from "../inspection-agent.ts";
 import { type IsolatedAntigravityPaths, prepareIsolatedAntigravityHome } from "../isolated-home.ts";
 import type { AntigravityExecutionFacts, AntigravityProgressCallback } from "../types.ts";
 import { eventType, isRecord, toolName } from "./event-values.ts";
@@ -24,6 +25,8 @@ export { AntigravityProcessError } from "./subprocess.ts";
 export function buildAntigravityRunArguments(options: {
   schemaPath: string;
   model: string;
+  /** Only new conversations select a profile; resumes retain their saved definition. */
+  agentName?: string;
   conversationId?: string;
   workspaceDirectory?: string;
   additionalReadOnlyDirectories?: readonly string[];
@@ -47,7 +50,11 @@ export function buildAntigravityRunArguments(options: {
       ]),
     ].flatMap((directory) => ["--add-dir", directory]),
     "--disable-slash-commands",
-    ...(options.conversationId ? ["--conversation", options.conversationId] : []),
+    ...(options.conversationId
+      ? ["--conversation", options.conversationId]
+      : options.agentName
+        ? ["--agent", options.agentName]
+        : []),
   ];
 }
 
@@ -81,10 +88,8 @@ export async function runAntigravityConversation(options: {
   onProcessStart?: () => void;
 }): Promise<AntigravityExecutionFacts> {
   await prepareIsolatedAntigravityHome(options.paths);
-  const schemaDirectory = await mkdtemp(
-    join(options.schemaDirectoryParent ?? tmpdir(), "supi-consulting-schema-"),
-  );
-  const schemaPath = join(schemaDirectory, "answer.json");
+  let schemaDirectory: string | undefined;
+  let inspectionAgent: Awaited<ReturnType<typeof createInspectionAgent>> | undefined;
   const responseToken = randomUUID();
   const accumulator = new AntigravityEventAccumulator({
     expectedResponseToken: responseToken,
@@ -93,6 +98,13 @@ export async function runAntigravityConversation(options: {
   });
   let eventCount = 0;
   try {
+    if (!options.conversationId) {
+      inspectionAgent = await createInspectionAgent(options.paths.homeDir);
+    }
+    schemaDirectory = await mkdtemp(
+      join(options.schemaDirectoryParent ?? tmpdir(), "supi-consulting-schema-"),
+    );
+    const schemaPath = join(schemaDirectory, "answer.json");
     // A resumed CLI can replay its previous structured output. Bind and locally
     // validate this invocation rather than trusting terminal success or schema shape.
     const schema = {
@@ -110,6 +122,7 @@ export async function runAntigravityConversation(options: {
     const args = buildAntigravityRunArguments({
       schemaPath,
       model: options.model,
+      agentName: inspectionAgent?.name,
       conversationId: options.conversationId,
       workspaceDirectory: options.workspaceDirectory,
       additionalReadOnlyDirectories: options.additionalReadOnlyDirectories,
@@ -149,7 +162,10 @@ export async function runAntigravityConversation(options: {
       },
     );
   } finally {
-    await rm(schemaDirectory, { recursive: true, force: true });
+    await Promise.all([
+      inspectionAgent?.dispose(),
+      schemaDirectory ? rm(schemaDirectory, { recursive: true, force: true }) : undefined,
+    ]);
   }
 }
 

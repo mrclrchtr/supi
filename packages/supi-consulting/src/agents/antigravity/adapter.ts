@@ -9,6 +9,7 @@ import type {
 } from "../types.ts";
 import { isWebToolName, isWorkspaceToolName } from "./activity.ts";
 import { discoverAntigravityAvailability } from "./availability.ts";
+import { INSPECTION_AGENT_FINGERPRINT } from "./inspection-agent.ts";
 import {
   getIsolatedAntigravityPaths,
   type IsolatedAntigravityPaths,
@@ -22,7 +23,9 @@ import { ANTIGRAVITY_ANSWER_SCHEMA } from "./structured-output.ts";
 const MAX_RETAINED_REFERENCE_HASHES = 512;
 const MAX_WARNING_COUNT = 24;
 const MAX_WARNING_CHARS = 500;
-const CONTINUATION_PREFIX = "agy1.";
+// A resumed CLI retains its original profile and ignores --agent overrides.
+// Reject pre-profile conversations and changed contracts before any process work.
+const CONTINUATION_PREFIX = `agy2.${INSPECTION_AGENT_FINGERPRINT}.`;
 
 type ExecutionPhase = "preparation" | "hook-probe" | "conversation" | "validation";
 
