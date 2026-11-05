@@ -88,6 +88,10 @@ The definition lives in the Isolated Antigravity Home under a random name to avo
 
 **Start a new Consultation after upgrading from the default-agent integration.** Old Conversation Handles cannot acquire the inspection tools by resuming. SuPi rejects legacy or incompatible profile continuations before starting any Antigravity process, retires the handle, and asks for a new Consultation. Profile compatibility is tracked privately; the calling tool's input shape is unchanged.
 
+Follow-up prompts get one fixed line asking the agent to end with `finish` using the current schema. Without it, a follow-up such as "do not use any tools" can skip `finish`, and Antigravity then replays the previous turn's answer, which SuPi rejects as unbound.
+
+Antigravity caches fetched pages inside its own conversation state and may read them back with `view_file`. File activity whose path resolves outside the selected workspace and configured read-only directories is treated as agent-internal: it does not count as workspace use or workspace evidence. File calls without a classifiable path remain counted.
+
 Web activity alone does not prove a cited page was read. For research, the agent is instructed to search for sources and directly read relevant pages before citing them. SuPi still classifies references from observed activity, not from the agent's claims. The CLI's startup tool inventory is not treated as proof that a tool is active for the selected agent.
 
 Use `/supi-settings` → **Consulting** to disable the tool. Disabling it skips availability checks and removes `consulting_run` from the active tool list.

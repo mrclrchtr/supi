@@ -58,6 +58,28 @@ async function main(): Promise<void> {
     throw new Error("The live probe resumed a different conversation.");
   }
   requireDirectRead(second, consultationWorkspace);
+
+  // A tool-free follow-up used to skip finish and replay the previous answer.
+  const toolFree = await adapter.execute({
+    prompt: "Return only the exact context token I gave you earlier. Do not use any tools.",
+    model: MODEL,
+    canonicalWorkingDirectory: consultationWorkspace,
+    workspaceAccess: false,
+    continuation: (
+      await adapter.execute({
+        prompt: `Remember the exact token ${CONTEXT_TOKEN}. Use read_url_content to read ${SOURCE_URL} and cite it.`,
+        model: MODEL,
+        canonicalWorkingDirectory: consultationWorkspace,
+        workspaceAccess: false,
+      })
+    ).continuation,
+  });
+  if (toolFree.answer.answer.trim() !== CONTEXT_TOKEN) {
+    throw new Error("The tool-free follow-up did not return the current context token.");
+  }
+  if (toolFree.workspaceUsed) {
+    throw new Error("Cached page reads were misreported as workspace use.");
+  }
   if (second.answer.answer.trim() !== CONTEXT_TOKEN) {
     throw new Error(
       "The follow-up did not return the requested current-turn answer from conversation context.",

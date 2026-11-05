@@ -139,6 +139,23 @@ describe("Antigravity Consulting Agent adapter", () => {
     });
   });
 
+  it("keeps tool-free follow-ups bound to the current request", async () => {
+    const paths = getIsolatedAntigravityPaths();
+    const adapter = createAntigravityAdapter(paths);
+    const options = {
+      model: "gemini-3.8-flash-low",
+      canonicalWorkingDirectory: paths.consultationWorkspace,
+      workspaceAccess: false,
+    };
+    const first = await adapter.execute({ ...options, prompt: "begin" });
+    const followUp = await adapter.execute({
+      ...options,
+      prompt: "no-tools-follow-up: return the marker without using any tools",
+      continuation: first.continuation,
+    });
+    expect(followUp.answer.answer).toContain("prior consultation");
+  });
+
   it.each(["legacy", "different-profile"])(
     "rejects %s continuation state before starting even a hook probe",
     async (scenario) => {

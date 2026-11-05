@@ -1,3 +1,6 @@
+import { mkdtemp, realpath, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { buildAntigravityEnvironment } from "../../src/agents/antigravity/process/environment.ts";
 import { AntigravityEventAccumulator } from "../../src/agents/antigravity/process/events.ts";
@@ -88,6 +91,43 @@ describe("bounded Antigravity streams", () => {
     });
     expect(accumulator.finish().observedSourceHashes).toHaveLength(1);
     expect(accumulator.finish().observedWorkspacePathHashes).toHaveLength(1);
+  });
+
+  it("does not count reads outside approved roots, such as agy page caches, as workspace use", async () => {
+    const root = await realpath(await mkdtemp(join(tmpdir(), "supi-consulting-roots-")));
+    try {
+      const workspace = join(root, "workspace");
+      const cache = join(root, "home", ".gemini", "antigravity-cli", "brain", "c1", "page.md");
+      const accumulator = new AntigravityEventAccumulator({ workspaceDirectory: workspace });
+      const tool = (id: string, name: string, input: Record<string, unknown>) => {
+        accumulator.consume({ type: "tool_use", id, name, input });
+        accumulator.consume({ type: "tool_result", tool_use_id: id, status: "success" });
+      };
+      tool("web", "read_url_content", { Url: "https://example.com/" });
+      tool("cache", "view_file", { AbsolutePath: cache });
+      tool("search", "grep_search", { Query: "needle" });
+      accumulator.consume({ type: "result", status: "success", session_id: "c1", result: answer });
+      const facts = accumulator.finish();
+      expect(facts.successfulToolNames).toEqual(["read_url_content", "grep_search"]);
+      expect(facts.observedSourceHashes).toHaveLength(1);
+      expect(facts.observedWorkspacePathHashes).toEqual([]);
+
+      const inside = new AntigravityEventAccumulator({ workspaceDirectory: workspace });
+      inside.consume({
+        type: "tool_use",
+        id: "f",
+        name: "view_file",
+        input: { AbsolutePath: join(workspace, "src", "index.ts") },
+      });
+      inside.consume({ type: "tool_result", tool_use_id: "f", status: "success" });
+      inside.consume({ type: "result", status: "success", session_id: "c2", result: answer });
+      expect(inside.finish()).toMatchObject({
+        successfulToolNames: ["view_file"],
+        observedWorkspacePathHashes: [expect.any(String)],
+      });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   });
 
   it("reduces tool blocks nested in assistant messages", () => {

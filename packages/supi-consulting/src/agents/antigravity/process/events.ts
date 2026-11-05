@@ -27,6 +27,7 @@ import {
   FileResources,
   type FileTargetObservation,
   fileTargetUpdate,
+  isAgentInternalFileActivity,
   isPermissionDenial,
   terminalDeniedOperations,
 } from "./permission-diagnostics.ts";
@@ -326,6 +327,7 @@ export class AntigravityEventAccumulator {
 
   #recordSuccessfulTool(name: string, event: Record<string, unknown>, pending?: PendingTool): void {
     if (!pending?.observed) this.#recordObservedTool(name);
+    if (isAgentInternalFileActivity(name, event, this.#readScope, pending)) return;
     this.#successfulToolNames.add(name);
     const input = toolInput(event) ?? event;
     const sourceHash = pending?.urlHash ?? hashValue(extractUrl(input));

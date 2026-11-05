@@ -26,6 +26,9 @@ const MAX_WARNING_CHARS = 500;
 // A resumed CLI retains its original profile and ignores --agent overrides.
 // Reject pre-profile conversations and changed contracts before any process work.
 const CONTINUATION_PREFIX = `agy2.${INSPECTION_AGENT_FINGERPRINT}.`;
+// Follow-ups saying "do not use any tools" can skip finish; agy then replays the
+// previous turn's structured answer, which the response token rejects. Tested live.
+const FOLLOW_UP_RESPONSE_CONTRACT = "\n\n[Always end with finish using the current schema.]";
 
 type ExecutionPhase = "preparation" | "hook-probe" | "conversation" | "validation";
 
@@ -124,7 +127,9 @@ class AntigravityAdapter implements ConsultingAgentAdapter {
     const rawFacts = await runAntigravityConversation({
       paths: this.#paths,
       cwd: options.canonicalWorkingDirectory,
-      prompt: options.prompt,
+      prompt: expectedConversationId
+        ? `${options.prompt}${FOLLOW_UP_RESPONSE_CONTRACT}`
+        : options.prompt,
       model: options.model,
       ...(expectedConversationId ? { conversationId: expectedConversationId } : {}),
       ...(options.workspaceAccess ? { workspaceDirectory: options.canonicalWorkingDirectory } : {}),

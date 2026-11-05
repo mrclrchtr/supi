@@ -160,7 +160,10 @@ process.stdin.on("end", () => {
       return;
     }
     emitEvent({ event: "init", conversation_id: conversationId, init: {} });
-    if (input.includes("stale-follow-up")) {
+    // Real agy replays the previous structured answer when a tool-free follow-up
+    // skips finish; the adapter's response contract prevents that.
+    const skipsFinish = input.includes("no-tools-follow-up") && !input.includes("end with finish");
+    if (input.includes("stale-follow-up") || (conversationIndex >= 0 && skipsFinish)) {
       emitEvent({ event: "step_update", step_update: {
         step_type: "agent_response", state: "DONE", text_delta: "Fresh follow-up answer.",
       } });

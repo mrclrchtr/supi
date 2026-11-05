@@ -204,6 +204,21 @@ export function fileTargetUpdate(
 }
 
 /**
+ * Antigravity caches fetched pages in its own conversation directory and reads them
+ * back with file tools. A successful file call proven outside the approved roots is
+ * agent-internal, not workspace use. Unknown or missing paths stay counted.
+ */
+export function isAgentInternalFileActivity(
+  name: string,
+  event: Record<string, unknown>,
+  scope: DiagnosticReadScope,
+  pending?: FileTargetObservation,
+): boolean {
+  const target = pending?.requestedResource ? pending : fileTargetUpdate(name, event, scope);
+  return target.outsideReadRoots === true;
+}
+
+/**
  * Classify the requested file location independently of the denial cause. Resolve
  * aliases (including missing targets' existing parents); inaccessible paths and
  * parent traversal stay unknown rather than relying on lexical symlink semantics.
