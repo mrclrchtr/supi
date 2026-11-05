@@ -10,7 +10,8 @@ import {
   formatGraphRange,
   graphCodeSpan,
 } from "./format.ts";
-import type { AssembledGraphSection, GraphResultAssembly } from "./result.ts";
+import type { GraphResultAssembly } from "./result.ts";
+import type { AssembledGraphSection } from "./section.ts";
 
 /** Render one target and one summary per requested relation. */
 export function renderGraphResult(assembly: GraphResultAssembly): string {

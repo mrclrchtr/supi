@@ -4,7 +4,7 @@ import { createToolDisplaySection } from "../result/display.ts";
 import type { ToolDisplaySection } from "../result/types.ts";
 import type { GraphFileGroup } from "./details.ts";
 import { compactGraphLabel } from "./format.ts";
-import type { AssembledGraphSection } from "./result.ts";
+import type { AssembledGraphSection } from "./section.ts";
 
 /** Bound sites before grouping them. Each file group partitions the display rows. */
 export function graphDisplaySection(

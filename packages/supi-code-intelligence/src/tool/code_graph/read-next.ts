@@ -1,6 +1,6 @@
 import { type ReadNextItem, readNextRange, readNextTopSites } from "../../analysis/read-next.ts";
 import { toDisplayPath } from "../../analysis/search/paths.ts";
-import type { AssembledGraphSection } from "./result.ts";
+import type { AssembledGraphSection } from "./section.ts";
 
 /** Prefer the known enclosing scope, then alternate relation sites before the display cap. */
 export function graphReadNext(
