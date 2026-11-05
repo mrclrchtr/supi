@@ -292,6 +292,23 @@ Server settings use one snapshot for the active workspace runtime:
 - SuPi validates the JSON object shape, not server-specific setting names or values.
 - Saved changes apply after reload or restart. A saved value does not prove that the server accepted it.
 
+TypeScript and JavaScript servers format code-action edits, such as organize imports, with their own defaults (4-space indentation) unless settings say otherwise. SuPi does not infer formatting from Biome, Prettier, or EditorConfig. Both the `typescript-language-server` and native TS 7 backends read `typescript.format` / `javascript.format`:
+
+```json
+{
+  "lsp": {
+    "servers": {
+      "typescript": {
+        "settings": {
+          "typescript": { "format": { "indentSize": 2, "tabSize": 2, "convertTabsToSpaces": true } },
+          "javascript": { "format": { "indentSize": 2, "tabSize": 2, "convertTabsToSpaces": true } }
+        }
+      }
+    }
+  }
+}
+```
+
 File types do not include a leading dot. If `rootMarkers` is omitted, the server uses the session root.
 
 Disable one language with `lsp.servers.<language>.enabled: false`. Use `/supi-ci-status` from `@mrclrchtr/supi-code-intelligence` to see detected, running, and missing servers.

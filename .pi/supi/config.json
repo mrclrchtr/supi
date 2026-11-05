@@ -13,5 +13,27 @@
     "pi-upgrade": {
       "modelInvocation": "disabled"
     }
+  },
+  "lsp": {
+    "servers": {
+      "typescript": {
+        "settings": {
+          "typescript": {
+            "format": {
+              "indentSize": 2,
+              "tabSize": 2,
+              "convertTabsToSpaces": true
+            }
+          },
+          "javascript": {
+            "format": {
+              "indentSize": 2,
+              "tabSize": 2,
+              "convertTabsToSpaces": true
+            }
+          }
+        }
+      }
+    }
   }
 }
