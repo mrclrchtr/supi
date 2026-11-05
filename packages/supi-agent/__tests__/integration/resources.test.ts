@@ -146,6 +146,62 @@ describe("profile resource policy", () => {
     expect(extensions).toHaveLength(2);
   });
 
+  it("receives only allowed Web Conditional Capabilities that the containing session provides", async () => {
+    const profile: AgentProfile = {
+      id: "web",
+      source: "global",
+      directory: "/profiles/web",
+      manifest: {
+        description: "web",
+        tools: ["read", "web_fetch_md", "web_search", "web_docs_fetch"],
+        systemPrompt: "native",
+        instructionScopes: [],
+      },
+    };
+    const requested: string[][] = [];
+    const base = {
+      cwd: "/project",
+      agentDir: "/agent",
+      projectTrusted: false,
+      providerAuthority,
+      model: { provider: "openai", id: "gpt-5", reasoning: false } as never,
+      thinkingLevel: "off" as const,
+      profile,
+    };
+
+    const withoutWeb = createAgentSessionInputs(base);
+    expect(withoutWeb.tools).toEqual(["read"]);
+
+    const inputs = createAgentSessionInputs({
+      ...base,
+      webTools: {
+        toolNames: ["web_fetch_md", "web_docs_search", "web_docs_fetch"],
+        createFactory: (names) => {
+          requested.push([...names]);
+          return (pi) => {
+            for (const name of names) {
+              pi.registerTool({
+                name,
+                label: name,
+                description: name,
+                parameters: { type: "object", properties: {} } as never,
+                execute: async () => ({ content: [], details: {} }),
+              });
+            }
+          };
+        },
+      },
+    });
+    await inputs.resourceLoader.reload();
+    const registered = inputs.resourceLoader
+      .getExtensions()
+      .extensions.flatMap((extension) => [...extension.tools.keys()]);
+
+    expect(inputs.tools).toEqual(["read", "web_fetch_md", "web_docs_fetch"]);
+    expect(requested).toEqual([["web_fetch_md", "web_docs_fetch"]]);
+    expect(registered).toEqual(["web_fetch_md", "web_docs_fetch"]);
+  });
+
   it("excludes ambient instructions when the profile selects no instruction scopes", async () => {
     const { profile, project, agentDir } = await setup();
     const inputs = createAgentSessionInputs({

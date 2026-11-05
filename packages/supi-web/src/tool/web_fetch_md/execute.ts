@@ -11,13 +11,29 @@ import {
 } from "./input.ts";
 import { buildFileResult, buildInlineResult, type WebFetchResult } from "./result.ts";
 
-// biome-ignore lint/complexity/useMaxParams: pi ToolDefinition.execute signature
-export async function runWebFetch(
-  _toolCallId: string,
+/**
+ * Build web_fetch_md execution. `configCwd` fixes where Web settings (Firecrawl) are read;
+ * omitted, settings come from the calling session's cwd.
+ */
+export function createWebFetchExecute(configCwd?: string) {
+  // biome-ignore lint/complexity/useMaxParams: pi ToolDefinition.execute signature
+  return (
+    _toolCallId: string,
+    params: unknown,
+    signal: AbortSignal | undefined,
+    onUpdate: AgentToolUpdateCallback<Record<string, unknown>> | undefined,
+    ctx: ExtensionContext,
+  ): Promise<WebFetchResult> => fetchAsMarkdown(params, signal, onUpdate, configCwd ?? ctx.cwd);
+}
+
+/** Default web_fetch_md execution reading Web settings from the calling session's cwd. */
+export const runWebFetch = createWebFetchExecute();
+
+async function fetchAsMarkdown(
   params: unknown,
   signal: AbortSignal | undefined,
   onUpdate: AgentToolUpdateCallback<Record<string, unknown>> | undefined,
-  ctx: ExtensionContext,
+  configCwd: string,
 ): Promise<WebFetchResult> {
   const input = (params ?? {}) as WebFetchMdInput;
   const url = String(input.url || "").trim();
@@ -38,7 +54,7 @@ export async function runWebFetch(
     timeoutMs,
     signal,
     fetchMode: input.fetch_mode,
-    firecrawlEnabled: loadWebConfig(ctx.cwd).firecrawlEnabled,
+    firecrawlEnabled: loadWebConfig(configCwd).firecrawlEnabled,
   });
   const markdown = await resolveMarkdown(result, absLinks);
   const lines = markdown.split("\n").length;

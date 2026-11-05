@@ -10,7 +10,12 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import type { AgentSessionInputs } from "@mrclrchtr/supi-agent-runtime/api";
 import headlessInspectionProfile from "@mrclrchtr/supi-code-intelligence/headless";
-import { toAgentToolNames, usesHeadlessInspection } from "./capabilities.ts";
+import {
+  effectiveCapabilities,
+  selectedWebCapabilities,
+  toAgentToolNames,
+  usesHeadlessInspection,
+} from "./capabilities.ts";
 import { realpathOrResolve } from "./path.ts";
 import type { AgentProfile, AgentSessionInputOptions, AgentSystemPrompt } from "./types.ts";
 
@@ -28,12 +33,19 @@ export function createAgentSessionInputs(options: AgentSessionInputOptions): Age
   );
   const contextFiles = selectInstructionFiles(options.profile, options.cwd, options.agentDir);
   const systemPrompt = resolveSystemPrompt(options.profile);
+  const webTools = selectedWebCapabilities(options.profile.manifest.tools).filter((tool) =>
+    options.webTools?.toolNames.includes(tool),
+  );
+  const tools = effectiveCapabilities(options.profile.manifest.tools, webTools);
   const extensionFactories = [
     ...(usesHeadlessInspection(options.profile.manifest.tools)
       ? [{ name: "supi-code-intelligence-headless", factory: headlessInspectionProfile }]
       : []),
     ...(options.profile.manifest.tools.includes("codemode")
       ? [createCodemodeExtension({ models: true, mode: "on" })]
+      : []),
+    ...(options.webTools && webTools.length > 0
+      ? [{ name: "supi-web-child", factory: options.webTools.createFactory(webTools) }]
       : []),
   ];
   const loader = new DefaultResourceLoader({
@@ -59,7 +71,7 @@ export function createAgentSessionInputs(options: AgentSessionInputOptions): Age
     model: options.model,
     providerAuthority: options.providerAuthority,
     thinkingLevel: options.thinkingLevel,
-    tools: Object.freeze(toAgentToolNames(options.profile.manifest.tools)),
+    tools: Object.freeze(toAgentToolNames(tools)),
     resourceLoader: loader,
     settingsManager,
     agentDir: options.agentDir,

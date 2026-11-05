@@ -86,14 +86,18 @@ describe("buildAgentRunSchema", () => {
     const catalogue = makeCatalogue([
       makeProfile("trace", "Trace repository calls without changing files."),
       makeProfile("fix", "Implement a focused code change.", ["bash", "edit", "write"]),
+      makeProfile("research", "Research external docs.", ["read", "web_search", "web_docs_fetch"]),
     ]);
     const schema = JSON.parse(JSON.stringify(buildAgentRunSchema(catalogue)));
     const profile = getNewProfileProperty(schema);
 
-    expect(profile).toMatchObject({ type: "string", enum: ["fix", "trace"] });
+    expect(profile).toMatchObject({ type: "string", enum: ["fix", "research", "trace"] });
     expect(profile.description.split("\n")).toEqual([
-      expect.stringMatching(/no inherited tools.*dedicated web tools/i),
+      expect.stringMatching(
+        /no inherited parent tools.*only when the containing session provides/i,
+      ),
       "fix: Implement a focused code change. [shell; edit]",
+      "research: Research external docs. [read-only; no shell; web when available: web_search, web_docs_fetch]",
       "trace: Trace repository calls without changing files. [read-only; no shell]",
     ]);
     expect(JSON.stringify(schema)).not.toContain("/profiles/");

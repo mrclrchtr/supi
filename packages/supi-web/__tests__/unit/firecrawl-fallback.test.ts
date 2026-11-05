@@ -7,6 +7,7 @@ import { DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES } from "@earendil-works/pi-coding-
 import { writeSupiConfig } from "@mrclrchtr/supi-core/config";
 import { createPiMock, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { createChildWebToolsFactory } from "../../src/child.ts";
 import type { runWebFetch } from "../../src/tool/web_fetch_md/execute.ts";
 import type { WebFetchMdOutput } from "../../src/tool/web_fetch_md/result-schema.ts";
 import webExtension from "../../src/web.ts";
@@ -95,6 +96,34 @@ describe("agent-selected Firecrawl retrieval", () => {
       expect((await execute({ fetch_mode })).structuredContent).toMatchObject({ markdown });
     },
   );
+
+  it("keeps the containing session's Firecrawl policy in a child with another cwd", async () => {
+    const requests = stubRequests(() => Response.json(providerPage()));
+    const childCwd = mkdtempSync(join(tmpdir(), "supi-firecrawl-child-"));
+    try {
+      writeSupiConfig({ section: "web", scope: "project", cwd }, { firecrawlEnabled: false });
+      writeSupiConfig(
+        { section: "web", scope: "project", cwd: childCwd },
+        { firecrawlEnabled: true },
+      );
+      const child = createPiMock();
+      createChildWebToolsFactory(["web_fetch_md"], cwd)(child as never);
+      const tool = child.tools[0] as { execute: typeof runWebFetch };
+
+      await expect(
+        tool.execute(
+          "child",
+          { url: sourceUrl, fetch_mode: "firecrawl" },
+          undefined,
+          undefined,
+          makeCtx({ cwd: childCwd }) as never,
+        ),
+      ).rejects.toThrow(/disabled.*supi-settings/i);
+      expect(requests).not.toHaveBeenCalled();
+    } finally {
+      rmSync(childCwd, { recursive: true, force: true });
+    }
+  });
 
   it("fetches with Firecrawl immediately without probing a JS-rendered source", async () => {
     const requests = stubRequests(() => Response.json(providerPage(["Article", "Site"])));

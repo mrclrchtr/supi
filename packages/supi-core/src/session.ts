@@ -1,5 +1,16 @@
 // supi-core session domain — session utilities and registries.
 
+export type {
+  ChildWebToolName,
+  ChildWebToolProvision,
+  ChildWebToolsRequestContext,
+} from "./child-web-tools.ts";
+export {
+  CHILD_WEB_TOOL_NAMES,
+  callableChildWebToolNames,
+  provideChildWebTools,
+  requestChildWebTools,
+} from "./child-web-tools.ts";
 export { createRegistry, createSessionStateRegistry } from "./registry-utils.ts";
 export type {
   SessionCapabilitySkill,

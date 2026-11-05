@@ -1,6 +1,7 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { AgentRunContext, AgentSessionInputs } from "@mrclrchtr/supi-agent-runtime/api";
 import { createAgentRunProviderAuthority } from "@mrclrchtr/supi-agent-runtime/api";
+import type { ChildWebToolProvision } from "@mrclrchtr/supi-core/session";
 import { isReadOnlyCapabilitySet } from "../../capabilities.ts";
 import type { DelegationCheckpoint } from "../../delegation/checkpoints.ts";
 import {
@@ -24,6 +25,7 @@ interface CurrentProfileOptions {
   readonly ctx: ExtensionContext;
   readonly modelContext: AgentModelContext;
   readonly agentDir: string;
+  readonly webTools?: ChildWebToolProvision;
 }
 
 /** One Delegation Task after profile, model, resource, and capability preflight. */
@@ -43,11 +45,15 @@ export interface ResolvedTask {
   inputs: AgentSessionInputs;
 }
 
-/** Validate one Delegation Batch atomically before any Agent Run starts. */
+/**
+ * Validate one Delegation Batch atomically before any Agent Run starts. `webTools` is the
+ * invocation's snapshot of session-provided Web tools, shared by every task in the batch.
+ */
 export function preflightDelegationBatch(
   params: AgentRunToolParams,
   catalogue: ProfileCatalogue,
   ctx: ExtensionContext,
+  webTools?: ChildWebToolProvision,
 ): { tasks: ResolvedTask[] } | { errors: PreflightError[] } {
   const errors = duplicateTaskErrors(params);
   const resolveTarget = createConversationTargetResolver(ctx.sessionManager.getBranch());
@@ -56,6 +62,7 @@ export function preflightDelegationBatch(
     ctx,
     modelContext: buildModelContext(ctx),
     agentDir: resolveAgentDirectory(),
+    ...(webTools ? { webTools } : {}),
   };
   const resolved: ResolvedTask[] = [];
   const targets = new Set<string>();
@@ -150,6 +157,7 @@ function resolveCurrentProfile(
     agentDir: options.agentDir,
     projectTrusted: options.ctx.isProjectTrusted(),
     providerAuthority: options.modelContext.providerAuthority,
+    ...(options.webTools ? { webTools: options.webTools } : {}),
   });
   if ("code" in effective) return { error: effective.message };
   return { profile, effective };

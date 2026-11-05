@@ -14,8 +14,8 @@ This package is the policy layer for `@mrclrchtr/supi-agent-runtime`. It discove
 
 Built-in profiles:
 
-- `explore` — read, grep, find, ls, headless Code Intelligence tools, and codemode, no instruction files, read-only.
-- `general` — read, grep, find, ls, bash, edit, write, headless Code Intelligence tools, and codemode, global/project instruction files, mutation-capable.
+- `explore` — read, grep, find, ls, headless Code Intelligence tools, codemode, and Web tools when available, no instruction files, read-only.
+- `general` — read, grep, find, ls, bash, edit, write, headless Code Intelligence tools, codemode, and Web tools when available, global/project instruction files, mutation-capable.
 
 Profile sources overlay fields by ID with project → global → package precedence. A partial user manifest can pin only `model` or `thinking`; package tools and prompts continue to flow through. An invalid source falls through with a bounded diagnostic. Profiles are context-isolated, not permission- or filesystem-sandboxed.
 
@@ -32,6 +32,12 @@ A Profile can opt into Pi codemode by adding `codemode` to its fixed `tools` lis
 The built-in `explore` and `general` profiles include codemode by default. To disable it for a profile, override its `tools` list without `codemode`. An opted-in child loads codemode with classifier and image-model APIs enabled and `mode: "on"`; its permitted direct tools remain available alongside scripts. Script discovery and nested calls are restricted to that Profile's permitted tools. No parent extensions or MCP servers are inherited. Codemode itself is non-mutating for batch classification; `bash`, `edit`, and `write` remain mutation-capable, so any Profile containing them is still single-task only.
 
 Each top-level batch with opted-in tasks captures one snapshot of the containing session's currently available classifier and image models. The same snapshot is shared by opted-in siblings only; follow-up batches capture a fresh snapshot, and additions during a batch do not expand its authority. An empty catalogue leaves scripting available but authorizes no classifier or image models. Using these APIs may send supplied inputs—including repository evidence—to external providers and may incur provider costs. Availability does not guarantee provider entitlement or a successful request. Codemode and Profile isolation are not filesystem or operating-system sandboxes.
+
+## Web tools
+
+Profiles can allow `web_fetch_md`, `web_search`, `web_docs_search`, and `web_docs_fetch` individually in their `tools` list. The built-in `explore` and `general` profiles allow all four. These are Conditional Capabilities. An Agent Run receives an allowed Web tool only when `@mrclrchtr/supi-web` is loaded in the containing session and that tool is callable there. `supi-agent` neither depends on nor bundles `supi-web`. Unavailable Web tools are silently absent, not a startup failure. Each `agent_run` call captures availability once for its batch, and each Delegation Follow-Up captures it again.
+
+Children follow the parent's Web behavior. For example, Context7 tools without `CONTEXT7_API_KEY` remain present and fail when called, and Firecrawl uses the existing Web settings. Web tools count as read-only for batch admission, so read-only profiles can still run in parallel and in the background. Queries and URLs reach external services. Web content is untrusted. Direct calls and codemode scripts see the same Web tools.
 
 Changes to **Agent Run tool**, **Active Agent Run limit**, and each profile's **Model** and **Thinking** settings apply immediately. `/agents`, `agent_list`, `agent_result`, and `agent_cancel` stay available when new starts through `agent_run` are off.
 
@@ -62,7 +68,7 @@ A fresh Delegation Conversation does not inherit the parent's conversation histo
 | Delegation Follow-Up | New work, changed facts, and new relevant context | Earlier findings already retained in that conversation |
 
 - Supply findings with accessible source locations or short excerpts, not just a reading itinerary. Separate observations, assumptions, and unresolved questions. Supplied evidence is not a required conclusion: the child should surface contradictions or stale evidence.
-- Match evidence access to the selected Agent Profile. For example, fetch an issue in the parent and pass its relevant requirements when the child has no shell or web tools; do not tell that child to run `gh`. Put task-specific evidence in `instructions`, not batch-wide context.
+- Match evidence access to the selected Agent Profile. For example, fetch an issue in the parent and pass its relevant requirements when the child has no shell or Web tools; do not tell that child to run `gh`. Put task-specific evidence in `instructions`, not batch-wide context.
 - Resolve product choices before assigning work that depends on them. A child can report a blocking choice rather than investigate every possible implementation branch.
 - Continue a relevant saved conversation rather than restart discovery. Collect completed background work first. Use fresh conversations when independence is intentional; keep independent review requirements and evidence separate from a preferred verdict.
 

@@ -1,13 +1,27 @@
 import type { ModelThinkingLevel, Usage } from "@earendil-works/pi-ai";
+import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type {
   AgentRunAuxiliaryModelSnapshot,
   AgentRunProgress,
   AgentRunRegistry,
 } from "@mrclrchtr/supi-agent-runtime/api";
+import type { ChildWebToolProvision } from "@mrclrchtr/supi-core/session";
 import type { DelegationCheckpoint } from "../../delegation/checkpoints.ts";
+import type { ProfileCatalogue } from "../../types.ts";
 import type { ResolvedTask } from "./batch-preflight.ts";
 import type { AgentConversationView, ConversationTaskMetadata } from "./conversation-view.ts";
 import type { AgentRunToolParams } from "./schema.ts";
+
+/** Inputs for starting one session-owned Delegation Batch. */
+export interface DelegationStartOptions {
+  params: AgentRunToolParams;
+  catalogue: ProfileCatalogue;
+  ctx: ExtensionContext;
+  /** Session-provided Web tools captured once for this invocation. */
+  webTools?: ChildWebToolProvision;
+  callId: string;
+  onUpdate?: (state: BatchProgressState) => void;
+}
 
 /** Per-task status tracked during live Delegation Batch execution. */
 export type BatchTaskStatus = Exclude<AgentRunProgress["status"], "retrospecting">;

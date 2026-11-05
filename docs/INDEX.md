@@ -41,6 +41,7 @@ Reference material for agents that develop PI extensions in this repo. Docs here
 - [ADR 0024: Shared code-intelligence exclusions](adr/0024-shared-code-intelligence-exclusions.md) — one configured list for automatic LSP work and broad AST searches.
 - [ADR 0022: Request-confirmed, LSP-agnostic diagnostics](adr/0022-request-confirmed-lsp-agnostic-diagnostics.md) — current diagnostic source, confirmation, scheduling, and coverage policy; supersedes the diagnostic-confirmation parts of ADR 0020.
 - [ADR 0025: Installation Matrix declarations](adr/0025-installation-matrix-declarations.md) — direct package declarations stay separate from effective resource activation.
+- [ADR 0026: Session-provided Web capabilities](adr/0026-session-provided-web-capabilities.md) — loaded `supi-web` supplies Web tools to Agent and Reviewer children, without bundling and with silent omission.
 - [Code Intelligence: bounded workspace observations](../packages/supi-code-intelligence/docs/adr/0003-bounded-workspace-orientation.md) — generic inventories, native declarations, output budgets, captured results, and instruction delivery.
 - `agents/` — issue tracker and triage workflow for agent work in this repo.
 

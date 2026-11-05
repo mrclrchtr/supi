@@ -1,5 +1,5 @@
 import { type TSchema, Type } from "typebox";
-import { isReadOnlyCapabilitySet } from "../../capabilities.ts";
+import { isReadOnlyCapabilitySet, selectedWebCapabilities } from "../../capabilities.ts";
 import { resolveProfileDefinition } from "../../profile-catalogue.ts";
 import type { AgentCapabilityId, ProfileCatalogue } from "../../types.ts";
 import {
@@ -17,7 +17,7 @@ export function buildAgentRunSchema(catalogue: ProfileCatalogue): TSchema {
       ? Type.Enum(ids as unknown as readonly string[] & [string, ...string[]], {
           type: "string",
           description: [
-            "No inherited tools or dedicated web tools.",
+            "No inherited parent tools. Web tags list allowed Web tools; a run receives them only when the containing session provides them.",
             ...ids.map((id) => {
               const entry = catalogue.profiles.find((profile) => profile.id === id);
               const description = (entry?.description ?? id).replace(/\s+/g, " ").trim();
@@ -103,6 +103,8 @@ function summarizeCapabilities(tools: readonly AgentCapabilityId[]): string {
   const tags = isReadOnlyCapabilitySet(tools) ? ["read-only"] : [];
   tags.push(tools.includes("bash") ? "shell" : "no shell");
   if (tools.includes("edit") || tools.includes("write")) tags.push("edit");
+  const web = selectedWebCapabilities(tools);
+  if (web.length > 0) tags.push(`web when available: ${web.join(", ")}`);
   return tags.join("; ");
 }
 

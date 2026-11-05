@@ -5,6 +5,7 @@ import type {
   AgentRunProviderAuthority,
   AgentRunRegistry,
 } from "@mrclrchtr/supi-agent-runtime/api";
+import type { ChildWebToolProvision } from "@mrclrchtr/supi-core/session";
 import type { LocalReviewAuditStore } from "./audit/local-review-audit-store.ts";
 import type { ReviewThinkingLevel } from "./thinking.ts";
 import type { ReviewWorkspaceCleanupWarning } from "./workspace/review-workspace.ts";
@@ -240,6 +241,8 @@ export interface PlannerInvocation {
   prompt: string;
   /** Reflect whether downstream Reviewers can use codemode; the Planner remains submit-only. */
   reviewerCodemodeEnabled?: boolean;
+  /** Reflect whether downstream Reviewers have Reviewer Web Access; the Planner remains submit-only. */
+  reviewerWebEnabled?: boolean;
   /** Requested level for this Planner Draft; omitted values keep the package default. */
   requestedThinkingLevel?: ReviewThinkingLevel;
   providerAuthority?: AgentRunProviderAuthority;
@@ -268,6 +271,8 @@ export interface ReviewerInvocation {
   reviewerCodemodeEnabled?: boolean;
   /** Frozen classifier/image authorization shared across Reviewer siblings in this Review. */
   authorizedAuxiliaryModels?: AgentRunAuxiliaryModelSnapshot;
+  /** Reviewer Web Access snapshot for this Review; investigation only, never recovery. */
+  reviewerWebTools?: ChildWebToolProvision;
   /** Requested level for this Reviewer Session; omitted values keep the package default. */
   requestedThinkingLevel?: ReviewThinkingLevel;
   providerAuthority?: AgentRunProviderAuthority;

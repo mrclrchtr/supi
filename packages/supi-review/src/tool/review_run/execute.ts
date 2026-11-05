@@ -13,6 +13,7 @@ import {
 } from "../../model.ts";
 import type { ReviewArtifactStore } from "../../session/review-artifact-store.ts";
 import { resolveReviewThinkingLevel } from "../../thinking.ts";
+import { captureReviewerWebTools } from "../../web-access.ts";
 import { parseRunReviewToolInput } from "./input-schema.ts";
 import { buildRunResult } from "./result.ts";
 import { runReview } from "./workflow.ts";
@@ -82,6 +83,7 @@ export function makeRunReviewExecute(
   artifactStore: ReviewArtifactStore,
   localAuditStore?: LocalReviewAuditStore,
   registry?: AgentRunRegistry,
+  events: Pick<ExtensionAPI["events"], "on" | "emit"> = { on: () => () => {}, emit: () => {} },
 ): NonNullable<Parameters<ExtensionAPI["registerTool"]>[0]["execute"]> {
   // biome-ignore lint/complexity/useMaxParams: Pi ToolDefinition execute signature
   return async (_id, params, signal, onUpdate, ctx) => {
@@ -102,6 +104,7 @@ export function makeRunReviewExecute(
 
     try {
       const recoveryModel = resolveRecoveryReviewModel(ctx, config.recoveryModel);
+      const reviewerWebTools = captureReviewerWebTools(config.reviewerWebEnabled, events, ctx.cwd);
       const outcome = await runReview({
         cwd: ctx.cwd,
         providerAuthority: createAgentRunProviderAuthority(ctx.modelRegistry),
@@ -111,6 +114,7 @@ export function makeRunReviewExecute(
         reviewerModel,
         reviewerThinkingLevel,
         reviewerCodemodeEnabled: config.reviewerCodemodeEnabled,
+        reviewerWebTools,
         ...(recoveryModel ? { recoveryModel } : {}),
         ...(config.recoveryModel !== "disabled" &&
         config.recoveryModel !== CURRENT_SESSION_REVIEW_MODEL &&

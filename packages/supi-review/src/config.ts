@@ -22,6 +22,8 @@ export interface ReviewConfig extends Record<string, unknown> {
   agentToolEnabled: boolean;
   /** Enable PI codemode scripting and scoped auxiliary models for Reviewer investigation. */
   reviewerCodemodeEnabled: boolean;
+  /** Enable Reviewer Web Access: session-provided Web tools during Reviewer investigation. */
+  reviewerWebEnabled: boolean;
   /** Canonical reviewer model id, or `current` for the active session model. */
   agentModel: string;
   /** Canonical Planner model id, or `current` for the active session model. */
@@ -46,6 +48,7 @@ export const REVIEW_CONFIG_SECTION = "review";
 export const REVIEW_DEFAULTS: ReviewConfig = {
   agentToolEnabled: true,
   reviewerCodemodeEnabled: false,
+  reviewerWebEnabled: false,
   agentModel: CURRENT_SESSION_REVIEW_MODEL,
   plannerModel: CURRENT_SESSION_REVIEW_MODEL,
   reviewerThinkingLevel: REVIEWER_DEFAULT_THINKING_LEVEL,
@@ -77,6 +80,7 @@ export function loadReviewConfig(cwd: string, homeDir?: string): ReviewConfig {
       raw.reviewerCodemodeEnabled,
       REVIEW_DEFAULTS.reviewerCodemodeEnabled,
     ),
+    reviewerWebEnabled: readBoolean(raw.reviewerWebEnabled, REVIEW_DEFAULTS.reviewerWebEnabled),
     agentModel: readModel(raw.agentModel, REVIEW_DEFAULTS.agentModel),
     plannerModel: readModel(raw.plannerModel, REVIEW_DEFAULTS.plannerModel),
     reviewerThinkingLevel: readThinkingLevel(
@@ -137,6 +141,13 @@ export function registerReviewSettings(pi: ExtensionAPI, homeDir?: string): void
           label: "Reviewer codemode",
           description:
             "Enable codemode scripting and auxiliary-model requests during Reviewer investigation; may transmit repository evidence and incur provider costs.",
+        },
+        {
+          kind: "boolean",
+          key: "reviewerWebEnabled",
+          label: "Reviewer web access",
+          description:
+            "Give Reviewers the Web tools this session provides (supi-web) during investigation; queries and URLs reach external services.",
         },
         {
           kind: "modelPicker",

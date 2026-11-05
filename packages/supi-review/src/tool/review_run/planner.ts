@@ -13,7 +13,10 @@ export const PLANNER_PROMPT_VERSION = "7";
 const PLANNER_TIMEOUT_MS = 5 * 60 * 1_000;
 
 /** Build the fixed Planner protocol, including the downstream reviewer capability boundary. */
-export function buildPlannerSystemPrompt(reviewerCodemodeEnabled = false): string {
+export function buildPlannerSystemPrompt(
+  reviewerCodemodeEnabled = false,
+  reviewerWebEnabled = false,
+): string {
   return [
     "You are a lightweight review planner.",
     "Your only tool is submit_planner_draft; you have no repository tools or codemode.",
@@ -30,6 +33,9 @@ export function buildPlannerSystemPrompt(reviewerCodemodeEnabled = false): strin
     reviewerCodemodeEnabled
       ? "During Reviewer investigation only, codemode may script the permitted inspection tools and snapshot-authorized classifier/image models; it does not expand tool access. Submission Recovery has only its terminal tools."
       : "Reviewer codemode is disabled; Planner Drafts and Submission Recovery never receive codemode.",
+    reviewerWebEnabled
+      ? "During Reviewer investigation only, Reviewers may also receive the Web tools this session provides to consult external documentation; web content supports but never replaces repository evidence for findings."
+      : "Reviewers have no web tools.",
     "Reviewers may use Git and read-only Code Intelligence, but must not launch PI, invoke nested reviews, mutate source/Git history, or inspect live runtime/accounting state.",
     "Do not request tests, builds, linters, runtime experiments, or verification outside repository inspection.",
     "Require findings to be concrete and supported by inspected code.",
@@ -63,7 +69,10 @@ export async function runPlanner(invocation: PlannerInvocation): Promise<Planner
   return runIsolatedChild<PlannerDraft>({
     cwd: invocation.cwd,
     ...(invocation.providerAuthority ? { providerAuthority: invocation.providerAuthority } : {}),
-    protocolPrompt: buildPlannerSystemPrompt(invocation.reviewerCodemodeEnabled),
+    protocolPrompt: buildPlannerSystemPrompt(
+      invocation.reviewerCodemodeEnabled,
+      invocation.reviewerWebEnabled,
+    ),
     model: invocation.model,
     thinkingLevel: clampReviewThinkingLevel(invocation.model, requestedThinkingLevel),
     timeoutMs: PLANNER_TIMEOUT_MS,

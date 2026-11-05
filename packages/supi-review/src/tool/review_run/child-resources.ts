@@ -4,6 +4,7 @@ import {
   SettingsManager,
 } from "@earendil-works/pi-coding-agent";
 import headlessInspectionProfile from "@mrclrchtr/supi-code-intelligence/headless";
+import type { ChildWebToolProvision } from "@mrclrchtr/supi-core/session";
 
 /** Loader and settings manager preconfigured for an isolated child session. */
 export interface IsolatedChildResources {
@@ -16,6 +17,8 @@ export interface IsolatedChildResourceOptions {
   headlessInspection?: boolean;
   /** Load PI codemode only for an explicitly opted-in Reviewer. */
   codemode?: boolean;
+  /** Session-provided Web tools for Reviewer Web Access; omitted means none. */
+  webTools?: ChildWebToolProvision;
   projectTrusted?: boolean;
 }
 
@@ -35,21 +38,26 @@ export function createIsolatedChildResources(
     retry: { enabled: false },
   });
   settingsManager.setProjectTrusted(options.projectTrusted ?? false);
+  const extensionFactories = [
+    ...(options.headlessInspection
+      ? [{ name: "supi-code-intelligence-headless", factory: headlessInspectionProfile }]
+      : []),
+    ...(options.codemode ? [createCodemodeExtension({ models: true, mode: "on" })] : []),
+    ...(options.webTools && options.webTools.toolNames.length > 0
+      ? [
+          {
+            name: "supi-web-child",
+            factory: options.webTools.createFactory(options.webTools.toolNames),
+          },
+        ]
+      : []),
+  ];
   const loader = new DefaultResourceLoader({
     cwd,
     agentDir,
     settingsManager,
     noExtensions: true,
-    ...(options.headlessInspection || options.codemode
-      ? {
-          extensionFactories: [
-            ...(options.headlessInspection
-              ? [{ name: "supi-code-intelligence-headless", factory: headlessInspectionProfile }]
-              : []),
-            ...(options.codemode ? [createCodemodeExtension({ models: true, mode: "on" })] : []),
-          ],
-        }
-      : {}),
+    ...(extensionFactories.length > 0 ? { extensionFactories } : {}),
     noSkills: true,
     noPromptTemplates: true,
     noThemes: true,

@@ -13,5 +13,8 @@ describe("Agent Capability Set", () => {
     });
     expect(isReadOnlyCapabilitySet(["bash"])).toBe(false);
     expect(isReadOnlyCapabilitySet(["future-tool" as never])).toBe(false);
+    expect(
+      isReadOnlyCapabilitySet(["web_fetch_md", "web_search", "web_docs_search", "web_docs_fetch"]),
+    ).toBe(true);
   });
 });

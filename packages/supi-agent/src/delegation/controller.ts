@@ -8,12 +8,10 @@ import { loadAgentConfig } from "../config.ts";
 import { preflightDelegationBatch } from "../tool/agent_run/batch-preflight.ts";
 import { startDelegationBatchWithAuxiliaryModels } from "../tool/agent_run/batch-runner.ts";
 import type {
-  BatchProgressState,
   BatchTaskResult,
   DelegationBatchHandle,
+  DelegationStartOptions,
 } from "../tool/agent_run/batch-types.ts";
-import type { AgentRunToolParams } from "../tool/agent_run/schema.ts";
-import type { ProfileCatalogue } from "../types.ts";
 import { DelegationConversationState, getSuccessfulCollection } from "./conversation-state.ts";
 import { DelegationUsageReceipts } from "./usage-receipts.ts";
 import { waitForDelegation } from "./wait.ts";
@@ -53,13 +51,7 @@ export class DelegationController {
   ) {}
 
   /** Validate all tasks before starting a session-owned batch. */
-  async start(options: {
-    params: AgentRunToolParams;
-    catalogue: ProfileCatalogue;
-    ctx: ExtensionContext;
-    callId: string;
-    onUpdate?: (state: BatchProgressState) => void;
-  }): Promise<ManagedBatch> {
+  async start(options: DelegationStartOptions): Promise<ManagedBatch> {
     if (this.#closed) throw new Error("The delegation session is closed.");
     const { params, catalogue, ctx, callId, onUpdate } = options;
     this.observeParent(ctx.signal);
@@ -75,7 +67,7 @@ export class DelegationController {
       activeBranch,
       (batch) => this.#onBranch(batch),
     );
-    const preflight = preflightDelegationBatch(params, catalogue, ctx);
+    const preflight = preflightDelegationBatch(params, catalogue, ctx, options.webTools);
     if ("errors" in preflight) {
       throw new Error(
         `Delegation Batch preflight failed:\n${preflight.errors.map((error) => error.message).join("\n")}`,

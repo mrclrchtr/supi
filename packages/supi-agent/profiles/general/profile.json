@@ -14,7 +14,11 @@
     "code_graph",
     "code_find",
     "code_health",
-    "codemode"
+    "codemode",
+    "web_fetch_md",
+    "web_search",
+    "web_docs_search",
+    "web_docs_fetch"
   ],
   "systemPrompt": "supi:general",
   "instructionScopes": ["global", "project"]

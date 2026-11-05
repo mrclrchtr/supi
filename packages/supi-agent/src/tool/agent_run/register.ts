@@ -1,4 +1,5 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { requestChildWebTools } from "@mrclrchtr/supi-core/session";
 import type { DelegationController } from "../../delegation/controller.ts";
 import { makeAgentRunExecute } from "./execute.ts";
 import { toolDescription } from "./guidance.ts";
@@ -16,6 +17,8 @@ export function registerAgentRunTool(pi: ExtensionAPI, controller: DelegationCon
     prepareArguments: prepareAgentRunArguments,
     renderCall,
     renderResult,
-    execute: makeAgentRunExecute(controller, parameters),
+    execute: makeAgentRunExecute(controller, parameters, (cwd) =>
+      requestChildWebTools(pi.events, { configCwd: cwd }),
+    ),
   });
 }

@@ -306,6 +306,25 @@ describe("runReviewer", () => {
     );
   });
 
+  it("adds Reviewer Web Access tools to investigation only and states their supporting role", async () => {
+    const reviewerWebTools = {
+      toolNames: ["web_fetch_md", "web_docs_fetch"] as const,
+      createFactory: () => () => {},
+    };
+    await runReviewer({ ...invocation, reviewerCodemodeEnabled: true, reviewerWebTools });
+
+    const config = mocks.runIsolatedChild.mock.calls[0]?.[0];
+    expect(config).toMatchObject({ webTools: reviewerWebTools });
+    expect(config?.initialActiveTools).toEqual(
+      expect.arrayContaining(["web_fetch_md", "web_docs_fetch"]),
+    );
+    expect(config?.protocolPrompt).toContain("never Target Evidence");
+    expect(config?.protocolPrompt).toContain(
+      "or supporting web research through web_fetch_md, web_docs_fetch",
+    );
+    expect(config?.continuation).toBeDefined();
+  });
+
   it("maps each runtime outcome into a reviewer result carrying modelId", async () => {
     mocks.runIsolatedChild.mockImplementationOnce(async (config) => {
       config.onSessionCreated?.(createView());

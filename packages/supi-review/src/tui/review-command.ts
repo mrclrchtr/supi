@@ -36,6 +36,7 @@ import type {
   ReviewTargetSpec,
   ReviewTask,
 } from "../types.ts";
+import { captureReviewerWebTools } from "../web-access.ts";
 import {
   formatInteractiveReviewScope,
   selectInteractiveReviewScope,
@@ -295,6 +296,7 @@ async function draftInteractiveReview(
       plannerModel,
       plannerThinkingLevel,
       reviewerCodemodeEnabled: config.reviewerCodemodeEnabled,
+      ...(config.reviewerWebEnabled ? { reviewerWebEnabled: true } : {}),
       signal,
     }),
   );
@@ -339,6 +341,11 @@ async function executeInteractiveReview(
   const config = loadReviewConfig(ctx.cwd);
   const auditStore = config.auditEnabled ? input.auditStore : undefined;
   const recoveryModel = resolveRecoveryReviewModel(ctx, config.recoveryModel);
+  const reviewerWebTools = captureReviewerWebTools(
+    config.reviewerWebEnabled,
+    input.pi.events,
+    ctx.cwd,
+  );
   return withCancellableLoader(
     ctx,
     `Reviewing… (${formatInteractiveReviewScope(input.scope)})`,
@@ -352,6 +359,7 @@ async function executeInteractiveReview(
         reviewerModel: input.reviewerModel,
         reviewerThinkingLevel: input.reviewerThinkingLevel,
         reviewerCodemodeEnabled: config.reviewerCodemodeEnabled,
+        ...(reviewerWebTools ? { reviewerWebTools } : {}),
         ...(recoveryModel ? { recoveryModel } : {}),
         ...(config.recoveryModel !== "disabled" &&
         config.recoveryModel !== CURRENT_SESSION_REVIEW_MODEL &&

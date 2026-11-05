@@ -11,6 +11,7 @@ import {
   createUnobservedAgentRunDiagnostics,
   raceAgentRunStartup,
 } from "@mrclrchtr/supi-agent-runtime/api";
+import type { ChildWebToolProvision } from "@mrclrchtr/supi-core/session";
 import type { LocalReviewAuditStore } from "../../audit/local-review-audit-store.ts";
 import { isRootCommit, resolveReviewSnapshot, summarizeReviewSnapshot } from "../../git.ts";
 import { normalizeReviewInput } from "../../review-input.ts";
@@ -51,6 +52,8 @@ export interface DraftReviewTasksInput {
   plannerThinkingLevel?: ReviewThinkingLevel;
   /** Reflect the Reviewer capability option to the submit-only Planner; does not enable it there. */
   reviewerCodemodeEnabled?: boolean;
+  /** Reflect Reviewer Web Access to the submit-only Planner; does not enable it there. */
+  reviewerWebEnabled?: boolean;
   signal?: AbortSignal;
   onUpdate?: OnUpdate;
 }
@@ -68,6 +71,8 @@ export interface RunReviewInput {
   reviewerThinkingLevel?: ReviewThinkingLevel;
   /** Opt Reviewer investigation into PI codemode and scoped auxiliary models. */
   reviewerCodemodeEnabled?: boolean;
+  /** Reviewer Web Access snapshot captured in the containing session; omitted means none. */
+  reviewerWebTools?: ChildWebToolProvision;
   /** Optional explicit second model for Submission Recovery. */
   recoveryModel?: ReviewModelSelection;
   /** Requested recovery model id when configuration did not resolve. */
@@ -156,6 +161,7 @@ export async function draftReviewTasks(input: DraftReviewTasksInput) {
       requestedThinkingLevel: input.plannerThinkingLevel,
       ...(input.providerAuthority ? { providerAuthority: input.providerAuthority } : {}),
       reviewerCodemodeEnabled: input.reviewerCodemodeEnabled,
+      ...(input.reviewerWebEnabled ? { reviewerWebEnabled: true } : {}),
       prompt: buildPlannerPrompt(snapshot, scope, input.plannerContext),
       signal: input.signal,
     });
@@ -427,6 +433,7 @@ export async function runReview(input: RunReviewInput) {
       input.registry,
       input.reviewerCodemodeEnabled ?? false,
       authorizedAuxiliaryModels,
+      input.reviewerWebTools,
     );
   } finally {
     cleanupWarning = await workspace.cleanup();

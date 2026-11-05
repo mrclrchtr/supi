@@ -9,9 +9,7 @@ import {
   getAgentRunDiagnosticErrorRows,
   startRegisteredAgentRun,
 } from "@mrclrchtr/supi-agent-runtime/api";
-import { toAgentToolNames } from "../../capabilities.ts";
 import { createDelegationCheckpoint } from "../../delegation/checkpoints.ts";
-import type { AgentProfile } from "../../types.ts";
 import type { ResolvedTask } from "./batch-preflight.ts";
 import type { BatchTaskProgress, BatchTaskResult } from "./batch-types.ts";
 import type { AgentConversationView, ConversationTaskMetadata } from "./conversation-view.ts";
@@ -161,7 +159,7 @@ export function startBatchTask(options: StartBatchTaskOptions): StartedBatchTask
     retrospective: registry ? createTaskDebugRetrospective(options) : undefined,
     ...(options.signal ? { signal: options.signal } : {}),
     ...(task.timeoutMs === undefined ? {} : { timeoutMs: task.timeoutMs }),
-    readinessCheck: makeReadinessCheck(task.profile),
+    readinessCheck: makeReadinessCheck(task.inputs.tools),
     completionResolver: (session) => session.getLastAssistantText(),
     observer,
     ...(registry ? { registry } : {}),
@@ -391,7 +389,9 @@ function finalizeRejectedTask(context: FinalizeContext): BatchTaskResult {
   return result;
 }
 
-function makeReadinessCheck(profile: AgentProfile): (session: AgentRunSessionView) => boolean {
-  const required = toAgentToolNames(profile.manifest.tools);
+/** Require every tool in the run's effective allowlist; unavailable Conditional Capabilities are already omitted. */
+function makeReadinessCheck(
+  required: readonly string[],
+): (session: AgentRunSessionView) => boolean {
   return (session) => required.every((name) => session.getActiveToolNames().includes(name));
 }

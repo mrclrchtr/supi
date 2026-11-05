@@ -31,5 +31,6 @@ Multi-context monorepo. Each package is an independent context with its own `GLO
 Relationships:
 - **supi-agent → supi-agent-runtime**: Agent Profiles compile Delegation Tasks into Agent Runs; the runtime owns the shared session registry, temporary transcripts, and `/agents` viewer.
 - **supi-review → supi-agent-runtime**: Reviewer and Planner adapters resolve structured completions through Agent Runs. Reviewer Runs appear in the same registry; Review audit stays separate.
+- **supi-web → supi-agent, supi-review**: The loaded Web extension supplies Conditional Capabilities and Reviewer Web Access to child sessions; neither consumer depends on supi-web ([ADR 0026](./docs/adr/0026-session-provided-web-capabilities.md)).
 
 System-wide context lives in the root [GLOSSARY.md](./GLOSSARY.md) and [system-wide ADRs](./docs/adr/).

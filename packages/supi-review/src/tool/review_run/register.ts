@@ -21,6 +21,6 @@ export function registerReviewRunTool(
     promptGuidelines: [...promptGuidelines],
     renderCall: renderRunCall,
     renderResult: renderRunResult,
-    execute: makeRunReviewExecute(artifactStore, localAuditStore, registry),
+    execute: makeRunReviewExecute(artifactStore, localAuditStore, registry, pi.events),
   });
 }

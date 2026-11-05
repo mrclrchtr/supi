@@ -5,6 +5,7 @@ import {
   type AgentRunRegistry,
   createUnobservedAgentRunDiagnostics,
 } from "@mrclrchtr/supi-agent-runtime/api";
+import type { ChildWebToolProvision } from "@mrclrchtr/supi-core/session";
 import { normalizeReviewInput } from "../../review-input.ts";
 import { buildReviewPacket } from "../../target/packet.ts";
 import {
@@ -132,6 +133,7 @@ export async function executeReviewTasks(
   registry?: AgentRunRegistry,
   reviewerCodemodeEnabled = false,
   authorizedAuxiliaryModels?: AgentRunAuxiliaryModelSnapshot,
+  reviewerWebTools?: ChildWebToolProvision,
 ): Promise<ReviewTaskResult[]> {
   const review = normalizeReviewInput(reviewInput);
   let completedCount = 0;
@@ -164,6 +166,7 @@ export async function executeReviewTasks(
   const reviewerCapabilities = {
     reviewerCodemodeEnabled,
     ...(authorizedAuxiliaryModels ? { authorizedAuxiliaryModels } : {}),
+    ...(reviewerWebTools ? { reviewerWebTools } : {}),
   };
 
   return Promise.all(

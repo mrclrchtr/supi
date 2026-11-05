@@ -6,6 +6,8 @@ export interface AgentCapability {
   readonly toolName: string;
   readonly mutationCapable: boolean;
   readonly label: string;
+  /** Conditional Capability: present only when the containing session provides it. */
+  readonly conditional?: true;
 }
 
 const capabilityList: readonly AgentCapability[] = [
@@ -53,6 +55,34 @@ const capabilityList: readonly AgentCapability[] = [
     label: "Inspect code health",
   },
   { id: "codemode", toolName: "codemode", mutationCapable: false, label: "Run tool scripts" },
+  {
+    id: "web_fetch_md",
+    toolName: "web_fetch_md",
+    mutationCapable: false,
+    label: "Fetch web pages",
+    conditional: true,
+  },
+  {
+    id: "web_search",
+    toolName: "web_search",
+    mutationCapable: false,
+    label: "Search the web",
+    conditional: true,
+  },
+  {
+    id: "web_docs_search",
+    toolName: "web_docs_search",
+    mutationCapable: false,
+    label: "Search library docs",
+    conditional: true,
+  },
+  {
+    id: "web_docs_fetch",
+    toolName: "web_docs_fetch",
+    mutationCapable: false,
+    label: "Fetch library docs",
+    conditional: true,
+  },
 ];
 
 /** The complete fixed capability set; callers must not mutate this array. */
@@ -75,6 +105,27 @@ export function isReadOnlyCapabilitySet(tools: readonly AgentCapabilityId[]): bo
 /** Return whether the selected capabilities include a headless Code Intelligence tool. */
 export function usesHeadlessInspection(tools: readonly AgentCapabilityId[]): boolean {
   return tools.some((tool) => tool.startsWith("code_"));
+}
+
+/** Return the profile's allowed Web Conditional Capabilities. */
+export function selectedWebCapabilities(
+  tools: readonly AgentCapabilityId[],
+): Extract<AgentCapabilityId, `web_${string}`>[] {
+  return tools.filter((tool): tool is Extract<AgentCapabilityId, `web_${string}`> =>
+    tool.startsWith("web_"),
+  );
+}
+
+/**
+ * Return the capabilities a run actually receives: every unconditional capability plus
+ * the allowed Conditional Capabilities that the containing session currently provides.
+ */
+export function effectiveCapabilities(
+  tools: readonly AgentCapabilityId[],
+  providedConditional: readonly string[],
+): AgentCapabilityId[] {
+  const provided = new Set(providedConditional);
+  return tools.filter((tool) => byId.get(tool)?.conditional !== true || provided.has(tool));
 }
 
 /** Convert validated capability IDs to PI's tool allowlist. */

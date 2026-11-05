@@ -1,4 +1,5 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { ChildWebToolProvision } from "@mrclrchtr/supi-core/session";
 import type { TSchema } from "typebox";
 import { Value } from "typebox/value";
 import type { DelegationController } from "../../delegation/controller.ts";
@@ -10,10 +11,14 @@ import type { AgentRunToolParams } from "./schema.ts";
 
 type AgentRunExecute = NonNullable<Parameters<ExtensionAPI["registerTool"]>[0]["execute"]>;
 
-/** Build the agent_run execute function for one registry and schema instance. */
+/**
+ * Build the agent_run execute function for one registry and schema instance.
+ * `captureWebTools` snapshots session-provided Web tools once per invocation.
+ */
 export function makeAgentRunExecute(
   controller: DelegationController,
   parameters: TSchema,
+  captureWebTools: (cwd: string) => ChildWebToolProvision | undefined = () => undefined,
 ): AgentRunExecute {
   // biome-ignore lint/complexity/useMaxParams: Pi execute contract requires 5 parameters.
   return async (toolCallId, params, _signal, onUpdate, ctx) => {
@@ -40,10 +45,12 @@ export function makeAgentRunExecute(
         }
       : undefined;
 
+    const webTools = captureWebTools(ctx.cwd);
     const batch = await controller.start({
       params: toolParams,
       catalogue,
       ctx,
+      ...(webTools ? { webTools } : {}),
       callId: toolCallId,
       onUpdate: onBatchUpdate,
     });

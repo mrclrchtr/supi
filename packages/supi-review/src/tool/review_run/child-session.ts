@@ -16,6 +16,7 @@ import {
   startAgentRun,
   startRegisteredAgentRun,
 } from "@mrclrchtr/supi-agent-runtime/api";
+import type { ChildWebToolProvision } from "@mrclrchtr/supi-core/session";
 import type { ChildRunOutcome, ReviewProgress } from "../../types.ts";
 import { createIsolatedChildResources } from "./child-resources.ts";
 
@@ -47,6 +48,8 @@ export interface IsolatedRunConfig<T> {
   authorizedAuxiliaryModels?: AgentRunAuxiliaryModelSnapshot;
   headlessInspection?: boolean;
   codemode?: boolean;
+  /** Session-provided Web tools for Reviewer Web Access. */
+  webTools?: ChildWebToolProvision;
   projectTrusted?: boolean;
   onSessionCreated?: (session: AgentRunSessionView) => undefined | (() => void);
   runDisplay?: AgentRunDisplayMetadata & { readonly runKey: string; readonly batchId: string };
@@ -138,6 +141,7 @@ export async function runIsolatedChild<T>(
     {
       headlessInspection: config.headlessInspection,
       ...(config.codemode ? { codemode: true } : {}),
+      webTools: config.webTools,
       projectTrusted: config.projectTrusted,
     },
   );

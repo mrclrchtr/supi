@@ -43,12 +43,16 @@ An external operating-system or container boundary around the whole Pi process, 
 _Avoid_: child sandbox, in-process sandbox
 
 **Inspection-only**:
-A behavioral protocol that permits repository inspection, read-only retrieval of identified Review Criteria Sources, and Dependency Bootstrap, but forbids intentional changes to Target Evidence or Git history. Test verification means inspecting test code and requirement coverage; runtime checks are delegated to the containing Agent. It is not an access-control guarantee.
-_Avoid_: read-only, sandboxed, write-protected, runtime verification, general web research
+A behavioral protocol that permits repository inspection, read-only retrieval of identified Review Criteria Sources, Dependency Bootstrap, and, when Reviewer Web Access is enabled, web research that supports but never replaces Target Evidence, but forbids intentional changes to Target Evidence or Git history. Test verification means inspecting test code and requirement coverage; runtime checks are delegated to the containing Agent. It is not an access-control guarantee.
+_Avoid_: read-only, sandboxed, write-protected, runtime verification, web-only findings
 
 **Reviewer Extension Set**:
-The package-owned extensions requested for Reviewer Sessions: headless Code Intelligence, plus PI codemode only when `review.reviewerCodemodeEnabled` is on. Codemode does not add tools or inherit parent extensions; unrelated extensions and non-extension resources remain excluded.
+The package-owned extensions requested for Reviewer Sessions: headless Code Intelligence, plus PI codemode only when `review.reviewerCodemodeEnabled` is on and Web tools only under Reviewer Web Access. Codemode does not add tools or inherit parent extensions; unrelated extensions and non-extension resources remain excluded.
 _Avoid_: ambient extensions, inherited tools, caller-selected extensions
+
+**Reviewer Web Access**:
+The opt-in, investigation-only availability of public web and library-documentation tools to Reviewer Sessions, limited to those the containing session currently provides. Web content is untrusted supporting material; it is not Target Evidence.
+_Avoid_: web evidence, inherited web tools, research mode
 
 **Reviewer Capability Warning**:
 A bounded parent-facing notice that a requested Reviewer Extension Set capability was unavailable and the task continued with its other permitted tools. It is execution provenance, not a finding and does not determine the Task Verdict.

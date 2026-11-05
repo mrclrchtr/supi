@@ -31,6 +31,20 @@ const REVIEWER_INSPECTION_TOOLS = [
   ...HEADLESS_INSPECTION_TOOL_NAMES,
 ];
 
+/** Investigation tools; Submission Recovery replaces these with its terminal tools only. */
+function investigationTools(
+  invocation: ReviewerInvocation,
+  webTools: readonly string[],
+  submitName: string,
+): string[] {
+  return [
+    ...REVIEWER_INSPECTION_TOOLS,
+    ...webTools,
+    submitName,
+    ...(invocation.reviewerCodemodeEnabled ? ["codemode"] : []),
+  ];
+}
+
 function reviewerRunDisplay(
   invocation: ReviewerInvocation,
   thinkingLevel: AgentRunDisplayMetadata["thinkingLevel"],
@@ -148,17 +162,15 @@ export async function runReviewer(invocation: ReviewerInvocation): Promise<Revie
     reviewerExtensionSetStatus: "unobserved",
     warnings: [],
   };
-  const originalTools = [
-    ...REVIEWER_INSPECTION_TOOLS,
-    submit.name,
-    ...(invocation.reviewerCodemodeEnabled ? ["codemode"] : []),
-  ];
+  const webTools = invocation.reviewerWebTools?.toolNames ?? [];
+  const originalTools = investigationTools(invocation, webTools, submit.name);
   const runDisplay = reviewerRunDisplay(invocation, effectiveThinkingLevel, originalTools);
   const retrospective = reviewerRetrospective(invocation, runDisplay);
   const protocolPrompt = buildReviewerSystemPrompt(
     invocation.dependencyBootstrapConfigured,
     invocation.reviewerCodemodeEnabled,
     Boolean(retrospective),
+    webTools,
   );
   let session: AgentRunSessionView | undefined;
   const recovery = new ReviewRecoveryPolicy({
@@ -195,6 +207,7 @@ export async function runReviewer(invocation: ReviewerInvocation): Promise<Revie
     ...(invocation.registry ? { registry: invocation.registry } : {}),
     headlessInspection: true,
     codemode: invocation.reviewerCodemodeEnabled ?? false,
+    webTools: invocation.reviewerWebTools,
     projectTrusted: invocation.projectTrusted ?? false,
     runDisplay,
     displayResult: (result) => {

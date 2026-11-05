@@ -32,6 +32,10 @@ _Avoid_: Profile warning, fallback notice, Agent Run failure
 The fixed package-owned set of tools that Agent Profiles may select for Agent Runs. It includes PI built-ins and explicitly supported child-capable extensions, never ambient extensions.
 _Avoid_: Inherited tools, parent tool set, extension allowlist
 
+**Conditional Capability**:
+A member of the Agent Capability Set that an Agent Profile may allow but an Agent Run receives only when the containing session currently provides it. An unavailable Conditional Capability is absent from that run rather than a startup failure.
+_Avoid_: Optional tool, inherited tool, parent tool
+
 **Agent Prompt Policy**:
 An Agent Profile's choice of one complete base prompt: PI-native, package-owned by Prompt ID, or a Custom System Prompt from the Profile Directory's `SYSTEM.md`.
 _Avoid_: Prompt mode, system prompt type, layered prompt

@@ -3,6 +3,7 @@ import type {
   AgentRunProviderAuthority,
   AgentSessionInputs,
 } from "@mrclrchtr/supi-agent-runtime/api";
+import type { ChildWebToolProvision } from "@mrclrchtr/supi-core/session";
 
 /** Maximum effective Profile IDs exposed to a session's model-facing catalogue. */
 export const MAX_PROFILE_COUNT = 32;
@@ -44,7 +45,11 @@ export type AgentCapabilityId =
   | "code_graph"
   | "code_find"
   | "code_health"
-  | "codemode";
+  | "codemode"
+  | "web_fetch_md"
+  | "web_search"
+  | "web_docs_search"
+  | "web_docs_fetch";
 
 /** Values accepted by PI's model thinking policy. */
 export type AgentThinkingLevel = ModelThinkingLevel;
@@ -205,4 +210,6 @@ export interface AgentSessionInputOptions {
   readonly model: Model<any>;
   readonly thinkingLevel: AgentThinkingLevel;
   readonly profile: AgentProfile;
+  /** Web tools the containing session provides for this invocation; omitted means none. */
+  readonly webTools?: ChildWebToolProvision;
 }
