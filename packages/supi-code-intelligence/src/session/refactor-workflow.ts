@@ -24,6 +24,7 @@ import {
   parseRefactorApplyWorkflowInput,
   parseRefactorPlanWorkflowInput,
 } from "./input/health-refactor.ts";
+import { collectFileFingerprints, dropIdentityEdits } from "./refactor-identity.ts";
 import {
   computeFileFingerprint,
   generatePlanId,
@@ -202,6 +203,14 @@ async function planResolvedRefactor(
     deps.cwd,
   );
   if (snapshotError) return { kind: "unavailable", reason: snapshotError };
+  const changed = dropIdentityEdits(result.edits, fileFingerprints);
+  if (changed.kind === "unavailable") return changed;
+  if (changed.edits.edits.length === 0) {
+    return {
+      kind: "invalid-input",
+      message: `The ${parsed.operation} refactor produces no changes; every planned edit matches the current text.`,
+    };
+  }
 
   const plan: RefactorPlan = {
     id: generatePlanId(
@@ -216,10 +225,10 @@ async function planResolvedRefactor(
     targetFile: file,
     targetLine: target.displayLine,
     targetCharacter: target.displayCharacter,
-    edits: result.edits,
+    edits: changed.edits,
     evidenceSource: sectionRename.evidenceSource,
     authorizedMutationRoots: authority.canonicalRoots,
-    fileFingerprints,
+    fileFingerprints: changed.fileFingerprints,
     createdAt: Date.now(),
   };
   deps.storePlan(plan);
@@ -364,18 +373,6 @@ async function planWithProvider(
     kind: "unavailable",
     reason: `The semantic provider cannot plan ${request.operation}.`,
   };
-}
-
-function collectFileFingerprints(
-  edits: Array<{ file: string }>,
-  sourceSnapshot?: { readonly file: string; readonly fingerprint: string },
-): Array<{ file: string; fingerprint: string }> {
-  const files = [...new Set(edits.map((edit) => edit.file))];
-  return files.map((file) => ({
-    file,
-    fingerprint:
-      sourceSnapshot?.file === file ? sourceSnapshot.fingerprint : computeFileFingerprint(file),
-  }));
 }
 
 function immutablePlan(plan: RefactorPlan): Readonly<RefactorPlan> {
