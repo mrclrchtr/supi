@@ -135,6 +135,7 @@ import {
   collectWorkspaceSymbols,
   findWorkspaceSymbolWarmTargets,
   getWorkspaceSymbolWarmPosition,
+  isWithinAnyScope,
   type WorkspaceSymbolCollection,
   workspaceSymbolCollectionResult,
 } from "./manager-workspace-symbol.ts";
@@ -2926,7 +2927,15 @@ export class LspManager {
       return this.filterWorkspaceSymbolCollection(collection, resolvedScopes);
     };
     const initial = await collect(this.clients.values(), query);
-    if (!initial.hasSupport || initial.results.length > 0) {
+    // Allowed out-of-scope rows do not show that the server knows the scope yet.
+    const hasScopedResult = (collection: WorkspaceSymbolCollection) =>
+      collection.hasSupport &&
+      collection.results.some(
+        (result) =>
+          !resolvedScopes?.length ||
+          isWithinAnyScope(uriToFile(result.location.uri), resolvedScopes),
+      );
+    if (!initial.hasSupport || hasScopedResult(initial)) {
       return workspaceSymbolCollectionResult(initial);
     }
 
@@ -2938,6 +2947,7 @@ export class LspManager {
         }),
       getWarmPosition: getWorkspaceSymbolWarmPosition,
       collect,
+      hasResult: hasScopedResult,
       routeMatches,
       query,
       control,
@@ -3124,11 +3134,14 @@ export class LspManager {
       symbols: import("../config/types.ts").DocumentSymbol[] | SymbolInformation[] | null,
     ) => import("../config/types.ts").Position | null;
     collect: (clients: Iterable<LspClient>, query: string) => Promise<WorkspaceSymbolCollection>;
+    /** Stop warming once a collection contains a row that answers the request. */
+    hasResult: (collection: WorkspaceSymbolCollection) => boolean;
     routeMatches?: (client: LspClient) => boolean;
     query: string;
     control?: CodeRequestControl;
   }): Promise<{ warmedAny: boolean; collection: WorkspaceSymbolCollection | null }> {
-    const { findWarmTargets, getWarmPosition, collect, routeMatches, query, control } = options;
+    const { findWarmTargets, getWarmPosition, collect, hasResult, routeMatches, query, control } =
+      options;
     let warmedAny = false;
     let latestCollection: WorkspaceSymbolCollection | null = null;
 
@@ -3168,7 +3181,7 @@ export class LspManager {
         }
 
         latestCollection = await collect(this.clients.values(), query);
-        if (latestCollection.hasSupport && latestCollection.results.length > 0) {
+        if (hasResult(latestCollection)) {
           return { warmedAny, collection: latestCollection };
         }
       }

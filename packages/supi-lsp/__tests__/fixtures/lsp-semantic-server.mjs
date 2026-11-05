@@ -168,7 +168,10 @@ function handle(message) {
     } else {
       const name = message.params.query;
       const symbols = symbolsFile
-        ? JSON.parse(fs.readFileSync(symbolsFile, "utf8"))
+        ? // `requiresOpen` rows model files the server only knows after didOpen.
+          JSON.parse(fs.readFileSync(symbolsFile, "utf8"))
+            .filter((symbol) => !symbol.requiresOpen || documents.has(symbol.location.uri))
+            .map(({ requiresOpen: _requiresOpen, ...symbol }) => symbol)
         : symbolsFromOpenFiles
           ? [...documents.keys()]
               .filter((uri) => uri.endsWith(`/${name}.tsx`))

@@ -1,4 +1,4 @@
-import { statSync } from "node:fs";
+import { realpathSync, statSync } from "node:fs";
 import * as path from "node:path";
 import {
   type CodeQueryResult,
@@ -156,7 +156,7 @@ export function findWorkspaceSymbolWarmTargets(
       return searchRoot
         ? findWorkspaceSymbolWarmTargets(searchRoot, rootMarkers, fileTypes, {
             ...options,
-            policy,
+            policy: explicitScopePolicy(policy, scope),
             scopes: undefined,
           })
         : [];
@@ -192,6 +192,50 @@ export function findWorkspaceSymbolWarmTargets(
 
   const fallback = findWarmFileRecursive(resolvedRoot, allowed, maxFileDepth, policy);
   return fallback ? [{ projectRoot: resolvedRoot, file: fallback }] : [];
+}
+
+/**
+ * True when a reported file is inside a scope by spelling or physical identity.
+ * Servers may report realpaths for files requested through symlinked roots.
+ */
+export function isWithinAnyScope(file: string, scopes: readonly string[]): boolean {
+  if (scopes.some((scope) => isWithinOrEqual(scope, file))) return true;
+  try {
+    const physicalFile = realpathSync(file);
+    return scopes.some((scope) => {
+      try {
+        return isWithinOrEqual(realpathSync(scope), physicalFile);
+      } catch {
+        return false;
+      }
+    });
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Keep an explicitly selected excluded file or directory warmable, matching the
+ * rows workspace-symbol filtering allows for that scope. Exclusions nested in an
+ * eligible directory scope stay excluded.
+ */
+function explicitScopePolicy(
+  policy: AutomaticLspPathPolicy,
+  scope: string,
+): AutomaticLspPathPolicy {
+  const kind = statSync(scope, { throwIfNoEntry: false });
+  if (!kind) return policy;
+  const selected = kind.isFile()
+    ? (candidate: string) => path.resolve(candidate) === path.resolve(scope)
+    : policy.isEligible(scope, "directory")
+      ? null
+      : (candidate: string) => isWithinOrEqual(scope, candidate);
+  if (!selected) return policy;
+  return {
+    ...policy,
+    isEligible: (candidate, candidateKind) =>
+      selected(candidate) ? true : policy.isEligible(candidate, candidateKind),
+  };
 }
 
 interface MarkerRootEntry {

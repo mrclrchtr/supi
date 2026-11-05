@@ -29,16 +29,11 @@ describe("registered tools with scoped workspace-symbol completeness", () => {
     }
   });
 
-  it("resolves a complete source scope but keeps broader excluded evidence incomplete", async () => {
-    cwd = fs.mkdtempSync(path.join(os.tmpdir(), "scoped-symbol-tool-"));
-    fs.writeFileSync(path.join(cwd, "project.marker"), "");
-    const files = ["src/main.test", "dist/generated.test", "other/other.test"];
-    for (const file of files) {
-      fs.mkdirSync(path.dirname(path.join(cwd, file)), { recursive: true });
-      fs.writeFileSync(path.join(cwd, file), "function work() {}\n");
-    }
-    const symbols = path.join(cwd, "symbols.json");
-    const suppliedSymbols = files.map((file) => ({
+  const files = ["src/main.test", "dist/generated.test", "other/other.test"];
+
+  function symbolRows(requiresOpen: readonly string[] = []) {
+    return files.map((file) => ({
+      ...(requiresOpen.includes(file) ? { requiresOpen: true } : {}),
       name: "work",
       kind: 12,
       location: {
@@ -49,7 +44,17 @@ describe("registered tools with scoped workspace-symbol completeness", () => {
         },
       },
     }));
-    fs.writeFileSync(symbols, JSON.stringify(suppliedSymbols));
+  }
+
+  async function startTools(requiresOpen: readonly string[] = []) {
+    cwd = fs.mkdtempSync(path.join(os.tmpdir(), "scoped-symbol-tool-"));
+    fs.writeFileSync(path.join(cwd, "project.marker"), "");
+    for (const file of files) {
+      fs.mkdirSync(path.dirname(path.join(cwd, file)), { recursive: true });
+      fs.writeFileSync(path.join(cwd, file), "function work() {}\n");
+    }
+    const symbols = path.join(cwd, "symbols.json");
+    fs.writeFileSync(symbols, JSON.stringify(symbolRows(requiresOpen)));
     writeIsolatedFixtureConfig(cwd, {
       args: [
         FIXTURE,
@@ -83,6 +88,11 @@ describe("registered tools with scoped workspace-symbol completeness", () => {
       )) as CodeIntelResult;
       return result.structuredContent;
     };
+    return { pi, symbols, callResolve };
+  }
+
+  it("resolves a complete source scope but keeps broader excluded evidence incomplete", async () => {
+    const { pi, symbols, callResolve } = await startTools();
     for (const scope of ["src/main.test", "src"]) {
       expect(await callResolve(scope)).toMatchObject({
         kind: "resolved",
@@ -92,7 +102,7 @@ describe("registered tools with scoped workspace-symbol completeness", () => {
     }
     // One visible source candidate is still not unique when the excluded
     // generated candidate belongs to the requested universe.
-    fs.writeFileSync(symbols, JSON.stringify(suppliedSymbols.slice(0, 2)));
+    fs.writeFileSync(symbols, JSON.stringify(symbolRows().slice(0, 2)));
     expect(await callResolve(".")).toMatchObject({
       kind: "disambiguation",
       targets: [{ name: "work", file: "src/main.test" }],
@@ -115,4 +125,16 @@ describe("registered tools with scoped workspace-symbol completeness", () => {
       evidenceLists: [{ totalCount: 1, shownCount: 1, partialReason: null }],
     });
   });
+
+  it.each(["dist/generated.test", "dist"])(
+    "resolves a cold explicitly excluded %s scope instead of reporting not found",
+    async (scope) => {
+      // The server reports the generated row only after its document opens.
+      const { callResolve } = await startTools(["dist/generated.test"]);
+      expect(await callResolve(scope)).toMatchObject({
+        kind: "resolved",
+        targets: [{ name: "work", file: "dist/generated.test" }],
+      });
+    },
+  );
 });

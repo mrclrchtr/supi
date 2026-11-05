@@ -22,11 +22,12 @@ describe("public WorkspaceLspRuntime scoped symbol completeness", () => {
     fs.writeFileSync(file, "function work() {}\n");
   }
 
-  function setResults(uris: string[]): void {
+  function setResults(uris: string[], requiresOpen: readonly string[] = []): void {
     fs.writeFileSync(
       symbolsFile,
       JSON.stringify(
         uris.map((uri) => ({
+          ...(requiresOpen.includes(uri) ? { requiresOpen: true } : {}),
           name: "work",
           kind: 12,
           location: {
@@ -139,6 +140,40 @@ describe("public WorkspaceLspRuntime scoped symbol completeness", () => {
       });
     },
   );
+
+  it.each(["file", "directory"])(
+    "warms a cold explicitly selected excluded %s despite out-of-scope rows",
+    async (kind) => {
+      await start();
+      // The server reports the generated row only after its document opens.
+      setResults([fileToUri(source), fileToUri(generated)], [fileToUri(generated)]);
+      const scope = kind === "file" ? generated : path.dirname(generated);
+      await expect(runtime.workspaceSymbol("work", undefined, [scope])).resolves.toMatchObject({
+        kind: "completed",
+        data: [
+          { location: { uri: fileToUri(source) } },
+          { location: { uri: fileToUri(generated) } },
+        ],
+      });
+    },
+  );
+
+  it("does not warm a scope that already has an in-scope row", async () => {
+    await start();
+    setResults([fileToUri(source), fileToUri(other)]);
+    const requests = () => {
+      const lines = fs.readFileSync(path.join(cwd, "protocol.log"), "utf8").split("\n");
+      const count = (method: string) =>
+        lines.filter((line) => line.includes(`"method":"${method}"`)).length;
+      return { symbol: count("workspace/symbol"), document: count("textDocument/documentSymbol") };
+    };
+    const before = requests();
+    await expect(
+      runtime.workspaceSymbol("work", undefined, [path.dirname(source)]),
+    ).resolves.toMatchObject({ kind: "completed" });
+    // A warm-up pass would add a document-symbol probe and a workspace-symbol retry.
+    expect(requests()).toEqual({ symbol: before.symbol + 1, document: before.document });
+  });
 
   it.each(["outside-alias", "inside-alias", "missing", "non-file"])(
     "does not discard a possibly relevant %s exclusion",
