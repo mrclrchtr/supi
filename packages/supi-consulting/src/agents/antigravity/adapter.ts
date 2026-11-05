@@ -81,12 +81,12 @@ class AntigravityAdapter implements ConsultingAgentAdapter {
       });
     } catch (error) {
       const failure = safeExecutionFailure(error);
-      const canceled = failure.kind === "cancelled";
+      const outcome = failureOutcome(failure.kind);
       timer.finish(
         () => ({
           source: "consulting",
-          level: canceled ? "info" : "error",
-          category: canceled ? "consultation.cancelled" : "consultation.failed",
+          level: outcome.level,
+          category: outcome.category,
           message: failure.message,
           cwd: options.canonicalWorkingDirectory,
           data: {
@@ -221,6 +221,19 @@ function decodeContinuation(value: string): string {
     throw new ConsultingAgentError("invalid-continuation");
   }
   return conversationId;
+}
+
+/**
+ * Cancellations and stale handles are expected outcomes, not execution failures:
+ * an incompatible continuation is rejected before any process starts.
+ */
+function failureOutcome(kind: ConsultingAgentFailureKind): {
+  level: "info" | "error";
+  category: string;
+} {
+  if (kind === "cancelled") return { level: "info", category: "consultation.cancelled" };
+  if (kind === "invalid-continuation") return { level: "info", category: "consultation.rejected" };
+  return { level: "error", category: "consultation.failed" };
 }
 
 /** Keep only fixed reasons and safe facts, including preparation and callback failures. */

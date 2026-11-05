@@ -76,7 +76,7 @@ A follow-up supplies only a returned Conversation Handle:
 }
 ```
 
-Supply exactly one of `new` and `continue`. Follow-ups retain the original agent, model, working directory, and Workspace Access. A handle is opaque and branch-aware. It is retired if a follow-up fails or is canceled after process work starts. Overlapping follow-ups on the same handle are rejected.
+Supply exactly one of `new` and `continue`. Follow-ups retain the original agent, model, working directory, and Workspace Access. A handle is opaque and branch-aware. It is retired if a follow-up fails or is canceled after process work starts, or if its continuation state is incompatible. Overlapping follow-ups on the same handle are rejected.
 
 Results report web use, workspace use, observed and claimed references, warnings, token use, and the Conversation Handle. An answer can claim a reference without matching tool activity; SuPi labels that reference as claimed, not observed.
 
@@ -86,7 +86,7 @@ New Antigravity conversations use a package-owned temporary agent definition wit
 
 The definition lives in the Isolated Antigravity Home under a random name to avoid workspace-agent name collisions. SuPi removes it after the process, including ordinary failures, timeouts, and cancellation. A hard process crash can leave a temporary definition behind. Follow-ups resume the saved conversation without a new agent override; Antigravity retains the original definition even after its file is removed.
 
-**Start a new Consultation after upgrading from the default-agent integration.** Old Conversation Handles cannot acquire the inspection tools by resuming. SuPi rejects legacy or incompatible profile continuations before starting any Antigravity process and asks for a new Consultation. Profile compatibility is tracked privately; the calling tool's input shape is unchanged.
+**Start a new Consultation after upgrading from the default-agent integration.** Old Conversation Handles cannot acquire the inspection tools by resuming. SuPi rejects legacy or incompatible profile continuations before starting any Antigravity process, retires the handle, and asks for a new Consultation. Profile compatibility is tracked privately; the calling tool's input shape is unchanged.
 
 Web activity alone does not prove a cited page was read. For research, the agent is instructed to search for sources and directly read relevant pages before citing them. SuPi still classifies references from observed activity, not from the agent's claims. The CLI's startup tool inventory is not treated as proof that a tool is active for the selected agent.
 
@@ -130,13 +130,13 @@ An observed tool permission denial is reported separately. It does not prove the
 
 Failure messages returned to the calling agent include the observed terminal status and denial counts by fixed operation category (`command`, `file-read`, `file-write`, `web-read`, `browser`, `mcp`, or `other`). They distinguish a successful agent terminal status from a usable final answer and recommend permitted inspection or a limited/blocked report rather than repeating denied actions unchanged. This feedback remains available when Debug is disabled.
 
-When SuPi Debug is enabled, failed executions emit one `consulting/consultation.failed` event at `error` level. Cancellations emit `consulting/consultation.cancelled` at `info` level. Use the `debug` tool:
+When SuPi Debug is enabled, failed executions emit one `consulting/consultation.failed` event at `error` level. Cancellations emit `consulting/consultation.cancelled` at `info` level. Rejected incompatible Conversation Handles emit `consulting/consultation.rejected` at `info` level; no process was started for them. Use the `debug` tool:
 
 ```json
 { "source": "consulting", "level": "error", "limit": 10 }
 ```
 
-Omit `level` to include cancellations. Add `sessionFile` to inspect events persisted in a saved PI session. A response aborted before the adapter starts has no Consulting event.
+Omit `level` to include cancellations and rejected handles. Add `sessionFile` to inspect events persisted in a saved PI session. A response aborted before the adapter starts has no Consulting event.
 
 Events contain the execution phase, timing, selected model, workspace-access and follow-up flags, failure category and reason, and available event counts, terminal-state flags, permission-denial count, and exit code. `permissionDenialsByOperation` breaks down deduplicated denials by fixed category; unknown tool names become `other`. `deniedFileAccessOutsideReadRoots` counts denied file operations whose requested paths resolve outside the selected directory and configured additional read-only directories, following symlinks and existing parents of missing targets. Unavailable path information, dangling symlink destinations, and paths containing parent traversal (`..`) remain unclassified rather than risking an incorrect outside-root claim. This location observation does not identify which rule caused a denial.
 

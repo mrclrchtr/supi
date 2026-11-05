@@ -42,7 +42,7 @@ function execute(
   prompt: string,
   options: Pick<
     ConsultingAgentExecutionOptions,
-    "signal" | "onProgress" | "additionalReadOnlyDirectories"
+    "signal" | "onProgress" | "additionalReadOnlyDirectories" | "continuation"
   > = {},
 ) {
   const paths = getIsolatedAntigravityPaths();
@@ -118,6 +118,21 @@ describe("Consultation failure diagnostics", () => {
         level: "info",
         category: "consultation.cancelled",
         data: { kind: "cancelled", reason: "cancelled", permissionDenials: 1 },
+      },
+    ]);
+  });
+
+  it("records incompatible continuations as rejections, not execution failures", async () => {
+    const failure = await execute("follow up", {
+      continuation: `agy1.${Buffer.from("legacy-conversation").toString("base64url")}`,
+    }).catch((error: unknown) => error);
+    expect(failure).toMatchObject({ kind: "invalid-continuation" });
+    expect(getDebugEvents({ source: "consulting", level: "error" }).events).toEqual([]);
+    expect(getDebugEvents({ source: "consulting" }).events).toMatchObject([
+      {
+        level: "info",
+        category: "consultation.rejected",
+        data: { kind: "invalid-continuation", followUp: true, phase: "preparation" },
       },
     ]);
   });

@@ -4,6 +4,7 @@ import type {
   ExtensionAPI,
   ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
+import { ConsultingAgentError } from "../../agents/errors.ts";
 import type { ConsultingAgentAdapter, ConsultingAgentAvailability } from "../../agents/types.ts";
 import { resolveAdditionalReadOnlyDirectories } from "../../config.ts";
 import {
@@ -167,9 +168,19 @@ async function runContinue(
       ...(hookWarning ? { hookWarning } : {}),
     });
   } catch (error) {
-    if (processStarted) {
+    // Incompatible continuation state can never succeed, so retire it even though
+    // the adapter rejected it before any process work.
+    const incompatible =
+      error instanceof ConsultingAgentError && error.kind === "invalid-continuation";
+    if (processStarted || incompatible) {
       const retired = dependencies.handles.retire(record.handle);
-      if (retired) appendHandleRetired(dependencies.pi, retired, "Consultation follow-up failed");
+      if (retired) {
+        appendHandleRetired(
+          dependencies.pi,
+          retired,
+          incompatible ? "Incompatible continuation state" : "Consultation follow-up failed",
+        );
+      }
     }
     throw error;
   } finally {

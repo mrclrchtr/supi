@@ -20,7 +20,7 @@ afterEach(async () => {
 });
 
 describe("consulting_run continuation identity", () => {
-  it("releases but does not retire an incompatible saved handle rejected before startup", async () => {
+  it("retires an incompatible saved handle without starting a process", async () => {
     const root = await mkdtemp(join(tmpdir(), "supi-consulting-continuation-"));
     roots.push(root);
     const adapter = createAntigravityAdapter(getIsolatedAntigravityPaths(root));
@@ -47,22 +47,24 @@ describe("consulting_run continuation identity", () => {
       homeDir: root,
     });
     const tool = pi.tools[0] as { execute: (...args: unknown[]) => Promise<unknown> };
-    for (const id of ["first", "retry"]) {
-      await expect(
-        tool.execute(
-          id,
-          { prompt: "continue", continue: { handle: record.handle } },
-          undefined,
-          undefined,
-          makeCtx({ cwd: root }),
-        ),
-      ).rejects.toMatchObject({ kind: "invalid-continuation" });
-    }
-    expect(handles.get(record.handle)?.status).toBe("active");
-    expect(pi.entries).not.toContainEqual({
+    const execute = vi.spyOn(adapter, "execute");
+    const run = (id: string) =>
+      tool.execute(
+        id,
+        { prompt: "continue", continue: { handle: record.handle } },
+        undefined,
+        undefined,
+        makeCtx({ cwd: root }),
+      );
+    await expect(run("first")).rejects.toMatchObject({ kind: "invalid-continuation" });
+    expect(handles.get(record.handle)?.status).toBe("retired");
+    expect(pi.entries).toContainEqual({
       type: CONSULTING_HANDLE_ENTRY_TYPE,
       data: expect.objectContaining({ action: "retired", handle: record.handle }),
     });
+    // The retirement is final: a retry fails in handle preflight, before the adapter.
+    await expect(run("retry")).rejects.toThrow(/retired/);
+    expect(execute).toHaveBeenCalledTimes(1);
   });
 
   it.each([
