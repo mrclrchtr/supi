@@ -1,5 +1,59 @@
 # Changelog
 
+## [11.3.0](https://github.com/mrclrchtr/supi/compare/v11.2.0...v11.3.0) (2026-11-06)
+
+
+### Features
+
+* **agent,review,web:** provide session Web tools to child sessions ([7489d3a](https://github.com/mrclrchtr/supi/commit/7489d3a7819f3a367011169051a66227ca968219))
+* **code-intelligence:** distribute graph references across files ([1a3297b](https://github.com/mrclrchtr/supi/commit/1a3297b91ac06e683aabd4648cf503920739af38))
+* **packaging:** ship extension package changelogs ([4438e76](https://github.com/mrclrchtr/supi/commit/4438e76ba99ddd9c0de097771938e90abc553888))
+* **settings:** add supi-setup configuration audit skill ([1fe5a84](https://github.com/mrclrchtr/supi/commit/1fe5a846188211807a57d0465bedb9fd42044f99))
+* **web:** add opt-in Firecrawl retrieval ([17d2c77](https://github.com/mrclrchtr/supi/commit/17d2c77c5cd1be7c427ffe4d617ad50fedcfe917))
+
+
+### Bug Fixes
+
+* **code-intelligence:** align refresh and path explanations ([5eb57b5](https://github.com/mrclrchtr/supi/commit/5eb57b5a2ff9f270f4865edc9fd62263c9178c55))
+* **code-intelligence:** clarify graph selection note ([aa8f2a5](https://github.com/mrclrchtr/supi/commit/aa8f2a55e43715428637732bea8e6d038dd45ada))
+* **code-intelligence:** clarify health readiness and route labels ([5a7dc32](https://github.com/mrclrchtr/supi/commit/5a7dc328095b6ba1db9e66edd1b7a755cfa51507))
+* **code-intelligence:** clarify inspector evidence and add health refresh ([3bedd23](https://github.com/mrclrchtr/supi/commit/3bedd2339ff20490b2b77d3df676fb42ab318834)), closes [#371](https://github.com/mrclrchtr/supi/issues/371)
+* **code-intelligence:** clarify limits and canonicalize paths ([948516d](https://github.com/mrclrchtr/supi/commit/948516dd99bed85772155210f1eba6d6350fbf3a))
+* **code-intelligence:** clarify shared target guidance ([ed61829](https://github.com/mrclrchtr/supi/commit/ed61829cff45c8b3e940b5828170652049c9b71c))
+* **code-intelligence:** drop identity edits from refactor plans ([18be7fa](https://github.com/mrclrchtr/supi/commit/18be7faccac53f000d6d6f114816a92992378eef))
+* **code-intelligence:** guide direct graph queries ([3389482](https://github.com/mrclrchtr/supi/commit/3389482d74155ef22242f6cb2a497af2ade03f84))
+* **code-intelligence:** keep resolution metadata request-local ([cf5f87e](https://github.com/mrclrchtr/supi/commit/cf5f87e6eef7d70164be642ae67b4d29d017f941))
+* **code-intelligence:** unify snap metadata and notes ([4e84660](https://github.com/mrclrchtr/supi/commit/4e846605c9be28e475213d18152bb7c3bb0ba786))
+* **consulting:** enable explicit read-only Antigravity tools ([9a9abcb](https://github.com/mrclrchtr/supi/commit/9a9abcb52adff5e3efe5d40d1e285806da9ad5a4))
+* **consulting:** keep tool-free follow-ups bound and ignore page caches ([1489b98](https://github.com/mrclrchtr/supi/commit/1489b9821dfa06af651be7a63e99485b9231dd78))
+* **consulting:** retire incompatible handles without error events ([9307c3e](https://github.com/mrclrchtr/supi/commit/9307c3ef20c3c23f84c96037c107b6800f78a579))
+* **debug:** surface actionable tooling retrospective hypotheses ([615b710](https://github.com/mrclrchtr/supi/commit/615b710a432de81069c5e71d94cdfcc4cf5de154))
+* **deps:** harden dependency supply-chain policy ([806e7aa](https://github.com/mrclrchtr/supi/commit/806e7aad75d8365de845f0bf12d2dcefdb648fdc))
+* **deps:** lock file maintenance ([31f66ca](https://github.com/mrclrchtr/supi/commit/31f66ca10dcc867a7262b754b678fd13776748e8))
+* **deps:** update actions/setup-java action to v6.2.0 ([4228082](https://github.com/mrclrchtr/supi/commit/4228082e73e4e7932db24a03a630c7c65d5e347f))
+* **deps:** update dependency hk to v2.11.0 ([206df85](https://github.com/mrclrchtr/supi/commit/206df8596aa070cefc9e87cb0a5014b9465eb4c1))
+* **deps:** update dependency pnpm to v12.17.0 ([e212c38](https://github.com/mrclrchtr/supi/commit/e212c380529d627323e7c0312c6e1ff8409dd094))
+* **deps:** update Node lock to v24.22.2 ([5a1be20](https://github.com/mrclrchtr/supi/commit/5a1be20152e1eaf49168f87552728a0156b48765))
+* **deps:** update pnpm/action-setup action to v6.1.1 ([3dd4202](https://github.com/mrclrchtr/supi/commit/3dd4202cc1d566b14392e80b19061ff7925dcc10))
+* **deps:** update routine non-major dependencies ([3c9df6c](https://github.com/mrclrchtr/supi/commit/3c9df6c2bb2332c192cf708f0e51cde99e399464))
+* **deps:** upgrade Pi to 1.5.0 ([f08a65c](https://github.com/mrclrchtr/supi/commit/f08a65c7a4d8e2231d683a69afd6989c7bec0421))
+* **lsp:** clarify push-only diagnostic limitations ([1921be1](https://github.com/mrclrchtr/supi/commit/1921be15f76ecb2eec2ddb8a315cb23e170c094d))
+* **lsp:** coordinate concurrent document enrollment ([b0e86d6](https://github.com/mrclrchtr/supi/commit/b0e86d6ea70014cb02fd3155433ee08db6846b2e))
+* **lsp:** coordinate refactor planning with document enrollment ([30d66ae](https://github.com/mrclrchtr/supi/commit/30d66aea81cbab1fe72d4ea9794941ec275b03cc))
+* **lsp:** retain startup failure explanations in passive health ([7518842](https://github.com/mrclrchtr/supi/commit/7518842751adcd352a963b5d61f73000060756d1))
+* **lsp:** scope workspace-symbol exclusion completeness ([65a9d2e](https://github.com/mrclrchtr/supi/commit/65a9d2e05e85c5a6df83edef6fbff2095d90a553))
+* **lsp:** warm cold explicitly excluded workspace-symbol scopes ([66426a2](https://github.com/mrclrchtr/supi/commit/66426a223f504d696fda8245600044f9ae4d371e))
+* **pi-docs-policy:** match current Pi documentation rule ([e26ca92](https://github.com/mrclrchtr/supi/commit/e26ca925fdd4d470e9757c8d12ef280edadba1bd))
+* **tree-sitter:** exclude type-only import calls ([9178fae](https://github.com/mrclrchtr/supi/commit/9178fae04fa7bb236bff388e0831d2538a0eec97))
+* **tree-sitter:** parse import types in generic calls ([3a9d94c](https://github.com/mrclrchtr/supi/commit/3a9d94c17c33a5a110e3056c5619db416d83d562))
+* **ui:** respect host shortcuts and report waiting forms ([0fe59ae](https://github.com/mrclrchtr/supi/commit/0fe59ae34c576ad307ab7ef0773250413be53c68))
+* **usage:** preserve provider cost provenance ([38ab159](https://github.com/mrclrchtr/supi/commit/38ab1597a70610742f4d3bd429420c0268dee0c2))
+
+
+### Performance Improvements
+
+* **commit:** streamline skill with read-only inspection ([4d32a4a](https://github.com/mrclrchtr/supi/commit/4d32a4a36f4943c549ed64c69327acc9b7d6ddc6))
+
 ## [11.2.0](https://github.com/mrclrchtr/supi/compare/v11.1.0...v11.2.0) (2026-11-01)
 
 
