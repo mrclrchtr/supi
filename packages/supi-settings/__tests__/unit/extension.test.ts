@@ -1,4 +1,5 @@
-import { createPiMock } from "@mrclrchtr/supi-test-utils";
+import { loadSkillsFromDir } from "@earendil-works/pi-coding-agent";
+import { createPiMock, getHandlerOrThrow } from "@mrclrchtr/supi-test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockFns = vi.hoisted(() => ({
@@ -32,5 +33,19 @@ describe("supi-settings extension", () => {
     await command?.handler("", ctx as never);
 
     expect(mockFns.openSettingsOverlay).toHaveBeenCalledWith(pi, ctx);
+  });
+
+  it("discovers the user-invoked supi-setup skill", async () => {
+    const pi = createPiMock();
+    registerSettingsExtension(pi as never);
+
+    const discover = getHandlerOrThrow(pi, "resources_discover");
+    const { skillPaths } = (await discover({}, { cwd: "/tmp" })) as { skillPaths: string[] };
+    const loaded = skillPaths.map((dir) => loadSkillsFromDir({ dir, source: "extension" }));
+
+    expect(loaded.flatMap((result) => result.diagnostics)).toEqual([]);
+    expect(loaded.flatMap((result) => result.skills)).toEqual([
+      expect.objectContaining({ name: "supi-setup", disableModelInvocation: true }),
+    ]);
   });
 });

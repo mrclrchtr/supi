@@ -30,9 +30,10 @@ pi install ./packages/supi-settings
 
 ## What it adds
 
-The extension registers one slash command:
+The extension registers one slash command and one skill:
 
 - **`/supi-settings`** — open a searchable settings screen
+- **`/skill:supi-setup`** — audit SuPi package declarations, language servers, TypeScript code-action formatting, Code Intelligence exclusions, stale config sections, and the Review bootstrap command; report findings with evidence and apply only confirmed fixes. User-invoked only; it adds no model context.
 
 The package does not register a tool, a shortcut, or its own setting. The screen contains settings from other loaded SuPi extensions. If no extension contributes settings, Pi shows `No settings registered by SuPi extensions`.
 

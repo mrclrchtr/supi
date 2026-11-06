@@ -28,6 +28,7 @@
   "files": [
     "CHANGELOG.md",
     "src/**/*.ts",
+    "skills",
     "!__tests__"
   ],
   "dependencies": {
