@@ -25,6 +25,8 @@ exclude =
 local precommit = new Mapping<String, Step> {
   ["check-merge-conflict"] = Builtins.check_merge_conflict
   ["gitleaks"] = (Builtins.gitleaks) {
+    // Scan only the content being committed, not the whole working tree.
+    scan = "staged"
     prefix = List("pnpm", "-s", "exec")
   }
   ["check-added-large-files"] = (Builtins.check_added_large_files) {
