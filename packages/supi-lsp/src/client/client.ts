@@ -94,6 +94,12 @@ const CONTENT_MODIFIED_RETRY_DELAY_MS = 100;
 
 /** Bounded stderr tail kept for startup-failure error messages. */
 const STDERR_TAIL_MAX_CHARS = 4_000;
+/**
+ * Bound for draining a failed startup's stdio. An initialize write can fail
+ * (`EPIPE`) before the exiting server's stderr is read; waiting for `close`
+ * lets the failure report the server's own reason instead of the transport error.
+ */
+const STARTUP_FAILURE_DRAIN_MS = 500;
 
 interface SemanticRequestAttemptState {
   inputRevision: number | undefined;
@@ -497,6 +503,20 @@ function killFailedStartupProcess(child: ChildProcess): void {
   child.kill();
 }
 
+/** Resolve once `closed()` holds or the child emits `close`, bounded by `ms`. */
+function waitForStdioClose(child: ChildProcess, closed: () => boolean, ms: number): Promise<void> {
+  if (closed()) return Promise.resolve();
+  return new Promise((resolve) => {
+    const done = () => {
+      clearTimeout(timer);
+      child.off("close", done);
+      resolve();
+    };
+    const timer = setTimeout(done, ms);
+    child.once("close", done);
+  });
+}
+
 // ── Types ─────────────────────────────────────────────────────────────
 export type ClientStatus = "initializing" | "running" | "error" | "shutdown";
 
@@ -731,19 +751,24 @@ export class LspClient {
     });
     this.rpc.onRequest((method, params) => this.handleServerRequest(method, params));
 
-    // Handle crashes
+    // Handle crashes. A failing initialize reports its own detailed failure.
+    let reportingStartupFailure = false;
     this.process.on("exit", (_code) => {
-      this.handleProcessFailure(new Error("Client crashed"));
+      if (!reportingStartupFailure) this.handleProcessFailure(new Error("Client crashed"));
     });
 
     this.process.on("error", (_err) => {
-      this.handleProcessFailure(new Error("Client process error"));
+      if (!reportingStartupFailure) this.handleProcessFailure(new Error("Client process error"));
     });
 
     // Capture a bounded stderr tail (discarded otherwise) so startup
     // failures can surface the server's own exit reason — expired builds,
     // missing runtimes, or invalid flags. Stderr never reaches the agent.
     let stderrTail = "";
+    let stdioClosed = false;
+    this.process.once("close", () => {
+      stdioClosed = true;
+    });
     this.process.stderr?.on("data", (chunk: Buffer | string) => {
       stderrTail = `${stderrTail}${chunk}`.slice(-STDERR_TAIL_MAX_CHARS);
     });
@@ -782,12 +807,16 @@ export class LspClient {
 
       this.armNoProgressTimer();
     } catch (err) {
+      const child = this.process;
+      reportingStartupFailure = true;
+      killFailedStartupProcess(child);
+      // Let already-written stderr drain before reporting the failure.
+      await waitForStdioClose(child, () => stdioClosed, STARTUP_FAILURE_DRAIN_MS);
       const stderrDetail = stderrTail.trim() ? `\n${this.name} stderr:\n${stderrTail.trim()}` : "";
       const failure = new Error(`${this.name}: initialize failed: ${err}${stderrDetail}`, {
         cause: err,
       });
       this.handleProcessFailure(failure);
-      killFailedStartupProcess(this.process);
       throw failure;
     }
   }

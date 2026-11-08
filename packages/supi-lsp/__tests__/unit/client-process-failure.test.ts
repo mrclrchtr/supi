@@ -169,6 +169,25 @@ describe("LspClient process failure", () => {
     await expect(startPromise).rejects.toThrow(/initialize failed[\s\S]*expired/);
   });
 
+  it("waits for late stderr when the initialize write fails first", async () => {
+    // Under load the initialize write can hit the closed pipe (EPIPE) before
+    // the exiting server's stderr is read; the failure must still carry it.
+    mocks.initializeError = new Error("write EPIPE");
+    const client = new LspClient(
+      "test",
+      { command: "test-lsp", fileTypes: ["ts"], rootMarkers: ["package.json"] },
+      "/project",
+    );
+    const stderr = process.stderr as NonNullable<ChildProcess["stderr"]>;
+    const startPromise = client.start();
+    setTimeout(() => {
+      stderr.emit("data", "selected native startup failed");
+      process.emit("close", 1, null);
+    }, 20);
+
+    await expect(startPromise).rejects.toThrow(/write EPIPE[\s\S]*selected native startup failed/);
+  });
+
   it("releases a pending file diagnostic waiter when the server process fails", async () => {
     const client = new LspClient(
       "test",
