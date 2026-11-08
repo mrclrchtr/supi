@@ -80,6 +80,11 @@ import type {
   SemanticInputSnapshot,
 } from "./client-semantic-input-barrier.ts";
 import { SemanticInputSynchronizationError } from "./client-semantic-input-errors.ts";
+import {
+  type ProjectMembership,
+  readTypeScriptProjectMembership,
+  typeScriptProjectInfoParams,
+} from "./client-typescript-project.ts";
 import { JsonRpcClient, JsonRpcRequestError } from "./transport.ts";
 
 const SHUTDOWN_TIMEOUT_MS = 5_000;
@@ -1186,6 +1191,23 @@ export class LspClient {
       { textDocument: { uri: fileToUri(filePath) } },
       control,
     );
+  }
+
+  /**
+   * Report whether the server placed an open file in a configured project.
+   * Only the TypeScript route can answer; other routes return `unknown`.
+   */
+  async projectMembership(
+    filePath: string,
+    control?: CodeRequestControl,
+  ): Promise<ProjectMembership> {
+    if (!this.hasTypeScriptRequestCommand()) return "unknown";
+    const result = await this.query<unknown>(
+      "workspace/executeCommand",
+      typeScriptProjectInfoParams(fileToUri(filePath)),
+      control,
+    );
+    return result.kind === "completed" ? readTypeScriptProjectMembership(result.data) : "unknown";
   }
 
   async workspaceSymbol(

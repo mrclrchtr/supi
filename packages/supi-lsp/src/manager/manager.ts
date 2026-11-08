@@ -19,6 +19,7 @@ import {
   withTimeout,
 } from "../client/client.ts";
 import type { ClientDiagnosticSnapshot } from "../client/client-document-state.ts";
+import type { ProjectMembership } from "../client/client-typescript-project.ts";
 
 export { RECOVERY_CLIENT_STARTUP_BOUND_MS } from "../client/client.ts";
 
@@ -138,6 +139,7 @@ import {
   isWithinAnyScope,
   type WorkspaceSymbolCollection,
   workspaceSymbolCollectionResult,
+  workspaceSymbolCoverageGap,
 } from "./manager-workspace-symbol.ts";
 
 type UnavailableReason = "missing-command" | "start-failed" | "runtime-error";
@@ -400,8 +402,12 @@ export class LspManager {
   private invalidationEpoch = 0;
   /** Invalidation generation in which each route last received a recovery restart. */
   private recoveryRestartEpochs = new Map<string, number>();
-  /** Files already probed for workspace-symbol warm-up. */
-  private warmedWorkspaceSymbolFiles = new Set<string>();
+  /**
+   * Files already probed for workspace-symbol warm-up, with the project
+   * membership the server reported. `inferred` probes stay recorded so they
+   * are not reopened, but they do not prove project coverage.
+   */
+  private warmedWorkspaceSymbolFiles = new Map<string, ProjectMembership>();
   /** Project roots whose semantic state was warmed with a readiness probe. */
   private warmedSemanticProjects = new Set<string>();
   /** In-flight warm-up probes keyed by project key so concurrent callers share one probe. */
@@ -2078,13 +2084,19 @@ export class LspManager {
 
     const serverConfig = this.config.servers[firstReady.name];
     if (serverConfig) {
-      const target = findWorkspaceSymbolWarmTargets(
+      // Candidates for the best-ranked marker root; later ones replace a probe
+      // that lands in an inferred project outside the configured program.
+      const targets = findWorkspaceSymbolWarmTargets(
         firstReady.root,
         serverConfig.rootMarkers,
         serverConfig.fileTypes,
         { policy: this.automaticPathPolicy },
-      )[0];
-      if (target) await this.warmSemanticProject(firstReady, target.file, false, control);
+      );
+      const primaryRoot = targets[0]?.projectRoot;
+      const files = targets
+        .filter((target) => target.projectRoot === primaryRoot)
+        .map((target) => target.file);
+      if (files.length > 0) await this.warmSemanticProject(firstReady, files, false, control);
       // The warm-up request can start server indexing after the initial
       // readiness wait resolves. Observe the resulting progress before
       // reporting the workspace as ready.
@@ -2935,7 +2947,12 @@ export class LspManager {
           !resolvedScopes?.length ||
           isWithinAnyScope(uriToFile(result.location.uri), resolvedScopes),
       );
-    if (!initial.hasSupport || hasScopedResult(initial)) {
+    // Rows from a route whose warm-up reached only inferred projects may come
+    // from those files alone, so they cannot end the search early.
+    if (
+      !initial.hasSupport ||
+      (hasScopedResult(initial) && !this.hasInferredOnlyWarmRoute(routeMatches))
+    ) {
       return workspaceSymbolCollectionResult(initial);
     }
 
@@ -2952,7 +2969,27 @@ export class LspManager {
       query,
       control,
     });
-    return workspaceSymbolCollectionResult(warmed.collection ?? initial);
+    const collection = warmed.collection ?? initial;
+    return workspaceSymbolCollectionResult(
+      warmed.coverageConfirmed
+        ? collection
+        : workspaceSymbolCoverageGap(collection, warmed.inferredProbeCount),
+    );
+  }
+
+  /** True when a matching route has inferred warm-up probes and no other probe. */
+  private hasInferredOnlyWarmRoute(routeMatches: (client: LspClient) => boolean): boolean {
+    return Array.from(this.clients.values()).some((client) => {
+      if (!routeMatches(client)) return false;
+      const prefix = `${client.name}:${path.resolve(client.root)}`;
+      let inferred = false;
+      for (const [key, membership] of this.warmedWorkspaceSymbolFiles) {
+        if (key !== prefix && !key.startsWith(`${prefix}${path.sep}`)) continue;
+        if (membership !== "inferred") return false;
+        inferred = true;
+      }
+      return inferred;
+    });
   }
 
   private addWorkspaceSymbolDemandEvidence(
@@ -3139,11 +3176,24 @@ export class LspManager {
     routeMatches?: (client: LspClient) => boolean;
     query: string;
     control?: CodeRequestControl;
-  }): Promise<{ warmedAny: boolean; collection: WorkspaceSymbolCollection | null }> {
+  }): Promise<{
+    collection: WorkspaceSymbolCollection | null;
+    /** False only when every probe the server classified landed in an inferred project. */
+    coverageConfirmed: boolean;
+    inferredProbeCount: number;
+  }> {
     const { findWarmTargets, getWarmPosition, collect, hasResult, routeMatches, query, control } =
       options;
-    let warmedAny = false;
     let latestCollection: WorkspaceSymbolCollection | null = null;
+    // A route with no inferred probe keeps today's evidence: non-TypeScript
+    // servers index the workspace, and `unknown` cannot prove a gap.
+    const routeCoverage: boolean[] = [];
+    let inferredProbeCount = 0;
+    const outcome = () => ({
+      collection: latestCollection,
+      coverageConfirmed: routeCoverage.every(Boolean),
+      inferredProbeCount,
+    });
 
     for (const client of Array.from(this.clients.values())) {
       if (routeMatches && !routeMatches(client)) continue;
@@ -3159,13 +3209,29 @@ export class LspManager {
         serverConfig.fileTypes,
       ).slice(0, 24);
 
+      // Marker roots whose program an earlier candidate already loaded.
+      const coveredRoots = new Set<string>();
+      let routeInferred = false;
       for (const target of warmTargets) {
+        if (coveredRoots.has(target.projectRoot)) continue;
         // A file probe does not load every program under the route root.
         const fileKey = `${client.name}:${path.resolve(target.file)}`;
-        if (this.warmedWorkspaceSymbolFiles.has(fileKey)) continue;
+        const previous = this.warmedWorkspaceSymbolFiles.get(fileKey);
+        if (previous === "inferred") {
+          routeInferred = true;
+          inferredProbeCount++;
+          continue;
+        }
+        if (previous !== undefined) {
+          coveredRoots.add(target.projectRoot);
+          continue;
+        }
 
         const openedClient = await this.ensureFileOpen(target.file, { control });
-        if (!openedClient) continue;
+        if (!openedClient) {
+          this.recordWarmProbeEvent(client.name, target.file, "open-failed", control);
+          continue;
+        }
 
         // A cancelled pass must not mark projects warmed on its way out.
         throwIfCodeRequestInterrupted(control);
@@ -3175,32 +3241,84 @@ export class LspManager {
           getWarmPosition,
           control,
         );
-        if (available) {
-          this.warmedWorkspaceSymbolFiles.add(fileKey);
-          warmedAny = true;
+        if (!available) {
+          this.recordWarmProbeEvent(client.name, target.file, "probe-unavailable", control);
+          continue;
+        }
+        const membership = await openedClient.projectMembership(target.file, control);
+        throwIfCodeRequestInterrupted(control);
+        this.warmedWorkspaceSymbolFiles.set(fileKey, membership);
+        this.recordWarmProbeEvent(client.name, target.file, membership, control);
+        if (membership === "inferred") {
+          // The file loaded only its own inferred project; workspace/symbol
+          // still cannot see the configured program, so try the next file
+          // without collecting: a hit here could come from that inferred
+          // project alone and would hide the configured program's rows.
+          routeInferred = true;
+          inferredProbeCount++;
+          continue;
         }
 
+        coveredRoots.add(target.projectRoot);
         latestCollection = await collect(this.clients.values(), query);
         if (hasResult(latestCollection)) {
-          return { warmedAny, collection: latestCollection };
+          return { ...outcome(), coverageConfirmed: true };
         }
       }
+      routeCoverage.push(coveredRoots.size > 0 || !routeInferred);
     }
 
+    if (inferredProbeCount > 0 && latestCollection === null) {
+      latestCollection = await collect(this.clients.values(), query);
+    }
     // A completed-empty retry replaces an earlier failure too.
-    return { warmedAny, collection: latestCollection };
+    return outcome();
+  }
+
+  /**
+   * Record one workspace-symbol warm-up probe: which file was opened and
+   * whether the server placed it in a configured project. `unknown` means the
+   * route cannot report membership (non-TypeScript or native TS7).
+   */
+  private recordWarmProbeEvent(
+    serverName: string,
+    file: string,
+    outcome: ProjectMembership | "open-failed" | "probe-unavailable",
+    control?: CodeRequestControl,
+  ): void {
+    try {
+      recordDebugEvent({
+        operationId: control?.operationId,
+        source: "lsp",
+        level: "debug",
+        category: "workspace-symbol.warm-probe",
+        message: `Workspace-symbol warm-up probe: ${outcome}`,
+        cwd: boundCwd(this.cwd),
+        data: {
+          server: truncateIdentity(serverName),
+          file: truncateIdentity(displayRelativeFilePath(file, this.cwd)),
+          outcome,
+        },
+      });
+    } catch {
+      // Warm-up telemetry must never change query behavior.
+    }
   }
 
   private async warmSemanticProject(
     client: LspClient,
-    filePath: string,
+    filePath: string | readonly string[],
     preferExactFile: boolean = false,
     control?: CodeRequestControl,
   ): Promise<void> {
     const serverConfig = this.config.servers[client.name];
     if (!serverConfig) return;
 
-    const resolvedFile = resolveSessionPath(this.cwd, filePath);
+    const candidates = (typeof filePath === "string" ? [filePath] : filePath).map((file) =>
+      resolveSessionPath(this.cwd, file),
+    );
+    const resolvedFile = candidates[0];
+    if (!resolvedFile) return;
     const projectRoot = preferExactFile
       ? resolveRootForFile(resolvedFile, client.name, serverConfig.rootMarkers, {
           knownRoots: this.knownRoots,
@@ -3218,7 +3336,7 @@ export class LspManager {
       return;
     }
 
-    const probe = this.performWarmProbe(client, resolvedFile, projectKey, control);
+    const probe = this.performWarmProbe(client, candidates, projectKey, control);
     this.pendingWarmProbes.set(projectKey, probe);
     try {
       await raceRequestControl(probe, control);
@@ -3229,28 +3347,40 @@ export class LspManager {
     }
   }
 
+  /**
+   * Probe candidates in order until one loads a non-inferred project.
+   * The project is marked warmed after any successful probe so files that
+   * really sit in inferred projects are not reprobed on every request.
+   */
   private async performWarmProbe(
     client: LspClient,
-    resolvedFile: string,
+    candidates: readonly string[],
     projectKey: string,
     control?: CodeRequestControl,
   ): Promise<void> {
     const key = clientKey(client.name, client.root);
-    if (this.clients.get(key) !== client) return;
-    const openedClient = await this.ensureFileOpen(resolvedFile);
-    if (!openedClient || openedClient !== client || this.clients.get(key) !== client) return;
-
     // The probe is shared state for concurrent callers. One caller's
     // cancellation must not cancel the shared in-flight queries, so only the
     // Debug Operation ID is forwarded; each caller races its own wait above.
     const sharedControl = { operationId: control?.operationId };
-    const available = await this.probeDocumentSymbols(
-      openedClient,
-      resolvedFile,
-      getWorkspaceSymbolWarmPosition,
-      sharedControl,
-    );
-    if (available && this.clients.get(key) === client) {
+    let warmed = false;
+    for (const [index, resolvedFile] of candidates.entries()) {
+      if (this.clients.get(key) !== client) return;
+      const openedClient = await this.ensureFileOpen(resolvedFile);
+      if (!openedClient || openedClient !== client || this.clients.get(key) !== client) continue;
+      const available = await this.probeDocumentSymbols(
+        openedClient,
+        resolvedFile,
+        getWorkspaceSymbolWarmPosition,
+        sharedControl,
+      );
+      if (!available) continue;
+      warmed = true;
+      if (index === candidates.length - 1) break;
+      const membership = await openedClient.projectMembership(resolvedFile, sharedControl);
+      if (membership !== "inferred") break;
+    }
+    if (warmed && this.clients.get(key) === client) {
       this.warmedSemanticProjects.add(projectKey);
     }
   }
@@ -3281,7 +3411,7 @@ export class LspManager {
 
   private clearWarmedWorkspaceSymbolFiles(serverName: string, root: string): void {
     const prefix = `${serverName}:${path.resolve(root)}`;
-    for (const key of Array.from(this.warmedWorkspaceSymbolFiles)) {
+    for (const key of Array.from(this.warmedWorkspaceSymbolFiles.keys())) {
       if (key === prefix || key.startsWith(`${prefix}${path.sep}`)) {
         this.warmedWorkspaceSymbolFiles.delete(key);
       }

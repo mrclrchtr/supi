@@ -53,6 +53,20 @@ describe("findWorkspaceSymbolWarmTargets", () => {
     });
   });
 
+  it("tries source directories before root config files and dotfiles", () => {
+    const root = makeTempRoot();
+    writeFileSync(join(root, ".tool.cjs"), "module.exports = {};\n");
+    writeFileSync(join(root, "knip.config.ts"), "export default {};\n");
+
+    expect(
+      findWorkspaceSymbolWarmTargets(root, ["package.json"], ["ts", "cjs"]).map((t) => t.file),
+    ).toEqual([
+      join(root, "src", "index.ts"),
+      join(root, "knip.config.ts"),
+      join(root, ".tool.cjs"),
+    ]);
+  });
+
   it("does not select a built-in or configured excluded warm file", () => {
     const root = makeTempRoot();
     rmSync(join(root, "src"), { recursive: true, force: true });
@@ -286,6 +300,7 @@ describe("LspManager.workspaceSymbol cold warm-up", () => {
         .mockResolvedValueOnce(unavailableCodeQuery("not ready"))
         .mockResolvedValueOnce(completedCodeQuery([])),
       hover: vi.fn(),
+      projectMembership: vi.fn().mockResolvedValue("unknown"),
     };
     getClients(manager).set(`typescript:${root}`, client);
     vi.spyOn(manager, "ensureFileOpen").mockResolvedValue(client as never);
@@ -294,6 +309,138 @@ describe("LspManager.workspaceSymbol cold warm-up", () => {
     await manager.workspaceSymbol("Widget");
 
     expect(client.documentSymbols).toHaveBeenCalledTimes(2);
+  });
+
+  it("skips inferred-project probes and reports partial when none reach a project", async () => {
+    const root = makeTempRoot();
+    writeFileSync(join(root, "knip.config.ts"), "export default {};\n");
+    const manager = new LspManager(
+      {
+        servers: {
+          typescript: {
+            command: "node",
+            args: [],
+            fileTypes: ["ts"],
+            rootMarkers: ["package.json"],
+          },
+        },
+      },
+      root,
+    );
+    const client = {
+      name: "typescript",
+      root,
+      status: "running",
+      serverCapabilities: { workspaceSymbolProvider: true },
+      workspaceSymbol: vi.fn().mockResolvedValue(completedCodeQuery([])),
+      documentSymbols: vi.fn().mockResolvedValue(completedCodeQuery([])),
+      hover: vi.fn(),
+      projectMembership: vi.fn().mockResolvedValue("inferred"),
+    };
+    getClients(manager).set(`typescript:${root}`, client);
+    vi.spyOn(manager, "ensureFileOpen").mockResolvedValue(client as never);
+
+    const first = await manager.workspaceSymbol("Widget");
+    expect(first).toMatchObject({
+      kind: "partial",
+      data: [],
+      reason: expect.stringContaining("2 opened warm-up files loaded only inferred projects"),
+    });
+    expect(client.projectMembership).toHaveBeenCalledTimes(2);
+
+    // Inferred probes are remembered: no reopening, and the gap stays visible.
+    const second = await manager.workspaceSymbol("Widget");
+    expect(second).toMatchObject({ kind: "partial" });
+    expect(client.documentSymbols).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not let an inferred-project hit end a later search as complete", async () => {
+    const root = makeTempRoot();
+    rmSync(join(root, "src"), { recursive: true, force: true });
+    const toolFile = join(root, ".tool.ts");
+    writeFileSync(toolFile, "export const ToolWidget = 1;\n");
+    const manager = new LspManager(
+      {
+        servers: {
+          typescript: {
+            command: "node",
+            args: [],
+            fileTypes: ["ts"],
+            rootMarkers: ["package.json"],
+          },
+        },
+      },
+      root,
+    );
+    const toolSymbol = {
+      name: "ToolWidget",
+      kind: 13,
+      location: { uri: fileToUri(toolFile), range: { start: {}, end: {} } },
+    };
+    const client = {
+      name: "typescript",
+      root,
+      status: "running",
+      serverCapabilities: { workspaceSymbolProvider: true },
+      workspaceSymbol: vi
+        .fn()
+        .mockResolvedValueOnce(completedCodeQuery([]))
+        .mockResolvedValue(completedCodeQuery([toolSymbol])),
+      documentSymbols: vi.fn().mockResolvedValue(completedCodeQuery([])),
+      hover: vi.fn(),
+      projectMembership: vi.fn().mockResolvedValue("inferred"),
+    };
+    getClients(manager).set(`typescript:${root}`, client);
+    vi.spyOn(manager, "ensureFileOpen").mockResolvedValue(client as never);
+
+    await expect(manager.workspaceSymbol("Widget")).resolves.toMatchObject({ kind: "partial" });
+    // The inferred file's own symbol now matches, but the configured program
+    // is still unsearched, so the result must stay partial.
+    await expect(manager.workspaceSymbol("Widget")).resolves.toMatchObject({
+      kind: "partial",
+      data: [toolSymbol],
+    });
+  });
+
+  it("keeps a configured-project empty result complete", async () => {
+    const root = makeTempRoot();
+    writeFileSync(join(root, "knip.config.ts"), "export default {};\n");
+    const manager = new LspManager(
+      {
+        servers: {
+          typescript: {
+            command: "node",
+            args: [],
+            fileTypes: ["ts"],
+            rootMarkers: ["package.json"],
+          },
+        },
+      },
+      root,
+    );
+    const client = {
+      name: "typescript",
+      root,
+      status: "running",
+      serverCapabilities: { workspaceSymbolProvider: true },
+      workspaceSymbol: vi.fn().mockResolvedValue(completedCodeQuery([])),
+      documentSymbols: vi.fn().mockResolvedValue(completedCodeQuery([])),
+      hover: vi.fn(),
+      projectMembership: vi.fn().mockResolvedValue("configured"),
+    };
+    getClients(manager).set(`typescript:${root}`, client);
+    vi.spyOn(manager, "ensureFileOpen").mockResolvedValue(client as never);
+
+    await expect(manager.workspaceSymbol("Missing")).resolves.toEqual({
+      kind: "completed",
+      data: [],
+    });
+    // The confirmed root stops further candidates.
+    expect(client.documentSymbols).toHaveBeenCalledTimes(1);
+    await expect(manager.workspaceSymbol("Missing")).resolves.toEqual({
+      kind: "completed",
+      data: [],
+    });
   });
 
   it("warms a cold workspace-symbol client and returns warmed results", async () => {
@@ -345,6 +492,7 @@ describe("LspManager.workspaceSymbol cold warm-up", () => {
         ]),
       ),
       hover: vi.fn().mockResolvedValue(completedCodeQuery({ contents: "hovered" })),
+      projectMembership: vi.fn().mockResolvedValue("configured"),
     };
 
     getClients(manager).set(`typescript:${root}`, client);

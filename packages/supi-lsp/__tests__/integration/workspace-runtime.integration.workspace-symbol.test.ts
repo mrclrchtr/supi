@@ -150,6 +150,30 @@ describe("workspace-symbol cold recovery", () => {
     });
   });
 
+  it("finds a symbol when root config files sit outside the configured program", async () => {
+    const { root, runtime } = await createWorkspace();
+    // Both sort before src/ and land in inferred projects when opened alone.
+    writeFileSync(join(root, ".dependency-cruiser.cjs"), "module.exports = {};\n");
+    writeFileSync(join(root, "knip.config.ts"), "export default {};\n");
+
+    await expect(runtime.workspaceSymbol("Widget")).resolves.toMatchObject({
+      kind: "completed",
+      data: [expect.objectContaining({ name: "Widget" })],
+    });
+  }, 15_000);
+
+  it("reports partial coverage when every warm-up file is in an inferred project", async () => {
+    const { root, runtime } = await createWorkspace();
+    rmSync(join(root, "src"), { recursive: true, force: true });
+    writeFileSync(join(root, ".dependency-cruiser.cjs"), "module.exports = {};\n");
+
+    await expect(runtime.workspaceSymbol("Widget")).resolves.toMatchObject({
+      kind: "partial",
+      data: [],
+      reason: expect.stringContaining("loaded only inferred projects"),
+    });
+  }, 15_000);
+
   it("warms a second selected file under the same route", async () => {
     const { runtime, writeSource } = await createWorkspace("open-files");
     const secondFile = writeSource("src/feature/OtherWidget.tsx", "OtherWidget");

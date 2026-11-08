@@ -1,4 +1,4 @@
-import { realpathSync, statSync } from "node:fs";
+import { type Dirent, realpathSync, statSync } from "node:fs";
 import * as path from "node:path";
 import {
   type CodeQueryResult,
@@ -25,6 +25,10 @@ type WorkspaceSymbolLike = SymbolInformation | WorkspaceSymbol;
 
 const DEFAULT_WARM_FILE_DEPTH = 4;
 const DEFAULT_MARKER_SCAN_DEPTH = 6;
+/** Candidates per marker root; later candidates help only when earlier ones land outside the project. */
+const WARM_FILES_PER_ROOT = 3;
+/** Conventional source directories tried before other top-level entries. */
+const PREFERRED_SOURCE_DIRECTORIES = ["src", "lib", "app"];
 
 export interface WorkspaceSymbolWarmTarget {
   projectRoot: string;
@@ -63,6 +67,26 @@ export interface WorkspaceSymbolCollection {
   excludedCount?: number;
   /** Bounded paths removed by the automatic path policy. */
   excludedExamples?: string[];
+  /** Known coverage limits: the server may not have loaded every project in scope. */
+  coverageGap?: string;
+}
+
+/**
+ * Mark a collection whose warm-up never reached a configured project.
+ * The server answered only from inferred projects of the opened probe files,
+ * so an empty or short result does not prove a symbol is absent.
+ */
+export function workspaceSymbolCoverageGap(
+  collection: WorkspaceSymbolCollection,
+  inferredProbeCount: number,
+): WorkspaceSymbolCollection {
+  const noun = `file${inferredProbeCount === 1 ? "" : "s"}`;
+  return {
+    ...collection,
+    coverageGap:
+      `Workspace-symbol coverage is limited: ${inferredProbeCount} opened warm-up ${noun} ` +
+      "loaded only inferred projects, not a configured project. Open a project source file and retry.",
+  };
 }
 
 export async function collectWorkspaceSymbols(
@@ -113,7 +137,7 @@ export function workspaceSymbolCollectionResult(
     );
   }
   const exclusion = workspaceSymbolExclusionReason(collection);
-  if (collection.failures.length > 0 || exclusion) {
+  if (collection.failures.length > 0 || exclusion || collection.coverageGap) {
     const excludedCount = collection.excludedCount ?? 0;
     const metadata =
       excludedCount > 0
@@ -126,13 +150,25 @@ export function workspaceSymbolCollectionResult(
         : undefined;
     return partialCodeQuery(
       collection.results,
-      [collection.failures.join("; "), exclusion].filter(Boolean).join("; "),
+      [collection.failures.join("; "), collection.coverageGap, exclusion]
+        .filter(Boolean)
+        .join("; "),
       metadata,
     );
   }
   return completedCodeQuery(collection.results);
 }
 
+/**
+ * Choose files to open so a workspace-symbol server loads the projects under `root`.
+ *
+ * Returns up to three candidates per marker root, interleaved so every root's
+ * best candidate comes before any root's fallback; nested roots first. Within a
+ * root, conventional source directories come first and hidden entries last:
+ * root-level dotfiles and tool configs are often outside the configured program
+ * (for example `tsconfig.json` `include`), and opening only such a file loads an
+ * unrelated project. Callers try candidates in order.
+ */
 export function findWorkspaceSymbolWarmTargets(
   root: string,
   rootMarkers: string[],
@@ -172,26 +208,32 @@ export function findWorkspaceSymbolWarmTargets(
   }
 
   const markerRoots = collectMarkerRoots(resolvedRoot, rootMarkers, maxMarkerDepth, policy);
-  const targets = markerRoots
-    .map((entry) => {
-      const file = findWarmFileRecursive(entry.root, allowed, maxFileDepth, policy);
-      return file ? { projectRoot: entry.root, file, priority: entry.priority } : null;
-    })
-    .filter((entry): entry is { projectRoot: string; file: string; priority: number } =>
-      Boolean(entry),
-    )
+  const perRoot = markerRoots
     .sort(
       (a, b) =>
-        a.priority - b.priority ||
-        a.projectRoot.length - b.projectRoot.length ||
-        a.projectRoot.localeCompare(b.projectRoot),
+        a.priority - b.priority || a.root.length - b.root.length || a.root.localeCompare(b.root),
     )
-    .map(({ projectRoot, file }) => ({ projectRoot, file }));
+    .map((entry) =>
+      findWarmFiles(entry.root, allowed, maxFileDepth, policy).map((file) => ({
+        projectRoot: entry.root,
+        file,
+      })),
+    );
+  // Interleave by rank so each root's best candidate precedes any root's fallback.
+  const targets = Array.from({ length: WARM_FILES_PER_ROOT }, (_, rank) =>
+    perRoot.flatMap((candidates) => candidates[rank] ?? []),
+  ).flat();
 
-  if (targets.length > 0) return targets;
+  if (targets.length > 0) {
+    // Keep the first, most specific root for a file a parent root also reaches.
+    const seen = new Set<string>();
+    return targets.filter((target) => !seen.has(target.file) && Boolean(seen.add(target.file)));
+  }
 
-  const fallback = findWarmFileRecursive(resolvedRoot, allowed, maxFileDepth, policy);
-  return fallback ? [{ projectRoot: resolvedRoot, file: fallback }] : [];
+  return findWarmFiles(resolvedRoot, allowed, maxFileDepth, policy).map((file) => ({
+    projectRoot: resolvedRoot,
+    file,
+  }));
 }
 
 /**
@@ -274,6 +316,54 @@ function collectMarkerRoots(
     root: matchedRoot,
     priority,
   }));
+}
+
+/**
+ * Pick at most {@link WARM_FILES_PER_ROOT} files under `root`, one per top-level
+ * group: preferred source directories, other directories, root files, then
+ * hidden entries.
+ */
+function findWarmFiles(
+  root: string,
+  allowed: Set<string>,
+  depth: number,
+  policy: AutomaticLspPathPolicy,
+): string[] {
+  let topLevel: readonly Dirent[] = [];
+  walkAutomaticLspTree(policy, root, 0, (_directory, entries) => {
+    topLevel = entries;
+    return true;
+  });
+  const isAllowedFile = (entry: Dirent) =>
+    (entry.isFile() || entry.isSymbolicLink()) &&
+    allowed.has(path.extname(entry.name).slice(1).toLowerCase());
+  const rank = (entry: Dirent) => {
+    const hidden = entry.name.startsWith(".") ? 3 : 0;
+    if (!entry.isDirectory()) return hidden + 2;
+    return hidden + (PREFERRED_SOURCE_DIRECTORIES.includes(entry.name) ? 0 : 1);
+  };
+  const ordered = topLevel
+    .filter((entry) => entry.isDirectory() || isAllowedFile(entry))
+    .map((entry, index) => ({ entry, index, rank: rank(entry) }))
+    .sort((a, b) => a.rank - b.rank || a.index - b.index);
+
+  const files: string[] = [];
+  const rootFileRanks = new Set<number>();
+  for (const { entry, rank: entryRank } of ordered) {
+    if (files.length >= WARM_FILES_PER_ROOT) break;
+    const entryPath = path.join(root, entry.name);
+    if (!entry.isDirectory()) {
+      // One root file per visibility group is enough evidence for that group.
+      if (rootFileRanks.has(entryRank)) continue;
+      rootFileRanks.add(entryRank);
+      files.push(entryPath);
+      continue;
+    }
+    if (depth <= 0) continue;
+    const file = findWarmFileRecursive(entryPath, allowed, depth - 1, policy);
+    if (file) files.push(file);
+  }
+  return files;
 }
 
 function findWarmFileRecursive(
