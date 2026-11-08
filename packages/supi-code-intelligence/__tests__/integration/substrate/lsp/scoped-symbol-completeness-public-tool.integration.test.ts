@@ -91,7 +91,7 @@ describe("registered tools with scoped workspace-symbol completeness", () => {
     return { pi, symbols, callResolve };
   }
 
-  it("resolves a complete source scope but keeps broader excluded evidence incomplete", async () => {
+  it("resolves a unique source candidate and discloses excluded generated evidence", async () => {
     const { pi, symbols, callResolve } = await startTools();
     for (const scope of ["src/main.test", "src"]) {
       expect(await callResolve(scope)).toMatchObject({
@@ -100,14 +100,16 @@ describe("registered tools with scoped workspace-symbol completeness", () => {
         evidenceLists: [{ totalCount: 1, shownCount: 1, partialReason: null }],
       });
     }
-    // One visible source candidate is still not unique when the excluded
-    // generated candidate belongs to the requested universe.
+    // An excluded generated candidate in the requested universe is policy
+    // evidence, not missing coverage: the one in-policy candidate resolves
+    // and the exclusion stays disclosed.
     fs.writeFileSync(symbols, JSON.stringify(symbolRows().slice(0, 2)));
-    expect(await callResolve(".")).toMatchObject({
-      kind: "disambiguation",
+    const broad = await callResolve(".");
+    expect(broad).toMatchObject({
+      kind: "resolved",
       targets: [{ name: "work", file: "src/main.test" }],
-      evidenceLists: [{ totalCount: null, shownCount: 1, partialReason: "provider-limited" }],
     });
+    expect(JSON.stringify(broad)).toContain("dist/generated.test");
     const found = (await getTool(pi, "code_find").execute(
       "find-scope",
       {

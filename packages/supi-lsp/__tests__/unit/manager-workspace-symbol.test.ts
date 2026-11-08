@@ -5,7 +5,11 @@ import { completedCodeQuery, unavailableCodeQuery } from "@mrclrchtr/supi-code-r
 import { fileToUri } from "@mrclrchtr/supi-core/path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { LspManager } from "../../src/manager/manager.ts";
-import { findWorkspaceSymbolWarmTargets } from "../../src/manager/manager-workspace-symbol.ts";
+import {
+  findWorkspaceSymbolWarmTargets,
+  workspaceSymbolCollectionResult,
+  workspaceSymbolCoverageGap,
+} from "../../src/manager/manager-workspace-symbol.ts";
 import { createAutomaticLspPathPolicy } from "../../src/workspace-path-policy.ts";
 
 const tempDirs: string[] = [];
@@ -102,6 +106,34 @@ describe("findWorkspaceSymbolWarmTargets", () => {
   });
 });
 
+// biome-ignore lint/security/noSecrets: test name only; no secret material.
+describe("workspaceSymbolCollectionResult", () => {
+  const exclusion = {
+    results: [],
+    hasSupport: true,
+    completedClientCount: 1,
+    failures: [] as string[],
+    excludedCount: 1,
+    excludedExamples: ["dist/widget.d.ts"],
+  };
+
+  it("marks policy exclusions as the only gap", () => {
+    expect(workspaceSymbolCollectionResult(exclusion)).toMatchObject({
+      kind: "partial",
+      metadata: { exclusionOnly: true },
+    });
+  });
+
+  it.each([
+    ["a route failure", { ...exclusion, failures: ["route failed"] }],
+    ["a coverage gap", workspaceSymbolCoverageGap(exclusion, 1)],
+  ])("does not mark exclusions as the only gap with %s", (_label, collection) => {
+    const result = workspaceSymbolCollectionResult(collection);
+    expect(result.kind).toBe("partial");
+    expect(result.kind === "partial" && result.metadata?.exclusionOnly).toBeFalsy();
+  });
+});
+
 describe("LspManager.workspaceSymbol filtering", () => {
   it("filters automatic results and discloses configured exclusions", async () => {
     const root = makeTempRoot();
@@ -162,6 +194,7 @@ describe("LspManager.workspaceSymbol filtering", () => {
           excludedCount: 2,
           examples: ["configured/drop.ts"],
         },
+        exclusionOnly: true,
       },
     });
 

@@ -139,6 +139,7 @@ export function workspaceSymbolCollectionResult(
   const exclusion = workspaceSymbolExclusionReason(collection);
   if (collection.failures.length > 0 || exclusion || collection.coverageGap) {
     const excludedCount = collection.excludedCount ?? 0;
+    const exclusionOnly = collection.failures.length === 0 && !collection.coverageGap;
     const metadata =
       excludedCount > 0
         ? {
@@ -146,6 +147,7 @@ export function workspaceSymbolCollectionResult(
               excludedCount,
               examples: [...(collection.excludedExamples ?? [])],
             },
+            ...(exclusionOnly ? { exclusionOnly: true } : {}),
           }
         : undefined;
     return partialCodeQuery(

@@ -313,7 +313,7 @@ function toWorkflowOutcome(
       kind: "resolved",
       entry: immutableEntry(registered.entry),
       ...(resolution ? { resolution } : {}),
-      notes: buildResolutionNotes(resolution),
+      notes: [...buildResolutionNotes(resolution), ...(outcome.notes ?? [])],
     };
   }
 

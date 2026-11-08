@@ -306,7 +306,7 @@ export async function refineTargetOutcomeIdentity(
 ): Promise<TargetOutcome> {
   if (outcome.kind === "resolved") {
     return {
-      kind: "resolved",
+      ...outcome,
       target: await refineTypeAliasIdentity(outcome.target, structural, control),
     };
   }

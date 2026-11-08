@@ -160,7 +160,12 @@ export interface TargetCandidateCompleteness {
  * the resolution pipeline itself stays presentation-agnostic.
  */
 export type TargetOutcome =
-  | { kind: "resolved"; target: ResolvedTargetData }
+  | {
+      kind: "resolved";
+      target: ResolvedTargetData;
+      /** Request-scoped evidence notes, such as policy exclusions beside a unique match. */
+      notes?: readonly string[];
+    }
   | { kind: "group"; group: ResolvedTargetGroupData }
   | ({
       kind: "disambiguation";

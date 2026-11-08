@@ -162,6 +162,7 @@ export async function resolveSymbolTarget(
     return resolveCandidates({
       candidates: exactKind,
       ...candidateCompleteness(result, exactKind.length, cwd),
+      exclusionNote: exclusionOnlyNote(result, cwd),
       semantic,
       cwd,
       maxResults: options.maxResults,
@@ -172,6 +173,7 @@ export async function resolveSymbolTarget(
   return resolveCandidates({
     candidates: eligible,
     ...candidateCompleteness(result, eligible.length, cwd),
+    exclusionNote: exclusionOnlyNote(result, cwd),
     semantic,
     cwd,
     maxResults: options?.maxResults,
@@ -188,7 +190,11 @@ function normalizeProviderKind(kind: string): string {
 }
 
 async function resolveCandidates(
-  options: CandidateOutcomeBase & Omit<TargetCandidateCompleteness, "omittedCount">,
+  options: CandidateOutcomeBase &
+    Omit<TargetCandidateCompleteness, "omittedCount"> & {
+      /** Disclosure for a unique match beside policy-excluded rows. */
+      exclusionNote?: string;
+    },
 ): Promise<TargetOutcome> {
   const {
     candidates,
@@ -199,13 +205,16 @@ async function resolveCandidates(
     totalCount,
     partialReason,
     partialMessage,
+    exclusionNote,
   } = options;
   const ranged = candidates.filter(
     (candidate) =>
       candidate.declarationAnchor.line > 0 || candidate.declarationAnchor.character > 0,
   );
   if (ranged.length === 1 && totalCount !== null) {
-    return resolvedTarget(await refineResolvedSymbolAnchor(ranged[0], semantic, control));
+    const resolved = resolvedTarget(await refineResolvedSymbolAnchor(ranged[0], semantic, control));
+    // Exclusion-only evidence resolves, but the excluded rows stay disclosed.
+    return exclusionNote ? { ...resolved, notes: [exclusionNote] } : resolved;
   }
   return buildCandidateOutcome({
     kind: "disambiguation",
@@ -220,7 +229,7 @@ async function resolveCandidates(
   });
 }
 
-function resolvedTarget(candidate: CodeSymbol): TargetOutcome {
+function resolvedTarget(candidate: CodeSymbol): Extract<TargetOutcome, { kind: "resolved" }> {
   const anchor = anchorOf(candidate);
   return {
     kind: "resolved",
@@ -254,13 +263,25 @@ function candidateCompleteness(
   totalCount: number,
   cwd: string,
 ): Omit<TargetCandidateCompleteness, "omittedCount"> {
-  return result.kind === "partial"
+  // Policy exclusions alone remove only rows the workspace marked out of
+  // automatic scope; the retained in-policy rows are complete. Failures and
+  // coverage gaps keep the total unknown.
+  return result.kind === "partial" && result.metadata?.exclusionOnly !== true
     ? {
         totalCount: null,
         partialReason: "provider-limited",
         partialMessage: describePartialQuery(result.reason, result.metadata, cwd),
       }
     : { totalCount, partialReason: null };
+}
+
+/** Describe exclusion-only evidence so a resolved target still discloses dropped rows. */
+function exclusionOnlyNote(
+  result: Exclude<CodeQueryResult<CodeSymbol[]>, { kind: "unavailable" }>,
+  cwd: string,
+): string | undefined {
+  if (result.kind !== "partial" || result.metadata?.exclusionOnly !== true) return undefined;
+  return describePartialQuery(result.reason, result.metadata, cwd);
 }
 
 type CandidateOutcomeOptions = CandidateOutcomeBase &

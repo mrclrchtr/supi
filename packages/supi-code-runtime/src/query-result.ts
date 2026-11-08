@@ -6,6 +6,14 @@ export interface CodeQueryPartialMetadata {
     /** Observed policy paths, not canonical navigation paths; retain aliases when presenting exclusions. */
     readonly examples: readonly string[];
   };
+  /**
+   * True when automatic path-policy exclusions are the only reason the result
+   * is partial: every contributing provider branch completed and no coverage
+   * gap was observed. Excluded rows matched paths the workspace policy treats
+   * as out of automatic scope, so the retained rows are the complete in-policy
+   * answer.
+   */
+  readonly exclusionOnly?: boolean;
 }
 
 /**

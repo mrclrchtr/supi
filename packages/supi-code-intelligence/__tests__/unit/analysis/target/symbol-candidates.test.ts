@@ -44,6 +44,42 @@ describe("symbol candidates", () => {
     });
   });
 
+  it("resolves one candidate when policy exclusions are the only gap", async () => {
+    const symbols = [candidate("Widget", "widget")];
+    const exclusionOnly: SemanticProvider = {
+      workspaceSymbols: async () =>
+        partialCodeQuery(symbols, "Automatic path policy excluded 1 workspace-symbol result.", {
+          automaticPathExclusion: { excludedCount: 1, examples: ["/project/dist/widget.d.ts"] },
+          exclusionOnly: true,
+        }),
+      documentSymbols: async () => completedCodeQuery([]),
+    } as unknown as SemanticProvider;
+
+    await expect(
+      resolveSymbolTarget("Widget", "/project", exclusionOnly, { maxResults: 6 }),
+    ).resolves.toMatchObject({
+      kind: "resolved",
+      target: { name: "Widget", file: "/project/src/widget.ts" },
+    });
+  });
+
+  it("keeps disambiguation when exclusions accompany another gap", async () => {
+    const symbols = [candidate("Widget", "widget")];
+    const mixed: SemanticProvider = {
+      workspaceSymbols: async () =>
+        partialCodeQuery(
+          symbols,
+          "One route failed.; Automatic path policy excluded 1 workspace-symbol result.",
+          { automaticPathExclusion: { excludedCount: 1, examples: ["/project/dist/widget.d.ts"] } },
+        ),
+      documentSymbols: async () => completedCodeQuery([]),
+    } as unknown as SemanticProvider;
+
+    await expect(
+      resolveSymbolTarget("Widget", "/project", mixed, { maxResults: 6 }),
+    ).resolves.toMatchObject({ kind: "disambiguation", totalCount: null });
+  });
+
   it("preserves the reason and name order when the requested kind has no match", async () => {
     const result = await resolveSymbolTarget(
       "Widget",
