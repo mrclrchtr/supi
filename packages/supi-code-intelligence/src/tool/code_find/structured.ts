@@ -34,7 +34,12 @@ export const FindOutputSchema = Type.Object(
     evidenceLists: Type.Array(EvidenceListSchema),
     nextQueries: Type.Array(Type.String()),
     message: Type.Optional(Type.String()),
-    partialReason: Type.Optional(Type.Union([Type.String(), Type.Null()])),
+    partialReason: Type.Optional(
+      Type.Union([Type.String(), Type.Null()], {
+        description:
+          "Why semantic results may be incomplete; null when complete. Policy exclusions alone are reported in automaticPathExclusion, not here.",
+      }),
+    ),
     automaticPathExclusion: Type.Optional(
       Type.Object({
         excludedCount: Type.Integer(),
@@ -118,7 +123,8 @@ export function structuredFindResult(
           container: symbol.container ?? null,
         };
       }),
-      partialReason: data.partialReason,
+      // Exclusion-only evidence is complete; automaticPathExclusion carries it.
+      partialReason: data.partialMetadata?.exclusionOnly === true ? null : data.partialReason,
       ...(exclusion
         ? {
             automaticPathExclusion: {

@@ -463,6 +463,7 @@ describe("structured navigation results", () => {
     expect(result.structuredContent).toMatchObject({
       kind: "completed",
       matches: [{ name: "widget", file: "index.ts" }],
+      partialReason: null,
       evidenceLists: [{ totalCount: 1, partialReason: null }],
       automaticPathExclusion: { excludedCount: 1 },
     });
