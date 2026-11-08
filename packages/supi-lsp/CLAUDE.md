@@ -5,6 +5,7 @@
 This library owns semantic analysis through language servers.
 
 There is no PI extension entrypoint and no model-callable `lsp_*` tool surface. `supi-code-intelligence` owns the public `code_*` family.
+User-visible `supi-lsp` changes go in `packages/supi-code-intelligence/CHANGELOG.md`; this package has none.
 
 ## Runtime architecture
 

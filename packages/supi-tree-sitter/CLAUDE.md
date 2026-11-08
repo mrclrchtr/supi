@@ -3,6 +3,7 @@
 ## Scope
 
 This library owns parser-backed structural analysis. Raw runtime and extraction helpers are Worker-internal. `supi-code-intelligence` alone owns public tool registration and session lifecycle handlers; do not add a Pi extension here.
+User-visible `supi-tree-sitter` changes go in `packages/supi-code-intelligence/CHANGELOG.md`; this package has none.
 
 ## WASM vendoring strategy
 
