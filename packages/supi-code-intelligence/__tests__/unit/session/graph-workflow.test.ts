@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import type { StructuralProvider } from "@mrclrchtr/supi-code-runtime/api";
-import { completedCodeQuery } from "@mrclrchtr/supi-code-runtime/api";
+import { completedCodeQuery, partialCodeQuery } from "@mrclrchtr/supi-code-runtime/api";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { runGraphWorkflow } from "../../../src/session/graph-workflow.ts";
 import type { TargetStoreEntry } from "../../../src/session/target-store.ts";
@@ -99,6 +99,59 @@ describe("runGraphWorkflow", () => {
         }),
       ]),
     );
+  });
+
+  it("shows symbol-resolution exclusion notes in Markdown and structured output", async () => {
+    const file = path.join(cwd, "src", "index.ts");
+    const deps: TargetWorkflowDeps = {
+      cwd,
+      capability: new TestCapabilityAdapter({
+        semantic: {
+          references: async () => completedCodeQuery([]),
+          implementation: async () => completedCodeQuery([]),
+          documentSymbols: async () => completedCodeQuery([]),
+          workspaceSymbols: async () =>
+            partialCodeQuery(
+              [
+                {
+                  name: "oldName",
+                  kind: "Function",
+                  file,
+                  declarationAnchor: { line: 1, character: 10 },
+                  container: null,
+                },
+              ],
+              "Automatic path policy excluded 1 workspace-symbol result.",
+              {
+                automaticPathExclusion: {
+                  excludedCount: 1,
+                  examples: [path.join(cwd, "dist", "index.d.ts")],
+                },
+                exclusionOnly: true,
+              },
+            ),
+        },
+      }),
+      lookupTargetId: (targetId) => getWorkflowTarget(store, targetId),
+      registerTarget: (input) => registerWorkflowTarget(store, cwd, input),
+    };
+
+    const outcome = await runGraphWorkflow(
+      { target: { symbol: { query: "oldName" } }, relations: ["references"] },
+      deps,
+    );
+
+    expect(outcome.kind).toBe("completed");
+    if (outcome.kind !== "completed") return;
+    const result = finishGraphResult(outcome, cwd);
+    expect(result.content).toContain(
+      "_Note: Automatic path policy excluded 1 workspace-symbol result.",
+    );
+    expect(result.content).toContain("dist/index.d.ts");
+    expect(result.structuredContent).toMatchObject({
+      kind: "completed",
+      notes: [expect.stringContaining("dist/index.d.ts")],
+    });
   });
 
   it("preserves an unavailable implementation reason in mixed Markdown and structured evidence", async () => {

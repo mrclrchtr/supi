@@ -19,6 +19,7 @@ export function renderGraphResult(assembly: GraphResultAssembly): string {
     `Target: ${graphCodeSpan(assembly.displayName)} — ${graphCodeSpan(assembly.resolvedDisplayFile)}`,
     "",
   ];
+  for (const note of assembly.notes) lines.push(`_Note: ${note}_`, "");
   for (const section of assembly.sections) lines.push(...renderSection(section, assembly), "");
   lines.push(...renderReadNextSection(assembledReadNext(assembly.assembled)));
   return lines.join("\n");

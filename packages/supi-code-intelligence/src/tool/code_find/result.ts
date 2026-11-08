@@ -173,7 +173,11 @@ function createFindEvidence(outcome: Extract<FindWorkflowOutcome, { kind: "compl
       items: [...outcome.data.symbols],
       maxResults: outcome.maxResults,
     };
-    const evidence = outcome.data.partialReason
+    // Exclusion-only results counted every in-policy row; the separate
+    // exclusion disclosure still reports the dropped paths.
+    const providerLimited =
+      outcome.data.partialReason !== null && outcome.data.partialMetadata?.exclusionOnly !== true;
+    const evidence = providerLimited
       ? createPartialEvidenceList({ ...params, partialReason: "provider-limited" })
       : createEvidenceList(params);
     return { total: outcome.data.symbols.length, metadata: evidence.metadata };

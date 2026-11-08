@@ -67,6 +67,11 @@ export const GraphOutputSchema = Type.Object(
     evidenceLists: Type.Array(EvidenceListSchema),
     readNext: Type.Array(ReadNextSchema),
     message: Type.Optional(Type.String()),
+    notes: Type.Optional(
+      Type.Array(Type.String(), {
+        description: "Target-resolution notes, such as excluded paths beside a unique match.",
+      }),
+    ),
     requestedKind: Type.Optional(Type.String()),
     nextQueries: Type.Array(Type.String()),
   },
@@ -114,6 +119,7 @@ export function structuredGraphResult(
     }),
     evidenceLists: assembly.assembled.evidenceLists.map((evidence) => ({ ...evidence })),
     readNext: assembly.details.readNext.map((item) => ({ ...item })),
+    ...(assembly.notes.length > 0 ? { notes: [...assembly.notes] } : {}),
     nextQueries: [],
   };
 }

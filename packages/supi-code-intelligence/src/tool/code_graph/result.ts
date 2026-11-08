@@ -23,6 +23,8 @@ export type { GraphRelationKind, GraphSection } from "../../session/graph-types.
 /** Presentation-neutral assembled graph result. */
 export interface GraphResultAssembly {
   displayName: string;
+  /** Target-resolution notes shown before relation sections. */
+  notes: readonly string[];
   sections: readonly AssembledGraphSection[];
   resolvedDisplayFile: string;
   cwd: string;
@@ -38,6 +40,7 @@ export function assembleGraphResult(input: {
   resolvedDisplayFile: string;
   maxResults: number;
   cwd: string;
+  notes?: readonly string[];
 }): GraphResultAssembly {
   const sections = input.sections.map((section) =>
     assembleGraphSection(section, input.maxResults, input.cwd),
@@ -74,6 +77,7 @@ export function assembleGraphResult(input: {
 
   return {
     displayName: input.displayName,
+    notes: input.notes ?? [],
     sections,
     resolvedDisplayFile: input.resolvedDisplayFile,
     cwd: input.cwd,
@@ -182,6 +186,7 @@ export function finishGraphResult(outcome: GraphOutcome, cwd: string): CodeIntel
     resolvedDisplayFile: outcome.resolvedDisplayFile,
     maxResults: outcome.maxResults,
     cwd,
+    notes: outcome.notes,
   });
   const displayTruncated = hasHiddenDisplayEvidence(assembly);
   return {

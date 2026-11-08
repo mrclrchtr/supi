@@ -75,6 +75,8 @@ export interface CompletedGraphWorkflow {
   readonly resolvedDisplayFile: string;
   readonly maxResults: number;
   readonly sections: readonly GraphSection[];
+  /** Target-resolution notes, such as anchor snaps or policy exclusions beside a unique match. */
+  readonly notes: readonly string[];
 }
 
 /** Graph workflow outcome, preserving target disambiguation and failure states. */

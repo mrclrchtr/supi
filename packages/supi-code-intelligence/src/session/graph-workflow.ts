@@ -116,6 +116,7 @@ export async function runGraphWorkflow(
     resolvedDisplayFile: toDisplayPath(deps.cwd, entry.file),
     maxResults,
     sections: Object.freeze(sections),
+    notes: Object.freeze([...targetOutcome.notes]),
   });
 }
 

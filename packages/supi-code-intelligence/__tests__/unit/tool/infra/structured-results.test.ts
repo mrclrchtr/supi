@@ -431,6 +431,47 @@ describe("structured navigation results", () => {
     expect(Value.Check(tool.outputSchema, result.structuredContent)).toBe(true);
   });
 
+  it("counts exclusion-only semantic results exactly while disclosing exclusions", async () => {
+    registerMockProvider(cwd, {
+      workspaceSymbols: async () => ({
+        kind: "partial",
+        data: [
+          {
+            name: "widget",
+            kind: "Function",
+            file: join(cwd, "index.ts"),
+            declarationAnchor: { line: 1, character: 1 },
+          },
+        ],
+        reason: "Automatic path policy excluded 1 workspace-symbol result.",
+        metadata: {
+          automaticPathExclusion: { excludedCount: 1, examples: ["dist/index.d.ts"] },
+          exclusionOnly: true,
+        },
+      }),
+    });
+    const pi = createPiMock();
+    registerCodeIntelligenceTools(pi as never, sessionCache.getOrCreate);
+    const tool = getTool(pi, "code_find") as unknown as StructuredTool;
+    const result = await tool.execute(
+      "exclusion-only",
+      { query: "widget", mode: "semantic" },
+      undefined,
+      undefined,
+      makeCtx({ cwd }),
+    );
+    expect(result.structuredContent).toMatchObject({
+      kind: "completed",
+      matches: [{ name: "widget", file: "index.ts" }],
+      evidenceLists: [{ totalCount: 1, partialReason: null }],
+      automaticPathExclusion: { excludedCount: 1 },
+    });
+    const text = JSON.stringify(result.content);
+    expect(text).not.toContain("more may exist");
+    expect(text).toContain("Automatic path policy excluded 1 workspace-symbol result");
+    expect(Value.Check(tool.outputSchema, result.structuredContent)).toBe(true);
+  });
+
   it("bounds model text without truncating codemode evidence", async () => {
     const name = `widget${"LongName".repeat(1500)}`;
     registerMockProvider(cwd, {
