@@ -72,6 +72,8 @@ export interface RealLanguageWorkspaceOptions {
   readonly args?: readonly string[];
   /** Test installation to expose as canonical typescript; launch remains automatic. */
   readonly typescriptInstallation?: "typescript" | "@typescript/native";
+  /** Runs after the fixture copy and before LSP start, e.g. to link dependencies. */
+  readonly prepare?: (cwd: string) => void;
 }
 
 export interface RealLanguageWorkspace extends RealSubstrateWorkspace {
@@ -116,6 +118,7 @@ export async function createRealLanguageWorkspace(
   try {
     cpSync(options.fixturePath, cwd, { recursive: true });
     normalizeCompilationDatabase(cwd);
+    options.prepare?.(cwd);
     if (options.typescriptInstallation) {
       const require = createRequire(import.meta.url);
       mkdirSync(join(cwd, "node_modules"), { recursive: true });

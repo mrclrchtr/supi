@@ -60,6 +60,7 @@ Reference material for agents that develop PI extensions in this repo. Docs here
 
 - [Background delegation](../packages/supi-agent/docs/background-delegation.md) — approved execution, completion, cancellation, capacity, and Usage accounting for background Agent Runs.
 - [Resumable Delegation Conversations](../packages/supi-agent/docs/resumable-conversations.md) — reusable child context, parent-owned persistence, branch behavior, and follow-up Agent Runs.
+- [Code Intelligence tool-output benchmark](../packages/supi-code-intelligence/docs/bench.md) — deterministic native-vs-`code_*` token, call, and precision/recall comparison on a frozen corpus, with a committed baseline.
 
 ## Design examples
 
