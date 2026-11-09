@@ -198,6 +198,7 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
     return this.withProjectCoverage(
       client,
       resolvedPath,
+      "references",
       mapCodeQueryResult(
         await client.references(resolvedPath, position, control),
         (data) => data ?? [],
@@ -220,23 +221,26 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
     return this.withProjectCoverage(
       client,
       resolvedPath,
+      "implementation",
       await client.implementation(resolvedPath, position, control),
     );
   }
 
   /**
-   * Downgrade a completed project-wide answer to partial when tsserver has not
-   * loaded every project that includes the queried file.
+   * Downgrade a completed project-wide answer to partial when the TypeScript
+   * server may not have searched every relevant project.
    */
   private withProjectCoverage<T extends Location[] | Location | LocationLink[] | null>(
     client: NonNullable<Awaited<ReturnType<LspManager["ensureFileOpen"]>>>,
     filePath: string,
+    request: "references" | "implementation",
     result: CodeQueryResult<T>,
   ): CodeQueryResult<T> {
     if (result.kind !== "completed") return result;
     const gap = this.manager.typeScriptProjectCoverageGap(
       client,
       filePath,
+      request,
       locationFiles(result.data),
     );
     return gap ? partialCodeQuery(result.data, gap) : result;

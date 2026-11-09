@@ -130,7 +130,9 @@ import type {
 } from "./manager-types.ts";
 import {
   discoverTypeScriptProjectConfigs,
+  findSkippedImplementationProjects,
   findUnloadedTypeScriptProjects,
+  singleProjectImplementationReason,
   typeScriptCoverageGapReason,
 } from "./manager-typescript-coverage.ts";
 import {
@@ -586,10 +588,14 @@ export class LspManager {
    * `filePath` owns neither an open file nor a file in `resultFiles`, so
    * tsserver may not have searched it; otherwise null. Non-TypeScript routes
    * always return null.
+   *
+   * Implementation requests not known to use the native backend report every
+   * other project instead: tsserver searches only the file's own project.
    */
   typeScriptProjectCoverageGap(
     client: LspClient,
     filePath: string,
+    request: "references" | "implementation",
     resultFiles: readonly string[] = [],
   ): string | null {
     if (client.name !== "typescript") return null;
@@ -599,8 +605,13 @@ export class LspManager {
       configs = discoverTypeScriptProjectConfigs(rootKey, this.automaticPathPolicy);
       this.typeScriptProjectConfigs.set(rootKey, configs);
     }
+    const file = resolveSessionPath(this.cwd, filePath);
+    if (request === "implementation" && client.typescriptSelection?.backend !== "native") {
+      const skipped = findSkippedImplementationProjects({ file, cwd: this.cwd, configs });
+      return skipped.length > 0 ? singleProjectImplementationReason(skipped) : null;
+    }
     const unloaded = findUnloadedTypeScriptProjects({
-      file: resolveSessionPath(this.cwd, filePath),
+      file,
       cwd: this.cwd,
       openFiles: client.openFiles,
       resultFiles,

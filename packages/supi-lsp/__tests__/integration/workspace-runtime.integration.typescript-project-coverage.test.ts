@@ -1,6 +1,8 @@
 // tsserver answers references only from loaded projects. A test project that
 // includes `../src` stays unloaded until one of its files is open, so its
 // references are silently missing unless the runtime reports partial coverage.
+// Implementations are narrower still: tsserver searches only the file's own
+// project, so opening other projects' files does not help.
 
 import * as fs from "node:fs";
 import * as os from "node:os";
@@ -82,5 +84,35 @@ describe.skipIf(!HAS_TS_LSP)("TypeScript project coverage for project-wide queri
     expect(after.data.some((location) => location.uri.endsWith("/__tests__/value.test.ts"))).toBe(
       true,
     );
+  }, 60_000);
+
+  it("reports tsserver implementations as single-project even after other projects load", async () => {
+    tmpDir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "ts-project-coverage-")));
+    const compilerOptions = { strict: true, noEmit: true, target: "ES2022", module: "ESNext" };
+    write(tmpDir, "tsconfig.json", JSON.stringify({ compilerOptions, include: ["src/**/*.ts"] }));
+    write(
+      tmpDir,
+      "__tests__/tsconfig.json",
+      JSON.stringify({ compilerOptions, include: ["**/*.ts", "../src/**/*.ts"] }),
+    );
+    const source = write(
+      tmpDir,
+      "src/shape.ts",
+      "export interface Shape {\n  area(): number;\n}\n",
+    );
+    const testFile = write(
+      tmpDir,
+      "__tests__/shape.test.ts",
+      'import type { Shape } from "../src/shape";\nexport class Square implements Shape {\n  area() {\n    return 1;\n  }\n}\n',
+    );
+    const owner = createWorkspaceLspRuntimeOwner(new LspManager(TS_CONFIG, tmpDir));
+    shutdown = owner.shutdown;
+    expect(await owner.runtime.trackFile(testFile)).toBe(true);
+
+    const result = await owner.runtime.implementation(source, { line: 0, character: 17 });
+    expect(result.kind).toBe("partial");
+    if (result.kind !== "partial") return;
+    expect(result.reason).toContain("only in this file's project");
+    expect(result.reason).not.toContain("Open a file");
   }, 60_000);
 });

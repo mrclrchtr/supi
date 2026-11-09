@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { clearTsconfigCache } from "../../src/config/tsconfig-scope.ts";
 import {
   discoverTypeScriptProjectConfigs,
+  findSkippedImplementationProjects,
   findUnloadedTypeScriptProjects,
 } from "../../src/manager/manager-typescript-coverage.ts";
 import { createAutomaticLspPathPolicy } from "../../src/workspace-path-policy.ts";
@@ -67,5 +68,17 @@ describe("findUnloadedTypeScriptProjects", () => {
   it("treats a project as searched when the answer contains one of its own files", () => {
     const { root, source, testFile } = monorepo();
     expect(unloaded(root, source, [source], [source, testFile])).toEqual([]);
+  });
+});
+
+// biome-ignore lint/security/noSecrets: describe name, not a secret
+describe("findSkippedImplementationProjects", () => {
+  it("reports every other non-base project, not the file's own or an extended base", () => {
+    const { root, source } = monorepo();
+    const configs = discoverTypeScriptProjectConfigs(root, createAutomaticLspPathPolicy(root, []));
+    const skipped = findSkippedImplementationProjects({ file: source, cwd: root, configs });
+    expect(skipped.map((config) => path.relative(root, config))).toEqual([
+      path.join("pkg", "__tests__", "tsconfig.json"),
+    ]);
   });
 });

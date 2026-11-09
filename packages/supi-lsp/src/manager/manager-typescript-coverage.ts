@@ -69,6 +69,40 @@ export function findUnloadedTypeScriptProjects(options: {
   });
 }
 
+/**
+ * Other projects that tsserver's implementation search skips for `file`.
+ *
+ * tsserver 6 and earlier answer `textDocument/implementation` from the file's
+ * default project only, unlike references, which span loaded projects. Any
+ * other non-base project may implement the target through an import, and
+ * opening its files does not change the answer.
+ */
+export function findSkippedImplementationProjects(options: {
+  readonly file: string;
+  readonly cwd: string;
+  readonly configs: readonly string[];
+}): string[] {
+  const baseConfigs = new Set(
+    options.configs.flatMap((config) => [...collectExtendedProjectConfigs(config)]),
+  );
+  const decision = getFileScopeDecision(options.file, options.cwd);
+  const own = decision.configPath ? normalizeTsconfigPath(decision.configPath) : undefined;
+  return options.configs.filter((config) => {
+    const key = normalizeTsconfigPath(config);
+    return key !== own && !baseConfigs.has(key);
+  });
+}
+
+/** Partial-result reason for tsserver's single-project implementation search. */
+export function singleProjectImplementationReason(skipped: readonly string[]): string {
+  const noun = skipped.length === 1 ? "1 other project is" : `${skipped.length} other projects are`;
+  return (
+    "TypeScript coverage is limited: the TypeScript 6 or earlier server (tsserver) " +
+    `searches implementations only in this file's project; ${noun} not searched. ` +
+    "Use references to find uses in other projects, or use TypeScript 7."
+  );
+}
+
 /** Actionable partial-result reason naming a bounded set of unloaded projects. */
 export function typeScriptCoverageGapReason(unloaded: readonly string[], cwd: string): string {
   const named = unloaded
