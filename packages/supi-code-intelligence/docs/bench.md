@@ -10,6 +10,8 @@ pnpm bench:code-intelligence --dump     # also write raw outputs to __tests__/be
 
 Requires git history for `CORPUS_COMMIT` and the TypeScript LSP from root dev dependencies. Not part of CI.
 
+Uses the native TypeScript 7 backend (`@typescript/native`), which SuPi selects by default. tsserver 6 answers implementations from a single project, so cross-package results would be understated.
+
 ## Files
 
 | Path | Role |
@@ -35,7 +37,7 @@ SuPi's `packages/` tree at `CORPUS_COMMIT`, extracted with `git archive` (binari
 | `codeToolSurfaceTokens` | yes | Per-request cost of all registered `code_*` definitions (description, schema, snippet, guidelines). |
 | latency | no | Printed only; machine-dependent. |
 
-All arms run once as warm-up before measurement. Cold tsserver project loading omits cross-project references nondeterministically.
+All arms run once as warm-up before measurement. Cold TypeScript project loading omits cross-project references nondeterministically.
 
 ## Workflow
 

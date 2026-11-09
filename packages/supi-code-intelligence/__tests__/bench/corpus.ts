@@ -37,13 +37,14 @@ export function extractCorpus(commit: string): { dir: string; dispose(): void } 
  * Link dependencies into a corpus workspace. Workspace packages resolve to
  * their corpus copies so cross-package locations stay inside the workspace;
  * third-party packages resolve to the live checkout's `node_modules`.
+ * `typescript` is left out: the workspace helper links the selected compiler.
  */
 export function linkCorpusDependencies(cwd: string): void {
   const liveModules = join(REPO_ROOT, "node_modules");
   const modules = join(cwd, "node_modules");
   mkdirSync(join(modules, "@mrclrchtr"), { recursive: true });
   for (const entry of readdirSync(liveModules)) {
-    if (entry.startsWith(".") || entry === "@mrclrchtr") continue;
+    if (entry.startsWith(".") || entry === "@mrclrchtr" || entry === "typescript") continue;
     symlinkSync(join(liveModules, entry), join(modules, entry));
   }
   for (const pkg of readdirSync(join(cwd, "packages"))) {

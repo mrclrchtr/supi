@@ -583,10 +583,15 @@ export class LspManager {
    * Coverage gap for a project-wide TypeScript request answered by `client`.
    *
    * Returns a partial-result reason when a TypeScript project that includes
-   * `filePath` has no open file, so tsserver has not loaded it; otherwise
-   * null. Non-TypeScript routes always return null.
+   * `filePath` owns neither an open file nor a file in `resultFiles`, so
+   * tsserver may not have searched it; otherwise null. Non-TypeScript routes
+   * always return null.
    */
-  typeScriptProjectCoverageGap(client: LspClient, filePath: string): string | null {
+  typeScriptProjectCoverageGap(
+    client: LspClient,
+    filePath: string,
+    resultFiles: readonly string[] = [],
+  ): string | null {
     if (client.name !== "typescript") return null;
     const rootKey = path.resolve(client.root);
     let configs = this.typeScriptProjectConfigs.get(rootKey);
@@ -598,6 +603,7 @@ export class LspManager {
       file: resolveSessionPath(this.cwd, filePath),
       cwd: this.cwd,
       openFiles: client.openFiles,
+      resultFiles,
       configs,
     });
     return unloaded.length > 0 ? typeScriptCoverageGapReason(unloaded, this.cwd) : null;

@@ -38,10 +38,15 @@ function monorepo(): { root: string; source: string; testFile: string } {
   return { root, source, testFile };
 }
 
-function unloaded(root: string, file: string, openFiles: string[]): string[] {
+function unloaded(
+  root: string,
+  file: string,
+  openFiles: string[],
+  resultFiles: string[] = [],
+): string[] {
   const configs = discoverTypeScriptProjectConfigs(root, createAutomaticLspPathPolicy(root, []));
-  return findUnloadedTypeScriptProjects({ file, cwd: root, openFiles, configs }).map((config) =>
-    path.relative(root, config),
+  return findUnloadedTypeScriptProjects({ file, cwd: root, openFiles, resultFiles, configs }).map(
+    (config) => path.relative(root, config),
   );
 }
 
@@ -57,5 +62,10 @@ describe("findUnloadedTypeScriptProjects", () => {
   it("reports nothing once a file from the including project is open", () => {
     const { root, source, testFile } = monorepo();
     expect(unloaded(root, source, [source, testFile])).toEqual([]);
+  });
+
+  it("treats a project as searched when the answer contains one of its own files", () => {
+    const { root, source, testFile } = monorepo();
+    expect(unloaded(root, source, [source], [source, testFile])).toEqual([]);
   });
 });

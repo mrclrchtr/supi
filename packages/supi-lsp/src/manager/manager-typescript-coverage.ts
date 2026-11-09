@@ -29,12 +29,16 @@ export function discoverTypeScriptProjectConfigs(
 }
 
 /**
- * Project configs whose program includes `file` but owns no open file.
+ * Project configs whose program includes `file` but show no sign of being loaded.
  *
  * tsserver answers project-wide requests such as references and
  * implementations only from loaded projects, and loads a project only when one
  * of its files is open. An unloaded including project (typically a test
  * config that includes `../src`) can hold matches the answer omits.
+ *
+ * A project counts as loaded when it is the nearest config of an open file or
+ * of a file in the answer (`resultFiles`): tsserver also loads projects on its
+ * own during a search, and a match from a project's own file proves it was searched.
  *
  * Base configs extended by another discovered config are skipped: their
  * default include usually spans the whole tree while they own only root
@@ -44,14 +48,15 @@ export function findUnloadedTypeScriptProjects(options: {
   readonly file: string;
   readonly cwd: string;
   readonly openFiles: readonly string[];
+  readonly resultFiles?: readonly string[];
   readonly configs: readonly string[];
 }): string[] {
   const baseConfigs = new Set(
     options.configs.flatMap((config) => [...collectExtendedProjectConfigs(config)]),
   );
   const loaded = new Set<string>();
-  for (const openFile of options.openFiles) {
-    const decision = getFileScopeDecision(openFile, options.cwd);
+  for (const loadedFile of [...options.openFiles, ...(options.resultFiles ?? [])]) {
+    const decision = getFileScopeDecision(loadedFile, options.cwd);
     if (decision.status === "included" && decision.configPath) {
       loaded.add(normalizeTsconfigPath(decision.configPath));
     }

@@ -1,6 +1,7 @@
 // Shared session-scoped LSP service registry reused by peer extensions.
 
 // biome-ignore lint/style/noExcessiveLinesPerFile: session registry, runtime recovery, and telemetry stay in one file; splitting would hide the recovery contract.
+import { fileURLToPath } from "node:url";
 import {
   type CodeQueryResult,
   type CodeRequestControl,
@@ -227,13 +228,17 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
    * Downgrade a completed project-wide answer to partial when tsserver has not
    * loaded every project that includes the queried file.
    */
-  private withProjectCoverage<T>(
+  private withProjectCoverage<T extends Location[] | Location | LocationLink[] | null>(
     client: NonNullable<Awaited<ReturnType<LspManager["ensureFileOpen"]>>>,
     filePath: string,
     result: CodeQueryResult<T>,
   ): CodeQueryResult<T> {
     if (result.kind !== "completed") return result;
-    const gap = this.manager.typeScriptProjectCoverageGap(client, filePath);
+    const gap = this.manager.typeScriptProjectCoverageGap(
+      client,
+      filePath,
+      locationFiles(result.data),
+    );
     return gap ? partialCodeQuery(result.data, gap) : result;
   }
 
@@ -626,6 +631,21 @@ export async function waitForWorkspaceLspRuntime(
   // A cancelled poll must not hand a runtime to a caller that no longer awaits.
   throwIfCodeRequestInterrupted(control);
   return state;
+}
+
+/** Local file paths of LSP locations or location links; non-file URIs are skipped. */
+function locationFiles(data: Location[] | Location | LocationLink[] | null): string[] {
+  const items: (Location | LocationLink)[] =
+    data === null ? [] : Array.isArray(data) ? data : [data];
+  return items.flatMap((item) => {
+    const uri = "targetUri" in item ? item.targetUri : item.uri;
+    if (!uri.startsWith("file:")) return [];
+    try {
+      return [fileURLToPath(uri)];
+    } catch {
+      return [];
+    }
+  });
 }
 
 /** Remove the LSP service state for a session cwd. */

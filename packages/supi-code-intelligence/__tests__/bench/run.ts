@@ -54,6 +54,9 @@ const workspace = await createRealLanguageWorkspace({
   sourceFile: "packages/supi-code-intelligence/src/tool/register.ts",
   language: "typescript",
   prepare: linkCorpusDependencies,
+  // The compiler SuPi selects by default; tsserver 6 answers implementations
+  // from a single project, which would understate cross-package results.
+  typescriptInstallation: "@typescript/native",
 });
 corpus.dispose();
 const cwd = workspace.cwd;
