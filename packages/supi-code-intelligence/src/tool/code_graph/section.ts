@@ -45,6 +45,7 @@ export function assembleGraphSection(
         maxResults,
         invalidLocationCount: section.data.invalidLocationCount,
         partialReason: section.data.partialReason,
+        partialMessage: section.data.partialMessage,
       });
       return {
         ...section,
@@ -94,6 +95,7 @@ export function assembleGraphSection(
           maxResults,
           invalidLocationCount: section.data.invalidLocationCount,
           partialReason: section.data.partialReason,
+          partialMessage: section.data.partialMessage,
         }),
       };
   }
@@ -105,6 +107,7 @@ function createRelationEvidenceList<T>(params: {
   maxResults: number;
   invalidLocationCount: number;
   partialReason: RelationLocationPartialReason | null;
+  partialMessage: string | null;
 }): EvidenceList<T> {
   const evidence =
     params.partialReason === "provider-limited"
@@ -117,6 +120,7 @@ function createRelationEvidenceList<T>(params: {
       ...evidence.metadata,
       partialReason: params.partialReason,
       invalidLocationCount: params.invalidLocationCount,
+      ...(params.partialMessage ? { partialMessage: params.partialMessage } : {}),
     },
   };
 }

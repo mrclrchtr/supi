@@ -162,6 +162,16 @@ export function getFileScopeDecision(filePath: string, cwd: string): FileScopeDe
   };
 }
 
+/**
+ * Whether a project config's program includes a file, by its own file set or
+ * include/exclude rules. Unlike {@link getFileScopeDecision}, the config need
+ * not be the file's nearest one (e.g. a test config including `../src`).
+ */
+export function projectConfigIncludesFile(configPath: string, filePath: string): boolean {
+  const parsed = parseProjectConfig(configPath);
+  return parsed !== null && decideFileScope(parsed, path.resolve(filePath)).included;
+}
+
 function isOutOfTree(cwd: string, absolutePath: string): boolean {
   const relative = path.relative(path.resolve(cwd), absolutePath);
   return relative.startsWith(`..${path.sep}`) || relative === "..";

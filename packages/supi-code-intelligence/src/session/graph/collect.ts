@@ -88,6 +88,7 @@ async function collectReferences(options: CollectRelationOptions): Promise<Graph
       externalCount: result.externalCount,
       invalidLocationCount: result.invalidLocationCount,
       partialReason: result.partialReason,
+      partialMessage: result.partialMessage,
       confidence: "semantic",
     },
     readNext: [
@@ -189,6 +190,7 @@ async function collectImplementationsRelation(
       externalCount: result.externalCount,
       invalidLocationCount: result.invalidLocationCount,
       partialReason: result.partialReason,
+      partialMessage: result.partialMessage,
     },
     readNext: result.implementations
       .slice(0, Math.min(options.maxResults, 2))

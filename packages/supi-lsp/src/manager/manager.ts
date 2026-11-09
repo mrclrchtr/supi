@@ -129,6 +129,11 @@ import type {
   ServerStatus,
 } from "./manager-types.ts";
 import {
+  discoverTypeScriptProjectConfigs,
+  findUnloadedTypeScriptProjects,
+  typeScriptCoverageGapReason,
+} from "./manager-typescript-coverage.ts";
+import {
   recoverWorkspaceDiagnostics as recoverWorkspaceDiagnosticsImpl,
   type WorkspaceRecoveryResult,
 } from "./manager-workspace-recovery.ts";
@@ -412,6 +417,8 @@ export class LspManager {
   private warmedSemanticProjects = new Set<string>();
   /** In-flight warm-up probes keyed by project key so concurrent callers share one probe. */
   private pendingWarmProbes = new Map<string, Promise<void>>();
+  /** Loadable TypeScript project configs per route root; cleared when a config changes. */
+  private typeScriptProjectConfigs = new Map<string, string[]>();
   /** One process-crash recovery budget and shared replacement per route. */
   private processCrashRecoveries = new Map<string, ProcessCrashRecoveryState>();
   /** Client generations that completed the initialize handshake. */
@@ -570,6 +577,30 @@ export class LspManager {
     return (
       this.getExistingClientForFile(resolvedPath)?.getOpenDocumentVersion(resolvedPath) ?? null
     );
+  }
+
+  /**
+   * Coverage gap for a project-wide TypeScript request answered by `client`.
+   *
+   * Returns a partial-result reason when a TypeScript project that includes
+   * `filePath` has no open file, so tsserver has not loaded it; otherwise
+   * null. Non-TypeScript routes always return null.
+   */
+  typeScriptProjectCoverageGap(client: LspClient, filePath: string): string | null {
+    if (client.name !== "typescript") return null;
+    const rootKey = path.resolve(client.root);
+    let configs = this.typeScriptProjectConfigs.get(rootKey);
+    if (!configs) {
+      configs = discoverTypeScriptProjectConfigs(rootKey, this.automaticPathPolicy);
+      this.typeScriptProjectConfigs.set(rootKey, configs);
+    }
+    const unloaded = findUnloadedTypeScriptProjects({
+      file: resolveSessionPath(this.cwd, filePath),
+      cwd: this.cwd,
+      openFiles: client.openFiles,
+      configs,
+    });
+    return unloaded.length > 0 ? typeScriptCoverageGapReason(unloaded, this.cwd) : null;
   }
 
   /** Get or create an LSP client for the given file. */
@@ -2397,7 +2428,7 @@ export class LspManager {
    */
   noteWorkspaceChanges(changes: FileEvent[]): void {
     if (changes.length > 0) this.invalidationEpoch++;
-    invalidateProjectConfigCaches(changes);
+    if (invalidateProjectConfigCaches(changes)) this.typeScriptProjectConfigs.clear();
     this.notifyWorkspaceFileChanges(changes);
   }
 
@@ -2586,6 +2617,7 @@ export class LspManager {
     this.warmedWorkspaceSymbolFiles.clear();
     this.warmedSemanticProjects.clear();
     this.pendingWarmProbes.clear();
+    this.typeScriptProjectConfigs.clear();
     this.pendingRestarts.clear();
   }
   /** Get status of all servers. */
@@ -3437,15 +3469,19 @@ export class LspManager {
   }
 }
 
-function invalidateProjectConfigCaches(changes: readonly FileEvent[]): void {
+/** Invalidate parsed project configs; returns whether any config changed. */
+function invalidateProjectConfigCaches(changes: readonly FileEvent[]): boolean {
+  let changed = false;
   for (const change of changes) {
     const configPath = uriToFile(change.uri);
     if (!isProjectConfigFileName(path.basename(configPath))) continue;
+    changed = true;
     invalidateTsconfigCacheForConfig(configPath);
     if (change.type === FileChangeType.Created) {
       invalidateTsconfigCacheForConfigDir(path.dirname(configPath));
     }
   }
+  return changed;
 }
 
 function collectClientDiagnosticEvidenceDocuments(

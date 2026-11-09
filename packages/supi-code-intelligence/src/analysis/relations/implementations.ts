@@ -18,6 +18,8 @@ interface ImplementationsResultBase {
   /** Provider locations omitted because their URI or position was unusable. */
   invalidLocationCount: number;
   partialReason: RelationLocationPartialReason | null;
+  /** Provider explanation when the provider reported partial collection. */
+  partialMessage: string | null;
 }
 
 /** An implementation lookup result with a reason on every unavailable outcome. */
@@ -43,6 +45,7 @@ export async function collectImplementations(
       externalCount: 0,
       invalidLocationCount: 0,
       partialReason: null,
+      partialMessage: null,
       confidence: "unavailable",
       message: "No semantic implementations provider",
     };
@@ -57,6 +60,7 @@ export async function collectImplementations(
       externalCount: 0,
       invalidLocationCount: 0,
       partialReason: null,
+      partialMessage: null,
       confidence: "unavailable",
       message: result.reason,
     };
@@ -79,6 +83,7 @@ export async function collectImplementations(
     externalCount: normalized.external.length,
     invalidLocationCount: normalized.invalidLocationCount,
     partialReason: result.kind === "partial" ? "provider-limited" : normalized.partialReason,
+    partialMessage: result.kind === "partial" ? result.reason : null,
     confidence: "semantic",
   };
 }

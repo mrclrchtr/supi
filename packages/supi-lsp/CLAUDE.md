@@ -19,7 +19,7 @@ Runtime positions are raw 0-based LSP coordinates. Use `toLspPosition()` when st
 
 ## Semantic and refactor behavior
 
-The provider maps semantic requests to `WorkspaceLspRuntime`. Read-only semantic and diagnostic requests return `CodeQueryResult<T>`: protocol-level empty data is `completed`, multi-client incomplete collection is `partial`, and routing/request/synchronization failure is `unavailable`. Do not collapse these states back to `null` or `[]`.
+The provider maps semantic requests to `WorkspaceLspRuntime`. Read-only semantic and diagnostic requests return `CodeQueryResult<T>`: protocol-level empty data is `completed`, multi-client incomplete collection is `partial`, and routing/request/synchronization failure is `unavailable`. Do not collapse these states back to `null` or `[]`. TypeScript `references`/`implementation` also become `partial` when another loadable `tsconfig.json`/`jsconfig.json` includes the file but owns no open file (`manager-typescript-coverage.ts`): tsserver searches only loaded projects. Configs extended by another config are skipped as bases.
 
 Public code-intelligence refactors currently use:
 

@@ -12,7 +12,7 @@
       },
       "code": {
         "calls": 1,
-        "tokens": 306,
+        "tokens": 362,
         "precision": 1,
         "recall": 0.381
       }
@@ -26,7 +26,7 @@
       },
       "code": {
         "calls": 1,
-        "tokens": 310,
+        "tokens": 366,
         "precision": 1,
         "recall": 0.762
       }
@@ -40,7 +40,7 @@
       },
       "code": {
         "calls": 1,
-        "tokens": 168,
+        "tokens": 224,
         "precision": 1,
         "recall": 1
       }
@@ -86,7 +86,7 @@
       },
       "code": {
         "calls": 1,
-        "tokens": 102
+        "tokens": 155
       }
     }
   }

@@ -21,6 +21,8 @@ interface CallerEvidenceData {
   /** Provider locations omitted because their URI or position was unusable. */
   invalidLocationCount: number;
   partialReason: RelationLocationPartialReason | null;
+  /** Provider explanation when the provider reported partial collection. */
+  partialMessage: string | null;
   evidence: CallerEvidence;
 }
 
@@ -47,6 +49,7 @@ export async function collectCallers(
       externalCount: 0,
       invalidLocationCount: 0,
       partialReason: null,
+      partialMessage: null,
       evidence: "semantic-references",
       confidence: "unavailable",
       message: "No semantic references provider",
@@ -62,6 +65,7 @@ export async function collectCallers(
       externalCount: 0,
       invalidLocationCount: 0,
       partialReason: null,
+      partialMessage: null,
       evidence: "semantic-references",
       confidence: "unavailable",
       message: result.reason,
@@ -83,6 +87,7 @@ export async function collectCallers(
     externalCount: normalized.external.length,
     invalidLocationCount: normalized.invalidLocationCount,
     partialReason: result.kind === "partial" ? "provider-limited" : normalized.partialReason,
+    partialMessage: result.kind === "partial" ? result.reason : null,
     evidence: "semantic-references",
     confidence: "semantic",
   };

@@ -6,6 +6,7 @@ import {
   type CodeRequestControl,
   isCodeRequestInterruption,
   mapCodeQueryResult,
+  partialCodeQuery,
   throwIfCodeRequestInterrupted,
   unavailableCodeQuery,
 } from "@mrclrchtr/supi-code-runtime/api";
@@ -193,9 +194,13 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
       control,
     });
     if (!client) return unavailableFileQuery("references", resolvedPath);
-    return mapCodeQueryResult(
-      await client.references(resolvedPath, position, control),
-      (data) => data ?? [],
+    return this.withProjectCoverage(
+      client,
+      resolvedPath,
+      mapCodeQueryResult(
+        await client.references(resolvedPath, position, control),
+        (data) => data ?? [],
+      ),
     );
   }
 
@@ -211,7 +216,25 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
       control,
     });
     if (!client) return unavailableFileQuery("implementation", resolvedPath);
-    return client.implementation(resolvedPath, position, control);
+    return this.withProjectCoverage(
+      client,
+      resolvedPath,
+      await client.implementation(resolvedPath, position, control),
+    );
+  }
+
+  /**
+   * Downgrade a completed project-wide answer to partial when tsserver has not
+   * loaded every project that includes the queried file.
+   */
+  private withProjectCoverage<T>(
+    client: NonNullable<Awaited<ReturnType<LspManager["ensureFileOpen"]>>>,
+    filePath: string,
+    result: CodeQueryResult<T>,
+  ): CodeQueryResult<T> {
+    if (result.kind !== "completed") return result;
+    const gap = this.manager.typeScriptProjectCoverageGap(client, filePath);
+    return gap ? partialCodeQuery(result.data, gap) : result;
   }
 
   async documentSymbols(

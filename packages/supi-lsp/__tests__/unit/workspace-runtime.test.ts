@@ -24,6 +24,7 @@ import { createWorkspaceLspRuntimeOwner } from "../../src/session/runtime-regist
 function makeManager(overrides: Record<string, unknown>): Manager {
   return {
     getCwd: () => "/project",
+    typeScriptProjectCoverageGap: () => null,
     hasConfiguredServerForFile: () => true,
     hasFailedStartupForFile: () => false,
     getScopeDecisionSummary: () => ({

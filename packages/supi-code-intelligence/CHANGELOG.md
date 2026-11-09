@@ -1,5 +1,9 @@
 # Changelog
 
+## [11.3.1]
+
+- `code_graph` references and implementations with the TypeScript server now report an incomplete result, naming the unloaded projects, when another `tsconfig.json` that includes the target file (such as a `__tests__` project that includes `../src`) has no open file. Previously, matches from such projects were silently missing and the result looked complete.
+
 ## [11.3.0]
 
 - Added package-specific release notes for code navigation, diagnostics, and refactoring.

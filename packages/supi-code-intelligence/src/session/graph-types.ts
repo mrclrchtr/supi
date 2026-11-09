@@ -32,6 +32,7 @@ export type GraphSection =
         readonly externalCount: number;
         readonly invalidLocationCount: number;
         readonly partialReason: RelationLocationPartialReason | null;
+        readonly partialMessage: string | null;
         readonly confidence: "semantic";
       };
       readonly readNext: readonly ReadNextItem[];
@@ -59,6 +60,7 @@ export type GraphSection =
         readonly externalCount: number;
         readonly invalidLocationCount: number;
         readonly partialReason: RelationLocationPartialReason | null;
+        readonly partialMessage: string | null;
       };
       readonly readNext: readonly ReadNextItem[];
     }
