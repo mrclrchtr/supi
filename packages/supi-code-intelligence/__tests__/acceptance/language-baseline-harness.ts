@@ -391,20 +391,22 @@ async function assertDiagnostics(setup: ToolContext, spec: LanguageCase): Promis
   const errorLine = findPoint(sourceWithControl, spec.errorText, 0).line;
   const controlLine = findPoint(sourceWithControl, spec.diagnosticControl.marker, 0).line;
   noteDiagnosticWrite(setup, file);
+  // Health output projects in-workspace paths relative to the workspace root.
+  const displayFile = spec.errorFile;
 
   const firstData = await waitForKnownDiagnostics(setup, spec, file, {
     error: errorLine,
     control: controlLine,
   });
-  assertDiagnosticScope(firstData, file);
+  assertDiagnosticScope(firstData, displayFile);
   expect(["completed", "partial"]).toContain(firstData.diagnosticObservation.kind);
   assertDiagnosticFreshness(firstData.diagnosticObservation);
   if (spec.typescriptInstallation) expect(firstData.diagnosticObservation.kind).toBe("completed");
   expect(firstData.refresh.kind).toBe("completed");
   expect(firstData.refresh.fileReadiness).toBe("ready");
 
-  const knownErrors = knownErrorMessages(firstData, file, errorLine);
-  const controlErrors = knownErrorMessages(firstData, file, controlLine);
+  const knownErrors = knownErrorMessages(firstData, displayFile, errorLine);
+  const controlErrors = knownErrorMessages(firstData, displayFile, controlLine);
   expect(knownErrors.length).toBeGreaterThan(0);
   expect(controlErrors.length).toBeGreaterThan(0);
   const sourceWithPrimaryFixed = replaceExactlyOnce(
@@ -416,16 +418,16 @@ async function assertDiagnostics(setup: ToolContext, spec: LanguageCase): Promis
   noteDiagnosticWrite(setup, file);
   const changed = await waitForDiagnosticFix({
     observe: async () => resultData<HealthData>(await healthFor(setup, file)),
-    file,
+    file: displayFile,
     previous: knownErrors,
     control: controlErrors,
     timeoutMs: 20_000,
     pollIntervalMs: 250,
   });
-  assertDiagnosticScope(changed, file);
+  assertDiagnosticScope(changed, displayFile);
   expect(["completed", "partial"]).toContain(changed.diagnosticObservation.kind);
-  expect(knownErrorMessages(changed, file, errorLine)).toEqual([]);
-  expect(knownErrorMessages(changed, file, controlLine)).toEqual(
+  expect(knownErrorMessages(changed, displayFile, errorLine)).toEqual([]);
+  expect(knownErrorMessages(changed, displayFile, controlLine)).toEqual(
     expect.arrayContaining(controlErrors),
   );
   expect(changed.refresh.kind).toBe("completed");
@@ -442,7 +444,7 @@ async function assertDiagnostics(setup: ToolContext, spec: LanguageCase): Promis
   writeFileSync(file, sourceWithoutControl);
   noteDiagnosticWrite(setup, file);
   const finalData = resultData<HealthData>(await healthFor(setup, file));
-  assertDiagnosticScope(finalData, file);
+  assertDiagnosticScope(finalData, displayFile);
   assertTruthfulFinalDiagnosticState(finalData.diagnosticObservation);
   if (spec.typescriptInstallation) expect(finalData.diagnosticObservation.kind).toBe("completed");
   expect(finalData.refresh.kind).toBe("completed");
@@ -483,6 +485,7 @@ async function waitForKnownDiagnostics(
   file: string,
   lines: { readonly error: number; readonly control: number },
 ): Promise<HealthData> {
+  const displayFile = spec.errorFile;
   const deadline = Date.now() + 20_000;
   while (Date.now() < deadline) {
     const latest = resultData<HealthData>(await healthFor(setup, file));
@@ -491,8 +494,8 @@ async function waitForKnownDiagnostics(
       latest.diagnosticObservation.kind === "partial";
     if (
       hasObservation &&
-      knownErrorMessages(latest, file, lines.error).length > 0 &&
-      knownErrorMessages(latest, file, lines.control).length > 0
+      knownErrorMessages(latest, displayFile, lines.error).length > 0 &&
+      knownErrorMessages(latest, displayFile, lines.control).length > 0
     ) {
       return latest;
     }
@@ -645,7 +648,7 @@ function expectedRenameLines(
       const prefix = source.slice(0, index);
       const line = prefix.split("\n").length;
       const character = prefix.length - prefix.lastIndexOf("\n");
-      return `${file} L${line}:${character} → L${line}:${character + oldName.length}: ${newName}`;
+      return `${relativeFile} L${line}:${character} → L${line}:${character + oldName.length}: ${newName}`;
     });
   });
   return expected.sort((left, right) => left.localeCompare(right));
