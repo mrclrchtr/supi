@@ -56,14 +56,9 @@ describe("buildPrompt", () => {
     expect(prompt).toContain("<assistant_message>\nsome assistant text\n</assistant_message>");
   });
 
-  it("ends with the Suggestion: trigger", () => {
-    const prompt = buildPrompt("text");
-    expect(prompt).toMatch(/Suggestion:\s*$/);
-  });
-
   it("formats the assistant message only, no inline instructions", () => {
     const prompt = buildPrompt("do X");
-    expect(prompt).toBe("<assistant_message>\ndo X\n</assistant_message>\n\nSuggestion:");
+    expect(prompt).toBe("<assistant_message>\ndo X\n</assistant_message>\n\nUser's next message:");
   });
 });
 

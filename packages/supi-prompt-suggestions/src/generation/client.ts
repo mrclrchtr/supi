@@ -14,28 +14,38 @@ import {
 export const GENERATION_TIMEOUT_MS = 20_000;
 
 /**
- * System prompt instructs the model to suggest a follow-up user message
- * (question, answer, or directive) or return the NO_SUGGESTION sentinel
- * when none is useful.
+ * System prompt instructs the model to predict the user's next message,
+ * preferably an imperative command to the assistant, or return the
+ * NO_SUGGESTION sentinel when none is useful.
  *
  * The model receives no PI, SuPi, project, or conversation context —
  * only the last assistant message text is sent.
  */
-const SYSTEM_PROMPT =
-  "You suggest follow-up messages for a coding assistant conversation. " +
-  "Given the assistant's last message, write a single line the user would type next. " +
-  "It must be a direct question, answer, or directive — nothing else. " +
-  "If the assistant asks for a decision, suggest a concise, specific answer to that decision, not the action that would follow from it. " +
-  "When answering yes/no, include the relevant constraint or option text when present. " +
-  "Do NOT include greetings, thank-yous, politeness, or conversational filler. " +
-  "If there is no useful follow-up, respond with exactly the word NO_SUGGESTION and nothing else. " +
-  "Keep suggestions under 240 characters.";
+const SYSTEM_PROMPT = `You predict the next message a developer types to their coding assistant.
+You receive the assistant's last message. Write the single line the USER would send next.
+
+Rules:
+- Write as the user talking to the assistant. Never write in the assistant's voice and never ask the user anything (no "Should I…?", "Do you want…?", "Shall we…?").
+- Prefer a short imperative command that moves the work forward: "Push the branch.", "Run the tests.", "Fix the lint errors."
+- If the assistant asks a question or offers options, answer it as a command that picks the most sensible option, e.g. "Yes, push it to origin." or "Use option 2."
+- Name concrete targets from the message (branch, file, command, option) when they make the command unambiguous.
+- Ask a question only when the user clearly needs information before deciding.
+- No greetings, thanks, politeness, explanations, quotes, or prefixes like "Suggestion:".
+- Keep it under 120 characters.
+- If no useful next message exists, respond with exactly NO_SUGGESTION.
+
+Examples (assistant message → your output):
+"Committed as abc123. Not pushed: the branch is 3 commits ahead of origin." → Push the branch to origin.
+"Should I also update the README, or keep the change code-only?" → Update the README too.
+"Two options: A) add a cache, B) batch the requests. Which do you prefer?" → Go with B and batch the requests.
+
+Output only the message text.`;
 
 // ── Prompt building ────────────────────────────────────────────────────────
 
 /** Format the tail text as a completion prompt. */
 export function buildPrompt(tail: string): string {
-  return `<assistant_message>\n${tail}\n</assistant_message>\n\nSuggestion:`;
+  return `<assistant_message>\n${tail}\n</assistant_message>\n\nUser's next message:`;
 }
 
 // ── Types ───────────────────────────────────────────────────────────────────

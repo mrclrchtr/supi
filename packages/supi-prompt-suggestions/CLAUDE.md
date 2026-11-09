@@ -31,9 +31,10 @@ Suggestions use `completeSimpleModelRequest` from `@mrclrchtr/supi-core/llm`, ba
 headers, provider environment, and the effective endpoint. The request uses the stable
 `prompt-suggestions` affinity scope. PI's simple path supplies model output limits and context
 guards; the extension does not import Pi AI implementation subpaths. Only the last 8,000
-characters of the final assistant message are sent. The system prompt instructs the model to write a single follow-up line
-(question, answer, or directive) or return the `NO_SUGGESTION` sentinel. The user message wraps the
-assistant text in `<assistant_message>...</assistant_message>` tags and appends `Suggestion:` — no
+characters of the final assistant message are sent. The system prompt instructs the model to predict the user's next line in the user's voice,
+preferring imperative commands (answering assistant questions as commands) over questions, or to
+return the `NO_SUGGESTION` sentinel. The user message wraps the assistant text in
+`<assistant_message>...</assistant_message>` tags and appends `User's next message:` — no
 PI, SuPi, project, or conversation context is included.
 
 ### Settings use the fixed config adapter
