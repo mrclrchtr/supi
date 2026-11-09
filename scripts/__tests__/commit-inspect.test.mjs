@@ -76,7 +76,9 @@ it("reports a mixed candidate without changing files, index, configuration, or H
   expect(result.stdout).toContain("MM tracked.txt");
   expect(result.stdout).toContain("?? untracked.txt");
   expect(result.stdout).toContain("docs: initial example");
-  expect(result.stdout).toContain("1 file changed");
+  expect(result.stdout).toMatch(
+    /Staged[^\n]*\n1\t1\ttracked\.txt\nUnstaged[^\n]*\n1\t1\ttracked\.txt\n/,
+  );
   expect(result.stdout).toContain("pre-commit");
   expect(result.stdout).not.toContain("staged content");
   expect(existsSync(join(cwd, "hook-ran"))).toBe(false);
@@ -91,6 +93,7 @@ it("reports an unborn branch and missing hooks without treating them as inspecti
   expect(result.status, result.stderr).toBe(0);
   expect(result.stdout).toContain("main");
   expect(result.stdout).toContain("none (no commits yet)");
+  expect(result.stdout).toMatch(/Staged[^\n]*\nnone\nUnstaged[^\n]*\nnone\n/);
   expect(result.stdout).toContain("pre-commit: absent");
 });
 
@@ -109,7 +112,7 @@ it("finds configuration-registered hooks even when the hook directory is disable
   git("config", "hook.candidate-check.command", "touch private-command-marker");
   const result = inspect();
   expect(result.status, result.stderr).toBe(0);
-  expect(result.stdout).toContain("candidate-check");
+  expect(result.stdout).toMatch(/^pre-commit: .*candidate-check$/m);
   expect(result.stdout).not.toContain("pre-commit: absent");
   expect(result.stdout).not.toContain("private-command-marker");
   expect(existsSync(join(cwd, "private-command-marker"))).toBe(false);

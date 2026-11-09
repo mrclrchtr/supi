@@ -7,6 +7,16 @@ if [ "$#" -ne 0 ]; then
   printf 'Usage: sh %s (run inside the target working tree)\n' "$0" >&2
   exit 2
 fi
+# Print added/deleted/path line counts for one diff, capped at 20 files.
+line_counts() {
+  counts=$(git -c core.fsmonitor=false --no-pager diff "$@" --numstat --no-color --no-ext-diff --no-textconv)
+  if [ -z "$counts" ]; then
+    printf 'none\n'
+    return
+  fi
+  printf '%s\n' "$counts" | awk 'NR <= 20 { print } END { if (NR > 20) printf "... %d more files\n", NR - 20 }'
+}
+
 root=$(git rev-parse --show-toplevel)
 cd "$root"
 
@@ -24,8 +34,13 @@ for marker in MERGE_HEAD CHERRY_PICK_HEAD REVERT_HEAD rebase-merge rebase-apply 
 done
 if [ "$operation" = false ]; then printf 'none\n'; fi
 
-printf '\n== Staged summary (not a patch audit) ==\n'
-git -c core.fsmonitor=false --no-pager diff --cached --stat --no-color --no-ext-diff --no-textconv
+# Unstaged counts expose unrelated work in files that also hold task changes.
+printf '\n== Line counts: added deleted path (first 20 files) ==\n'
+printf 'Staged (not a patch audit):\n'
+line_counts --cached
+
+printf 'Unstaged (tracked files):\n'
+line_counts
 
 printf '\n== Recent subjects ==\n'
 if git rev-parse --verify -q HEAD >/dev/null; then
@@ -41,7 +56,7 @@ listing=true
 for event in pre-commit prepare-commit-msg commit-msg post-commit; do
   if [ "$listing" = true ]; then
     if hooks=$(git hook list --show-scope "$event" 2>&1); then
-      printf '%s:\n%s\n' "$event" "$hooks"
+      printf '%s: %s\n' "$event" "$(printf '%s\n' "$hooks" | tr '\t' ' ' | awk 'NR > 1 { printf "; " } { printf "%s", $0 }')"
       continue
     else
       code=$?
