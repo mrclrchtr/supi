@@ -124,13 +124,18 @@ function appendGroupedRows(lines: string[], targets: readonly OutlineRowTarget[]
 
 /** One compact row; evidence notes appear only when they differ from the usual case. */
 function outlineRow(target: OutlineRowTarget, depth: number): string {
-  const displayKind = target.nativeKind ?? target.kind;
+  const displayKind = outlineKind(target.nativeKind ?? target.kind);
   const kind = displayKind ? `${displayKind} ` : "";
   const container = depth === 0 && target.container ? ` in \`${target.container}\`` : "";
   const indent = "  ".repeat(depth);
   const suffix = target.provenance.includes("semantic") ? "" : " (syntax parser only)";
   const name = (target.name ?? "anonymous").replace(/\s+/g, " ");
   return `${indent}- \`${target.targetId}\` ${kind}\`${name}\`${container} — L${target.displayLine}:${target.displayCharacter}${suffix}`;
+}
+
+/** Lower-case words for both providers' kinds, e.g. `EnumMember` -> `enum member`. */
+function outlineKind(kind: string | null | undefined): string {
+  return (kind ?? "").replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase();
 }
 
 function appendNotListed(lines: string[], details: ResolveDetails): void {
@@ -153,7 +158,7 @@ function appendNotListed(lines: string[], details: ResolveDetails): void {
       : []),
     ...(notListed.exportListNames
       ? [
-          `- ${plural(notListed.exportListNames.count, "name")} in export lists (${span(notListed.exportListNames)}). Read those lines, or list them with code_find mode "ast", kind "export", and scope set to this file.`,
+          `- ${plural(notListed.exportListNames.count, "name")} in export lists (${span(notListed.exportListNames)}). Read those lines, or find them with code_find mode "ast", kind "export", a name fragment as query, and scope set to this file.`,
         ]
       : []),
     ...(notListed.localDeclarations > 0

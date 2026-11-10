@@ -307,8 +307,9 @@ describe("canonical Tool result assembly", () => {
             row("run", "Function", 9, null),
             row("size", "Property", 2, "Box"),
             row("hidden", "Method", 12, "NotShown"),
+            row("ON", "EnumMember", 14, null),
           ],
-          totalCount: 4,
+          totalCount: 5,
           omittedCount: 0,
           unknownLevelCount: 0,
           notListed: {
@@ -324,10 +325,11 @@ describe("canonical Tool result assembly", () => {
 
     expect(markdown).toContain(
       [
-        "- `tg-Box` Class `Box` — L1:1",
-        "  - `tg-size` Property `size` — L2:1",
-        "- `tg-run` Function `run` — L9:1",
-        "- `tg-hidden` Method `hidden` in `NotShown` — L12:1",
+        "- `tg-Box` class `Box` — L1:1",
+        "  - `tg-size` property `size` — L2:1",
+        "- `tg-run` function `run` — L9:1",
+        "- `tg-hidden` method `hidden` in `NotShown` — L12:1",
+        "- `tg-ON` enum member `ON` — L14:1",
       ].join("\n"),
     );
   });

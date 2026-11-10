@@ -86,6 +86,39 @@ describe("file outline omissions", () => {
     }
   });
 
+  it("counts `export *` statements, which have no outline row", async () => {
+    // A barrel module: the syntax parser lists no rows, so without counting
+    // the statements the outline would look like an empty file.
+    writeFileSync(
+      file,
+      'export * from "./a.ts";\nexport * as ns from "./b.ts";\nexport { c } from "./c.ts";\n',
+    );
+    const semantic = {
+      documentSymbols: async () => completedCodeQuery([]),
+      workspaceSymbols: async () => completedCodeQuery([]),
+      references: async () => completedCodeQuery([]),
+      implementation: async () => completedCodeQuery([]),
+    };
+    const treeSitter = createTreeSitterSession(cwd);
+    try {
+      const outcome = await resolveFileOutline(file, cwd, {
+        semantic,
+        structural: createTreeSitterProvider(treeSitter),
+      });
+
+      expect(outcome.kind).toBe("resolved");
+      if (outcome.kind !== "resolved") return;
+      expect(outcome.outline.targets).toEqual([]);
+      expect(outcome.outline.notListed.reExportStatements).toEqual({
+        count: 3,
+        startLine: 1,
+        endLine: 3,
+      });
+    } finally {
+      await treeSitter.dispose();
+    }
+  });
+
   it("keeps language-server names listed when the syntax parser is unavailable", async () => {
     const semantic = {
       documentSymbols: async () =>

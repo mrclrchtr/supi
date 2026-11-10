@@ -22,17 +22,11 @@ import {
 import type { AnchorKind } from "../../session/target-store.ts";
 import { normalizePath } from "../search/paths.ts";
 import { mergeDiscoveryPartial, type TargetDiscoveryResult } from "./discovery.ts";
+import { mergeDiscoveries } from "./file-merge.ts";
 import { collectBindingRanges, partitionOutline } from "./file-outline-omissions.ts";
-import {
-  reconcileContainer,
-  reconcileLevel,
-  refineLatexSectionNameAnchor,
-} from "./file-refinement.ts";
 import {
   canonicalDeclarationKind,
   canonicalFileDeclarationKind,
-  canonicalFileDeclarationName,
-  declarationOccurrencesFor,
   refineTypeAliasIdentity,
 } from "./identity.ts";
 import type { FileOutlineData, ResolvedTargetData } from "./types.ts";
@@ -284,127 +278,4 @@ function flattenOutline(
     const childParent = { name: item.name, kind: item.kind, level };
     return [target, ...flattenOutline(file, item.children ?? [], childParent)];
   });
-}
-
-/**
- * Merge duplicate provider observations without collapsing repeated declarations.
- * Semantic facts win a matched pair while retaining both provider sources.
- */
-function mergeDiscoveries(
-  structural: readonly DiscoveredTargetData[],
-  semantic: readonly DiscoveredTargetData[],
-): DiscoveredTargetData[] {
-  const unmatchedSemantic = new Set(semantic.map((_target, index) => index));
-  const mergedStructural = structural.flatMap((structuralTarget) => {
-    const semanticIndex = findSemanticMatch(structuralTarget, semantic, unmatchedSemantic);
-    if (semanticIndex === null) return [structuralTarget];
-    unmatchedSemantic.delete(semanticIndex);
-    const semanticTarget = semantic[semanticIndex];
-    const refinedSemantic = refineLatexSectionNameAnchor(semanticTarget, structuralTarget);
-    return [
-      {
-        ...refinedSemantic,
-        provenance: ["semantic", "structural"] as const,
-        nativeKind: structuralTarget.nativeKind ?? semanticTarget.nativeKind,
-        container: reconcileContainer(semanticTarget, structuralTarget),
-        level: reconcileLevel(semanticTarget.level, structuralTarget.level),
-      },
-    ];
-  });
-  const semanticOnly = semantic.filter((_target, index) => unmatchedSemantic.has(index));
-  const sourceOrdered = [...mergedStructural, ...semanticOnly].sort(compareDeclarations);
-  const identified = assignDeclarationOccurrences(sourceOrdered);
-  return identified.sort(compareFileOrientationDeclarations);
-}
-
-function findSemanticMatch(
-  structural: DiscoveredTargetData,
-  semantic: readonly DiscoveredTargetData[],
-  unmatched: ReadonlySet<number>,
-): number | null {
-  const matches = semantic
-    .map((target, index) => ({ target, index }))
-    .filter(({ target, index }) => unmatched.has(index) && sameDeclaration(target, structural))
-    .sort(
-      (left, right) =>
-        Math.abs(left.target.declarationAnchor.character - structural.declarationAnchor.character) -
-          Math.abs(
-            right.target.declarationAnchor.character - structural.declarationAnchor.character,
-          ) ||
-        left.target.declarationAnchor.character - right.target.declarationAnchor.character ||
-        compareDeclarations(left.target, right.target) ||
-        (left.target.container ?? "").localeCompare(right.target.container ?? "") ||
-        left.target.level.localeCompare(right.target.level) ||
-        left.index - right.index,
-    );
-  return matches[0]?.index ?? null;
-}
-
-function sameDeclaration(left: DiscoveredTargetData, right: DiscoveredTargetData): boolean {
-  return (
-    canonicalFileDeclarationName(left.file, left.kind, left.name) ===
-      canonicalFileDeclarationName(right.file, right.kind, right.name) &&
-    compatibleContainerEvidence(left, right) &&
-    left.declarationAnchor.line === right.declarationAnchor.line &&
-    declarationIdentityKind(left) === declarationIdentityKind(right)
-  );
-}
-
-/** Container conflicts match only when both providers report the exact declaration anchor. */
-function compatibleContainerEvidence(
-  left: DiscoveredTargetData,
-  right: DiscoveredTargetData,
-): boolean {
-  return (
-    left.container === right.container ||
-    left.declarationAnchor.character === right.declarationAnchor.character
-  );
-}
-
-function assignDeclarationOccurrences(
-  targets: readonly DiscoveredTargetData[],
-): DiscoveredTargetData[] {
-  const candidates = targets.map((target) => ({
-    name: target.name,
-    identityKind: declarationIdentityKind(target),
-    declarationAnchor: target.declarationAnchor,
-    nameAnchor: { line: target.displayLine, character: target.displayCharacter },
-    container: target.container,
-  }));
-  const occurrences = declarationOccurrencesFor(candidates);
-  return targets.map((target, index) => {
-    const declarationOccurrence = occurrences[index];
-    if (declarationOccurrence === undefined) {
-      throw new Error("The declaration occurrence was not assigned.");
-    }
-    return { ...target, declarationOccurrence };
-  });
-}
-
-function declarationIdentityKind(target: ResolvedTargetData): string {
-  return (
-    target.identityKind ??
-    canonicalFileDeclarationKind(target.file, target.kind, target.name) ??
-    canonicalDeclarationKind(target.kind)
-  );
-}
-
-function compareFileOrientationDeclarations(
-  left: DiscoveredTargetData,
-  right: DiscoveredTargetData,
-): number {
-  return topLevelRank(left) - topLevelRank(right) || compareDeclarations(left, right);
-}
-
-function topLevelRank(target: DiscoveredTargetData): number {
-  return target.level === "top-level" ? 0 : 1;
-}
-
-function compareDeclarations(left: ResolvedTargetData, right: ResolvedTargetData): number {
-  return (
-    left.displayLine - right.displayLine ||
-    left.displayCharacter - right.displayCharacter ||
-    (left.name ?? "").localeCompare(right.name ?? "") ||
-    (left.kind ?? "").localeCompare(right.kind ?? "")
-  );
 }
