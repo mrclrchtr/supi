@@ -8,7 +8,7 @@ import {
   WEB_TOOL_SPECS,
 } from "../../src/tool/tool-specs.ts";
 
-const MODEL_SURFACE_CHAR_BUDGET = 950;
+const MODEL_SURFACE_CHAR_BUDGET = 1100;
 
 describe("web tool guidance", () => {
   const surfaces = WEB_TOOL_SPECS.map((spec) => ({
@@ -50,6 +50,18 @@ describe("web tool guidance", () => {
       properties?: { library_id?: { description?: string } };
     };
     expect(schema.properties?.library_id?.description).not.toMatch(/search first/i);
+  });
+
+  it("routes library documentation toward Context7 without forbidding web_search", () => {
+    const docsSearch = surfaces.find(({ spec }) => spec.name === "web_docs_search");
+    const webSearch = surfaces.find(({ spec }) => spec.name === "web_search");
+
+    // web_search is optional (bx), so the always-registered docs tools must not depend on it.
+    expect(docsSearch?.surface.promptGuidelines.join(" ")).toMatch(/library/i);
+    expect(
+      [docsSearch?.surface.description, ...(docsSearch?.surface.promptGuidelines ?? [])].join(" "),
+    ).not.toContain("web_search");
+    expect(webSearch?.surface.promptGuidelines.join(" ")).toContain("web_docs_search");
   });
 
   it("accepts only supported fetch timeout values", () => {

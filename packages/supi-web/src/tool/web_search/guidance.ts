@@ -3,4 +3,6 @@ export const toolDescription =
 
 export const promptSnippet = "search public web sources";
 
-export const promptGuidelines = ["Use web_search when current or external web sources are needed."];
+export const promptGuidelines = [
+  "Use web_search for current or external sources like issues, release notes, or news; for library docs, web_docs_search is usually more focused.",
+];
