@@ -43,6 +43,12 @@ export interface BenchScenario {
    * questions). Scored as path recall; precision is not meaningful for maps.
    */
   readonly truthPaths?: readonly string[];
+  /**
+   * The question needs the code at each reported location (e.g. how a symbol
+   * is used), not just positions: also measure the cost of reading every
+   * reported location whose source text the arm has not shown.
+   */
+  readonly viewSource?: boolean;
 }
 
 const CI = "packages/supi-code-intelligence";
@@ -196,6 +202,7 @@ export const scenarios: readonly BenchScenario[] = [
   },
   {
     id: "refs-unique-all",
+    viewSource: true,
     question: "Where is toWorkflowControl used? (all sites requested)",
     native: [grep("\\btoWorkflowControl\\b")],
     code: [{ tool: "code_graph", args: { target: workflowControl, maxResults: 50 } }],
@@ -204,6 +211,7 @@ export const scenarios: readonly BenchScenario[] = [
   },
   {
     id: "refs-ambiguous",
+    viewSource: true,
     question: "Who uses the exported resultData() from orientation/context-sections.ts?",
     native: [grep("\\bresultData\\b")],
     code: [
@@ -274,6 +282,7 @@ export const scenarios: readonly BenchScenario[] = [
   },
   {
     id: "find-calls",
+    viewSource: true,
     question: "Where is selectDirectoryNavigation called?",
     // biome-ignore lint/security/noSecrets: regex pattern
     native: [grep("selectDirectoryNavigation\\(", `${CI}/src`)],
@@ -354,6 +363,7 @@ export const scenarios: readonly BenchScenario[] = [
   },
   {
     id: "implementations",
+    viewSource: true,
     question: "Which objects implement SettingsModule?",
     // biome-ignore lint/security/noSecrets: regex pattern
     native: [grep(":\\s*SettingsModule\\b")],
@@ -380,6 +390,7 @@ export const scenarios: readonly BenchScenario[] = [
   },
   {
     id: "method-callers",
+    viewSource: true,
     question: "Who calls WorkspaceCodeIntelligenceSession.resolve()?",
     // A competent agent greps the receiver naming convention, not bare `.resolve(`.
     native: [grep("session\\.resolve\\(", CI)],
@@ -400,6 +411,7 @@ export const scenarios: readonly BenchScenario[] = [
   },
   {
     id: "constant-with-docs",
+    viewSource: true,
     // Expected loss for code_*: semantic references cover code, not Markdown.
     question: "Where is DEFAULT_WORKFLOW_DEADLINE_MS used or documented?",
     native: [grep("\\bDEFAULT_WORKFLOW_DEADLINE_MS\\b", CI)],
@@ -419,6 +431,7 @@ export const scenarios: readonly BenchScenario[] = [
   },
   {
     id: "calls-across-packages",
+    viewSource: true,
     question: "Where is registerSettings called across packages?",
     native: [grep("\\bregisterSettings\\(")],
     code: [

@@ -35,7 +35,12 @@ interface ArmMetrics {
    * Metrics after re-running a truncated last call with the limit its output
    * names, as an agent would to get every result. Absent when nothing was cut.
    */
-  complete?: Omit<ArmMetrics, "complete">;
+  complete?: Omit<ArmMetrics, "complete" | "viewed">;
+  /**
+   * Cost after also reading the source line of every reported location whose
+   * text the arm has not shown yet. Only for `viewSource` scenarios.
+   */
+  viewed?: { calls: number; tokens: number };
 }
 interface ScenarioMetrics {
   native: ArmMetrics;
@@ -55,6 +60,8 @@ const dump = process.argv.includes("--dump");
 const check = process.argv.includes("--check");
 /** Upper bound on follow-up calls that lift a disclosed truncation. */
 const MAX_EXPANSIONS = 3;
+/** Lines of context an agent reads around each location it has not seen yet. */
+const VIEW_CONTEXT = 2;
 
 /** Same heuristic PI uses for context estimation. */
 const estimateTokens = (text: string) => Math.ceil(text.length / 4);
@@ -134,12 +141,14 @@ process.exit(exitCode);
  * What an arm surfaced. `found` are reported answer locations (wrong ones
  * lower precision); `seen` are lines of read windows, which count only when
  * they hit the truth, because unrelated window lines are already paid for in
- * tokens; `paths` are named expected files.
+ * tokens; `paths` are named expected files; `shown` are locations whose
+ * source text was displayed (grep match lines and read windows).
  */
 interface Evidence {
   found: Set<string>;
   seen: Set<string>;
   paths: Set<string>;
+  shown: Set<string>;
 }
 
 async function runArm(
@@ -149,7 +158,12 @@ async function runArm(
   cwd: string,
 ): Promise<{ metrics: ArmMetrics; outputs: string[]; ms: number }> {
   const outputs: string[] = [];
-  const evidence: Evidence = { found: new Set(), seen: new Set(), paths: new Set() };
+  const evidence: Evidence = {
+    found: new Set(),
+    seen: new Set(),
+    paths: new Set(),
+    shown: new Set(),
+  };
   let tokens = 0;
   const started = performance.now();
   let calls = 0;
@@ -167,24 +181,47 @@ async function runArm(
     if (call) await run(call);
   }
   const metrics = score(scenario, { calls, tokens }, evidence);
-  let next = last && expansion(last, outputs.at(-1) ?? "");
-  if (next) {
-    for (let round = 0; next && round < MAX_EXPANSIONS; round++) {
-      await run(next);
-      next = expansion(next, outputs.at(-1) ?? "");
-    }
+  if (last && (await expandTruncation(run, last, outputs))) {
     metrics.complete = score(scenario, { calls, tokens }, evidence);
   }
-  const ms = Math.round(performance.now() - started);
-  if ((metrics.complete ?? metrics).recall === 0) {
-    // Every scenario has a non-empty answer: zero hits means the extractors no
-    // longer understand the output format, not that the tool got worse.
-    throw new Error(
-      `${scenario.id}: no expected location or path recognized; update extractors.\n` +
-        `Last output:\n${(outputs.at(-1) ?? "").slice(0, 1500)}`,
-    );
+  if (scenario.viewSource) {
+    for (const call of viewCalls(evidence)) await run(call);
+    metrics.viewed = { calls, tokens };
   }
+  const ms = Math.round(performance.now() - started);
+  assertRecognized(scenario, metrics, outputs);
   return { metrics, outputs, ms };
+}
+
+/** Re-run a disclosed truncation up to `MAX_EXPANSIONS` times; true when anything ran. */
+async function expandTruncation(
+  run: (call: BenchCall) => Promise<void>,
+  last: BenchCall,
+  outputs: readonly string[],
+): Promise<boolean> {
+  let next = expansion(last, outputs.at(-1) ?? "");
+  if (!next) return false;
+  for (let round = 0; next && round < MAX_EXPANSIONS; round++) {
+    await run(next);
+    next = expansion(next, outputs.at(-1) ?? "");
+  }
+  return true;
+}
+
+/**
+ * Every scenario has a non-empty answer: zero hits means the extractors no
+ * longer understand the output format, not that the tool got worse.
+ */
+function assertRecognized(
+  scenario: BenchScenario,
+  metrics: ArmMetrics,
+  outputs: readonly string[],
+): void {
+  if ((metrics.complete ?? metrics).recall !== 0) return;
+  throw new Error(
+    `${scenario.id}: no expected location or path recognized; update extractors.\n` +
+      `Last output:\n${(outputs.at(-1) ?? "").slice(0, 1500)}`,
+  );
 }
 
 /**
@@ -211,6 +248,36 @@ function expansion(call: BenchCall, output: string): BenchCall | null {
   return total ? { ...call, args: { ...call.args, maxResults: total } } : null;
 }
 
+/**
+ * Reads that display every reported location not yet shown: windows of
+ * `VIEW_CONTEXT` lines around each, merged per file when they touch. Wrong
+ * locations are read too; the agent cannot tell them apart beforehand.
+ */
+function viewCalls({ found, shown }: Evidence): BenchCall[] {
+  const byFile = new Map<string, number[]>();
+  for (const location of found) {
+    if (shown.has(location)) continue;
+    const cut = location.lastIndexOf(":");
+    const path = location.slice(0, cut);
+    byFile.set(path, [...(byFile.get(path) ?? []), Number(location.slice(cut + 1))]);
+  }
+  const calls: BenchCall[] = [];
+  for (const [path, lines] of [...byFile].sort(([a], [b]) => a.localeCompare(b))) {
+    const windows: [number, number][] = [];
+    for (const line of lines.sort((a, b) => a - b)) {
+      const start = Math.max(1, line - VIEW_CONTEXT);
+      const end = line + VIEW_CONTEXT;
+      const previous = windows.at(-1);
+      if (previous && start <= previous[1] + 1) previous[1] = end;
+      else windows.push([start, end]);
+    }
+    for (const [start, end] of windows) {
+      calls.push({ tool: "read", args: { path, offset: start, limit: end - start + 1 } });
+    }
+  }
+  return calls;
+}
+
 function collectEvidence(
   evidence: Evidence,
   { call, output }: { call: BenchCall; output: string },
@@ -218,13 +285,25 @@ function collectEvidence(
   cwd: string,
 ): void {
   if (call.tool === "read") {
-    for (const line of readWindow(call, output, cwd)) evidence.seen.add(line);
-  } else if (!call.locate) {
-    const base = call.tool === "grep" ? grepBase(cwd, String(call.args.path ?? ".")) : cwd;
-    for (const location of locations(output, base, cwd)) evidence.found.add(location);
+    for (const line of readWindow(call, output, cwd)) {
+      evidence.seen.add(line);
+      evidence.shown.add(line);
+    }
+  } else {
+    collectLocations(evidence, call, output, cwd);
   }
   for (const path of namedPaths(call, output, scenario.truthPaths ?? [], cwd)) {
     evidence.paths.add(path);
+  }
+}
+
+function collectLocations(evidence: Evidence, call: BenchCall, output: string, cwd: string): void {
+  const isGrep = call.tool === "grep";
+  const base = isGrep ? grepBase(cwd, String(call.args.path ?? ".")) : cwd;
+  for (const location of locations(output, base, cwd)) {
+    // grep match lines carry their source text; code_* rows name positions only.
+    if (isGrep) evidence.shown.add(location);
+    if (!call.locate) evidence.found.add(location);
   }
 }
 
@@ -469,6 +548,7 @@ function printReport(
         "tok/hit n/c": `${native.tokensPerHit ?? "–"}/${code.tokensPerHit ?? "–"}${diff(code.tokensPerHit, before?.tokensPerHit)}`,
         "full tok n/c": fullCell(native, code, (m) => m.tokens),
         "full recall n/c": fullCell(native, code, (m) => m.recall, pct),
+        "viewed tok n/c": native.viewed ? `${native.viewed.tokens}/${code.viewed?.tokens}` : "",
         "ms n/c": latency[id],
       };
     }),
@@ -498,18 +578,29 @@ function fullCell(
  * in later requests.
  */
 function printBalance(current: Baseline): void {
+  printBalanceLine(current, "Complete answers", (m) => (m.complete ?? m).tokens);
+  printBalanceLine(
+    current,
+    "Complete answers with viewed sources",
+    (m) => m.viewed?.tokens ?? (m.complete ?? m).tokens,
+  );
+}
+
+function printBalanceLine(
+  current: Baseline,
+  label: string,
+  tokensOf: (metrics: ArmMetrics) => number,
+): void {
   const arms = Object.values(current.scenarios);
-  const total = (pick: (s: ScenarioMetrics) => ArmMetrics) =>
-    arms.reduce((sum, s) => sum + (pick(s).complete ?? pick(s)).tokens, 0);
-  const native = total((s) => s.native);
-  const code = total((s) => s.code);
+  const native = arms.reduce((sum, s) => sum + tokensOf(s.native), 0);
+  const code = arms.reduce((sum, s) => sum + tokensOf(s.code), 0);
   const savedPerQuestion = (native - code) / arms.length;
   const breakEven =
     savedPerQuestion > 0
       ? `one request's tool surface equals the savings of ~${(current.codeToolSurfaceTokens / savedPerQuestion).toFixed(1)} questions`
       : "no savings to offset the tool surface";
   console.log(
-    `Complete answers, ${arms.length} questions: native ${native} / code ${code} tokens ` +
+    `${label}, ${arms.length} questions: native ${native} / code ${code} tokens ` +
       `(${Math.round(savedPerQuestion)} saved per question; ${breakEven}).`,
   );
 }

@@ -32,14 +32,22 @@
         "tokens": 853,
         "precision": 0.913,
         "recall": 1,
-        "tokensPerHit": 41
+        "tokensPerHit": 41,
+        "viewed": {
+          "calls": 1,
+          "tokens": 853
+        }
       },
       "code": {
         "calls": 1,
         "tokens": 350,
         "precision": 1,
         "recall": 1,
-        "tokensPerHit": 17
+        "tokensPerHit": 17,
+        "viewed": {
+          "calls": 22,
+          "tokens": 2467
+        }
       }
     },
     "refs-ambiguous": {
@@ -48,14 +56,22 @@
         "tokens": 896,
         "precision": 0.222,
         "recall": 1,
-        "tokensPerHit": 149
+        "tokensPerHit": 149,
+        "viewed": {
+          "calls": 1,
+          "tokens": 896
+        }
       },
       "code": {
         "calls": 1,
         "tokens": 224,
         "precision": 1,
         "recall": 1,
-        "tokensPerHit": 37
+        "tokensPerHit": 37,
+        "viewed": {
+          "calls": 7,
+          "tokens": 680
+        }
       }
     },
     "refs-ambiguous-unscoped": {
@@ -135,14 +151,22 @@
         "tokens": 158,
         "precision": 0.75,
         "recall": 1,
-        "tokensPerHit": 53
+        "tokensPerHit": 53,
+        "viewed": {
+          "calls": 1,
+          "tokens": 158
+        }
       },
       "code": {
         "calls": 1,
         "tokens": 170,
         "precision": 1,
         "recall": 1,
-        "tokensPerHit": 57
+        "tokensPerHit": 57,
+        "viewed": {
+          "calls": 3,
+          "tokens": 425
+        }
       }
     },
     "find-imports": {
@@ -209,7 +233,11 @@
         "tokens": 1171,
         "precision": 0.182,
         "recall": 0.727,
-        "tokensPerHit": 146
+        "tokensPerHit": 146,
+        "viewed": {
+          "calls": 1,
+          "tokens": 1171
+        }
       },
       "code": {
         "calls": 2,
@@ -223,6 +251,10 @@
           "precision": 0.818,
           "recall": 0.727,
           "tokensPerHit": 76
+        },
+        "viewed": {
+          "calls": 13,
+          "tokens": 1340
         }
       }
     },
@@ -232,7 +264,11 @@
         "tokens": 394,
         "precision": 1,
         "recall": 1,
-        "tokensPerHit": 33
+        "tokensPerHit": 33,
+        "viewed": {
+          "calls": 1,
+          "tokens": 394
+        }
       },
       "code": {
         "calls": 2,
@@ -246,6 +282,10 @@
           "precision": 0.923,
           "recall": 1,
           "tokensPerHit": 59
+        },
+        "viewed": {
+          "calls": 14,
+          "tokens": 1919
         }
       }
     },
@@ -255,14 +295,22 @@
         "tokens": 211,
         "precision": 0.8,
         "recall": 1,
-        "tokensPerHit": 53
+        "tokensPerHit": 53,
+        "viewed": {
+          "calls": 1,
+          "tokens": 211
+        }
       },
       "code": {
         "calls": 1,
         "tokens": 149,
         "precision": 1,
         "recall": 0.75,
-        "tokensPerHit": 50
+        "tokensPerHit": 50,
+        "viewed": {
+          "calls": 4,
+          "tokens": 486
+        }
       }
     },
     "calls-across-packages": {
@@ -271,7 +319,11 @@
         "tokens": 465,
         "precision": 0.818,
         "recall": 1,
-        "tokensPerHit": 26
+        "tokensPerHit": 26,
+        "viewed": {
+          "calls": 1,
+          "tokens": 465
+        }
       },
       "code": {
         "calls": 1,
@@ -285,6 +337,10 @@
           "precision": 0.9,
           "recall": 1,
           "tokensPerHit": 78
+        },
+        "viewed": {
+          "calls": 22,
+          "tokens": 2880
         }
       }
     }
