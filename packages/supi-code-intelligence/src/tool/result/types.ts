@@ -9,6 +9,7 @@ import type {
   StructuredMatch,
   StructuredScanSummary,
 } from "../../analysis/search/pattern.ts";
+import type { FileOutlineNotListed } from "../../analysis/target/types.ts";
 import type {
   HealthDiagnosticObservation,
   HealthRefreshState,
@@ -137,6 +138,8 @@ export interface ResolveDetails {
   /** Provider recovery that makes this File outline incomplete. */
   outlinePartialReason?: string | null;
   outlineErrorRanges?: readonly SourceRange[];
+  /** Discovered declarations left out of the File outline, with exact counts. */
+  outlineNotListed?: FileOutlineNotListed;
   /** Strict provider kind that produced a near-match result. */
   requestedKind?: TargetSymbolKind;
   confidence: ConfidenceMode;

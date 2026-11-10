@@ -101,8 +101,32 @@ export interface ResolvedTargetData {
   resolution?: import("../../types/index.ts").AnchoredResolutionMetadata;
 }
 
+/** Names left out of a File outline that sit on a contiguous span of lines. */
+export interface FileOutlineNameSpan {
+  readonly count: number;
+  /** 1-based first and last line holding such a name. */
+  readonly startLine: number;
+  readonly endLine: number;
+}
+
 /**
- * The File outline of one file: zero or more evidence-backed declarations.
+ * Declarations discovered in a file but left out of its File outline, counted
+ * so an agent can request them explicitly.
+ */
+export interface FileOutlineNotListed {
+  /** Names bound by import statements; the file does not declare them. */
+  readonly importedNames: FileOutlineNameSpan | null;
+  /** Names inside `export { … }` lists, including re-exports `export { … } from`. */
+  readonly exportListNames: FileOutlineNameSpan | null;
+  /** `export … from` statements; they only forward names declared in other modules. */
+  readonly reExportStatements: FileOutlineNameSpan | null;
+  /** Declarations inside function, method, or constructor bodies. */
+  readonly localDeclarations: number;
+}
+
+/**
+ * The File outline of one file: its top-level declarations and members,
+ * without imported names, export-list names, and local declarations.
  */
 export interface FileOutlineData {
   file: string;
@@ -116,6 +140,8 @@ export interface FileOutlineData {
   unknownLevelCount: number;
   /** Partial provider collection; targets remain usable and exact absence is not claimed. */
   partial?: { reason: string; errorRanges: readonly SourceRange[] };
+  /** Discovered declarations left out of `targets`, with exact counts. */
+  notListed: FileOutlineNotListed;
 }
 
 /**

@@ -64,6 +64,11 @@ const WORKFLOW_CONTROL_SITES = [
 ];
 const workflowControl = { symbol: { query: "toWorkflowControl" } };
 
+// biome-ignore lint/security/noSecrets: regex pattern
+const SESSION_DECLARATIONS = "^(export )?(async )?(function|class|interface|type|const|enum) ";
+/** The class and two module functions; re-export statements forward other modules' names. */
+const SESSION_TOP_LEVEL = [140, 484, 492].map((line) => `${CI}/src/session/session.ts:${line}`);
+
 export const scenarios: readonly BenchScenario[] = [
   {
     id: "refs-unique-default",
@@ -114,21 +119,23 @@ export const scenarios: readonly BenchScenario[] = [
     truth: [`${CI}/src/app/app.ts:57`],
   },
   {
+    id: "file-outline-default",
+    question: "Which top-level declarations does session.ts contain? (default output bounds)",
+    native: [grep(SESSION_DECLARATIONS, `${CI}/src/session/session.ts`)],
+    code: [{ tool: "code_resolve", args: { target: { file: `${CI}/src/session/session.ts` } } }],
+    truth: SESSION_TOP_LEVEL,
+  },
+  {
     id: "file-outline",
     question: "Which top-level declarations does session.ts contain?",
-    native: [
-      grep(
-        // biome-ignore lint/security/noSecrets: regex pattern
-        "^(export )?(async )?(function|class|interface|type|const|enum) ",
-        `${CI}/src/session/session.ts`,
-      ),
-    ],
+    native: [grep(SESSION_DECLARATIONS, `${CI}/src/session/session.ts`)],
     code: [
       {
         tool: "code_resolve",
         args: { target: { file: `${CI}/src/session/session.ts` }, maxResults: 50 },
       },
     ],
+    truth: SESSION_TOP_LEVEL,
   },
   {
     id: "callees",

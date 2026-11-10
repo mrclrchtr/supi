@@ -38,6 +38,12 @@ describe("code_resolve result rendering", () => {
         totalCount: 2,
         omittedCount: 1,
         unknownLevelCount: 1,
+        notListed: {
+          importedNames: null,
+          exportListNames: null,
+          reExportStatements: null,
+          localDeclarations: 0,
+        },
       },
       "/repo",
     );

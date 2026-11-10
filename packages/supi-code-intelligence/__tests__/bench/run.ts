@@ -7,8 +7,8 @@
  *   pnpm bench:code-intelligence --dump     # also write raw outputs to bench/out/
  */
 /* biome-ignore-all lint/suspicious/noConsole: CLI report output */
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join, relative, resolve } from "node:path";
+import { mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { dirname, join, relative, resolve } from "node:path";
 import { createGrepTool, createReadTool } from "@earendil-works/pi-coding-agent";
 import { createPiMock, getTool, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { registerCodeIntelligenceTools } from "../../src/tool/register.ts";
@@ -130,7 +130,7 @@ async function runArm(
     const output = await execute(call);
     outputs.push(output);
     tokens += estimateTokens(call.tool + JSON.stringify(call.args)) + estimateTokens(output);
-    const base = call.tool === "grep" ? resolve(cwd, String(call.args.path ?? ".")) : cwd;
+    const base = call.tool === "grep" ? grepBase(cwd, String(call.args.path ?? ".")) : cwd;
     for (const location of locations(output, base, cwd)) found.add(location);
   }
   const ms = Math.round(performance.now() - started);
@@ -146,12 +146,17 @@ async function runArm(
 
 /**
  * Extract answer locations as `path:line`. Handles grep (`path:12:`) and
- * code_* (`` `path`: L12:3, L40 `` / `` `path:12:3` ``). "Read Next" hints are
+ * code_* (`` `path`: L12:3, L40 `` / `` `path:12:3` `` / file outline rows
+ * `` — L12:3 `` under `` # File outline of `path` ``). "Read Next" hints are
  * navigation suggestions, not answers, and are excluded.
  */
 function locations(text: string, base: string, cwd: string): Set<string> {
   const out = new Set<string>();
   const answer = text.split("## Read Next")[0] ?? "";
+  const outlineFile = /^# File outline of `([^`]+)`/m.exec(answer)?.[1];
+  if (outlineFile) {
+    for (const m of answer.matchAll(/ — L(\d+):\d+/g)) out.add(`${outlineFile}:${m[1]}`);
+  }
   const norm = (path: string) => relative(cwd, resolve(base, path));
   for (const m of answer.matchAll(/^([\w./@-]+\.\w+):(\d+):/gm)) {
     out.add(`${norm(m[1] as string)}:${m[2]}`);
@@ -165,6 +170,12 @@ function locations(text: string, base: string, cwd: string): Set<string> {
     out.add(`${relative(cwd, resolve(cwd, m[1] as string))}:${m[2]}`);
   }
   return out;
+}
+
+/** grep prints paths relative to a searched directory, or the bare name for a searched file. */
+function grepBase(cwd: string, path: string): string {
+  const target = resolve(cwd, path);
+  return statSync(target).isFile() ? dirname(target) : target;
 }
 
 /** Per-request prompt cost of the registered code_* tool definitions. */

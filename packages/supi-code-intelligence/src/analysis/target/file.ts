@@ -22,6 +22,7 @@ import {
 import type { AnchorKind } from "../../session/target-store.ts";
 import { normalizePath } from "../search/paths.ts";
 import { mergeDiscoveryPartial, type TargetDiscoveryResult } from "./discovery.ts";
+import { collectBindingRanges, partitionOutline } from "./file-outline-omissions.ts";
 import {
   reconcileContainer,
   reconcileLevel,
@@ -68,6 +69,8 @@ type DiscoveryResult = TargetDiscoveryResult<DiscoveredTargetData>;
 export interface DiscoveredTargetData extends ResolvedTargetData {
   /** Provider-backed position in the file, used only for outline ranking. */
   readonly level: DeclarationLevel;
+  /** 1-based last line of a syntax-parser declaration, used to classify export statements. */
+  readonly endLine?: number;
 }
 
 /** Validated file-discovery input with its normalized absolute path. */
@@ -102,9 +105,10 @@ export async function resolveFileOutline(
   if (validation.kind === "invalid-input") return validation;
   const resolvedFile = validation.file;
 
-  const [semantic, structural] = await Promise.all([
+  const [semantic, structural, bindingRanges] = await Promise.all([
     discoverSemantic(resolvedFile, deps.semantic, deps.structural, control),
     discoverStructural(resolvedFile, deps.structural, control),
+    collectBindingRanges(resolvedFile, deps.structural, control),
   ]);
   if (!semantic.available && !structural.available) {
     const displayFile = path.relative(cwd, resolvedFile) || file;
@@ -114,7 +118,10 @@ export async function resolveFileOutline(
     };
   }
 
-  const targets = mergeDiscoveries(structural.targets, semantic.targets);
+  const { targets, notListed } = partitionOutline(
+    mergeDiscoveries(structural.targets, semantic.targets),
+    bindingRanges,
+  );
   const unknownLevelCount = targets.filter((target) => target.level === "unknown").length;
   const discoveryProvenance = [
     ...(semantic.available ? (["semantic"] as const) : []),
@@ -130,6 +137,7 @@ export async function resolveFileOutline(
       confidence: fileOutlineConfidence(targets, discoveryProvenance),
       unknownLevelCount,
       ...mergeDiscoveryPartial(semantic, structural),
+      notListed,
     },
   };
 }
@@ -259,6 +267,7 @@ function flattenOutline(
       displayLine: nameAnchor.line,
       displayCharacter: nameAnchor.character,
       declarationAnchor: { line: item.startLine, character: item.startCharacter },
+      endLine: item.endLine,
       declarationOccurrence: 0,
       name: item.name,
       kind: item.kind,

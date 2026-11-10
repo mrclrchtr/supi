@@ -59,14 +59,32 @@
         "recall": 1
       }
     },
-    "file-outline": {
+    "file-outline-default": {
       "native": {
         "calls": 1,
-        "tokens": 248
+        "tokens": 248,
+        "precision": 0.2,
+        "recall": 1
       },
       "code": {
         "calls": 1,
-        "tokens": 1690
+        "tokens": 417,
+        "precision": 0.3,
+        "recall": 1
+      }
+    },
+    "file-outline": {
+      "native": {
+        "calls": 1,
+        "tokens": 248,
+        "precision": 0.2,
+        "recall": 1
+      },
+      "code": {
+        "calls": 1,
+        "tokens": 1139,
+        "precision": 0.06,
+        "recall": 1
       }
     },
     "callees": {

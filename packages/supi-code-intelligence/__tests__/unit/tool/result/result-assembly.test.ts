@@ -278,6 +278,60 @@ describe("canonical Tool result assembly", () => {
     expect(assembly.details.nextQueries[0]).toContain("Retry without symbolKind");
   });
 
+  it("renders file outline members below their container without repeating it", () => {
+    const row = (name: string, kind: string, line: number, container: string | null) => ({
+      targetId: `tg-${name}`,
+      spanId: `sp-${name}`,
+      file: "/repo/src/a.ts",
+      position: { line: line - 1, character: 0 },
+      displayLine: line,
+      displayCharacter: 1,
+      name,
+      kind,
+      container,
+      confidence: "semantic" as const,
+      provenance: ["semantic"] as const,
+      anchorKind: "name" as const,
+      fileFingerprint: "fp",
+    });
+    const markdown = renderResolveResult(
+      assembleResolveResult(
+        {
+          kind: "file-outline",
+          file: "/repo/src/a.ts",
+          confidence: "semantic",
+          discoveryProvenance: ["semantic"],
+          // Top-level declarations first, then members, as discovery orders them.
+          targets: [
+            row("Box", "Class", 1, null),
+            row("run", "Function", 9, null),
+            row("size", "Property", 2, "Box"),
+            row("hidden", "Method", 12, "NotShown"),
+          ],
+          totalCount: 4,
+          omittedCount: 0,
+          unknownLevelCount: 0,
+          notListed: {
+            importedNames: null,
+            exportListNames: null,
+            reExportStatements: null,
+            localDeclarations: 0,
+          },
+        },
+        "/repo",
+      ),
+    );
+
+    expect(markdown).toContain(
+      [
+        "- `tg-Box` Class `Box` — L1:1",
+        "  - `tg-size` Property `size` — L2:1",
+        "- `tg-run` Function `run` — L9:1",
+        "- `tg-hidden` Method `hidden` in `NotShown` — L12:1",
+      ].join("\n"),
+    );
+  });
+
   it("assembles a bounded file outline without synthetic handles", () => {
     const makeTarget = (name: string, line: number) => ({
       targetId: `tg-${name}`,
@@ -305,6 +359,12 @@ describe("canonical Tool result assembly", () => {
         totalCount: 2,
         omittedCount: 1,
         unknownLevelCount: 1,
+        notListed: {
+          importedNames: { count: 3, startLine: 1, endLine: 2 },
+          exportListNames: null,
+          reExportStatements: null,
+          localDeclarations: 4,
+        },
         partial: {
           reason: "Tree-sitter recovered syntax.",
           errorRanges: [{ start: { line: 2, character: 0 }, end: { line: 2, character: 0 } }],
@@ -335,13 +395,17 @@ describe("canonical Tool result assembly", () => {
     });
     expect(markdown).toContain("File outline of `src/a.ts`");
     expect(markdown.match(/src\/a\.ts/g)).toHaveLength(1);
-    expect(markdown).toContain("`1:8`");
+    expect(markdown).toContain("record `one` — L1:8");
     expect(markdown).toContain(
       "Partial discovery: Tree-sitter recovered syntax. Error locations: L3:1.",
     );
     expect(markdown).toContain("tg-one");
-    expect(markdown).toContain("(`record`)");
-    expect(markdown).toContain("provenance: semantic+structural");
+    expect(markdown).toContain("- Sources: language server and syntax parser");
+    // Evidence notes appear only when they differ from the usual case.
+    expect(markdown).not.toContain("syntax parser only");
+    expect(markdown).toContain("3 imported names (L1–L2).");
+    expect(markdown).toContain("4 declarations inside function, method, or constructor bodies.");
+    expect(markdown).not.toContain("in export lists");
     expect(markdown).toContain("1 declaration has no enclosing declaration reported");
     expect(markdown).not.toContain("tg-two");
     expect(markdown).toContain("showing 1 of 2; 1 omitted");

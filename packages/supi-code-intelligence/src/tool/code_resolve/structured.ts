@@ -8,6 +8,11 @@ import {
 } from "../result/structured.ts";
 import type { ResolveDetails } from "../result/types.ts";
 
+const NameSpanSchema = Type.Object(
+  { count: Type.Integer(), startLine: Type.Integer(), endLine: Type.Integer() },
+  { additionalProperties: false },
+);
+
 /** Codemode contract for resolution, including candidate selection and invalid input. */
 export const ResolveOutputSchema = Type.Object(
   {
@@ -24,6 +29,17 @@ export const ResolveOutputSchema = Type.Object(
     file: Type.Optional(Type.String()),
     requestedKind: Type.Optional(Type.String()),
     unknownLevelCount: Type.Optional(Type.Integer()),
+    notListed: Type.Optional(
+      Type.Object(
+        {
+          importedNames: Type.Union([NameSpanSchema, Type.Null()]),
+          exportListNames: Type.Union([NameSpanSchema, Type.Null()]),
+          reExportStatements: Type.Union([NameSpanSchema, Type.Null()]),
+          localDeclarations: Type.Integer(),
+        },
+        { additionalProperties: false },
+      ),
+    ),
     discoveryProvenance: Type.Optional(
       Type.Array(Type.Enum(["semantic", "structural"], { type: "string" })),
     ),
@@ -82,6 +98,9 @@ export function structuredResolveResult(
     ...(data.message === undefined ? {} : { message: data.message }),
     ...(data.outlineFile === undefined ? {} : { file: data.outlineFile }),
     ...(data.requestedKind === undefined ? {} : { requestedKind: data.requestedKind }),
+    ...(data.outlineNotListed === undefined
+      ? {}
+      : { notListed: structuredNotListed(data.outlineNotListed) }),
     ...(data.outlineUnknownLevelCount === undefined
       ? {}
       : { unknownLevelCount: data.outlineUnknownLevelCount }),
@@ -99,5 +118,17 @@ export function structuredResolveResult(
             end: { ...range.end },
           })),
         }),
+  };
+}
+
+/** Copy outline omission counts into the codemode contract. */
+function structuredNotListed(notListed: NonNullable<ResolveDetails["outlineNotListed"]>) {
+  const span = (value: { count: number; startLine: number; endLine: number } | null) =>
+    value ? { ...value } : null;
+  return {
+    importedNames: span(notListed.importedNames),
+    exportListNames: span(notListed.exportListNames),
+    reExportStatements: span(notListed.reExportStatements),
+    localDeclarations: notListed.localDeclarations,
   };
 }

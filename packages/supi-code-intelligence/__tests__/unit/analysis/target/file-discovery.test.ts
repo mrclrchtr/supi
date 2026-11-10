@@ -140,7 +140,7 @@ describe("file outline discovery", () => {
     const semantic = semanticProvider([
       {
         name: "outer",
-        kind: "Function",
+        kind: "Class",
         file,
         declarationAnchor: { line: 1, character: 1 },
         nameAnchor: { line: 1, character: 10 },
@@ -149,7 +149,7 @@ describe("file outline discovery", () => {
       },
       {
         name: "nested",
-        kind: "Variable",
+        kind: "Property",
         file,
         declarationAnchor: { line: 1, character: 20 },
         nameAnchor: { line: 1, character: 26 },
@@ -160,7 +160,7 @@ describe("file outline discovery", () => {
     const structural = structuralProvider([
       {
         name: "outer",
-        kind: "function",
+        kind: "class",
         startLine: 1,
         startCharacter: 1,
         endLine: 1,
@@ -168,7 +168,7 @@ describe("file outline discovery", () => {
         children: [
           {
             name: "nested",
-            kind: "variable",
+            kind: "property",
             startLine: 1,
             startCharacter: 20,
             endLine: 1,
@@ -258,7 +258,7 @@ describe("file outline discovery", () => {
     expect(outcome.outline.targets.every((target) => target.provenance.length === 2)).toBe(true);
   });
 
-  it("separates class members from declarations inside function bodies", async () => {
+  it("lists class members but only counts declarations inside function bodies", async () => {
     // class Box { method() { const inner = 1; } }  function run() { const step = 2; }
     const symbol = (
       name: string,
@@ -322,13 +322,9 @@ describe("file outline discovery", () => {
           (target as unknown as { level: string }).level,
         ]),
       );
-      expect(levels).toEqual({
-        Box: "top-level",
-        run: "top-level",
-        method: "member",
-        inner: "local",
-        step: "local",
-      });
+      // Members stay listed with handles; the two locals are only counted.
+      expect(levels).toEqual({ Box: "top-level", run: "top-level", method: "member" });
+      expect(outcome.outline.notListed.localDeclarations).toBe(2);
     }
   });
 
@@ -336,12 +332,12 @@ describe("file outline discovery", () => {
     const semantic = semanticProvider([
       {
         name: "nestedEarly",
-        kind: "Variable",
+        kind: "Property",
         file,
         declarationAnchor: { line: 1, character: 1 },
         nameAnchor: { line: 1, character: 7 },
-        container: "outer",
-        level: "local",
+        container: "Outer",
+        level: "member",
       },
       {
         name: "unknownMiddle",

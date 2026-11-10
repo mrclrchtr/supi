@@ -67,6 +67,7 @@ export type TargetWorkflowOutcome =
       omittedCount: number;
       unknownLevelCount: number;
       partial?: FileOutlineData["partial"];
+      notListed: FileOutlineData["notListed"];
     }
   | ({
       kind: "disambiguation";
@@ -364,6 +365,7 @@ function registerFileOutline(
     omittedCount: totalCount - targets.length,
     unknownLevelCount: outline.unknownLevelCount,
     ...(outline.partial ? { partial: outline.partial } : {}),
+    notListed: outline.notListed,
   });
 }
 

@@ -151,6 +151,7 @@ function projectFileOutline(
       outlineUnknownLevelCount: outcome.unknownLevelCount,
       outlinePartialReason: outcome.partial?.reason ?? null,
       outlineErrorRanges: outcome.partial?.errorRanges,
+      outlineNotListed: outcome.notListed,
       confidence: outcome.confidence,
       targetCount: outcome.totalCount,
       omittedCount: evidence.metadata.omittedCount,

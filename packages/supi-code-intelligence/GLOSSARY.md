@@ -119,7 +119,7 @@ The monotonic set of provider families—semantic and structural—that establis
 _Avoid_: strongest source, symbol-query provenance, resolution reason
 
 **File outline**:
-The bounded list of declarations discovered in one file when a file, not a single symbol, was selected. Each listed declaration carries its own handle; the outline itself is not a Resolved target, and precise downstream work selects one declaration from it.
+The bounded list of a file's top-level declarations and members when a file, not a single symbol, was selected. Imported names, names in export lists, `export … from` statements, and local declarations are counted instead of listed. Each listed declaration carries its own handle; the outline itself is not a Resolved target, and precise downstream work selects one declaration from it.
 _Avoid_: Target group, file handle, synthetic target, treating a file coordinate as a symbol
 
 **Declaration level**:

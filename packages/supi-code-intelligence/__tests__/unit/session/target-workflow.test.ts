@@ -499,14 +499,14 @@ describe("target-workflow (deep session seam)", () => {
     });
 
     it("retains a structural container and handle when flat semantic facts appear later", async () => {
-      writeSource("src/mod.ts", "function outer() { const helper = 1; }\n");
+      writeSource("src/mod.ts", "class outer { helper = 1; }\n");
       const structural = makeTestStructural({
         outline: async () => ({
           kind: "success",
           data: [
             {
               name: "outer",
-              kind: "function",
+              kind: "class",
               startLine: 1,
               startCharacter: 1,
               endLine: 1,
@@ -514,7 +514,7 @@ describe("target-workflow (deep session seam)", () => {
               children: [
                 {
                   name: "helper",
-                  kind: "variable",
+                  kind: "property",
                   startLine: 1,
                   startCharacter: 20,
                   endLine: 1,
@@ -538,7 +538,7 @@ describe("target-workflow (deep session seam)", () => {
       const semantic = makeTestSemantic([
         {
           name: "helper",
-          kind: "Variable",
+          kind: "Property",
           file: path.join(tmpDir, "src/mod.ts"),
           declarationAnchor: { line: 1, character: 20 },
           nameAnchor: { line: 1, character: 26 },
@@ -557,7 +557,7 @@ describe("target-workflow (deep session seam)", () => {
 
       expect(refinedHelper?.targetId).toBe(firstHelper?.targetId);
       expect(refinedHelper).toMatchObject({
-        kind: "Variable",
+        kind: "Property",
         container: "outer",
         anchorKind: "name",
         confidence: "semantic",
@@ -658,17 +658,17 @@ describe("target-workflow (deep session seam)", () => {
     it("registers only prioritized bounded members while retaining exact completeness", async () => {
       writeSource(
         "src/mod.ts",
-        "function outer() { const nested = 1; }\nconst unknown = 2;\nfunction laterTop() {}\n",
+        "class Outer { nested = 1; }\nconst unknown = 2;\nfunction laterTop() {}\n",
       );
       const symbols = [
         {
           name: "nested",
-          kind: "Variable",
+          kind: "Property",
           file: path.join(tmpDir, "src/mod.ts"),
-          declarationAnchor: { line: 1, character: 20 },
-          nameAnchor: { line: 1, character: 26 },
-          container: "outer",
-          level: "local" as const,
+          declarationAnchor: { line: 1, character: 15 },
+          nameAnchor: { line: 1, character: 15 },
+          container: "Outer",
+          level: "member" as const,
         },
         {
           name: "unknown",
