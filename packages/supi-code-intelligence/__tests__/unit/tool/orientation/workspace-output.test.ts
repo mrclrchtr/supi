@@ -165,8 +165,8 @@ describe("workspace Orientation output", () => {
     expect(text).toContain("## Direct directories");
     expect(text).toContain("## Direct files");
     expect(text).toContain("Keep caller data private.");
-    expect(text).toContain("## Captured navigation");
-    expect(text).toContain("omitted");
+    expect(text).toContain("Deferred to captured details:");
+    expect(text).not.toContain("## Captured navigation");
     expect(text).not.toContain("```mermaid");
     expect(text).not.toContain("## Project declarations");
     expect(text).not.toContain("## File extensions");
@@ -180,6 +180,20 @@ describe("workspace Orientation output", () => {
     expect(captured).toContain("example.com/fixture");
     expect(captured).toContain("Keep caller data private.");
     expect(captured).toContain('"inventory"');
+  });
+
+  it("keeps declared entry paths and every direct file inline for directory focus", async () => {
+    put(
+      "units/app/package.json",
+      JSON.stringify({ name: "app", exports: { "./api": "./src/api.ts" } }),
+    );
+    for (let index = 0; index < 15; index++) put(`units/app/src/file-${index}.ts`, "");
+    const text = await orient({ focus: { path: "units/app/src" } });
+    expect(text).toContain("`file-14.ts`");
+    expect(text).toContain("15 observed");
+    const pkg = await orient({ focus: { path: "units/app" } });
+    expect(pkg).toContain("## Declared paths (project-relative)");
+    expect(pkg).toContain("`./src/api.ts`");
   });
 
   it("preserves supplied instruction text beyond the general inline preview budget", async () => {

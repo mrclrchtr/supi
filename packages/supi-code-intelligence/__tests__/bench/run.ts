@@ -235,7 +235,8 @@ function namedPaths(
       const name = relative(base, resolve(cwd, path));
       if (name.startsWith("..")) return false;
       const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      return new RegExp(`(^|[^\\w./-])${escaped}($|[^\\w./-])`, "m").test(output);
+      // Manifest values keep their written `./` prefix; it names the same file.
+      return new RegExp(`(^|[^\\w./-])(\\./)?${escaped}($|[^\\w./-])`, "m").test(output);
     });
   });
 }

@@ -20,6 +20,8 @@ export interface WorkspaceOrientationFacts {
   /** Absolute explicit focus, or null for the session working directory. */
   readonly focus: string | null;
   readonly maxResults: number;
+  /** True when the caller set `maxResults`; directory file lists then honor it exactly. */
+  readonly maxResultsExplicit?: boolean;
   readonly overview?: boolean;
 }
 
@@ -64,6 +66,7 @@ export async function orientWorkspaceContext(
           cwd: options.cwd,
           focus,
           maxResults: request.maxResults ?? 10,
+          maxResultsExplicit: request.maxResults !== undefined,
         }),
         focusKind: workspaceFocusKind(request),
       },

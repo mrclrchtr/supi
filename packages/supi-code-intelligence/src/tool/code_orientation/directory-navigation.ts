@@ -10,12 +10,16 @@ const INLINE_SECTIONS = new Set([
   "workspace.issues",
 ]);
 
-/** Keep the immediate directory map and all collection problems inline; defer ancillary facts. */
+/**
+ * Keep the immediate directory map, manifest-declared entry paths, and all collection problems
+ * inline; defer ancillary facts to the captured result and name them in one note.
+ */
 export function selectDirectoryNavigation(data: OrientationResultData): OrientationResultData {
   if (!data.workspace?.focus || data.workspace.overview) return data;
   const workspaceRoot = data.workspace.focus === data.workspace.observation.root;
   const inline = (section: OrientationSectionData): boolean =>
     INLINE_SECTIONS.has(section.key) ||
+    section.key.endsWith(".paths") ||
     section.key.startsWith("gradle.") ||
     (workspaceRoot &&
       (section.key === "workspace.projects" || section.key === "workspace.memberships")) ||
@@ -28,39 +32,24 @@ export function selectDirectoryNavigation(data: OrientationResultData): Orientat
       sum + section.evidenceLists.reduce((count, list) => count + (list.totalCount ?? 0), 0),
     0,
   );
-  if (total > 0) {
-    sections.push({
-      key: "workspace.captured",
-      title: "Captured navigation",
-      status: "complete",
-      reason: null,
-      confidence: "unavailable",
-      provenance: [],
-      evidenceLists: [
-        {
-          key: "workspace.captured",
-          totalCount: total,
-          shownCount: 0,
-          omittedCount: total,
-          partialReason: null,
-        },
-      ],
-      items: [
-        {
-          kind: "paragraph",
-          text: `Ancillary sections are in the captured details: ${deferred.map((section) => section.title).join("; ")}.`,
-        },
-      ],
-    });
-  }
+  const notes =
+    total > 0
+      ? [
+          ...data.notes,
+          `Deferred to captured details: ${deferred.map((section) => section.title).join("; ")}.`,
+        ]
+      : data.notes;
   return {
     ...data,
+    notes,
     sections,
     renderedSections: sections.map((section) => section.key),
-    omittedCount: sections.reduce(
-      (sum, section) =>
-        sum + section.evidenceLists.reduce((count, list) => count + (list.omittedCount ?? 0), 0),
-      0,
-    ),
+    omittedCount:
+      total +
+      sections.reduce(
+        (sum, section) =>
+          sum + section.evidenceLists.reduce((count, list) => count + (list.omittedCount ?? 0), 0),
+        0,
+      ),
   };
 }

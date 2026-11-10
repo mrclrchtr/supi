@@ -19,6 +19,7 @@ export function workspaceSections(
   data: OrientationResultData,
   limit: number,
   descriptions: boolean,
+  fileLimit = limit,
 ): OrientationResultData {
   const facts = data.workspace;
   if (!facts) return data;
@@ -54,7 +55,7 @@ export function workspaceSections(
       "Declared descriptions are omitted to preserve names and paths. They remain in the captured result.",
     );
   }
-  const sections = inventorySections(entries, facts, limit);
+  const sections = inventorySections(entries, facts, limit, fileLimit);
   sections.push(...projectSections(facts, limit, descriptions));
   sections.push(...gradleSections(observation.gradle, limit));
   const issues = [
@@ -192,6 +193,7 @@ function inventorySections(
   entries: readonly InventoryEntry[],
   facts: WorkspaceOrientationFacts,
   limit: number,
+  fileLimit: number,
 ): OrientationSectionData[] {
   const { directories, directFiles, extensions } = collectWorkspaceInventory(entries);
   const sections = [
@@ -205,7 +207,8 @@ function inventorySections(
       detail: "included paths",
     }),
   ];
-  if (directFiles.length > 0 || !facts.overview)
+  if (facts.focus && !facts.overview) sections.push(directFileList(directFiles, fileLimit));
+  else if (directFiles.length > 0 || !facts.overview)
     sections.push(
       tableSection("workspace.files", "Direct files", {
         headers: ["Path", "Kind"],
@@ -226,6 +229,46 @@ function inventorySections(
     }),
   );
   return sections;
+}
+
+/**
+ * Directory focus lists direct files as one compact line instead of a per-row table. Its own
+ * `fileLimit` lets presentation show all siblings and shrink them first under the text budget.
+ */
+function directFileList(
+  directFiles: readonly InventoryEntry[],
+  fileLimit: number,
+): OrientationSectionData {
+  const names = directFiles
+    .slice(0, fileLimit)
+    .map((entry) =>
+      entry.kind === "symlink" ? `${code(entry.path)} (symlink)` : code(entry.path),
+    );
+  return {
+    key: "workspace.files",
+    title: "Direct files",
+    status: "complete",
+    reason: null,
+    confidence: "unavailable",
+    provenance: [{ source: "filesystem", detail: "included paths" }],
+    evidenceLists: [
+      {
+        key: "workspace.files",
+        totalCount: directFiles.length,
+        shownCount: names.length,
+        omittedCount: directFiles.length - names.length,
+        partialReason: null,
+      },
+    ],
+    items: [
+      {
+        kind: "paragraph",
+        text: directFiles.length
+          ? names.join(", ") || "No entries shown."
+          : "No collected entries.",
+      },
+    ],
+  };
 }
 
 export function display(cwd: string, target: string): string {

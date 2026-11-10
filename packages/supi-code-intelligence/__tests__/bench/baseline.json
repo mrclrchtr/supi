@@ -154,9 +154,9 @@
       },
       "code": {
         "calls": 1,
-        "tokens": 383,
-        "recall": 0.286,
-        "tokensPerHit": 192
+        "tokens": 430,
+        "recall": 0.714,
+        "tokensPerHit": 86
       }
     },
     "orient-directory": {
@@ -168,9 +168,9 @@
       },
       "code": {
         "calls": 1,
-        "tokens": 385,
-        "recall": 0.5,
-        "tokensPerHit": 96
+        "tokens": 402,
+        "recall": 1,
+        "tokensPerHit": 50
       }
     },
     "callees": {

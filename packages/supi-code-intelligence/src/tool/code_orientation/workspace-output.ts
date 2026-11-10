@@ -40,21 +40,9 @@ export function prepareWorkspaceOutput(input: OrientationResultData): {
     true,
   );
   const fullContent = renderOrientationData(full);
-  let limit = workspace.overview
-    ? Math.max(10, workspace.observation.projects.length)
-    : workspace.maxResults;
-  let descriptions = true;
-  let data = selectDirectoryNavigation(workspaceSections(input, limit, descriptions));
-  if (navigationText(data).length > budget.warning * 4) {
-    descriptions = false;
-    data = selectDirectoryNavigation(workspaceSections(input, limit, descriptions));
-  }
   // Reserve room for the snapshot path and omission notice before reducing rows.
   const reserved = 1024;
-  while (exceedsNavigationBudget(data, budget.cap * 4 - reserved) && limit > 0) {
-    limit = Math.floor(limit / 2);
-    data = selectDirectoryNavigation(workspaceSections(input, limit, descriptions));
-  }
+  let { data, descriptions } = selectWithinBudget(input, workspace, budget, reserved);
   const overflow = exceedsNavigationBudget(data, budget.cap * 4 - reserved);
   if (overflow) {
     data = {
@@ -109,6 +97,45 @@ export function prepareWorkspaceOutput(input: OrientationResultData): {
         ? { estimatedTokens, threshold: budget.warning, surface }
         : undefined,
   };
+}
+
+/**
+ * Shrink one observation's presentation until it fits: drop descriptions, then the uncapped
+ * directory file list, then halve every list cap.
+ */
+function selectWithinBudget(
+  input: OrientationResultData,
+  workspace: WorkspaceOrientationFacts,
+  budget: { warning: number; cap: number },
+  reserved: number,
+): { data: OrientationResultData; descriptions: boolean } {
+  let limit = workspace.overview
+    ? Math.max(10, workspace.observation.projects.length)
+    : workspace.maxResults;
+  // Without an explicit cap, directory focus shows every direct file until the budget forces the default.
+  let fileLimit =
+    workspace.focus && !workspace.overview && !workspace.maxResultsExplicit
+      ? Number.MAX_SAFE_INTEGER
+      : limit;
+  let descriptions = true;
+  const select = () =>
+    selectDirectoryNavigation(workspaceSections(input, limit, descriptions, fileLimit));
+  let data = select();
+  if (navigationText(data).length > budget.warning * 4) {
+    descriptions = false;
+    data = select();
+  }
+  const cap = budget.cap * 4 - reserved;
+  if (exceedsNavigationBudget(data, cap) && fileLimit > limit) {
+    fileLimit = limit;
+    data = select();
+  }
+  while (exceedsNavigationBudget(data, cap) && limit > 0) {
+    limit = Math.floor(limit / 2);
+    fileLimit = limit;
+    data = select();
+  }
+  return { data, descriptions };
 }
 
 /** Overview links recover omitted navigation; explicit Orientation also retains raw facts. */
