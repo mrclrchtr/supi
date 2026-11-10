@@ -12,6 +12,36 @@
 // biome-ignore lint/security/noSecrets: git commit SHA
 export const CORPUS_COMMIT = "b0c23833bb5b1da0c8f4a1619ca7ffdb47fd5f20";
 
+/**
+ * Completed `code_*` calls per usage category in persisted Pi sessions across
+ * all local projects, 60 days up to 2026-11-11 (classified like
+ * `scripts/code-tool-usage.mjs`). The usage-weighted balance weights each
+ * scenario category by its share; categories without scenarios are reported
+ * as uncovered. A snapshot of one user's sessions, not a general workload.
+ */
+export const USAGE_WEIGHTS = {
+  "orientation-path": 1291,
+  "find-definition": 302,
+  health: 240,
+  "orientation-workspace": 224,
+  "graph-references": 129,
+  "find-call": 94,
+  inspect: 84,
+  "find-semantic": 61,
+  "resolve-file": 50,
+  "find-import": 46,
+  "resolve-symbol": 44,
+  refactor: 42,
+  "graph-callees": 28,
+  "resolve-anchor": 26,
+  "find-other-kind": 23,
+  "orientation-target": 23,
+  "graph-combined": 15,
+  "graph-implements": 4,
+} as const;
+
+export type UsageCategory = keyof typeof USAGE_WEIGHTS;
+
 export interface BenchCall {
   readonly tool: string;
   readonly args: Record<string, unknown>;
@@ -28,12 +58,16 @@ export type BenchStep = BenchCall | ((previousOutputs: readonly string[]) => Ben
 export interface BenchScenario {
   readonly id: string;
   readonly question: string;
+  /** Observed usage category the code arm represents; see `USAGE_WEIGHTS`. */
+  readonly category: UsageCategory;
   readonly native: readonly BenchStep[];
   readonly code: readonly BenchStep[];
   /**
    * Expected answer locations as corpus-relative `path:line`, or
    * `path:start-end` when tools legitimately report different lines of one
    * construct (e.g. a return-type signature vs. the object literal it returns).
+   * An empty list means the correct answer is "none" (e.g. a symbol that does
+   * not exist); any reported location then counts against precision.
    */
   readonly truth?: readonly string[];
   /** Pattern every `truth` span must contain in the corpus; guards stale line numbers. */
@@ -72,6 +106,16 @@ const readFromGrepHit =
   (outputs: readonly string[]): BenchCall | null => {
     const hit = /^([\w./@-]+\.\w+):(\d+):/m.exec(outputs.at(-1) ?? "");
     return hit ? read(`${base}/${hit[1]}`, Number(hit[2]), limit) : null;
+  };
+/**
+ * Read the Pi extension entry the previous output names (`./src/….ts` from a
+ * manifest or a declared-paths table), as an agent would after orienting.
+ */
+const readEntryPoint =
+  (pkg: string) =>
+  (outputs: readonly string[]): BenchCall | null => {
+    const entry = /\.\/(src\/[\w/-]*extension\.ts)/.exec(outputs.at(-1) ?? "")?.[1];
+    return entry ? read(`${pkg}/${entry}`) : null;
   };
 /** Inspect the first `path:line:character` a code_resolve answer reports. */
 const inspectResolved = (outputs: readonly string[]): BenchCall | null => {
@@ -194,6 +238,7 @@ const SESSION_WORKFLOW_PATHS = [
 export const scenarios: readonly BenchScenario[] = [
   {
     id: "refs-unique-default",
+    category: "graph-references",
     question: "Where is toWorkflowControl used? (default output bounds)",
     native: [grep("\\btoWorkflowControl\\b")],
     code: [{ tool: "code_graph", args: { target: workflowControl } }],
@@ -202,6 +247,7 @@ export const scenarios: readonly BenchScenario[] = [
   },
   {
     id: "refs-unique-all",
+    category: "graph-references",
     viewSource: true,
     question: "Where is toWorkflowControl used? (all sites requested)",
     native: [grep("\\btoWorkflowControl\\b")],
@@ -211,6 +257,7 @@ export const scenarios: readonly BenchScenario[] = [
   },
   {
     id: "refs-ambiguous",
+    category: "graph-references",
     viewSource: true,
     question: "Who uses the exported resultData() from orientation/context-sections.ts?",
     native: [grep("\\bresultData\\b")],
@@ -234,6 +281,7 @@ export const scenarios: readonly BenchScenario[] = [
   },
   {
     id: "refs-ambiguous-unscoped",
+    category: "graph-references",
     question: "Who uses resultData() from context-sections.ts? (no scope; disambiguate by path)",
     native: [grep("\\bresultData\\b")],
     code: [
@@ -250,6 +298,7 @@ export const scenarios: readonly BenchScenario[] = [
   },
   {
     id: "definition-signature",
+    category: "resolve-symbol",
     question: "Where is createSessionCache defined and what does it return?",
     native: [grep("function createSessionCache"), readFromGrepHit("packages", 15)],
     code: [
@@ -261,6 +310,7 @@ export const scenarios: readonly BenchScenario[] = [
   },
   {
     id: "file-outline-default",
+    category: "resolve-file",
     question: "Which top-level declarations does session.ts contain? (default output bounds)",
     native: [grep(SESSION_DECLARATIONS, `${CI}/src/session/session.ts`)],
     code: [{ tool: "code_resolve", args: { target: { file: `${CI}/src/session/session.ts` } } }],
@@ -269,6 +319,7 @@ export const scenarios: readonly BenchScenario[] = [
   },
   {
     id: "file-outline",
+    category: "resolve-file",
     question: "Which top-level declarations does session.ts contain?",
     native: [grep(SESSION_DECLARATIONS, `${CI}/src/session/session.ts`)],
     code: [
@@ -282,6 +333,7 @@ export const scenarios: readonly BenchScenario[] = [
   },
   {
     id: "find-calls",
+    category: "find-call",
     viewSource: true,
     question: "Where is selectDirectoryNavigation called?",
     // biome-ignore lint/security/noSecrets: regex pattern
@@ -304,6 +356,7 @@ export const scenarios: readonly BenchScenario[] = [
   },
   {
     id: "find-imports",
+    category: "find-import",
     question: "Which source files import the Tree-sitter package?",
     native: [grep('from "@mrclrchtr/supi-tree-sitter', `${CI}/src`)],
     code: [
@@ -328,6 +381,7 @@ export const scenarios: readonly BenchScenario[] = [
   },
   {
     id: "orient-package",
+    category: "orientation-path",
     question: "Where are the entry points and central modules of supi-code-intelligence?",
     native: [ls(CI), ls(`${CI}/src`), read(`${CI}/package.json`)],
     code: [{ tool: "code_orientation", args: { focus: { path: CI } } }],
@@ -335,6 +389,7 @@ export const scenarios: readonly BenchScenario[] = [
   },
   {
     id: "orient-directory",
+    category: "orientation-path",
     question: "Which workflow modules make up src/session?",
     native: [ls(`${CI}/src/session`)],
     code: [{ tool: "code_orientation", args: { focus: { path: `${CI}/src/session` } } }],
@@ -342,6 +397,7 @@ export const scenarios: readonly BenchScenario[] = [
   },
   {
     id: "callees",
+    category: "graph-callees",
     question: "What does registerCodeIntelligenceTools call?",
     // The agent does not know where the function ends; 80 lines is a typical window.
     native: [
@@ -363,6 +419,7 @@ export const scenarios: readonly BenchScenario[] = [
   },
   {
     id: "implementations",
+    category: "graph-implements",
     viewSource: true,
     question: "Which objects implement SettingsModule?",
     // biome-ignore lint/security/noSecrets: regex pattern
@@ -390,6 +447,7 @@ export const scenarios: readonly BenchScenario[] = [
   },
   {
     id: "method-callers",
+    category: "graph-references",
     viewSource: true,
     question: "Who calls WorkspaceCodeIntelligenceSession.resolve()?",
     // A competent agent greps the receiver naming convention, not bare `.resolve(`.
@@ -411,6 +469,7 @@ export const scenarios: readonly BenchScenario[] = [
   },
   {
     id: "constant-with-docs",
+    category: "graph-references",
     viewSource: true,
     // Expected loss for code_*: semantic references cover code, not Markdown.
     question: "Where is DEFAULT_WORKFLOW_DEADLINE_MS used or documented?",
@@ -431,6 +490,7 @@ export const scenarios: readonly BenchScenario[] = [
   },
   {
     id: "calls-across-packages",
+    category: "find-call",
     viewSource: true,
     question: "Where is registerSettings called across packages?",
     native: [grep("\\bregisterSettings\\(")],
@@ -442,5 +502,91 @@ export const scenarios: readonly BenchScenario[] = [
     ],
     truth: REGISTER_SETTINGS_CALLS,
     truthText: /registerSettings\(/,
+  },
+  {
+    id: "find-definition",
+    category: "find-definition",
+    question: "Where is runGraphWorkflow defined?",
+    // biome-ignore lint/security/noSecrets: regex pattern
+    native: [grep("(function|class|interface|type|const|let) runGraphWorkflow\\b", `${CI}/src`)],
+    code: [
+      {
+        tool: "code_find",
+        args: { mode: "ast", kind: "definition", query: "runGraphWorkflow", scope: [`${CI}/src`] },
+      },
+    ],
+    truth: [`${CI}/src/session/graph-workflow.ts:29`],
+    truthText: /function runGraphWorkflow/,
+  },
+  {
+    id: "find-definition-substring",
+    category: "find-definition",
+    // Name fragments are common in observed queries; grep also matches imports and uses.
+    question: "Which *WorkflowDeps declarations exist in src/session?",
+    // biome-ignore lint/security/noSecrets: regex pattern
+    native: [grep("\\w*WorkflowDeps\\b", `${CI}/src/session`)],
+    code: [
+      {
+        tool: "code_find",
+        args: {
+          mode: "ast",
+          kind: "definition",
+          query: "WorkflowDeps",
+          scope: [`${CI}/src/session`],
+        },
+      },
+    ],
+    truth: [
+      "find-workflow.ts:16",
+      "graph-workflow.ts:24",
+      "health-workflow.ts:46",
+      "inspect-workflow.ts:19",
+      "orientation-workflow.ts:30",
+      "refactor-workflow.ts:48",
+      "target-workflow.ts:84",
+      "session.ts:389",
+      "session.ts:398",
+    ].map((site) => `${CI}/src/session/${site}`),
+    truthText: /(interface \w*WorkflowDeps|WorkflowDeps\(\) \{)/,
+  },
+  {
+    id: "find-definition-missing",
+    category: "find-definition",
+    // About a third of observed definition searches return no match; confirming
+    // absence has a cost too.
+    question: "Where is emitDebug defined? (it does not exist)",
+    native: [
+      // biome-ignore lint/security/noSecrets: regex pattern
+      grep("(function|class|interface|type|const|let) emitDebug\\b", "packages/supi-core/src"),
+    ],
+    code: [
+      {
+        tool: "code_find",
+        args: {
+          mode: "ast",
+          kind: "definition",
+          query: "emitDebug",
+          scope: ["packages/supi-core/src"],
+        },
+      },
+    ],
+    truth: [],
+  },
+  {
+    id: "orient-then-read",
+    category: "orientation-path",
+    // Observed: directory orientation is usually followed by reading a file.
+    question: "What does the supi-web extension entry point register?",
+    native: [
+      ls("packages/supi-web"),
+      read("packages/supi-web/package.json"),
+      readEntryPoint("packages/supi-web"),
+    ],
+    code: [
+      { tool: "code_orientation", args: { focus: { path: "packages/supi-web" } } },
+      readEntryPoint("packages/supi-web"),
+    ],
+    truth: ["packages/supi-web/src/extension.ts:8"],
+    truthText: /registerChildWebToolProvider\(pi\)/,
   },
 ];

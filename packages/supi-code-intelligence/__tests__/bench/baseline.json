@@ -343,6 +343,75 @@
           "tokens": 2880
         }
       }
+    },
+    "find-definition": {
+      "native": {
+        "calls": 1,
+        "tokens": 49,
+        "precision": 1,
+        "recall": 1,
+        "tokensPerHit": 49
+      },
+      "code": {
+        "calls": 1,
+        "tokens": 94,
+        "precision": 1,
+        "recall": 1,
+        "tokensPerHit": 94
+      }
+    },
+    "find-definition-substring": {
+      "native": {
+        "calls": 1,
+        "tokens": 703,
+        "precision": 0.209,
+        "recall": 1,
+        "tokensPerHit": 78
+      },
+      "code": {
+        "calls": 1,
+        "tokens": 290,
+        "precision": 1,
+        "recall": 0.889,
+        "tokensPerHit": 36,
+        "complete": {
+          "calls": 2,
+          "tokens": 605,
+          "precision": 1,
+          "recall": 1,
+          "tokensPerHit": 67
+        }
+      }
+    },
+    "find-definition-missing": {
+      "native": {
+        "calls": 1,
+        "tokens": 30,
+        "precision": 1,
+        "recall": 1
+      },
+      "code": {
+        "calls": 1,
+        "tokens": 138,
+        "precision": 1,
+        "recall": 1
+      }
+    },
+    "orient-then-read": {
+      "native": {
+        "calls": 3,
+        "tokens": 634,
+        "precision": 1,
+        "recall": 1,
+        "tokensPerHit": 634
+      },
+      "code": {
+        "calls": 2,
+        "tokens": 449,
+        "precision": 1,
+        "recall": 1,
+        "tokensPerHit": 449
+      }
     }
   }
 }

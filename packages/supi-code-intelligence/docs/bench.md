@@ -46,6 +46,8 @@ Before running, every `truth` span is checked against the corpus and must match 
 
 The report ends with a suite balance: summed tokens of complete answers per arm, savings per question, and how many questions' savings one request's tool surface costs. It is a rough ratio over this scenario mix, not a session model (no prompt caching, no persistence of output in later requests). A second line repeats the balance with `viewed` tokens where present.
 
+A third line weights savings by observed usage. Each scenario names a `category` (e.g. `find-definition`, `orientation-path`); `USAGE_WEIGHTS` in `scenarios.ts` holds completed `code_*` calls per category from persisted Pi sessions across local projects. Each covered category contributes its mean per-scenario savings on complete answers, weighted by its share among covered categories. The line also reports the share of observed calls the suite covers and lists uncovered categories; they are not extrapolated. Refresh the weights with the classification of the [code tool usage report](../../../docs/ops/code-tool-usage.md) when usage shifts; they are one user's sessions, not a general workload.
+
 All arms run once as warm-up before measurement. Cold TypeScript project loading omits cross-project references nondeterministically.
 
 ## Workflow
@@ -62,6 +64,8 @@ All arms run once as warm-up before measurement. Cold TypeScript project loading
 - Derive follow-up arguments (read offsets, inspect points) from earlier outputs with function steps. Hard-coded positions leak the answer and hide whether the first output was sufficient.
 - Mark pure locating calls (e.g. grep for a declaration before reading its body) with `locate: true` so their hits are not scored as answers.
 - Use a function step for data-dependent follow-ups (e.g. disambiguation handles); return `null` when not needed.
+- Set `category` to the observed usage category the code arm represents; add a category to `USAGE_WEIGHTS` only with observed counts.
+- Use `truth: []` when the correct answer is that nothing exists (e.g. a missing symbol); any reported location then lowers precision.
 - Include questions where `code_*` is expected to lose or tie (e.g. text in Markdown, name-based calls across packages), so the suite does not only cover its strengths.
 
 ## Limits

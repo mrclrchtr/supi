@@ -21,6 +21,8 @@ import {
   type BenchStep,
   CORPUS_COMMIT,
   scenarios,
+  USAGE_WEIGHTS,
+  type UsageCategory,
 } from "./scenarios.ts";
 
 /** Deterministic metrics only; latency is reported but never compared. */
@@ -315,7 +317,8 @@ function score(scenario: BenchScenario, base: ArmMetrics, evidence: Evidence): A
   if (scenario.truth) {
     const { precision, hits } = scoreLocations(scenario.truth.map(parseSpan), evidence);
     metrics.precision = precision;
-    metrics.recall = round(hits / scenario.truth.length);
+    // An empty truth means "none": nothing can be missed, only wrongly reported.
+    metrics.recall = scenario.truth.length ? round(hits / scenario.truth.length) : 1;
     Object.assign(metrics, perHit(hits));
   }
   if (scenario.truthPaths) {
@@ -336,7 +339,9 @@ function scoreLocations(
   const seenOnly = [...seen].filter((line) => !found.has(line) && matches(line).length > 0).length;
   const answered = reported.length + seenOnly;
   const hits = new Set([...reported, ...seen].flatMap(matches)).size;
-  return { precision: round(answered ? (correct + seenOnly) / answered : 0), hits };
+  // Reporting nothing is exact when nothing is expected.
+  const empty = spans.length === 0 ? 1 : 0;
+  return { precision: round(answered ? (correct + seenOnly) / answered : empty), hits };
 }
 
 /**
@@ -584,6 +589,7 @@ function printBalance(current: Baseline): void {
     "Complete answers with viewed sources",
     (m) => m.viewed?.tokens ?? (m.complete ?? m).tokens,
   );
+  printWeightedBalance(current);
 }
 
 function printBalanceLine(
@@ -602,6 +608,39 @@ function printBalanceLine(
   console.log(
     `${label}, ${arms.length} questions: native ${native} / code ${code} tokens ` +
       `(${Math.round(savedPerQuestion)} saved per question; ${breakEven}).`,
+  );
+}
+
+/**
+ * Balance weighted by observed usage: each covered category contributes its
+ * mean per-scenario savings, weighted by its share of observed calls among
+ * covered categories. Uncovered categories are listed, not extrapolated.
+ */
+function printWeightedBalance(current: Baseline): void {
+  const byCategory = new Map<UsageCategory, number[]>();
+  for (const scenario of scenarios) {
+    const result = current.scenarios[scenario.id];
+    if (!result) continue;
+    const tokens = (m: ArmMetrics) => (m.complete ?? m).tokens;
+    const saved = tokens(result.native) - tokens(result.code);
+    byCategory.set(scenario.category, [...(byCategory.get(scenario.category) ?? []), saved]);
+  }
+  const weights = Object.entries(USAGE_WEIGHTS) as [UsageCategory, number][];
+  const total = weights.reduce((sum, [, weight]) => sum + weight, 0);
+  const covered = weights.filter(([category]) => byCategory.has(category));
+  const coveredWeight = covered.reduce((sum, [, weight]) => sum + weight, 0);
+  const savedPerCall = covered.reduce((sum, [category, weight]) => {
+    const savings = byCategory.get(category) ?? [];
+    const mean = savings.reduce((a, b) => a + b, 0) / savings.length;
+    return sum + (mean * weight) / coveredWeight;
+  }, 0);
+  const uncovered = weights
+    .filter(([category]) => !byCategory.has(category))
+    .map(([category, weight]) => `${category} ${Math.round((weight / total) * 100)}%`);
+  console.log(
+    `Usage-weighted complete answers: ${Math.round(savedPerCall)} tokens saved per call ` +
+      `(covers ${Math.round((coveredWeight / total) * 100)}% of observed calls; ` +
+      `uncovered: ${uncovered.join(", ")}).`,
   );
 }
 
