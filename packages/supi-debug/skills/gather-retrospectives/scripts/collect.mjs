@@ -247,6 +247,7 @@ function report(entry, context) {
   for (const key of ["runKey", "caller", "batchId", "taskId", "label", "conversationId"]) {
     if (typeof data[key] === "string") report[key] = data[key];
   }
+  if (Number.isSafeInteger(data.promptRevision)) report.promptRevision = data.promptRevision;
   const identity = report.runKey
     ? [report.source, report.runKey]
     : [report.source, report.timestamp, report.status, report.text, report.entryId];

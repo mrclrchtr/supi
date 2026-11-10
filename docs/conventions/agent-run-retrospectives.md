@@ -68,7 +68,7 @@ Adapt the existing [`/supi-tooling-retro` prompt](../../packages/supi-debug/prom
 
 - Use the existing Debug event persistence path in the containing session, not normal Agent Run Diagnostics or parent-facing result content.
 - Keep the event message static; put assessment prose in event `data` so it receives existing best-effort redaction. Do not use raw-only data, which is not persisted.
-- Include `runKey`, `caller`, `batchId`, `taskId`, and a readable `label` alongside retrospective text and Usage. Delegation also includes `conversationId`; its label remains the saved conversation label on follow-ups. Reviewer labels identify the Review Mode.
+- Include `runKey`, `caller`, `batchId`, `taskId`, and a readable `label` alongside retrospective text and Usage. Include `promptRevision` (`RETROSPECTIVE_PROMPT_REVISION`) and increment it whenever the assessment prompt changes, so collectors can separate answers to different questions. Delegation also includes `conversationId`; its label remains the saved conversation label on follow-ups. Reviewer labels identify the Review Mode.
 - Correlation metadata belongs in sanitized Debug `data`, not parent tool results. Include identifiers and display labels only, never task instructions or inspected evidence.
 - Debug capture retains session entries outside automatic model context. Existing Debug access and retention behavior apply; assessment text may still contain sensitive task details.
 - Do not add a new durable transcript copy, replay store, background aggregation, or automatic feedback channel.

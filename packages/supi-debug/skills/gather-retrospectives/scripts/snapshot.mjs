@@ -153,6 +153,7 @@ export function displayPage(evidence, evidenceFile, options, scriptFile) {
       source: record.source,
       date: new Date(record.timestamp).toISOString(),
       status: record.status,
+      ...(record.promptRevision === undefined ? {} : { promptRevision: record.promptRevision }),
       file: relative(filters.sessionsDir, record.sessionFile),
       line: record.line,
       text: record.text?.slice(textOffset),

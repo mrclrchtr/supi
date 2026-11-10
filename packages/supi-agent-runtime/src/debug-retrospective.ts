@@ -1,6 +1,12 @@
 import { canRecordAgentRunRetrospective, recordDebugEvent } from "@mrclrchtr/supi-core/debug";
 import type { AgentRunRetrospective } from "./types.ts";
 
+/**
+ * Increment whenever RETROSPECTIVE_PROMPT changes so evidence collectors can
+ * separate assessments answering different questions.
+ */
+export const RETROSPECTIVE_PROMPT_REVISION = 2;
+
 // Compact, tool-free adaptation of supi-debug's interactive /supi-tooling-retro prompt.
 const RETROSPECTIVE_PROMPT = `Reflect briefly on the task you just completed. Based only on the context available from this run, what would have made it more token/time efficient or more effective?
 
@@ -44,6 +50,7 @@ export function createDebugAgentRunRetrospective(input: {
           batchId: input.batchId,
           taskId: input.taskId,
           label: input.label,
+          promptRevision: RETROSPECTIVE_PROMPT_REVISION,
           ...(input.conversationId === undefined ? {} : { conversationId: input.conversationId }),
           ...assessment,
           // Avoid secret-like "token" keys in the shared Debug sanitizer.

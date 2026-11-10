@@ -58,6 +58,7 @@ it("returns foreground results before the retrospective and logs its separate Us
     runKey: harness.registry.snapshot().runs[0]?.runKey,
     conversationId: (result.details.tasks as Array<{ conversationId: string }>)[0]?.conversationId,
     text: "Parent could have supplied the implementation path.",
+    promptRevision: expect.any(Number),
     usage: { total: 15 },
   });
 });

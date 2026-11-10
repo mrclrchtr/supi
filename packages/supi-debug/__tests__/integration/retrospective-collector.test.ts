@@ -42,6 +42,10 @@ function retrospective(runKey: string, text: string, source = "supi-agent", time
   };
 }
 
+function withData(entry: ReturnType<typeof retrospective>, data: Record<string, unknown>) {
+  return { ...entry, data: { ...entry.data, data: { ...entry.data.data, ...data } } };
+}
+
 async function session(name: string, cwd: string, entries: unknown[]) {
   const path = join(sessions, name);
   await mkdir(dirname(path), { recursive: true });
@@ -283,6 +287,20 @@ describe("retrospective collector CLI", () => {
     ]);
     expect(JSON.parse(result.stdout).coverage.uniqueReports).toBe(1);
     expect(JSON.parse(await readFile(output, "utf8")).records[0].runKey).toBe("new");
+  });
+
+  it("carries numeric prompt revisions and omits invalid ones", async () => {
+    await session("a/session.jsonl", workspace, [
+      withData(retrospective("new", "Revised.", "supi-agent", 2000), { promptRevision: 2 }),
+      withData(retrospective("bad", "Invalid.", "supi-agent", 1000), { promptRevision: "2" }),
+    ]);
+
+    const { preview, evidence } = await collect();
+    expect(
+      evidence.records.map((record: { promptRevision?: number }) => record.promptRevision),
+    ).toEqual([2, undefined]);
+    expect(preview.records[0]).toMatchObject({ promptRevision: 2 });
+    expect(preview.records[1]).not.toHaveProperty("promptRevision");
   });
 
   it("keeps legacy events without run keys and failed assessments without inventing text", async () => {
