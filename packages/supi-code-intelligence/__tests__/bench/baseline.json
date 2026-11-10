@@ -8,13 +8,15 @@
         "calls": 1,
         "tokens": 853,
         "precision": 0.913,
-        "recall": 1
+        "recall": 1,
+        "tokensPerHit": 41
       },
       "code": {
         "calls": 1,
         "tokens": 319,
         "precision": 1,
-        "recall": 0.381
+        "recall": 0.381,
+        "tokensPerHit": 40
       }
     },
     "refs-unique-all": {
@@ -22,13 +24,15 @@
         "calls": 1,
         "tokens": 853,
         "precision": 0.913,
-        "recall": 1
+        "recall": 1,
+        "tokensPerHit": 41
       },
       "code": {
         "calls": 1,
         "tokens": 350,
         "precision": 1,
-        "recall": 1
+        "recall": 1,
+        "tokensPerHit": 17
       }
     },
     "refs-ambiguous": {
@@ -36,13 +40,31 @@
         "calls": 1,
         "tokens": 896,
         "precision": 0.222,
-        "recall": 1
+        "recall": 1,
+        "tokensPerHit": 149
       },
       "code": {
         "calls": 1,
         "tokens": 224,
         "precision": 1,
-        "recall": 1
+        "recall": 1,
+        "tokensPerHit": 37
+      }
+    },
+    "refs-ambiguous-unscoped": {
+      "native": {
+        "calls": 1,
+        "tokens": 896,
+        "precision": 0.222,
+        "recall": 1,
+        "tokensPerHit": 149
+      },
+      "code": {
+        "calls": 2,
+        "tokens": 369,
+        "precision": 1,
+        "recall": 1,
+        "tokensPerHit": 62
       }
     },
     "definition-signature": {
@@ -50,13 +72,15 @@
         "calls": 2,
         "tokens": 342,
         "precision": 1,
-        "recall": 1
+        "recall": 1,
+        "tokensPerHit": 342
       },
       "code": {
         "calls": 2,
         "tokens": 310,
         "precision": 1,
-        "recall": 1
+        "recall": 1,
+        "tokensPerHit": 310
       }
     },
     "file-outline-default": {
@@ -64,13 +88,15 @@
         "calls": 1,
         "tokens": 248,
         "precision": 0.2,
-        "recall": 1
+        "recall": 1,
+        "tokensPerHit": 83
       },
       "code": {
         "calls": 1,
         "tokens": 423,
         "precision": 0.3,
-        "recall": 1
+        "recall": 1,
+        "tokensPerHit": 141
       }
     },
     "file-outline": {
@@ -78,13 +104,73 @@
         "calls": 1,
         "tokens": 248,
         "precision": 0.2,
-        "recall": 1
+        "recall": 1,
+        "tokensPerHit": 83
       },
       "code": {
         "calls": 1,
         "tokens": 1145,
         "precision": 0.06,
-        "recall": 1
+        "recall": 1,
+        "tokensPerHit": 382
+      }
+    },
+    "find-calls": {
+      "native": {
+        "calls": 1,
+        "tokens": 158,
+        "precision": 0.75,
+        "recall": 1,
+        "tokensPerHit": 53
+      },
+      "code": {
+        "calls": 1,
+        "tokens": 170,
+        "precision": 1,
+        "recall": 1,
+        "tokensPerHit": 57
+      }
+    },
+    "find-imports": {
+      "native": {
+        "calls": 1,
+        "tokens": 131,
+        "recall": 1,
+        "tokensPerHit": 33
+      },
+      "code": {
+        "calls": 1,
+        "tokens": 200,
+        "recall": 1,
+        "tokensPerHit": 50
+      }
+    },
+    "orient-package": {
+      "native": {
+        "calls": 3,
+        "tokens": 732,
+        "recall": 0.714,
+        "tokensPerHit": 146
+      },
+      "code": {
+        "calls": 1,
+        "tokens": 383,
+        "recall": 0.286,
+        "tokensPerHit": 192
+      }
+    },
+    "orient-directory": {
+      "native": {
+        "calls": 1,
+        "tokens": 128,
+        "recall": 1,
+        "tokensPerHit": 16
+      },
+      "code": {
+        "calls": 1,
+        "tokens": 385,
+        "recall": 0.5,
+        "tokensPerHit": 96
       }
     },
     "callees": {

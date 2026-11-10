@@ -34,6 +34,8 @@ SuPi's `packages/` tree at `CORPUS_COMMIT`, extracted with `git archive` (binari
 | `tokens` | yes | chars/4 of call arguments plus model-visible output, the estimate PI uses. Not a provider tokenizer. |
 | `calls` | yes | Executed steps; conditional steps that return `null` are not counted. |
 | `precision` / `recall` | yes | `path:line` locations in the answer against `truth`. "Read Next" hints are excluded. Only for scenarios with `truth`. |
+| `recall` (paths) | yes | For `truthPaths` scenarios (orientation, multi-line imports): share of expected files the answer names, workspace- or focus-relative, or reads. No precision: a map may list more than the question needs. |
+| `tokensPerHit` | yes | `tokens` divided by correct locations or paths. Compares cost per useful fact across arms with different recall. |
 | `codeToolSurfaceTokens` | yes | Per-request cost of all registered `code_*` definitions (description, schema, snippet, guidelines). |
 | latency | no | Printed only; machine-dependent. |
 
@@ -49,11 +51,12 @@ All arms run once as warm-up before measurement. Cold TypeScript project loading
 ## Adding scenarios
 
 - Model a competent agent's minimal sequence for each arm. Do not handicap either side.
-- Add `truth` whenever the answer is a set of locations.
+- Add `truth` whenever the answer is a set of locations; use `truthPaths` when the answer is a set of files.
 - Use a function step for data-dependent follow-ups (e.g. disambiguation handles); return `null` when not needed.
 
 ## Limits
 
 - Fixed call sequences: real agents may phrase grep differently, misuse `code_*`, or still read files afterward. Agent-level effects need an LLM A/B run (see [Terminal-Bench workflow](../../../docs/ops/benchmarking-terminal-bench.md)).
 - TypeScript only.
+- Path recall checks that a file is named, not that the agent would recognize it as relevant. Captured snapshot files are not followed, matching observed agent behavior.
 - Break-even: `codeToolSurfaceTokens` is paid on every request; saved output also persists in later requests, so the package pays off once cumulative per-session savings exceed the surface cost.

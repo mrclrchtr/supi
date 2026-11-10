@@ -9,7 +9,7 @@
 /* biome-ignore-all lint/suspicious/noConsole: CLI report output */
 import { mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
-import { createGrepTool, createReadTool } from "@earendil-works/pi-coding-agent";
+import { createGrepTool, createLsTool, createReadTool } from "@earendil-works/pi-coding-agent";
 import { createPiMock, getTool, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { registerCodeIntelligenceTools } from "../../src/tool/register.ts";
 import { createRealLanguageWorkspace } from "../helpers/real-substrate-workspace.ts";
@@ -28,6 +28,8 @@ interface ArmMetrics {
   tokens: number;
   precision?: number;
   recall?: number;
+  /** Tokens per correct location or path; lower is better. Absent without hits. */
+  tokensPerHit?: number;
 }
 interface ScenarioMetrics {
   native: ArmMetrics;
@@ -65,7 +67,11 @@ try {
   const pi = createPiMock();
   registerCodeIntelligenceTools(pi as never, () => workspace.session);
   const ctx = makeCtx({ cwd });
-  const nativeTools = { grep: createGrepTool(cwd), read: createReadTool(cwd) };
+  const nativeTools = {
+    grep: createGrepTool(cwd),
+    ls: createLsTool(cwd),
+    read: createReadTool(cwd),
+  };
 
   const execute = async (call: BenchCall): Promise<string> => {
     const native = nativeTools[call.tool as keyof typeof nativeTools];
@@ -120,6 +126,7 @@ async function runArm(
 ): Promise<{ metrics: ArmMetrics; outputs: string[]; ms: number }> {
   const outputs: string[] = [];
   const found = new Set<string>();
+  const foundPaths = new Set<string>();
   let tokens = 0;
   const started = performance.now();
   let calls = 0;
@@ -132,22 +139,42 @@ async function runArm(
     tokens += estimateTokens(call.tool + JSON.stringify(call.args)) + estimateTokens(output);
     const base = call.tool === "grep" ? grepBase(cwd, String(call.args.path ?? ".")) : cwd;
     for (const location of locations(output, base, cwd)) found.add(location);
+    for (const path of namedPaths(call, output, scenario.truthPaths ?? [], cwd))
+      foundPaths.add(path);
   }
   const ms = Math.round(performance.now() - started);
-  const metrics: ArmMetrics = { calls, tokens };
+  return { metrics: score(scenario, { calls, tokens }, found, foundPaths), outputs, ms };
+}
+
+/** Add accuracy and cost-per-hit metrics against the scenario's ground truth. */
+function score(
+  scenario: BenchScenario,
+  base: ArmMetrics,
+  found: ReadonlySet<string>,
+  foundPaths: ReadonlySet<string>,
+): ArmMetrics {
+  const metrics = { ...base };
+  const perHit = (hits: number) =>
+    hits ? { tokensPerHit: Math.round(metrics.tokens / hits) } : {};
   if (scenario.truth) {
     const expected = new Set(scenario.truth);
     const hits = [...found].filter((location) => expected.has(location)).length;
     metrics.precision = round(found.size ? hits / found.size : 0);
     metrics.recall = round(hits / expected.size);
+    Object.assign(metrics, perHit(hits));
   }
-  return { metrics, outputs, ms };
+  if (scenario.truthPaths) {
+    metrics.recall = round(foundPaths.size / scenario.truthPaths.length);
+    Object.assign(metrics, perHit(foundPaths.size));
+  }
+  return metrics;
 }
 
 /**
  * Extract answer locations as `path:line`. Handles grep (`path:12:`) and
  * code_* (`` `path`: L12:3, L40 `` / `` `path:12:3` `` / file outline rows
- * `` — L12:3 `` under `` # File outline of `path` ``). "Read Next" hints are
+ * `` — L12:3 `` under `` # File outline of `path` `` / code_find rows
+ * `` - `name` (kind) L12:3–L12:9 `` under `` ### path ``). "Read Next" hints are
  * navigation suggestions, not answers, and are excluded.
  */
 function locations(text: string, base: string, cwd: string): Set<string> {
@@ -157,6 +184,7 @@ function locations(text: string, base: string, cwd: string): Set<string> {
   if (outlineFile) {
     for (const m of answer.matchAll(/ — L(\d+):\d+/g)) out.add(`${outlineFile}:${m[1]}`);
   }
+  for (const location of findRowLocations(answer, cwd)) out.add(location);
   const norm = (path: string) => relative(cwd, resolve(base, path));
   for (const m of answer.matchAll(/^([\w./@-]+\.\w+):(\d+):/gm)) {
     out.add(`${norm(m[1] as string)}:${m[2]}`);
@@ -170,6 +198,46 @@ function locations(text: string, base: string, cwd: string): Set<string> {
     out.add(`${relative(cwd, resolve(cwd, m[1] as string))}:${m[2]}`);
   }
   return out;
+}
+
+/** code_find rows (`` - `name` (kind) L12:3 ``) under their `### path` file heading. */
+function findRowLocations(answer: string, cwd: string): string[] {
+  const out: string[] = [];
+  let heading: string | undefined;
+  for (const line of answer.split("\n")) {
+    const file = /^### ([\w./@-]+\.\w+)$/.exec(line)?.[1];
+    if (file) heading = file;
+    else if (/^#{1,3} /.test(line)) heading = undefined;
+    const row = /^- .*\) L(\d+):\d+/.exec(line)?.[1];
+    if (heading && row) out.push(`${relative(cwd, resolve(cwd, heading))}:${row}`);
+  }
+  return out;
+}
+
+/**
+ * Expected files a navigation answer names. A path counts when the output
+ * mentions it relative to the workspace or to the call's directory/focus
+ * (ls and directory inventories print focus-relative names), or when the
+ * call itself reads it.
+ */
+function namedPaths(
+  call: BenchCall,
+  output: string,
+  expected: readonly string[],
+  cwd: string,
+): string[] {
+  const args = call.args as { path?: unknown; focus?: { path?: unknown } };
+  const callPath = String(args.focus?.path ?? args.path ?? ".");
+  const bases = [cwd, resolve(cwd, callPath)];
+  return expected.filter((path) => {
+    if (call.tool === "read" && resolve(cwd, callPath) === resolve(cwd, path)) return true;
+    return bases.some((base) => {
+      const name = relative(base, resolve(cwd, path));
+      if (name.startsWith("..")) return false;
+      const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      return new RegExp(`(^|[^\\w./-])${escaped}($|[^\\w./-])`, "m").test(output);
+    });
+  });
 }
 
 /** grep prints paths relative to a searched directory, or the bare name for a searched file. */
@@ -225,6 +293,7 @@ function printReport(
         "calls n/c": `${native.calls}/${code.calls}${diff(code.calls, before?.calls)}`,
         "precision n/c": `${pct(native.precision)}/${pct(code.precision)}${diff(code.precision, before?.precision)}`,
         "recall n/c": `${pct(native.recall)}/${pct(code.recall)}${diff(code.recall, before?.recall)}`,
+        "tok/hit n/c": `${native.tokensPerHit ?? "–"}/${code.tokensPerHit ?? "–"}${diff(code.tokensPerHit, before?.tokensPerHit)}`,
         "ms n/c": latency[id],
       };
     }),
