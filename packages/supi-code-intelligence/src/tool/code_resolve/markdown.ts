@@ -13,8 +13,8 @@ export function renderResolveResult(assembly: ResolveResultAssembly): string {
   switch (outcome.kind) {
     case "resolved":
       return renderResolved(outcome, cwd);
-    case "target-group":
-      return renderTargetGroup(assembly.details);
+    case "file-outline":
+      return renderFileOutline(assembly.details);
     case "disambiguation":
       return renderDisambiguation(assembly.details);
     case "kind-mismatch":
@@ -47,26 +47,26 @@ function renderResolved(
   return lines.join("\n");
 }
 
-function renderTargetGroup(details: ResolveDetails): string {
-  const discovery = details.groupDiscoveryProvenance?.join("+") || "unavailable";
+function renderFileOutline(details: ResolveDetails): string {
+  const discovery = details.outlineDiscoveryProvenance?.join("+") || "unavailable";
   const lines = [
-    `# Targets in \`${details.groupFile ?? "file"}\``,
+    `# File outline of \`${details.outlineFile ?? "file"}\``,
     "",
     `- Group confidence: \`${details.confidence}\``,
     `- Discovery provenance: \`${discovery}\``,
   ];
-  appendUnknownHierarchyDisclosure(lines, details.groupUnknownNestingCount ?? 0);
-  appendGroupRecoveryDisclosure(lines, details);
+  appendUnknownLevelDisclosure(lines, details.outlineUnknownLevelCount ?? 0);
+  appendOutlineRecoveryDisclosure(lines, details);
   lines.push("");
-  appendTargetGroupItems(lines, details);
+  appendFileOutlineItems(lines, details);
   appendDisclosure(lines, details);
   return lines.join("\n");
 }
 
-function appendTargetGroupItems(lines: string[], details: ResolveDetails): void {
+function appendFileOutlineItems(lines: string[], details: ResolveDetails): void {
   if (details.targets.length === 0) {
     lines.push(
-      details.groupPartialReason
+      details.outlinePartialReason
         ? "No declarations were collected before structural recovery limited discovery."
         : "No declarations were reported for this file.",
     );
@@ -83,24 +83,24 @@ function appendTargetGroupItems(lines: string[], details: ResolveDetails): void 
   }
 }
 
-function appendGroupRecoveryDisclosure(lines: string[], details: ResolveDetails): void {
-  if (!details.groupPartialReason) return;
-  const locations = (details.groupErrorRanges ?? []).map(
+function appendOutlineRecoveryDisclosure(lines: string[], details: ResolveDetails): void {
+  if (!details.outlinePartialReason) return;
+  const locations = (details.outlineErrorRanges ?? []).map(
     (range) => `L${range.start.line + 1}:${range.start.character + 1}`,
   );
   const errors = locations.length ? ` Error locations: ${locations.join(", ")}.` : "";
-  lines.push(`- Partial discovery: ${details.groupPartialReason}${errors}`);
+  lines.push(`- Partial discovery: ${details.outlinePartialReason}${errors}`);
 }
 
 function declarationCountHeading(count: number): string {
   return `**${count} declaration${count === 1 ? "" : "s"} discovered**`;
 }
 
-function appendUnknownHierarchyDisclosure(lines: string[], count: number): void {
+function appendUnknownLevelDisclosure(lines: string[], count: number): void {
   if (count <= 0) return;
-  const declaration = count === 1 ? "declaration has" : "declarations have";
+  const declarations = count === 1 ? "declaration has" : "declarations have";
   lines.push(
-    `- Hierarchy: ${count} ${declaration} unknown hierarchy; only provider-proven top-level declarations were prioritized.`,
+    `- Position unknown: ${count} ${declarations} no enclosing declaration reported by the language server, so ${count === 1 ? "it is" : "they are"} listed after the top-level declarations.`,
   );
 }
 

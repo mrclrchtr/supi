@@ -82,10 +82,11 @@ export async function runRefactorPlanWorkflow(
     control,
   );
   throwIfAborted(control);
-  if (target.kind === "target-group") {
+  if (target.kind === "file-outline") {
     return {
       kind: "invalid-input",
-      message: "Refactor planning requires one member handle from a Target group.",
+      message:
+        "Refactor planning requires one declaration, not a whole file. Pass one handle from the file outline as target.handle.",
     };
   }
   if (target.kind === "disambiguation" || target.kind === "kind-mismatch") {

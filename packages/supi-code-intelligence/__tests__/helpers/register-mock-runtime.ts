@@ -60,7 +60,7 @@ function scanDocumentSymbols(filePath: string): DocumentCodeSymbol[] {
       declarationAnchor: { line: index + 1, character: line.search(/\S/) + 1 },
       nameAnchor: { line: index + 1, character: nameCharacter },
       container: null,
-      nesting: "top-level",
+      level: "top-level",
     });
   }
   return symbols;

@@ -270,7 +270,7 @@ describe("structured navigation results", () => {
     const handle = (anchored.structuredContent.targets as Array<{ handle: string }>)[0].handle;
     for (const [target, kind] of [
       [{ symbol: { query: "widget" } }, "resolved"],
-      [{ file: "index.ts" }, "target-group"],
+      [{ file: "index.ts" }, "file-outline"],
     ] as const) {
       const result = await resolve(target);
       expect(result.structuredContent).toMatchObject({

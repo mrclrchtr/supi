@@ -1,15 +1,8 @@
 import type { ConfidenceMode } from "@mrclrchtr/supi-code-runtime/api";
-import type { ResolvedTargetData, ResolvedTargetGroupData } from "./target/types.ts";
 
 interface FileLineRef {
   file: string;
   line: number;
-}
-
-export function isResolvedTargetGroup(
-  target: ResolvedTargetData | ResolvedTargetGroupData,
-): target is ResolvedTargetGroupData {
-  return "targets" in target;
 }
 
 export function highestConfidence(confidences: ConfidenceMode[]): ConfidenceMode {

@@ -4,6 +4,7 @@
 
 - `code_graph` references and implementations with the TypeScript server now report an incomplete result, naming the unloaded projects, when another `tsconfig.json` that includes the target file (such as a `__tests__` project that includes `../src`) has no open file. Previously, matches from such projects were silently missing and the result looked complete.
 - With the TypeScript 6 or earlier server (tsserver), `code_graph` implementations in workspaces with several TypeScript projects are now reported as incomplete: tsserver searches implementations only in the target file's project. The note suggests references or TypeScript 7 instead of opening more files.
+- `code_resolve` with a file target now reports a **file outline** instead of a "Target group": the result heading reads `# File outline of …`, structured output uses `kind: "file-outline"` and `unknownLevelCount`, and messages from `code_graph`, `code_orientation`, and `code_refactor_plan` explain that they need one declaration handle from the outline. Each declaration is classified as top-level, member (inside a class, interface, enum, namespace, or object literal), or local (inside a function or method body) instead of a single "nested" category.
 
 ## [11.3.0]
 

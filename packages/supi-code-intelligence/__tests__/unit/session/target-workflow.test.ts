@@ -10,7 +10,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import {
   completedCodeQuery,
-  type DeclarationNesting,
+  type DeclarationLevel,
   type SemanticProvider,
   type StructuralProvider,
 } from "@mrclrchtr/supi-code-runtime/api";
@@ -85,7 +85,7 @@ function makeTestSemantic(
     nameAnchor?: { line: number; character: number };
     declarationAnchor: { line: number; character: number };
     container?: string | null;
-    nesting?: DeclarationNesting;
+    level?: DeclarationLevel;
   }>,
 ): SemanticProvider {
   return {
@@ -100,7 +100,7 @@ function makeTestSemantic(
             declarationAnchor: s.declarationAnchor,
             nameAnchor: s.nameAnchor,
             container: s.container ?? null,
-            nesting: s.nesting ?? "unknown",
+            level: s.level ?? "unknown",
           })),
       ),
     workspaceSymbols: async () =>
@@ -440,8 +440,8 @@ describe("target-workflow (deep session seam)", () => {
         deps,
       );
 
-      expect(outcome.kind).toBe("target-group");
-      if (outcome.kind === "target-group") {
+      expect(outcome.kind).toBe("file-outline");
+      if (outcome.kind === "file-outline") {
         expect(outcome.file).toContain("src/mod.ts");
         expect(outcome.targets).toHaveLength(1);
         expect(outcome.targets[0]?.name).toBe("x");
@@ -478,8 +478,8 @@ describe("target-workflow (deep session seam)", () => {
         deps,
       );
 
-      expect(outcome.kind).toBe("target-group");
-      if (outcome.kind !== "target-group") return;
+      expect(outcome.kind).toBe("file-outline");
+      if (outcome.kind !== "file-outline") return;
       expect(new Set(outcome.targets.map((target) => target.targetId))).toHaveLength(2);
       expect(outcome.targets.map((target) => target.displayLine)).toEqual([1, 1]);
       expect(outcome.targets.map((target) => target.provenance)).toEqual([
@@ -530,8 +530,8 @@ describe("target-workflow (deep session seam)", () => {
         { ...DEFAULT_POLICY, fileLevelAllowed: true },
         buildDeps(new TestCapabilityAdapter({ semantic: makeTestSemantic([]), structural })),
       );
-      expect(first.kind).toBe("target-group");
-      if (first.kind !== "target-group") return;
+      expect(first.kind).toBe("file-outline");
+      if (first.kind !== "file-outline") return;
       const firstHelper = first.targets.find((target) => target.name === "helper");
       expect(firstHelper?.container).toBe("outer");
 
@@ -543,7 +543,7 @@ describe("target-workflow (deep session seam)", () => {
           declarationAnchor: { line: 1, character: 20 },
           nameAnchor: { line: 1, character: 26 },
           container: null,
-          nesting: "unknown",
+          level: "unknown",
         },
       ]);
       const refined = await resolveTargetWorkflow(
@@ -551,8 +551,8 @@ describe("target-workflow (deep session seam)", () => {
         { ...DEFAULT_POLICY, fileLevelAllowed: true },
         buildDeps(new TestCapabilityAdapter({ semantic, structural })),
       );
-      expect(refined.kind).toBe("target-group");
-      if (refined.kind !== "target-group") return;
+      expect(refined.kind).toBe("file-outline");
+      if (refined.kind !== "file-outline") return;
       const refinedHelper = refined.targets.find((target) => target.name === "helper");
 
       expect(refinedHelper?.targetId).toBe(firstHelper?.targetId);
@@ -565,7 +565,7 @@ describe("target-workflow (deep session seam)", () => {
       });
     });
 
-    it("keeps reconciled hierarchy-conflict handles stable across provider order", async () => {
+    it("keeps reconciled level-conflict handles stable across provider order", async () => {
       writeSource(
         "src/mod.ts",
         "function parent() {}\nfunction same() {}\nfunction laterTop() {}\n",
@@ -578,7 +578,7 @@ describe("target-workflow (deep session seam)", () => {
           declarationAnchor: { line: 2, character: 1 },
           nameAnchor: { line: 2, character: 10 },
           container: null,
-          nesting: "top-level" as const,
+          level: "top-level" as const,
         },
         {
           name: "laterTop",
@@ -587,7 +587,7 @@ describe("target-workflow (deep session seam)", () => {
           declarationAnchor: { line: 3, character: 1 },
           nameAnchor: { line: 3, character: 10 },
           container: null,
-          nesting: "top-level" as const,
+          level: "top-level" as const,
         },
       ];
       const outline = [
@@ -640,11 +640,11 @@ describe("target-workflow (deep session seam)", () => {
       const first = await resolve(false);
       const reversed = await resolve(true);
 
-      expect(first.kind).toBe("target-group");
-      expect(reversed.kind).toBe("target-group");
-      if (first.kind !== "target-group" || reversed.kind !== "target-group") return;
+      expect(first.kind).toBe("file-outline");
+      expect(reversed.kind).toBe("file-outline");
+      if (first.kind !== "file-outline" || reversed.kind !== "file-outline") return;
       expect(first.targets.map((target) => target.name)).toEqual(["parent", "laterTop", "same"]);
-      expect(first.unknownNestingCount).toBe(1);
+      expect(first.unknownLevelCount).toBe(1);
       expect(first.targets.find((target) => target.name === "same")).toMatchObject({
         container: null,
         provenance: ["semantic", "structural"] as const,
@@ -652,7 +652,7 @@ describe("target-workflow (deep session seam)", () => {
       expect(reversed.targets.map((target) => target.targetId)).toEqual(
         first.targets.map((target) => target.targetId),
       );
-      expect(reversed.unknownNestingCount).toBe(1);
+      expect(reversed.unknownLevelCount).toBe(1);
     });
 
     it("registers only prioritized bounded members while retaining exact completeness", async () => {
@@ -668,7 +668,7 @@ describe("target-workflow (deep session seam)", () => {
           declarationAnchor: { line: 1, character: 20 },
           nameAnchor: { line: 1, character: 26 },
           container: "outer",
-          nesting: "nested" as const,
+          level: "local" as const,
         },
         {
           name: "unknown",
@@ -676,7 +676,7 @@ describe("target-workflow (deep session seam)", () => {
           file: path.join(tmpDir, "src/mod.ts"),
           declarationAnchor: { line: 2, character: 1 },
           nameAnchor: { line: 2, character: 7 },
-          nesting: "unknown" as const,
+          level: "unknown" as const,
         },
         {
           name: "laterTop",
@@ -684,7 +684,7 @@ describe("target-workflow (deep session seam)", () => {
           file: path.join(tmpDir, "src/mod.ts"),
           declarationAnchor: { line: 3, character: 1 },
           nameAnchor: { line: 3, character: 10 },
-          nesting: "top-level" as const,
+          level: "top-level" as const,
         },
       ];
       const semantic = makeTestSemantic(symbols);
@@ -694,13 +694,13 @@ describe("target-workflow (deep session seam)", () => {
         buildDeps(new TestCapabilityAdapter({ semantic })),
       );
 
-      expect(outcome.kind).toBe("target-group");
-      if (outcome.kind !== "target-group") return;
+      expect(outcome.kind).toBe("file-outline");
+      if (outcome.kind !== "file-outline") return;
       expect(outcome.targets.map((target) => target.name)).toEqual(["laterTop"]);
       expect(store).toHaveLength(1);
       expect(outcome.totalCount).toBe(3);
       expect(outcome.omittedCount).toBe(2);
-      expect(outcome.unknownNestingCount).toBe(1);
+      expect(outcome.unknownLevelCount).toBe(1);
 
       const repeated = await resolveTargetWorkflow(
         { file: "src/mod.ts" },
@@ -709,15 +709,15 @@ describe("target-workflow (deep session seam)", () => {
           new TestCapabilityAdapter({ semantic: makeTestSemantic([...symbols].reverse()) }),
         ),
       );
-      expect(repeated.kind).toBe("target-group");
-      if (repeated.kind !== "target-group") return;
+      expect(repeated.kind).toBe("file-outline");
+      if (repeated.kind !== "file-outline") return;
       expect(repeated.targets.map((target) => target.name)).toEqual([
         "laterTop",
         "nested",
         "unknown",
       ]);
       expect(repeated.targets[0]?.targetId).toBe(outcome.targets[0]?.targetId);
-      expect(repeated).toMatchObject({ totalCount: 3, omittedCount: 0, unknownNestingCount: 1 });
+      expect(repeated).toMatchObject({ totalCount: 3, omittedCount: 0, unknownLevelCount: 1 });
     });
   });
 

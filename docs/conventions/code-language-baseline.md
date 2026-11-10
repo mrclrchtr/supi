@@ -117,7 +117,7 @@ Return usable recovered syntax as partial evidence when recovery can hide releva
 ### Operation without LSP
 
 - AST search and point syntax inspection can operate without a language server.
-- New targets and target groups still require semantic readiness.
+- New targets and file outlines still require semantic readiness.
 - Target-based structural callees retain the existing LSP-first target rule.
 - Existing fresh targets retain their current structural-consumer behavior after semantic-provider loss.
 - Semantic operations and rename require the relevant live server capability.

@@ -40,8 +40,8 @@ export type {
 export type { CodeProvider, CodeProviderState } from "./analysis/provider.ts";
 // Target resolution types.
 export type {
+  FileOutlineData,
   ResolvedTargetData,
-  ResolvedTargetGroupData,
   TargetOutcome,
   TargetProviderProvenance,
 } from "./analysis/target/types.ts";

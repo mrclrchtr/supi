@@ -119,7 +119,7 @@ describe("public scoped symbol recovery guidance", () => {
       details: {
         status: "completed",
         data: {
-          resultKind: "target-group",
+          resultKind: "file-outline",
           targets: [expect.objectContaining({ name: "Widget", targetId: expect.any(String) })],
         },
       },

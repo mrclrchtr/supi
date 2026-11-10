@@ -113,8 +113,8 @@ function sectionFacts(details: Details): string[] {
     case "resolve":
       return [
         `${details.data.resultKind}: ${details.data.targetCount} targets; ${details.data.omittedCount} cap omissions.`,
-        ...(details.data.groupPartialReason
-          ? [`Partial discovery: ${details.data.groupPartialReason}`]
+        ...(details.data.outlinePartialReason
+          ? [`Partial discovery: ${details.data.outlinePartialReason}`]
           : []),
         ...details.data.targets
           .slice(0, 3)

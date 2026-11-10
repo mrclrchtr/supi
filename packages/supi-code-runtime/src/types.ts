@@ -34,8 +34,16 @@ export interface SymbolAnchor {
   character: number;
 }
 
-/** Provider-backed nesting evidence for a declaration reported within one document. */
-export type DeclarationNesting = "top-level" | "nested" | "unknown";
+/**
+ * Where a declaration sits within its file, as reported by a provider.
+ *
+ * - `top-level`: directly in the file, not inside another declaration.
+ * - `member`: directly inside a class, interface, enum, struct, namespace,
+ *   module, or object literal (methods, fields, properties, enum members).
+ * - `local`: inside the body of a function, method, or constructor.
+ * - `unknown`: the provider reported a flat symbol list without hierarchy.
+ */
+export type DeclarationLevel = "top-level" | "member" | "local" | "unknown";
 
 /**
  * A discovered symbol / declaration.
@@ -54,7 +62,7 @@ export interface CodeSymbol {
   file: string;
   declarationAnchor: SymbolAnchor;
   nameAnchor?: SymbolAnchor;
-  /** Named symbolic container when reported; absence does not prove top-level nesting. */
+  /** Named enclosing declaration when reported; absence does not prove a top-level declaration. */
   container?: string | null;
 }
 
@@ -63,10 +71,10 @@ export interface CodeSymbol {
  *
  * `unknown` means the provider returned a flat observation without an actual
  * hierarchy. A reported container name remains metadata and does not promote
- * a flat observation to known nesting.
+ * a flat observation to a known level.
  */
 export interface DocumentCodeSymbol extends CodeSymbol {
-  nesting: DeclarationNesting;
+  level: DeclarationLevel;
 }
 
 // ── Result types ───────────────────────────────────────────────────────

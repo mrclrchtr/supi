@@ -118,21 +118,21 @@ _Avoid_: whole-record replacement, latest observation wins, first observation wi
 The monotonic set of provider families—semantic and structural—that established a target declaration. It records corroborating evidence, not selector or workflow origin; anchored resolution path belongs to resolution metadata.
 _Avoid_: strongest source, symbol-query provenance, resolution reason
 
-**Target group**:
-A bounded public collection derived from all evidence-backed declarations discovered within one file when no single symbol was selected, including nested declarations. Discovery retains exact total/omitted completeness, but only visible members are materialized as handles. Provider-proven top-level declarations are presented first; every other declaration remains source-ordered. The group is not itself a Resolved target; downstream precise intents select one member.
-_Avoid_: file handle, synthetic target, unbounded handle batch, treating a file coordinate as a symbol
+**File outline**:
+The bounded list of declarations discovered in one file when a file, not a single symbol, was selected. Each listed declaration carries its own handle; the outline itself is not a Resolved target, and precise downstream work selects one declaration from it.
+_Avoid_: Target group, file handle, synthetic target, treating a file coordinate as a symbol
 
-**Declaration nesting evidence**:
-A document-declaration fact with exactly three states: `top-level`, `nested`, or `unknown`. Hierarchical LSP document symbols and structural outline ancestry establish known states. Every flat LSP `SymbolInformation` observation remains `unknown`; `containerName` is retained only as container metadata and never establishes nesting. Equivalent provider observations reconcile nesting before presentation ranking, and a Target group discloses the exact unknown count.
-_Avoid_: nullable container inference, capitalization heuristics, kind-based hierarchy, source-order fallback
+**Declaration level**:
+Where a declaration sits within its file: `top-level` (directly in the file), `member` (directly inside a class, interface, enum, struct, namespace, module, or object literal), `local` (inside a function, method, or constructor body), or `unknown` (the provider reported no enclosing declaration). Only provider-reported hierarchy establishes a known level.
+_Avoid_: nesting, nested declaration, hierarchy, inferring a level from a container name, capitalization, or source order
 
-**Target group discovery provenance**:
-The provider families that successfully enumerated a selected file, including successful empty observations. It describes the group discovery attempt, not the evidence establishing each member.
-_Avoid_: member provenance, group confidence, provider availability
+**File outline discovery provenance**:
+The provider families that successfully enumerated the selected file, including successful empty observations. It describes the discovery attempt, not the evidence establishing each declaration.
+_Avoid_: declaration provenance, outline confidence, provider availability
 
-**Target group confidence**:
-A conservative summary of member confidence: semantic only when every member is semantic, and structural when any member is structural-only. For an empty group, it reflects the strongest successful enumerator.
-_Avoid_: strongest member confidence, provider availability, mixed provenance
+**File outline confidence**:
+A conservative summary of declaration confidence: semantic only when every declaration is semantic, and structural when any declaration is structural-only. For an empty outline, it reflects the strongest successful enumerator.
+_Avoid_: strongest declaration confidence, provider availability, mixed provenance
 
 **Canonical declaration identity kind**:
 The provider-independent declaration family used only for cross-provider matching and Target-handle identity. It normally normalizes the Provider-reported symbol kind; when that kind cannot express the source construct, exact structural evidence at the declaration's Name anchor may refine it. For example, a TypeScript LSP `Variable` at a Tree-sitter `type_alias_declaration` retains `Variable` for display but uses `type` for identity. This is declaration-specific and does not merge separate type/value namespace declarations.
@@ -155,7 +155,7 @@ A valid target-selection outcome where a semantic symbol query reports candidate
 _Avoid_: symbol not found, invalid input, disambiguation, silent fallback
 
 **LSP-first target resolution**:
-The rule that a live semantic provider is required when a Resolved target or Target group is established or refined. Workspace-symbol demand can use a registered pending provider while it recovers required LSP routes; incomplete route evidence cannot establish not-found. A fresh stored target may still support structural consumers, while semantic consumers require live semantic evidence.
+The rule that a live semantic provider is required when a Resolved target or File outline is established or refined. Workspace-symbol demand can use a registered pending provider while it recovers required LSP routes; incomplete route evidence cannot establish not-found. A fresh stored target may still support structural consumers, while semantic consumers require live semantic evidence.
 _Avoid_: structural-only target creation, treating a structural identifier as semantic identity
 
 **Server status evidence**:
@@ -235,7 +235,7 @@ One fact that can independently support a coding decision. Evidence-list totals 
 _Avoid_: counting visual rows as facts, treating file groups as references
 
 **Result cap**:
-A display limit for public tool evidence, not a normal-path enumeration limit. A capped result may show fewer evidence atoms than exist, but it must still disclose the exact total and omitted count unless exceptional interruption prevents exact counting. For Target groups, enumeration completes before the cap and only visible declarations are materialized as handles.
+A display limit for public tool evidence, not a normal-path enumeration limit. A capped result may show fewer evidence atoms than exist, but it must still disclose the exact total and omitted count unless exceptional interruption prevents exact counting. For File outlines, enumeration completes before the cap and only visible declarations are materialized as handles.
 _Avoid_: treating `maxResults` as permission to stop counting evidence, registering hidden handles, silent early-stop search
 
 **Evidence ordering**:

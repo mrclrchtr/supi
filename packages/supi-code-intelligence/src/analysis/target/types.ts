@@ -102,18 +102,18 @@ export interface ResolvedTargetData {
 }
 
 /**
- * A file-derived Target group with zero or more evidence-backed declarations.
+ * The File outline of one file: zero or more evidence-backed declarations.
  */
-export interface ResolvedTargetGroupData {
+export interface FileOutlineData {
   file: string;
   displayName: string;
   targets: ResolvedTargetData[];
   /** Providers that successfully enumerated the selected file. */
   discoveryProvenance: readonly TargetProviderProvenance[];
-  /** Conservative confidence across the complete group, before display capping. */
+  /** Conservative confidence across the complete outline, before display capping. */
   confidence: "semantic" | "structural" | "heuristic" | "unavailable";
-  /** Complete-group declarations whose provider observations could not establish hierarchy. */
-  unknownNestingCount: number;
+  /** Declarations in the complete outline whose provider reported no enclosing declaration. */
+  unknownLevelCount: number;
   /** Partial provider collection; targets remain usable and exact absence is not claimed. */
   partial?: { reason: string; errorRanges: readonly SourceRange[] };
 }
@@ -166,7 +166,7 @@ export type TargetOutcome =
       /** Request-scoped evidence notes, such as policy exclusions beside a unique match. */
       notes?: readonly string[];
     }
-  | { kind: "group"; group: ResolvedTargetGroupData }
+  | { kind: "file-outline"; outline: FileOutlineData }
   | ({
       kind: "disambiguation";
       candidates: DisambiguationCandidateData[];

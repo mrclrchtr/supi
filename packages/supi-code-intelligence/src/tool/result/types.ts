@@ -123,20 +123,20 @@ export type { DisambiguationCandidateData as DisambiguationCandidate } from "../
 export interface ResolveDetails {
   resultKind:
     | "resolved"
-    | "target-group"
+    | "file-outline"
     | "disambiguation"
     | "kind-mismatch"
     | "invalid-input"
     | "unavailable";
-  /** Workspace-relative source file for a file-derived Target group. */
-  groupFile?: string;
-  /** Providers that successfully enumerated a file-derived Target group. */
-  groupDiscoveryProvenance?: readonly TargetProviderProvenance[];
-  /** Complete-group declarations whose providers could not establish nesting. */
-  groupUnknownNestingCount?: number;
-  /** Provider recovery that makes this target group incomplete. */
-  groupPartialReason?: string | null;
-  groupErrorRanges?: readonly SourceRange[];
+  /** Workspace-relative source file of a File outline. */
+  outlineFile?: string;
+  /** Providers that successfully enumerated the File outline's file. */
+  outlineDiscoveryProvenance?: readonly TargetProviderProvenance[];
+  /** Outline declarations whose provider reported no enclosing declaration. */
+  outlineUnknownLevelCount?: number;
+  /** Provider recovery that makes this File outline incomplete. */
+  outlinePartialReason?: string | null;
+  outlineErrorRanges?: readonly SourceRange[];
   /** Strict provider kind that produced a near-match result. */
   requestedKind?: TargetSymbolKind;
   confidence: ConfidenceMode;

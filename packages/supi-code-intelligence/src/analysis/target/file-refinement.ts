@@ -24,11 +24,11 @@ export function refineLatexSectionNameAnchor(
   };
 }
 
-/** Prefer known hierarchy, but keep conflicts unknown. */
-export function reconcileNesting(
-  semantic: DiscoveredTargetData["nesting"],
-  structural: DiscoveredTargetData["nesting"],
-): DiscoveredTargetData["nesting"] {
+/** Prefer a known declaration level, but keep conflicts unknown. */
+export function reconcileLevel(
+  semantic: DiscoveredTargetData["level"],
+  structural: DiscoveredTargetData["level"],
+): DiscoveredTargetData["level"] {
   if (semantic === structural) return semantic;
   if (semantic === "unknown") return structural;
   if (structural === "unknown") return semantic;
@@ -41,10 +41,10 @@ export function reconcileContainer(
   structural: DiscoveredTargetData,
 ): string | null {
   if (semantic.container === structural.container) return semantic.container;
-  if (semantic.nesting === "unknown" && semantic.container === null) {
+  if (semantic.level === "unknown" && semantic.container === null) {
     return structural.container;
   }
-  if (structural.nesting === "unknown" && structural.container === null) {
+  if (structural.level === "unknown" && structural.container === null) {
     return semantic.container;
   }
   return null;

@@ -122,10 +122,11 @@ async function orientTarget(options: {
     control,
   );
   throwIfAborted(control);
-  if (target.kind === "target-group") {
+  if (target.kind === "file-outline") {
     return {
       kind: "invalid-input",
-      message: "Precise Orientation requires one member handle from a Target group.",
+      message:
+        "Orientation on a target requires one declaration, not a whole file. Pass one handle from the file outline as target.handle, or use focus.path for the file.",
     };
   }
   if (target.kind === "disambiguation" || target.kind === "kind-mismatch") {

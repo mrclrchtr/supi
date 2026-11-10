@@ -12,7 +12,7 @@ const testTheme = {
 beforeAll(() => initTheme("dark"));
 
 describe("code_resolve result rendering", () => {
-  it("discloses unknown hierarchy in markdown and both TUI views", () => {
+  it("discloses unknown declaration positions in markdown and both TUI views", () => {
     const target = {
       targetId: "tg-known",
       spanId: "sp-known",
@@ -30,14 +30,14 @@ describe("code_resolve result rendering", () => {
     };
     const assembly = assembleResolveResult(
       {
-        kind: "target-group",
+        kind: "file-outline",
         file: target.file,
         confidence: "semantic",
         discoveryProvenance: ["semantic"],
         targets: [target],
         totalCount: 2,
         omittedCount: 1,
-        unknownNestingCount: 1,
+        unknownLevelCount: 1,
       },
       "/repo",
     );
@@ -60,9 +60,9 @@ describe("code_resolve result rendering", () => {
       undefined,
     );
 
-    expect(markdown).toContain("1 declaration has unknown hierarchy");
-    expect(compact.render(300).join("\n")).toContain("1 hierarchy unknown");
-    expect(expanded.render(300).join("\n")).toContain("hierarchy unknown: 1");
+    expect(markdown).toContain("1 declaration has no enclosing declaration reported");
+    expect(compact.render(300).join("\n")).toContain("1 position unknown");
+    expect(expanded.render(300).join("\n")).toContain("position unknown: 1");
   });
 
   it("renders a no-symbol coordinate error with one TUI error label", () => {

@@ -2,10 +2,11 @@ import { readFile } from "node:fs/promises";
 import type {
   CodeLocation,
   CodeSymbol,
-  DeclarationNesting,
+  DeclarationLevel,
   DocumentCodeSymbol,
   SourceRange,
 } from "@mrclrchtr/supi-code-runtime/api";
+import { childDeclarationLevel } from "@mrclrchtr/supi-code-runtime/api";
 import { uriToFile } from "@mrclrchtr/supi-core/path";
 import type {
   DocumentSymbol,
@@ -100,15 +101,26 @@ export async function mapDocumentSymbols(
 ): Promise<DocumentCodeSymbol[]> {
   return flattenDocumentSymbols(symbols, filePath, null, {
     sourceLines: await readSourceLines(filePath),
-    nesting: "top-level",
+    parent: null,
   });
+}
+
+/** Level of a symbol reported inside `parent`, or top-level without one. */
+function levelWithin(
+  parent: { readonly kind: string; readonly level: DeclarationLevel } | null,
+  kind: string,
+): DeclarationLevel {
+  return parent ? childDeclarationLevel(parent, kind) : "top-level";
 }
 
 function flattenDocumentSymbols(
   symbols: DocumentSymbol[] | SymbolInformation[],
   filePath: string,
   container: string | null,
-  context: { sourceLines: readonly string[] | null; nesting: DeclarationNesting },
+  context: {
+    sourceLines: readonly string[] | null;
+    parent: { readonly kind: string; readonly level: DeclarationLevel } | null;
+  },
 ): DocumentCodeSymbol[] {
   const result: DocumentCodeSymbol[] = [];
   for (const sym of symbols) {
@@ -116,15 +128,13 @@ function flattenDocumentSymbols(
     let document: DocumentSymbol | null = null;
     if (isSymbolInformation(sym)) information = sym;
     else document = sym;
+    const kind = symbolKindName(sym.kind);
+    const level = information ? "unknown" : levelWithin(context.parent, kind);
+    const childContext = { sourceLines: context.sourceLines, parent: { kind, level } };
     const declarationRange = toValidRange(document?.range ?? information?.location.range);
     if (!declarationRange) {
       if (document?.children?.length) {
-        result.push(
-          ...flattenDocumentSymbols(document.children, filePath, sym.name, {
-            sourceLines: context.sourceLines,
-            nesting: "nested",
-          }),
-        );
+        result.push(...flattenDocumentSymbols(document.children, filePath, sym.name, childContext));
       }
       continue;
     }
@@ -134,23 +144,18 @@ function flattenDocumentSymbols(
       : null;
     const symbol: DocumentCodeSymbol = {
       name: sym.name,
-      kind: symbolKindName(sym.kind),
+      kind,
       file: filePath,
       declarationAnchor: { line: declStart.line + 1, character: declStart.character + 1 },
       container: information?.containerName ?? container,
-      nesting: information ? "unknown" : context.nesting,
+      level,
     };
     if (nameStart) {
       symbol.nameAnchor = { line: nameStart.line + 1, character: nameStart.character + 1 };
     }
     result.push(symbol);
     if (document?.children?.length) {
-      result.push(
-        ...flattenDocumentSymbols(document.children, filePath, sym.name, {
-          sourceLines: context.sourceLines,
-          nesting: "nested",
-        }),
-      );
+      result.push(...flattenDocumentSymbols(document.children, filePath, sym.name, childContext));
     }
   }
   return result;

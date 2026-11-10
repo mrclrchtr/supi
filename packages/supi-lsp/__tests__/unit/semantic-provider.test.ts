@@ -258,12 +258,12 @@ describe("LspSemanticProvider", () => {
         name: "myClass",
         kind: "Class",
         container: null,
-        nesting: "top-level",
+        level: "top-level",
       });
       expect(data[1]).toMatchObject({
         name: "myMethod",
         container: "myClass",
-        nesting: "nested",
+        level: "member",
       });
     });
 
@@ -322,8 +322,8 @@ describe("LspSemanticProvider", () => {
       const result = await createLspSemanticProvider(lsp).documentSymbols("test.ts");
 
       expect(completedData(result)).toMatchObject([
-        { name: "unknownRoot", container: null, nesting: "unknown" },
-        { name: "knownNested", container: "Box", nesting: "unknown" },
+        { name: "unknownRoot", container: null, level: "unknown" },
+        { name: "knownNested", container: "Box", level: "unknown" },
       ]);
     });
 

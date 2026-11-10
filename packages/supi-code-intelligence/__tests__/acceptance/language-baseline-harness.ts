@@ -193,16 +193,16 @@ async function assertDocumentSymbols(setup: ToolContext, spec: LanguageCase): Pr
     const data = resultData<{
       resultKind: string;
       targets: TargetInfo[];
-      groupPartialReason: string | null;
+      outlinePartialReason: string | null;
     }>(result);
-    expect(data.resultKind).toBe("target-group");
+    expect(data.resultKind).toBe("file-outline");
     expect(data.targets.some((target) => target.name === spec.renameName)).toBe(true);
     expect(data.targets.every((target) => target.provenance.length > 0)).toBe(true);
     if (spec.typescriptInstallation) {
       expect(data.targets.find((target) => target.name === spec.renameName)?.provenance).toContain(
         "semantic",
       );
-      expect(data.groupPartialReason).toBeNull();
+      expect(data.outlinePartialReason).toBeNull();
     }
   } finally {
     if (spec.typescriptInstallation) setup.workspace.enableStructural();

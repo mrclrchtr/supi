@@ -50,7 +50,7 @@ function setup(edits: (files: { index: string; other: string }) => FileEdit[]) {
           declarationAnchor: { line: 1, character: 1 },
           nameAnchor: { line: 1, character: 1 },
           container: null,
-          nesting: "top-level",
+          level: "top-level",
         },
       ]),
     workspaceSymbols: async () => completedCodeQuery([]),

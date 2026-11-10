@@ -197,7 +197,7 @@ describe("code_orientation evidence sections", () => {
             declarationAnchor: { line: 1, character: 1 },
             nameAnchor: { line: 1, character: 17 },
             container: null,
-            nesting: "top-level" as const,
+            level: "top-level" as const,
           },
         ]),
     });

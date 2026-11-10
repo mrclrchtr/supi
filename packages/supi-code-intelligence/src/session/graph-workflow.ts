@@ -57,10 +57,11 @@ export async function runGraphWorkflow(
     control,
   );
   throwIfAborted(control);
-  if (targetOutcome.kind === "target-group") {
+  if (targetOutcome.kind === "file-outline") {
     return {
       kind: "invalid-input",
-      message: "Graph analysis requires one member handle from a Target group.",
+      message:
+        "Graph analysis requires one declaration, not a whole file. Pass one handle from the file outline as target.handle.",
     };
   }
   if (targetOutcome.kind !== "resolved") return targetOutcome;
@@ -155,6 +156,6 @@ async function getSemanticReadinessError(options: {
 /** Narrow helper retained for session method typing. */
 export function isTargetFailure(
   outcome: TargetWorkflowOutcome,
-): outcome is Exclude<TargetWorkflowOutcome, { kind: "resolved" } | { kind: "target-group" }> {
-  return outcome.kind !== "resolved" && outcome.kind !== "target-group";
+): outcome is Exclude<TargetWorkflowOutcome, { kind: "resolved" } | { kind: "file-outline" }> {
+  return outcome.kind !== "resolved" && outcome.kind !== "file-outline";
 }

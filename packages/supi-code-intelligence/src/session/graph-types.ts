@@ -84,4 +84,4 @@ export interface CompletedGraphWorkflow {
 /** Graph workflow outcome, preserving target disambiguation and failure states. */
 export type GraphWorkflowOutcome =
   | CompletedGraphWorkflow
-  | Exclude<TargetWorkflowOutcome, { kind: "resolved" } | { kind: "target-group" }>;
+  | Exclude<TargetWorkflowOutcome, { kind: "resolved" } | { kind: "file-outline" }>;

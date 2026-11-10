@@ -14,6 +14,7 @@ export type {
   StructuralProvider,
   StructuralResult,
 } from "./capability/types.ts";
+export { childDeclarationLevel } from "./declaration-level.ts";
 export type {
   CFamilyExtension,
   CFamilyFileAssociationResolver,
@@ -50,7 +51,7 @@ export type {
   CodeResult,
   CodeSymbol,
   ConfidenceMode,
-  DeclarationNesting,
+  DeclarationLevel,
   DisambiguationCandidate,
   DocumentCodeSymbol,
   DocumentEditPrecondition,

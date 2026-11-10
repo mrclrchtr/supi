@@ -37,7 +37,7 @@ function docSymbols(
         declarationAnchor: { line: 1, character: 1 },
         nameAnchor: { line: 1, character: 17 },
         container: null,
-        nesting: "top-level",
+        level: "top-level",
       },
     ]);
   }
@@ -189,7 +189,7 @@ describe("resolveAnchoredSymbolTarget — ambiguous coordinates", () => {
             declarationAnchor: { line: 1, character: 1 },
             nameAnchor: { line: 1, character: 14 },
             container: null,
-            nesting: "top-level" as const,
+            level: "top-level" as const,
           },
           {
             name: "b",
@@ -198,7 +198,7 @@ describe("resolveAnchoredSymbolTarget — ambiguous coordinates", () => {
             declarationAnchor: { line: 2, character: 1 },
             nameAnchor: { line: 2, character: 14 },
             container: null,
-            nesting: "top-level" as const,
+            level: "top-level" as const,
           },
         ]),
       ),
@@ -229,7 +229,7 @@ describe("resolveAnchoredSymbolTarget — ambiguous coordinates", () => {
             declarationAnchor: { line: 1, character: 1 },
             nameAnchor: { line: 1, character: 17 },
             container: null,
-            nesting: "top-level" as const,
+            level: "top-level" as const,
           },
           {
             name: "widget",
@@ -238,7 +238,7 @@ describe("resolveAnchoredSymbolTarget — ambiguous coordinates", () => {
             declarationAnchor: { line: 1, character: 1 },
             nameAnchor: { line: 1, character: 17 },
             container: "Other",
-            nesting: "nested" as const,
+            level: "member" as const,
           },
         ]),
       ),

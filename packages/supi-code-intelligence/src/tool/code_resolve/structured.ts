@@ -12,7 +12,7 @@ import type { ResolveDetails } from "../result/types.ts";
 export const ResolveOutputSchema = Type.Object(
   {
     kind: Type.Enum(
-      ["resolved", "target-group", "disambiguation", "kind-mismatch", "invalid-input"],
+      ["resolved", "file-outline", "disambiguation", "kind-mismatch", "invalid-input"],
       { type: "string" },
     ),
     confidence: ConfidenceSchema,
@@ -23,7 +23,7 @@ export const ResolveOutputSchema = Type.Object(
     message: Type.Optional(Type.String()),
     file: Type.Optional(Type.String()),
     requestedKind: Type.Optional(Type.String()),
-    unknownNestingCount: Type.Optional(Type.Integer()),
+    unknownLevelCount: Type.Optional(Type.Integer()),
     discoveryProvenance: Type.Optional(
       Type.Array(Type.Enum(["semantic", "structural"], { type: "string" })),
     ),
@@ -80,19 +80,21 @@ export function structuredResolveResult(
     nextQueries: data.nextQueries,
     notes: outcome.kind === "resolved" ? [...outcome.notes] : [],
     ...(data.message === undefined ? {} : { message: data.message }),
-    ...(data.groupFile === undefined ? {} : { file: data.groupFile }),
+    ...(data.outlineFile === undefined ? {} : { file: data.outlineFile }),
     ...(data.requestedKind === undefined ? {} : { requestedKind: data.requestedKind }),
-    ...(data.groupUnknownNestingCount === undefined
+    ...(data.outlineUnknownLevelCount === undefined
       ? {}
-      : { unknownNestingCount: data.groupUnknownNestingCount }),
-    ...(data.groupDiscoveryProvenance === undefined
+      : { unknownLevelCount: data.outlineUnknownLevelCount }),
+    ...(data.outlineDiscoveryProvenance === undefined
       ? {}
-      : { discoveryProvenance: [...data.groupDiscoveryProvenance] }),
-    ...(data.groupPartialReason === undefined ? {} : { partialReason: data.groupPartialReason }),
-    ...(data.groupErrorRanges === undefined
+      : { discoveryProvenance: [...data.outlineDiscoveryProvenance] }),
+    ...(data.outlinePartialReason === undefined
+      ? {}
+      : { partialReason: data.outlinePartialReason }),
+    ...(data.outlineErrorRanges === undefined
       ? {}
       : {
-          errorRanges: data.groupErrorRanges.map((range) => ({
+          errorRanges: data.outlineErrorRanges.map((range) => ({
             start: { ...range.start },
             end: { ...range.end },
           })),

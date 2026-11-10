@@ -278,7 +278,7 @@ describe("canonical Tool result assembly", () => {
     expect(assembly.details.nextQueries[0]).toContain("Retry without symbolKind");
   });
 
-  it("assembles a bounded file Target group without synthetic handles", () => {
+  it("assembles a bounded file outline without synthetic handles", () => {
     const makeTarget = (name: string, line: number) => ({
       targetId: `tg-${name}`,
       spanId: `sp-${name}`,
@@ -297,14 +297,14 @@ describe("canonical Tool result assembly", () => {
     });
     const assembly = assembleResolveResult(
       {
-        kind: "target-group",
+        kind: "file-outline",
         file: "/repo/src/a.ts",
         confidence: "semantic",
         discoveryProvenance: ["semantic", "structural"],
         targets: [makeTarget("one", 1)],
         totalCount: 2,
         omittedCount: 1,
-        unknownNestingCount: 1,
+        unknownLevelCount: 1,
         partial: {
           reason: "Tree-sitter recovered syntax.",
           errorRanges: [{ start: { line: 2, character: 0 }, end: { line: 2, character: 0 } }],
@@ -315,12 +315,12 @@ describe("canonical Tool result assembly", () => {
     const markdown = renderResolveResult(assembly);
 
     expect(assembly.details).toMatchObject({
-      resultKind: "target-group",
-      groupFile: "src/a.ts",
-      groupDiscoveryProvenance: ["semantic", "structural"],
-      groupUnknownNestingCount: 1,
-      groupPartialReason: "Tree-sitter recovered syntax.",
-      groupErrorRanges: [{ start: { line: 2, character: 0 }, end: { line: 2, character: 0 } }],
+      resultKind: "file-outline",
+      outlineFile: "src/a.ts",
+      outlineDiscoveryProvenance: ["semantic", "structural"],
+      outlineUnknownLevelCount: 1,
+      outlinePartialReason: "Tree-sitter recovered syntax.",
+      outlineErrorRanges: [{ start: { line: 2, character: 0 }, end: { line: 2, character: 0 } }],
       targetCount: 2,
       omittedCount: 1,
       targets: [{ targetId: "tg-one" }],
@@ -333,7 +333,7 @@ describe("canonical Tool result assembly", () => {
       partialReason: "provider-limited",
       partialMessage: "Tree-sitter recovered syntax.",
     });
-    expect(markdown).toContain("Targets in `src/a.ts`");
+    expect(markdown).toContain("File outline of `src/a.ts`");
     expect(markdown.match(/src\/a\.ts/g)).toHaveLength(1);
     expect(markdown).toContain("`1:8`");
     expect(markdown).toContain(
@@ -342,11 +342,11 @@ describe("canonical Tool result assembly", () => {
     expect(markdown).toContain("tg-one");
     expect(markdown).toContain("(`record`)");
     expect(markdown).toContain("provenance: semantic+structural");
-    expect(markdown).toContain("1 declaration has unknown hierarchy");
+    expect(markdown).toContain("1 declaration has no enclosing declaration reported");
     expect(markdown).not.toContain("tg-two");
     expect(markdown).toContain("showing 1 of 2; 1 omitted");
-    // A partial group keeps the established member-choice advice.
-    expect(assembly.details.nextQueries[0]).toContain("Choose one Target group member handle");
+    // A partial outline keeps the advice to pass one declaration handle onward.
+    expect(assembly.details.nextQueries[0]).toContain("as target.handle");
   });
 
   it("assembles Orientation facts before markdown rendering", () => {

@@ -382,8 +382,8 @@ describe("WorkspaceCodeIntelligenceSession real-substrate contract", () => {
       target: { file: CONTRACT_FIXTURE.contracts },
       maxResults: 6,
     });
-    expect(fileOutcome.kind).toBe("target-group");
-    if (fileOutcome.kind !== "target-group") throw new Error("Expected a Target group.");
+    expect(fileOutcome.kind).toBe("file-outline");
+    if (fileOutcome.kind !== "file-outline") throw new Error("Expected a file outline.");
     expect(fileOutcome.targets.map((target) => target.name)).toEqual([
       "ContractAlias",
       "Contract",
@@ -393,11 +393,11 @@ describe("WorkspaceCodeIntelligenceSession real-substrate contract", () => {
       "coordinateTarget",
     ]);
     expect(fileOutcome.targets.every((target) => target.container === null)).toBe(true);
-    expect(fileOutcome.unknownNestingCount).toBe(0);
+    expect(fileOutcome.unknownLevelCount).toBe(0);
     expect(fileOutcome.omittedCount).toBeGreaterThan(0);
 
     const fileTarget = fileOutcome.targets.find((target) => target.name === "coordinateTarget");
-    if (!fileTarget) throw new Error("Expected coordinateTarget in the Target group.");
+    if (!fileTarget) throw new Error("Expected coordinateTarget in the file outline.");
 
     const symbolTarget = resolvedEntry(
       await session.resolve({

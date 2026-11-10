@@ -310,13 +310,13 @@ export function buildSimpleCompact(data: Record<string, unknown> | undefined, th
   const confidence = typeof data.confidence === "string" ? data.confidence : "";
   const dot = theme.fg("dim", "·");
   const segments = badges.map((badge) => theme.fg("success", theme.bold(badge)));
-  const unknownNestingCount = data.groupUnknownNestingCount;
+  const unknownLevelCount = data.outlineUnknownLevelCount;
   if (
-    typeof unknownNestingCount === "number" &&
-    Number.isInteger(unknownNestingCount) &&
-    unknownNestingCount > 0
+    typeof unknownLevelCount === "number" &&
+    Number.isInteger(unknownLevelCount) &&
+    unknownLevelCount > 0
   ) {
-    segments.push(theme.fg("warning", `${unknownNestingCount} hierarchy unknown`));
+    segments.push(theme.fg("warning", `${unknownLevelCount} position unknown`));
   }
   if (confidence) {
     segments.push(`${theme.fg("dim", "confidence")} ${theme.fg("muted", confidence)}`);
@@ -349,13 +349,13 @@ function structuredDetailLines(data: Record<string, unknown>): string[] {
 
   lines.push(...inspectSectionStatusLines(data.sections));
 
-  const unknownNestingCount = data.groupUnknownNestingCount;
+  const unknownLevelCount = data.outlineUnknownLevelCount;
   if (
-    typeof unknownNestingCount === "number" &&
-    Number.isInteger(unknownNestingCount) &&
-    unknownNestingCount > 0
+    typeof unknownLevelCount === "number" &&
+    Number.isInteger(unknownLevelCount) &&
+    unknownLevelCount > 0
   ) {
-    lines.push(`hierarchy unknown: ${unknownNestingCount}`);
+    lines.push(`position unknown: ${unknownLevelCount}`);
   }
 
   const checkNext = data.checkNext;

@@ -1,5 +1,5 @@
 /**
- * File target discovery — collects every evidence-backed declaration in one
+ * File outline discovery — collects every evidence-backed declaration in one
  * file after the Target workflow has established semantic readiness.
  *
  * Semantic and structural facts are merged. Semantic facts win duplicate
@@ -11,7 +11,8 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import {
   type CodeRequestControl,
-  type DeclarationNesting,
+  childDeclarationLevel,
+  type DeclarationLevel,
   type DocumentCodeSymbol,
   isCodeRequestInterruption,
   type OutlineData,
@@ -23,7 +24,7 @@ import { normalizePath } from "../search/paths.ts";
 import { mergeDiscoveryPartial, type TargetDiscoveryResult } from "./discovery.ts";
 import {
   reconcileContainer,
-  reconcileNesting,
+  reconcileLevel,
   refineLatexSectionNameAnchor,
 } from "./file-refinement.ts";
 import {
@@ -33,7 +34,7 @@ import {
   declarationOccurrencesFor,
   refineTypeAliasIdentity,
 } from "./identity.ts";
-import type { ResolvedTargetData, ResolvedTargetGroupData } from "./types.ts";
+import type { FileOutlineData, ResolvedTargetData } from "./types.ts";
 
 const BINARY_EXTENSIONS = new Set([
   ".png",
@@ -65,8 +66,8 @@ const BINARY_EXTENSIONS = new Set([
 type DiscoveryResult = TargetDiscoveryResult<DiscoveredTargetData>;
 
 export interface DiscoveredTargetData extends ResolvedTargetData {
-  /** Provider-backed hierarchy used only for file-result presentation ranking. */
-  readonly nesting: DeclarationNesting;
+  /** Provider-backed position in the file, used only for outline ranking. */
+  readonly level: DeclarationLevel;
 }
 
 /** Validated file-discovery input with its normalized absolute path. */
@@ -83,8 +84,8 @@ export function validateFileTargetDiscovery(file: string, cwd: string): FileDisc
     : { kind: "valid", file: resolvedFile };
 }
 
-/** Discover a Target group for one file without rendering or registering handles. */
-export async function resolveFileTargetGroup(
+/** Discover the File outline of one file without rendering or registering handles. */
+export async function resolveFileOutline(
   file: string,
   cwd: string,
   deps: {
@@ -93,7 +94,7 @@ export async function resolveFileTargetGroup(
   } = {},
   control?: CodeRequestControl,
 ): Promise<
-  | { kind: "resolved"; group: ResolvedTargetGroupData }
+  | { kind: "resolved"; outline: FileOutlineData }
   | { kind: "invalid-input"; message: string }
   | { kind: "unavailable"; message: string }
 > {
@@ -114,29 +115,29 @@ export async function resolveFileTargetGroup(
   }
 
   const targets = mergeDiscoveries(structural.targets, semantic.targets);
-  const unknownNestingCount = targets.filter((target) => target.nesting === "unknown").length;
+  const unknownLevelCount = targets.filter((target) => target.level === "unknown").length;
   const discoveryProvenance = [
     ...(semantic.available ? (["semantic"] as const) : []),
     ...(structural.available ? (["structural"] as const) : []),
   ];
   return {
     kind: "resolved",
-    group: {
+    outline: {
       file: resolvedFile,
       displayName: path.relative(cwd, resolvedFile) || resolvedFile,
       targets,
       discoveryProvenance,
-      confidence: targetGroupConfidence(targets, discoveryProvenance),
-      unknownNestingCount,
+      confidence: fileOutlineConfidence(targets, discoveryProvenance),
+      unknownLevelCount,
       ...mergeDiscoveryPartial(semantic, structural),
     },
   };
 }
 
-function targetGroupConfidence(
+function fileOutlineConfidence(
   targets: readonly ResolvedTargetData[],
-  discoveryProvenance: ResolvedTargetGroupData["discoveryProvenance"],
-): ResolvedTargetGroupData["confidence"] {
+  discoveryProvenance: FileOutlineData["discoveryProvenance"],
+): FileOutlineData["confidence"] {
   if (targets.length === 0) {
     return discoveryProvenance.includes("semantic") ? "semantic" : "structural";
   }
@@ -173,7 +174,7 @@ async function discoverSemantic(
         result.data.map(async (symbol) => {
           const target = targetFromSymbol(file, symbol);
           const refined = await refineTypeAliasIdentity(target, structural, control);
-          return { ...refined, nesting: target.nesting };
+          return { ...refined, level: target.level };
         }),
       ),
       ...(result.kind === "partial" ? { partial: { reason: result.reason, errorRanges: [] } } : {}),
@@ -201,13 +202,15 @@ function targetFromSymbol(file: string, symbol: DocumentCodeSymbol): DiscoveredT
     provenance: ["semantic"],
     anchorKind: (symbol.nameAnchor ? "name" : "declaration") as AnchorKind,
     container: symbol.container ?? null,
-    nesting: normalizeNesting(symbol.nesting),
+    level: normalizeLevel(symbol.level),
   };
 }
 
 /** Normalize process-global or legacy provider observations at the discovery seam. */
-function normalizeNesting(value: unknown): DeclarationNesting {
-  if (value === "top-level" || value === "nested" || value === "unknown") return value;
+function normalizeLevel(value: unknown): DeclarationLevel {
+  if (value === "top-level" || value === "member" || value === "local" || value === "unknown") {
+    return value;
+  }
   return "unknown";
 }
 
@@ -238,10 +241,14 @@ async function discoverStructural(
 function flattenOutline(
   file: string,
   items: readonly OutlineData[],
-  container: string | null = null,
-  nesting: DeclarationNesting = "top-level",
+  parent: {
+    readonly name: string;
+    readonly kind: string;
+    readonly level: DeclarationLevel;
+  } | null = null,
 ): DiscoveredTargetData[] {
   return items.flatMap((item) => {
+    const level: DeclarationLevel = parent ? childDeclarationLevel(parent, item.kind) : "top-level";
     const nameAnchor = item.nameAnchor ?? {
       line: item.startLine,
       character: item.startCharacter,
@@ -262,10 +269,11 @@ function flattenOutline(
       confidence: "structural",
       provenance: ["structural"],
       anchorKind: item.nameAnchor ? "name" : "declaration",
-      container,
-      nesting,
+      container: parent?.name ?? null,
+      level,
     };
-    return [target, ...flattenOutline(file, item.children ?? [], item.name, "nested")];
+    const childParent = { name: item.name, kind: item.kind, level };
+    return [target, ...flattenOutline(file, item.children ?? [], childParent)];
   });
 }
 
@@ -290,7 +298,7 @@ function mergeDiscoveries(
         provenance: ["semantic", "structural"] as const,
         nativeKind: structuralTarget.nativeKind ?? semanticTarget.nativeKind,
         container: reconcileContainer(semanticTarget, structuralTarget),
-        nesting: reconcileNesting(semanticTarget.nesting, structuralTarget.nesting),
+        level: reconcileLevel(semanticTarget.level, structuralTarget.level),
       },
     ];
   });
@@ -317,7 +325,7 @@ function findSemanticMatch(
         left.target.declarationAnchor.character - right.target.declarationAnchor.character ||
         compareDeclarations(left.target, right.target) ||
         (left.target.container ?? "").localeCompare(right.target.container ?? "") ||
-        left.target.nesting.localeCompare(right.target.nesting) ||
+        left.target.level.localeCompare(right.target.level) ||
         left.index - right.index,
     );
   return matches[0]?.index ?? null;
@@ -380,7 +388,7 @@ function compareFileOrientationDeclarations(
 }
 
 function topLevelRank(target: DiscoveredTargetData): number {
-  return target.nesting === "top-level" ? 0 : 1;
+  return target.level === "top-level" ? 0 : 1;
 }
 
 function compareDeclarations(left: ResolvedTargetData, right: ResolvedTargetData): number {

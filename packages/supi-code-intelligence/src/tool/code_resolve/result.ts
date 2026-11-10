@@ -85,8 +85,8 @@ function projectResolveOutcome(outcome: TargetWorkflowOutcome, cwd: string): Res
   switch (outcome.kind) {
     case "resolved":
       return projectResolved(outcome, cwd);
-    case "target-group":
-      return projectTargetGroup(outcome, cwd);
+    case "file-outline":
+      return projectFileOutline(outcome, cwd);
     case "disambiguation":
     case "kind-mismatch":
       return projectCandidateOutcome(outcome, cwd);
@@ -121,8 +121,8 @@ function projectResolved(
   };
 }
 
-function projectTargetGroup(
-  outcome: Extract<TargetWorkflowOutcome, { kind: "target-group" }>,
+function projectFileOutline(
+  outcome: Extract<TargetWorkflowOutcome, { kind: "file-outline" }>,
   cwd: string,
 ): ResolveProjection {
   const evidence = {
@@ -138,19 +138,19 @@ function projectTargetGroup(
     },
   };
   return {
-    key: "resolve.target-group",
-    title: "Target group",
+    key: "resolve.file-outline",
+    title: "File outline",
     status: outcome.partial ? "partial" : "complete",
     items: evidence.items,
     confidence: outcome.confidence,
     evidence: evidence.metadata,
     details: {
-      resultKind: "target-group",
-      groupFile: toDisplayPath(cwd, outcome.file),
-      groupDiscoveryProvenance: [...outcome.discoveryProvenance],
-      groupUnknownNestingCount: outcome.unknownNestingCount,
-      groupPartialReason: outcome.partial?.reason ?? null,
-      groupErrorRanges: outcome.partial?.errorRanges,
+      resultKind: "file-outline",
+      outlineFile: toDisplayPath(cwd, outcome.file),
+      outlineDiscoveryProvenance: [...outcome.discoveryProvenance],
+      outlineUnknownLevelCount: outcome.unknownLevelCount,
+      outlinePartialReason: outcome.partial?.reason ?? null,
+      outlineErrorRanges: outcome.partial?.errorRanges,
       confidence: outcome.confidence,
       targetCount: outcome.totalCount,
       omittedCount: evidence.metadata.omittedCount,
@@ -158,7 +158,9 @@ function projectTargetGroup(
       targets: evidence.items.map((target) => toTargetDetails(target, cwd)),
       nextQueries:
         outcome.totalCount > 0
-          ? ["Choose one Target group member handle for precise graph or refactor work"]
+          ? [
+              "Pass one declaration handle from the file outline as target.handle to code_graph, code_inspect, or code_refactor_plan",
+            ]
           : ["Use code_inspect for point facts or code_find for explicit source evidence"],
     },
   };
@@ -298,7 +300,7 @@ function resolveProvenance(outcome: TargetWorkflowOutcome): ResultProvenance[] {
   const sources = new Set<"semantic" | "structural">();
   if (outcome.kind === "resolved") {
     for (const source of outcome.entry.provenance) sources.add(source);
-  } else if (outcome.kind === "target-group") {
+  } else if (outcome.kind === "file-outline") {
     for (const source of outcome.discoveryProvenance) sources.add(source);
   } else if (outcome.kind === "disambiguation" || outcome.kind === "kind-mismatch") {
     sources.add("semantic");
@@ -343,7 +345,7 @@ export function finishResolveResult(
       type: "resolve",
       data: assembly.details,
       status:
-        outcome.kind === "resolved" || outcome.kind === "target-group"
+        outcome.kind === "resolved" || outcome.kind === "file-outline"
           ? "completed"
           : outcome.kind === "disambiguation" || outcome.kind === "kind-mismatch"
             ? "disambiguation"

@@ -140,22 +140,22 @@ describe.skipIf(!HAS_TEXLAB)("LaTeX targets through real Texlab and Tree-sitter"
     await prepareWorkspace();
     const runtime = await startTexlab();
     const session = registerTools(runtime);
-    const group = await session.resolve({ target: { file: mainFile } });
-    if (group.kind !== "target-group")
-      throw new Error("The TeX file did not return a Target group.");
-    const label = group.targets.find((target) => target.name === "sec:Intro");
+    const outline = await session.resolve({ target: { file: mainFile } });
+    if (outline.kind !== "file-outline")
+      throw new Error("The TeX file did not return a file outline.");
+    const label = outline.targets.find((target) => target.name === "sec:Intro");
     if (!label) throw new Error("Texlab and Tree-sitter did not report sec:Intro.");
     labelTargetId = label.targetId;
     const headingGroup = await session.resolve({ target: { file: headingFile } });
-    if (headingGroup.kind !== "target-group") {
-      throw new Error("The heading TeX file did not return a Target group.");
+    if (headingGroup.kind !== "file-outline") {
+      throw new Error("The heading TeX file did not return a file outline.");
     }
     const heading = headingGroup.targets.find((target) => target.name === "Intro");
     if (!heading) throw new Error("Texlab and Tree-sitter did not report the Intro section.");
     headingTargetId = heading.targetId;
     const underscoreGroup = await session.resolve({ target: { file: underscoreFile } });
-    if (underscoreGroup.kind !== "target-group") {
-      throw new Error("The underscore TeX file did not return a Target group.");
+    if (underscoreGroup.kind !== "file-outline") {
+      throw new Error("The underscore TeX file did not return a file outline.");
     }
     const underscoreLabel = underscoreGroup.targets.find(
       (target) => target.name === "sec:my_label",

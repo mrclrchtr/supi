@@ -6,7 +6,7 @@ import { createTreeSitterSession } from "@mrclrchtr/supi-tree-sitter/api";
 import { createTreeSitterProvider } from "@mrclrchtr/supi-tree-sitter/provider/tree-sitter-provider";
 import { afterEach, describe, expect, it } from "vitest";
 import { resolveAnchoredSymbolTarget } from "../../../../src/analysis/target/anchored.ts";
-import { resolveFileTargetGroup } from "../../../../src/analysis/target/file.ts";
+import { resolveFileOutline } from "../../../../src/analysis/target/file.ts";
 import { canonicalDeclarationKind } from "../../../../src/analysis/target/identity.ts";
 import type { ResolvedTargetData } from "../../../../src/analysis/target/types.ts";
 import {
@@ -29,10 +29,10 @@ describe("anchored LaTeX labels", () => {
     const structural = createTreeSitterProvider(treeSitter);
 
     try {
-      const discovered = await resolveFileTargetGroup(file, cwd, { structural });
+      const discovered = await resolveFileOutline(file, cwd, { structural });
       expect(discovered.kind).toBe("resolved");
       if (discovered.kind !== "resolved") return;
-      const fileTargets = discovered.group.targets.filter(({ name }) => name === "dup");
+      const fileTargets = discovered.outline.targets.filter(({ name }) => name === "dup");
       expect(fileTargets.map(({ declarationOccurrence }) => declarationOccurrence)).toEqual([0, 1]);
       expect(
         fileTargets.map(({ declarationAnchor, displayCharacter }) => [
@@ -86,10 +86,10 @@ describe("anchored LaTeX labels", () => {
     const store = new Map<string, TargetStoreEntry>();
 
     try {
-      const discovered = await resolveFileTargetGroup(file, cwd, { structural });
+      const discovered = await resolveFileOutline(file, cwd, { structural });
       expect(discovered.kind).toBe("resolved");
       if (discovered.kind !== "resolved") return;
-      const fileTarget = discovered.group.targets.find(({ name }) => name === "sec:my_label");
+      const fileTarget = discovered.outline.targets.find(({ name }) => name === "sec:my_label");
       expect(fileTarget).toMatchObject({
         name: "sec:my_label",
         displayLine: 1,

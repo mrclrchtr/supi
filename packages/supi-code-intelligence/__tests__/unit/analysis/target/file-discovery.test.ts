@@ -13,7 +13,7 @@ import { createLspSemanticProvider } from "@mrclrchtr/supi-lsp/provider/lsp-sema
 import type { TreeSitterService } from "@mrclrchtr/supi-tree-sitter/api";
 import { createTreeSitterProvider } from "@mrclrchtr/supi-tree-sitter/provider/tree-sitter-provider";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { resolveFileTargetGroup } from "../../../../src/analysis/target/file.ts";
+import { resolveFileOutline } from "../../../../src/analysis/target/file.ts";
 
 let cwd: string;
 let file: string;
@@ -28,8 +28,8 @@ afterEach(() => {
   rmSync(cwd, { recursive: true, force: true });
 });
 
-describe("file Target group discovery", () => {
-  it("merges before deterministic hierarchy ranking across provider order", async () => {
+describe("file outline discovery", () => {
+  it("merges before deterministic level ranking across provider order", async () => {
     const semanticSymbols: DocumentCodeSymbol[] = [
       {
         name: "Box",
@@ -38,7 +38,7 @@ describe("file Target group discovery", () => {
         declarationAnchor: { line: 1, character: 1 },
         nameAnchor: { line: 1, character: 14 },
         container: null,
-        nesting: "top-level",
+        level: "top-level",
       },
       {
         name: "method",
@@ -47,7 +47,7 @@ describe("file Target group discovery", () => {
         declarationAnchor: { line: 1, character: 20 },
         nameAnchor: { line: 1, character: 20 },
         container: "Box",
-        nesting: "nested",
+        level: "member",
       },
       {
         name: "helper",
@@ -56,7 +56,7 @@ describe("file Target group discovery", () => {
         declarationAnchor: { line: 2, character: 1 },
         nameAnchor: { line: 2, character: 7 },
         container: null,
-        nesting: "top-level",
+        level: "top-level",
       },
     ];
     const outline = [
@@ -88,55 +88,55 @@ describe("file Target group discovery", () => {
       },
     ];
 
-    const outcome = await resolveFileTargetGroup(file, cwd, {
+    const outcome = await resolveFileOutline(file, cwd, {
       semantic: semanticProvider(semanticSymbols),
       structural: structuralProvider(outline),
     });
 
     expect(outcome.kind).toBe("resolved");
     if (outcome.kind !== "resolved") return;
-    expect(outcome.group.targets).toHaveLength(3);
-    expect(outcome.group.targets.map((target) => [target.name, target.container])).toEqual([
+    expect(outcome.outline.targets).toHaveLength(3);
+    expect(outcome.outline.targets.map((target) => [target.name, target.container])).toEqual([
       ["Box", null],
       ["helper", null],
       ["method", "Box"],
     ]);
-    expect(outcome.group.unknownNestingCount).toBe(0);
-    expect(outcome.group.targets[0]).toMatchObject({
+    expect(outcome.outline.unknownLevelCount).toBe(0);
+    expect(outcome.outline.targets[0]).toMatchObject({
       confidence: "semantic",
       anchorKind: "name",
       displayCharacter: 14,
       provenance: ["semantic", "structural"] as const,
     });
-    expect(outcome.group.targets[2]).toMatchObject({
+    expect(outcome.outline.targets[2]).toMatchObject({
       confidence: "semantic",
       anchorKind: "name",
       provenance: ["semantic", "structural"] as const,
     });
 
-    const reversed = await resolveFileTargetGroup(file, cwd, {
+    const reversed = await resolveFileOutline(file, cwd, {
       semantic: semanticProvider([...semanticSymbols].reverse()),
       structural: structuralProvider([...outline].reverse()),
     });
     expect(reversed.kind).toBe("resolved");
     if (reversed.kind !== "resolved") return;
     expect(
-      reversed.group.targets.map(({ name, container, provenance }) => ({
+      reversed.outline.targets.map(({ name, container, provenance }) => ({
         name,
         container,
         provenance,
       })),
     ).toEqual(
-      outcome.group.targets.map(({ name, container, provenance }) => ({
+      outcome.outline.targets.map(({ name, container, provenance }) => ({
         name,
         container,
         provenance,
       })),
     );
-    expect(reversed.group.unknownNestingCount).toBe(outcome.group.unknownNestingCount);
+    expect(reversed.outline.unknownLevelCount).toBe(outcome.outline.unknownLevelCount);
   });
 
-  it("uses known structural nesting to refine a flat semantic observation", async () => {
+  it("uses a known structural level to refine a flat semantic observation", async () => {
     const semantic = semanticProvider([
       {
         name: "outer",
@@ -145,7 +145,7 @@ describe("file Target group discovery", () => {
         declarationAnchor: { line: 1, character: 1 },
         nameAnchor: { line: 1, character: 10 },
         container: null,
-        nesting: "top-level",
+        level: "top-level",
       },
       {
         name: "nested",
@@ -154,7 +154,7 @@ describe("file Target group discovery", () => {
         declarationAnchor: { line: 1, character: 20 },
         nameAnchor: { line: 1, character: 26 },
         container: null,
-        nesting: "unknown",
+        level: "unknown",
       },
     ]);
     const structural = structuralProvider([
@@ -178,16 +178,16 @@ describe("file Target group discovery", () => {
       },
     ]);
 
-    const outcome = await resolveFileTargetGroup(file, cwd, { semantic, structural });
+    const outcome = await resolveFileOutline(file, cwd, { semantic, structural });
 
     expect(outcome.kind).toBe("resolved");
     if (outcome.kind !== "resolved") return;
-    expect(outcome.group.targets.map((target) => target.name)).toEqual(["outer", "nested"]);
-    expect(outcome.group.targets[1]).toMatchObject({
+    expect(outcome.outline.targets.map((target) => target.name)).toEqual(["outer", "nested"]);
+    expect(outcome.outline.targets[1]).toMatchObject({
       container: "outer",
       provenance: ["semantic", "structural"] as const,
     });
-    expect(outcome.group.unknownNestingCount).toBe(0);
+    expect(outcome.outline.unknownLevelCount).toBe(0);
   });
 
   it("deduplicates declarations emitted through the real provider adapters", async () => {
@@ -244,14 +244,92 @@ describe("file Target group discovery", () => {
       }),
     } as unknown as TreeSitterService);
 
-    const outcome = await resolveFileTargetGroup(file, cwd, { semantic, structural });
+    const outcome = await resolveFileOutline(file, cwd, { semantic, structural });
 
     expect(outcome.kind).toBe("resolved");
     if (outcome.kind !== "resolved") return;
-    expect(outcome.group.targets.map((target) => target.name)).toEqual(["Box", "helper", "method"]);
-    expect(outcome.group.unknownNestingCount).toBe(0);
-    expect(outcome.group.targets.every((target) => target.confidence === "semantic")).toBe(true);
-    expect(outcome.group.targets.every((target) => target.provenance.length === 2)).toBe(true);
+    expect(outcome.outline.targets.map((target) => target.name)).toEqual([
+      "Box",
+      "helper",
+      "method",
+    ]);
+    expect(outcome.outline.unknownLevelCount).toBe(0);
+    expect(outcome.outline.targets.every((target) => target.confidence === "semantic")).toBe(true);
+    expect(outcome.outline.targets.every((target) => target.provenance.length === 2)).toBe(true);
+  });
+
+  it("separates class members from declarations inside function bodies", async () => {
+    // class Box { method() { const inner = 1; } }  function run() { const step = 2; }
+    const symbol = (
+      name: string,
+      kind: DocumentSymbol["kind"],
+      line: number,
+      children?: DocumentSymbol[],
+    ): DocumentSymbol => ({
+      name,
+      kind,
+      range: { start: { line, character: 0 }, end: { line, character: 30 } },
+      selectionRange: { start: { line, character: 2 }, end: { line, character: 8 } },
+      ...(children ? { children } : {}),
+    });
+    const documentSymbols: DocumentSymbol[] = [
+      symbol("Box", 5, 0, [symbol("method", 6, 1, [symbol("inner", 13, 2)])]),
+      symbol("run", 12, 4, [symbol("step", 13, 5)]),
+    ];
+    const semantic = createLspSemanticProvider({
+      documentSymbols: async () => completedCodeQuery(documentSymbols),
+    } as unknown as WorkspaceLspRuntime);
+    const range = (line: number) => ({
+      startLine: line,
+      startCharacter: 1,
+      endLine: line,
+      endCharacter: 31,
+    });
+    const structural = createTreeSitterProvider({
+      outline: async () => ({
+        kind: "success",
+        data: [
+          {
+            name: "Box",
+            kind: "class",
+            range: range(1),
+            children: [
+              {
+                name: "method",
+                kind: "method",
+                range: range(2),
+                children: [{ name: "inner", kind: "variable", range: range(3) }],
+              },
+            ],
+          },
+          {
+            name: "run",
+            kind: "function",
+            range: range(5),
+            children: [{ name: "step", kind: "variable", range: range(6) }],
+          },
+        ],
+      }),
+    } as unknown as TreeSitterService);
+
+    for (const providers of [{ semantic }, { structural }, { semantic, structural }]) {
+      const outcome = await resolveFileOutline(file, cwd, providers);
+      expect(outcome.kind).toBe("resolved");
+      if (outcome.kind !== "resolved") return;
+      const levels = Object.fromEntries(
+        outcome.outline.targets.map((target) => [
+          target.name,
+          (target as unknown as { level: string }).level,
+        ]),
+      );
+      expect(levels).toEqual({
+        Box: "top-level",
+        run: "top-level",
+        method: "member",
+        inner: "local",
+        step: "local",
+      });
+    }
   });
 
   it("prioritizes only proven top-level declarations after merging provider evidence", async () => {
@@ -263,7 +341,7 @@ describe("file Target group discovery", () => {
         declarationAnchor: { line: 1, character: 1 },
         nameAnchor: { line: 1, character: 7 },
         container: "outer",
-        nesting: "nested",
+        level: "local",
       },
       {
         name: "unknownMiddle",
@@ -272,7 +350,7 @@ describe("file Target group discovery", () => {
         declarationAnchor: { line: 2, character: 1 },
         nameAnchor: { line: 2, character: 7 },
         container: null,
-        nesting: "unknown",
+        level: "unknown",
       },
       {
         name: "laterTopLevel",
@@ -281,7 +359,7 @@ describe("file Target group discovery", () => {
         declarationAnchor: { line: 3, character: 1 },
         nameAnchor: { line: 3, character: 17 },
         container: null,
-        nesting: "unknown",
+        level: "unknown",
       },
     ]);
     const structural = structuralProvider([
@@ -295,21 +373,21 @@ describe("file Target group discovery", () => {
       },
     ]);
 
-    const outcome = await resolveFileTargetGroup(file, cwd, { semantic, structural });
+    const outcome = await resolveFileOutline(file, cwd, { semantic, structural });
 
     expect(outcome.kind).toBe("resolved");
     if (outcome.kind !== "resolved") return;
-    expect(outcome.group.targets.map((target) => target.name)).toEqual([
+    expect(outcome.outline.targets.map((target) => target.name)).toEqual([
       "laterTopLevel",
       "nestedEarly",
       "unknownMiddle",
     ]);
-    expect(outcome.group.targets[0]?.provenance).toEqual(["semantic", "structural"]);
-    expect(outcome.group.unknownNestingCount).toBe(1);
+    expect(outcome.outline.targets[0]?.provenance).toEqual(["semantic", "structural"]);
+    expect(outcome.outline.unknownLevelCount).toBe(1);
   });
 
-  it("keeps group confidence at the weakest member while retaining discovery provenance", async () => {
-    const outcome = await resolveFileTargetGroup(file, cwd, {
+  it("keeps outline confidence at the weakest member while retaining discovery provenance", async () => {
+    const outcome = await resolveFileOutline(file, cwd, {
       semantic: semanticProvider([]),
       structural: structuralProvider([
         {
@@ -325,7 +403,7 @@ describe("file Target group discovery", () => {
 
     expect(outcome).toMatchObject({
       kind: "resolved",
-      group: {
+      outline: {
         confidence: "structural",
         discoveryProvenance: ["semantic", "structural"],
         targets: [{ confidence: "structural", provenance: ["structural"] }],
@@ -333,24 +411,24 @@ describe("file Target group discovery", () => {
     });
   });
 
-  it("returns a successful empty group after complete enumeration", async () => {
-    const outcome = await resolveFileTargetGroup(file, cwd, {
+  it("returns a successful empty outline after complete enumeration", async () => {
+    const outcome = await resolveFileOutline(file, cwd, {
       semantic: semanticProvider([]),
       structural: structuralProvider([]),
     });
 
     expect(outcome).toMatchObject({
       kind: "resolved",
-      group: {
+      outline: {
         targets: [],
         confidence: "semantic",
         discoveryProvenance: ["semantic", "structural"],
-        unknownNestingCount: 0,
+        unknownLevelCount: 0,
       },
     });
   });
 
-  it("keeps recovered structural targets and marks the group partial", async () => {
+  it("keeps recovered structural targets and marks the outline partial", async () => {
     const structural: StructuralProvider = {
       ...structuralProvider([]),
       outline: async () => ({
@@ -375,11 +453,11 @@ describe("file Target group discovery", () => {
         ],
       }),
     };
-    const outcome = await resolveFileTargetGroup(file, cwd, { structural });
+    const outcome = await resolveFileOutline(file, cwd, { structural });
     expect(outcome.kind).toBe("resolved");
     if (outcome.kind !== "resolved") return;
-    expect(outcome.group.targets.map((target) => target.name)).toContain("Box");
-    expect(outcome.group.partial).toEqual({
+    expect(outcome.outline.targets.map((target) => target.name)).toContain("Box");
+    expect(outcome.outline.partial).toEqual({
       reason: "Tree-sitter recovered syntax.",
       errorRanges: [
         {
@@ -391,7 +469,7 @@ describe("file Target group discovery", () => {
   });
 
   it("returns unavailable discovery when neither provider can enumerate", async () => {
-    const outcome = await resolveFileTargetGroup(file, cwd, {
+    const outcome = await resolveFileOutline(file, cwd, {
       semantic: semanticProvider(null),
       structural: structuralProvider(null),
     });

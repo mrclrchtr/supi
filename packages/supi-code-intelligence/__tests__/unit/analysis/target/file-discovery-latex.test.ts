@@ -8,7 +8,7 @@ import { createTreeSitterSession } from "@mrclrchtr/supi-tree-sitter/api";
 import { createTreeSitterProvider } from "@mrclrchtr/supi-tree-sitter/provider/tree-sitter-provider";
 import { afterEach, describe, expect, it } from "vitest";
 import { resolveAnchoredSymbolTarget } from "../../../../src/analysis/target/anchored.ts";
-import { resolveFileTargetGroup } from "../../../../src/analysis/target/file.ts";
+import { resolveFileOutline } from "../../../../src/analysis/target/file.ts";
 import type { ResolvedTargetData } from "../../../../src/analysis/target/types.ts";
 import {
   registerWorkflowTarget,
@@ -35,11 +35,11 @@ sec:next}`,
     const structural = createTreeSitterProvider(treeSitter);
 
     try {
-      const outcome = await resolveFileTargetGroup(file, cwd, { structural });
+      const outcome = await resolveFileOutline(file, cwd, { structural });
 
       expect(outcome.kind).toBe("resolved");
       if (outcome.kind !== "resolved") return;
-      expect(outcome.group.targets.filter(({ kind }) => kind === "label")).toMatchObject([
+      expect(outcome.outline.targets.filter(({ kind }) => kind === "label")).toMatchObject([
         {
           name: "sec:intro_label",
           position: { line: 0, character: 7 },
@@ -93,11 +93,11 @@ sec:next}`,
     const structural = createTreeSitterProvider(treeSitter);
 
     try {
-      const outcome = await resolveFileTargetGroup(file, cwd, { semantic, structural });
+      const outcome = await resolveFileOutline(file, cwd, { semantic, structural });
 
       expect(outcome.kind).toBe("resolved");
       if (outcome.kind !== "resolved") return;
-      expect(outcome.group.targets.find(({ name }) => name === "Intro")).toMatchObject({
+      expect(outcome.outline.targets.find(({ name }) => name === "Intro")).toMatchObject({
         name: "Intro",
         kind: "Module",
         identityKind: "latex-section",
@@ -138,7 +138,7 @@ sec:next}`,
     const structural = createTreeSitterProvider(treeSitter);
 
     try {
-      const fileOutcome = await resolveFileTargetGroup(file, cwd, { semantic, structural });
+      const fileOutcome = await resolveFileOutline(file, cwd, { semantic, structural });
       const anchorOutcome = await resolveAnchoredSymbolTarget(file, 1, 10, {
         documentSymbols: semantic.documentSymbols,
         outline: structural.outline,
@@ -167,7 +167,7 @@ sec:next}`,
           anchorKind: target.anchorKind,
           container: target.container,
         });
-      const fromFile = fileOutcome.group.targets.find(({ name }) => name === "Intro, overview");
+      const fromFile = fileOutcome.outline.targets.find(({ name }) => name === "Intro, overview");
       if (!fromFile) throw new Error("File discovery did not return the section target.");
 
       expect(fromFile.identityKind).toBe("latex-section");
@@ -214,31 +214,31 @@ sec:next}`,
     const structural = createTreeSitterProvider(treeSitter);
 
     try {
-      const outcome = await resolveFileTargetGroup(file, cwd, { semantic, structural });
+      const outcome = await resolveFileOutline(file, cwd, { semantic, structural });
 
       expect(outcome.kind).toBe("resolved");
       if (outcome.kind !== "resolved") return;
-      expect(outcome.group.targets.map(({ name, kind }) => [name, kind])).toEqual([
+      expect(outcome.outline.targets.map(({ name, kind }) => [name, kind])).toEqual([
         ["Overview", "Module"],
         ["define \\vect", "Key"],
         ["proofsketch", "environment"],
         ["sec:intro", "label"],
       ]);
-      expect(outcome.group.targets.find(({ name }) => name === "Overview")).toMatchObject({
+      expect(outcome.outline.targets.find(({ name }) => name === "Overview")).toMatchObject({
         kind: "Module",
         identityKind: "latex-section",
         provenance: ["semantic", "structural"],
       });
-      expect(outcome.group.targets.find(({ name }) => name === "define \\vect")).toMatchObject({
+      expect(outcome.outline.targets.find(({ name }) => name === "define \\vect")).toMatchObject({
         kind: "Key",
         identityKind: "latex-command",
         provenance: ["semantic", "structural"],
       });
-      expect(outcome.group.targets.find(({ name }) => name === "proofsketch")).toMatchObject({
+      expect(outcome.outline.targets.find(({ name }) => name === "proofsketch")).toMatchObject({
         kind: "environment",
         provenance: ["structural"],
       });
-      expect(outcome.group.targets.find(({ name }) => name === "sec:intro")).toMatchObject({
+      expect(outcome.outline.targets.find(({ name }) => name === "sec:intro")).toMatchObject({
         kind: "label",
         position: { line: 3, character: 7 },
         displayLine: 4,

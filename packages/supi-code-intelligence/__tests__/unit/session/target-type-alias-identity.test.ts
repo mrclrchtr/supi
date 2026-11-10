@@ -32,7 +32,7 @@ beforeEach(() => {
 afterEach(() => rmSync(cwd, { recursive: true, force: true }));
 
 describe("type-alias Target identity", () => {
-  it("merges exact semantic and structural observations before bounding the Target group", async () => {
+  it("merges exact semantic and structural observations before bounding the file outline", async () => {
     const outcome = await resolveTargetWorkflow(
       { file: "sample.ts" },
       { fileLevelAllowed: true, nameAnchorRequired: false, maxResults: 1 },
@@ -40,7 +40,7 @@ describe("type-alias Target identity", () => {
     );
 
     expect(outcome).toMatchObject({
-      kind: "target-group",
+      kind: "file-outline",
       confidence: "semantic",
       totalCount: 1,
       omittedCount: 0,
@@ -77,9 +77,9 @@ describe("type-alias Target identity", () => {
       const fileOutcome = order === "file then symbol" ? first : second;
       const symbolOutcome = order === "file then symbol" ? second : first;
 
-      expect(fileOutcome.kind).toBe("target-group");
+      expect(fileOutcome.kind).toBe("file-outline");
       expect(symbolOutcome.kind).toBe("resolved");
-      if (fileOutcome.kind !== "target-group" || symbolOutcome.kind !== "resolved") return;
+      if (fileOutcome.kind !== "file-outline" || symbolOutcome.kind !== "resolved") return;
       expect(symbolOutcome.entry.targetId).toBe(fileOutcome.targets[0]?.targetId);
       expect(symbolOutcome.entry.provenance).toEqual(["semantic", "structural"]);
       expect(store).toHaveLength(1);
@@ -99,9 +99,9 @@ describe("type-alias Target identity", () => {
       deps,
     );
 
-    expect(fromFile.kind).toBe("target-group");
+    expect(fromFile.kind).toBe("file-outline");
     expect(fromAnchor.kind).toBe("resolved");
-    if (fromFile.kind !== "target-group" || fromAnchor.kind !== "resolved") return;
+    if (fromFile.kind !== "file-outline" || fromAnchor.kind !== "resolved") return;
     expect(fromAnchor.entry.targetId).toBe(fromFile.targets[0]?.targetId);
     expect(fromAnchor.entry.provenance).toEqual(["semantic", "structural"]);
     expect(store).toHaveLength(1);
@@ -121,9 +121,9 @@ describe("type-alias Target identity", () => {
       deps,
     );
 
-    expect(fromFile.kind).toBe("target-group");
+    expect(fromFile.kind).toBe("file-outline");
     expect(fromAnchor.kind).toBe("resolved");
-    if (fromFile.kind !== "target-group" || fromAnchor.kind !== "resolved") return;
+    if (fromFile.kind !== "file-outline" || fromAnchor.kind !== "resolved") return;
     const valueMember = fromFile.targets.find((target) => target.displayCharacter === 41);
     expect(fromAnchor.entry.targetId).toBe(valueMember?.targetId);
     expect(store).toHaveLength(2);
@@ -144,9 +144,9 @@ describe("type-alias Target identity", () => {
       deps,
     );
 
-    expect(fromFile.kind).toBe("target-group");
+    expect(fromFile.kind).toBe("file-outline");
     expect(fromSymbol.kind).toBe("disambiguation");
-    if (fromFile.kind !== "target-group" || fromSymbol.kind !== "disambiguation") return;
+    if (fromFile.kind !== "file-outline" || fromSymbol.kind !== "disambiguation") return;
     expect(fromFile.totalCount).toBe(2);
     expect(fromFile.confidence).toBe("semantic");
     expect(fromFile.targets.map((target) => target.kind)).toEqual(["Variable", "Variable"]);
@@ -179,7 +179,7 @@ function semanticProvider(): SemanticProvider {
     declarationAnchor: { line: 1, character: 1 },
     nameAnchor: { line: 1, character: 13 },
     container: null,
-    nesting: "top-level" as const,
+    level: "top-level" as const,
   };
   return {
     documentSymbols: async () => completedCodeQuery([symbol]),
@@ -221,7 +221,7 @@ function collisionSemanticProvider(): SemanticProvider {
       declarationAnchor: { line: 1, character: 1 },
       nameAnchor: { line: 1, character: 13 },
       container: null,
-      nesting: "top-level" as const,
+      level: "top-level" as const,
     },
     {
       name: "UserId",
@@ -230,7 +230,7 @@ function collisionSemanticProvider(): SemanticProvider {
       declarationAnchor: { line: 1, character: 41 },
       nameAnchor: { line: 1, character: 41 },
       container: null,
-      nesting: "top-level" as const,
+      level: "top-level" as const,
     },
   ];
   return {

@@ -53,7 +53,7 @@ function createSemanticProvider(rename: NonNullable<SemanticProvider["rename"]>)
           declarationAnchor: { line: 1, character: 1 },
           nameAnchor: { line: 1, character: 1 },
           container: null,
-          nesting: "top-level",
+          level: "top-level",
         },
       ]),
     workspaceSymbols: async () => completedCodeQuery([]),

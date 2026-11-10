@@ -10,15 +10,15 @@ import type { CodeRequestControl } from "@mrclrchtr/supi-code-runtime/api";
 import { withSemanticRequestControl, withStructuralRequestControl } from "../analysis/provider.ts";
 import { normalizePath, resolveScope } from "../analysis/search/paths.ts";
 import { resolveAnchoredSymbolTarget } from "../analysis/target/anchored.ts";
-import { resolveFileTargetGroup, validateFileTargetDiscovery } from "../analysis/target/file.ts";
+import { resolveFileOutline, validateFileTargetDiscovery } from "../analysis/target/file.ts";
 import {
   canonicalDeclarationKind,
   refineTargetOutcomeIdentity,
 } from "../analysis/target/identity.ts";
 import { resolveSymbolTarget } from "../analysis/target/symbol.ts";
 import type {
+  FileOutlineData,
   ResolvedTargetData,
-  ResolvedTargetGroupData,
   TargetCandidateCompleteness,
   TargetOutcome,
 } from "../analysis/target/types.ts";
@@ -58,15 +58,15 @@ export type TargetWorkflowOutcome =
       notes: readonly string[];
     }
   | {
-      kind: "target-group";
+      kind: "file-outline";
       file: string;
       confidence: ResolvedTargetData["confidence"];
-      discoveryProvenance: ResolvedTargetGroupData["discoveryProvenance"];
+      discoveryProvenance: FileOutlineData["discoveryProvenance"];
       targets: ReadonlyArray<Readonly<TargetStoreEntry>>;
       totalCount: number;
       omittedCount: number;
-      unknownNestingCount: number;
-      partial?: ResolvedTargetGroupData["partial"];
+      unknownLevelCount: number;
+      partial?: FileOutlineData["partial"];
     }
   | ({
       kind: "disambiguation";
@@ -266,7 +266,7 @@ async function resolveFileOnlyWorkflow(
     return { kind: "unavailable", reason: readiness.reason };
   }
 
-  const result = await resolveFileTargetGroup(
+  const result = await resolveFileOutline(
     file,
     deps.cwd,
     {
@@ -284,7 +284,7 @@ async function resolveFileOnlyWorkflow(
     return { kind: "unavailable", reason: result.message };
   }
 
-  return registerTargetGroup(result.group, deps, maxResults);
+  return registerFileOutline(result.outline, deps, maxResults);
 }
 
 function toWorkflowOutcome(
@@ -317,8 +317,8 @@ function toWorkflowOutcome(
     };
   }
 
-  if (outcome.kind === "group") {
-    return registerTargetGroup(outcome.group, deps, policy.maxResults ?? 10);
+  if (outcome.kind === "file-outline") {
+    return registerFileOutline(outcome.outline, deps, policy.maxResults ?? 10);
   }
 
   const candidates = registerTargetCandidates(outcome.candidates, deps.registerTarget);
@@ -342,28 +342,28 @@ function toWorkflowOutcome(
       };
 }
 
-function registerTargetGroup(
-  group: ResolvedTargetGroupData,
+function registerFileOutline(
+  outline: FileOutlineData,
   deps: TargetWorkflowDeps,
   maxResults: number,
 ): TargetWorkflowOutcome {
-  const totalCount = group.targets.length;
-  const visibleTargets = group.targets.slice(0, Math.max(0, maxResults));
-  const fingerprint = computeFileFingerprint(group.file);
+  const totalCount = outline.targets.length;
+  const visibleTargets = outline.targets.slice(0, Math.max(0, maxResults));
+  const fingerprint = computeFileFingerprint(outline.file);
   const fileFingerprint = fingerprint.kind === "ok" ? fingerprint.fingerprint : "unfingerprinted";
   const targets = visibleTargets.map((target) =>
     immutableEntry(registerFromTargetData(target, deps, fileFingerprint).entry),
   );
   return Object.freeze({
-    kind: "target-group",
-    file: group.file,
-    confidence: group.confidence,
-    discoveryProvenance: Object.freeze([...group.discoveryProvenance]),
+    kind: "file-outline",
+    file: outline.file,
+    confidence: outline.confidence,
+    discoveryProvenance: Object.freeze([...outline.discoveryProvenance]),
     targets: Object.freeze(targets),
     totalCount,
     omittedCount: totalCount - targets.length,
-    unknownNestingCount: group.unknownNestingCount,
-    ...(group.partial ? { partial: group.partial } : {}),
+    unknownLevelCount: outline.unknownLevelCount,
+    ...(outline.partial ? { partial: outline.partial } : {}),
   });
 }
 
