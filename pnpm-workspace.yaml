@@ -16,13 +16,13 @@ saveExact: true
 # Upgrade these pins together after a manual Pi review. Keep published peers at '*'.
 # These overrides prevent Pi updates during full lock-file maintenance.
 overrides:
-  '@earendil-works/pi-agent-core': 1.5.0
-  '@earendil-works/pi-ai': 1.5.0
-  '@earendil-works/pi-codemode': 1.5.0
-  '@earendil-works/pi-coding-agent': 1.5.0
-  '@earendil-works/pi-mcp': 1.5.0
-  '@earendil-works/pi-telemetry': 1.5.0
-  '@earendil-works/pi-tui': 1.5.0
+  '@earendil-works/pi-agent-core': 1.5.1
+  '@earendil-works/pi-ai': 1.5.1
+  '@earendil-works/pi-codemode': 1.5.1
+  '@earendil-works/pi-coding-agent': 1.5.1
+  '@earendil-works/pi-mcp': 1.5.1
+  '@earendil-works/pi-telemetry': 1.5.1
+  '@earendil-works/pi-tui': 1.5.1
 
 peerDependencyRules:
   allowAny:
@@ -57,15 +57,15 @@ allowBuilds:
 
 # Exceptions are version-specific; future Pi upgrades must be reviewed again.
 minimumReleaseAgeExclude:
-  - '@earendil-works/pi-agent-core@1.5.0'
-  - '@earendil-works/pi-ai@1.5.0'
-  - '@earendil-works/pi-codemode@1.5.0'
-  - '@earendil-works/pi-coding-agent@1.5.0'
-  - '@earendil-works/pi-mcp@1.5.0'
-  - '@earendil-works/pi-schema@1.5.0'
-  - '@earendil-works/pi-telemetry@1.5.0'
-  - '@earendil-works/pi-tui@1.5.0'
-  # Pi 1.5.0 pins minimatch 11.0.3, which requires this glob matcher.
+  - '@earendil-works/pi-agent-core@1.5.1'
+  - '@earendil-works/pi-ai@1.5.1'
+  - '@earendil-works/pi-codemode@1.5.1'
+  - '@earendil-works/pi-coding-agent@1.5.1'
+  - '@earendil-works/pi-mcp@1.5.1'
+  - '@earendil-works/pi-schema@1.5.1'
+  - '@earendil-works/pi-telemetry@1.5.1'
+  - '@earendil-works/pi-tui@1.5.1'
+  # Pi 1.5.1 pins minimatch 11.0.3, which requires this glob matcher.
   - 'minimatch@11.0.3'
   - '@isaacs/nonrecursive-glob-match@1.0.3'
   # Older mature Smithy releases are deprecated for a logger-redaction bug.
