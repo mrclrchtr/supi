@@ -37,10 +37,13 @@ SuPi's `packages/` tree at `CORPUS_COMMIT`, extracted with `git archive` (binari
 | `precision` / `recall` | yes | Answer locations against `truth` spans (`path:line` or `path:start-end`). "Read Next" hints and `locate` steps are excluded. Lines shown by `read` count only when they hit a span: unrelated window lines are already paid for in tokens. Recall counts covered spans. Only for scenarios with `truth`. |
 | `recall` (paths) | yes | For `truthPaths` scenarios (orientation, multi-line imports): share of expected files the answer names, workspace- or focus-relative, or reads. No precision: a map may list more than the question needs. |
 | `tokensPerHit` | yes | `tokens` divided by correct locations or paths. Compares cost per useful fact across arms with different recall. |
+| `complete` | yes | Same metrics after lifting a truncation the last call discloses, as an agent would to get every result: code_* `N of M … K omitted` or `showing N; K collected omitted` re-run with `maxResults` covering all collected results; grep `limit reached. Use limit=N` re-run with that limit (at most 3 follow-ups). Absent when nothing was cut. Shown as `full tok` / `full recall`. |
 | `codeToolSurfaceTokens` | yes | Per-request cost of all registered `code_*` definitions (description, schema, snippet, guidelines). |
 | latency | no | Printed only; machine-dependent. |
 
 Before running, every `truth` span is checked against the corpus and must match the scenario's `truthText`; stale line numbers abort the run. An arm that recognizes none of the expected locations or paths also aborts, since that indicates an output format the extractors no longer parse rather than a tool regression.
+
+The report ends with a suite balance: summed tokens of complete answers per arm, savings per question, and how many questions' savings one request's tool surface costs. It is a rough ratio over this scenario mix, not a session model (no prompt caching, no persistence of output in later requests).
 
 All arms run once as warm-up before measurement. Cold TypeScript project loading omits cross-project references nondeterministically.
 
@@ -58,10 +61,12 @@ All arms run once as warm-up before measurement. Cold TypeScript project loading
 - Derive follow-up arguments (read offsets, inspect points) from earlier outputs with function steps. Hard-coded positions leak the answer and hide whether the first output was sufficient.
 - Mark pure locating calls (e.g. grep for a declaration before reading its body) with `locate: true` so their hits are not scored as answers.
 - Use a function step for data-dependent follow-ups (e.g. disambiguation handles); return `null` when not needed.
+- Include questions where `code_*` is expected to lose or tie (e.g. text in Markdown, name-based calls across packages), so the suite does not only cover its strengths.
 
 ## Limits
 
 - Fixed call sequences: real agents may phrase grep differently, misuse `code_*`, or still read files afterward. The [code tool usage report](../../../docs/ops/code-tool-usage.md) measures observed follow-up behavior from session logs. Agent-level effects need an LLM A/B run (see [Terminal-Bench workflow](../../../docs/ops/benchmarking-terminal-bench.md)).
 - TypeScript only.
 - Path recall checks that a file is named, not that the agent would recognize it as relevant. Captured snapshot files are not followed, matching observed agent behavior.
-- Break-even: `codeToolSurfaceTokens` is paid on every request; saved output also persists in later requests, so the package pays off once cumulative per-session savings exceed the surface cost.
+- Break-even: `codeToolSurfaceTokens` is paid on every request; saved output also persists in later requests, so the package pays off once cumulative per-session savings exceed the surface cost. The suite balance depends on the scenario mix and is not a representative workload.
+- Truncations without omitted results (`more may exist` only) are not expanded; such answers stay incomplete in `complete`.

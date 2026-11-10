@@ -31,6 +31,11 @@ interface ArmMetrics {
   recall?: number;
   /** Tokens per correct location or path; lower is better. Absent without hits. */
   tokensPerHit?: number;
+  /**
+   * Metrics after re-running a truncated last call with the limit its output
+   * names, as an agent would to get every result. Absent when nothing was cut.
+   */
+  complete?: Omit<ArmMetrics, "complete">;
 }
 interface ScenarioMetrics {
   native: ArmMetrics;
@@ -48,6 +53,8 @@ const OUT = join(import.meta.dirname, "out");
 const update = process.argv.includes("--update");
 const dump = process.argv.includes("--dump");
 const check = process.argv.includes("--check");
+/** Upper bound on follow-up calls that lift a disclosed truncation. */
+const MAX_EXPANSIONS = 3;
 
 /** Same heuristic PI uses for context estimation. */
 const estimateTokens = (text: string) => Math.ceil(text.length / 4);
@@ -146,23 +153,62 @@ async function runArm(
   let tokens = 0;
   const started = performance.now();
   let calls = 0;
-  for (const step of steps) {
-    const call = typeof step === "function" ? step(outputs) : step;
-    if (!call) continue;
+  let last: BenchCall | undefined;
+  const run = async (call: BenchCall) => {
     calls++;
+    last = call;
     const output = await execute(call);
     outputs.push(output);
     tokens += estimateTokens(call.tool + JSON.stringify(call.args)) + estimateTokens(output);
     collectEvidence(evidence, { call, output }, scenario, cwd);
+  };
+  for (const step of steps) {
+    const call = typeof step === "function" ? step(outputs) : step;
+    if (call) await run(call);
+  }
+  const metrics = score(scenario, { calls, tokens }, evidence);
+  let next = last && expansion(last, outputs.at(-1) ?? "");
+  if (next) {
+    for (let round = 0; next && round < MAX_EXPANSIONS; round++) {
+      await run(next);
+      next = expansion(next, outputs.at(-1) ?? "");
+    }
+    metrics.complete = score(scenario, { calls, tokens }, evidence);
   }
   const ms = Math.round(performance.now() - started);
-  const metrics = score(scenario, { calls, tokens }, evidence);
-  if (metrics.recall === 0) {
+  if ((metrics.complete ?? metrics).recall === 0) {
     // Every scenario has a non-empty answer: zero hits means the extractors no
     // longer understand the output format, not that the tool got worse.
-    throw new Error(`${scenario.id}: no expected location or path recognized; update extractors`);
+    throw new Error(
+      `${scenario.id}: no expected location or path recognized; update extractors.\n` +
+        `Last output:\n${(outputs.at(-1) ?? "").slice(0, 1500)}`,
+    );
   }
   return { metrics, outputs, ms };
+}
+
+/**
+ * Follow-up call that lifts a truncation the output discloses: code_* report
+ * `N of M … K omitted` or `showing N; K collected omitted` (re-run with
+ * `maxResults` covering every collected result), grep reports
+ * `… limit reached. Use limit=N` (re-run with that limit). Outputs that only
+ * say "more may exist" without omitted results are not expanded.
+ */
+function expansion(call: BenchCall, output: string): BenchCall | null {
+  const answer = output.split("## Read Next")[0] ?? "";
+  if (call.tool === "grep") {
+    const limit = /limit reached\. Use limit=(\d+)/.exec(answer)?.[1];
+    return limit ? { ...call, args: { ...call.args, limit: Number(limit) } } : null;
+  }
+  if (!call.tool.startsWith("code_")) return null;
+  const counted = /\b\d+ of (\d+)\b[^\n]*?\b\d+ omitted/.exec(answer);
+  const collected = /showing (\d+); (\d+) collected omitted/.exec(answer);
+  const total = counted
+    ? Number(counted[1])
+    : collected
+      ? Number(collected[1]) + Number(collected[2])
+      : 0;
+  return total ? { ...call, args: { ...call.args, maxResults: total } } : null;
 }
 
 function collectEvidence(
@@ -421,6 +467,8 @@ function printReport(
         "precision n/c": `${pct(native.precision)}/${pct(code.precision)}${diff(code.precision, before?.precision)}`,
         "recall n/c": `${pct(native.recall)}/${pct(code.recall)}${diff(code.recall, before?.recall)}`,
         "tok/hit n/c": `${native.tokensPerHit ?? "–"}/${code.tokensPerHit ?? "–"}${diff(code.tokensPerHit, before?.tokensPerHit)}`,
+        "full tok n/c": fullCell(native, code, (m) => m.tokens),
+        "full recall n/c": fullCell(native, code, (m) => m.recall, pct),
         "ms n/c": latency[id],
       };
     }),
@@ -428,6 +476,41 @@ function printReport(
   console.log(
     `code_* tool surface: ~${current.codeToolSurfaceTokens} tokens per request` +
       diff(current.codeToolSurfaceTokens, previous?.codeToolSurfaceTokens),
+  );
+  printBalance(current);
+}
+
+/** `native/code` after expanding truncated answers; empty when neither arm was cut. */
+function fullCell(
+  native: ArmMetrics,
+  code: ArmMetrics,
+  pick: (metrics: ArmMetrics) => number | undefined,
+  format: (value?: number) => string = (value) => String(value ?? "–"),
+): string {
+  if (!native.complete && !code.complete) return "";
+  return `${format(pick(native.complete ?? native))}/${format(pick(code.complete ?? code))}`;
+}
+
+/**
+ * Suite-level balance on complete answers: output tokens saved per question
+ * against the tool surface every request pays. A rough break-even, not a
+ * session model: it ignores prompt caching and that saved output also stays
+ * in later requests.
+ */
+function printBalance(current: Baseline): void {
+  const arms = Object.values(current.scenarios);
+  const total = (pick: (s: ScenarioMetrics) => ArmMetrics) =>
+    arms.reduce((sum, s) => sum + (pick(s).complete ?? pick(s)).tokens, 0);
+  const native = total((s) => s.native);
+  const code = total((s) => s.code);
+  const savedPerQuestion = (native - code) / arms.length;
+  const breakEven =
+    savedPerQuestion > 0
+      ? `one request's tool surface equals the savings of ~${(current.codeToolSurfaceTokens / savedPerQuestion).toFixed(1)} questions`
+      : "no savings to offset the tool surface";
+  console.log(
+    `Complete answers, ${arms.length} questions: native ${native} / code ${code} tokens ` +
+      `(${Math.round(savedPerQuestion)} saved per question; ${breakEven}).`,
   );
 }
 

@@ -16,7 +16,14 @@
         "tokens": 319,
         "precision": 1,
         "recall": 0.381,
-        "tokensPerHit": 40
+        "tokensPerHit": 40,
+        "complete": {
+          "calls": 2,
+          "tokens": 669,
+          "precision": 1,
+          "recall": 1,
+          "tokensPerHit": 32
+        }
       }
     },
     "refs-unique-all": {
@@ -96,7 +103,14 @@
         "tokens": 423,
         "precision": 0.3,
         "recall": 1,
-        "tokensPerHit": 141
+        "tokensPerHit": 141,
+        "complete": {
+          "calls": 2,
+          "tokens": 1568,
+          "precision": 0.06,
+          "recall": 1,
+          "tokensPerHit": 523
+        }
       }
     },
     "file-outline": {
@@ -202,7 +216,76 @@
         "tokens": 338,
         "precision": 0.875,
         "recall": 0.545,
-        "tokensPerHit": 56
+        "tokensPerHit": 56,
+        "complete": {
+          "calls": 3,
+          "tokens": 605,
+          "precision": 0.818,
+          "recall": 0.727,
+          "tokensPerHit": 76
+        }
+      }
+    },
+    "method-callers": {
+      "native": {
+        "calls": 1,
+        "tokens": 394,
+        "precision": 1,
+        "recall": 1,
+        "tokensPerHit": 33
+      },
+      "code": {
+        "calls": 2,
+        "tokens": 407,
+        "precision": 0.875,
+        "recall": 0.583,
+        "tokensPerHit": 58,
+        "complete": {
+          "calls": 3,
+          "tokens": 706,
+          "precision": 0.923,
+          "recall": 1,
+          "tokensPerHit": 59
+        }
+      }
+    },
+    "constant-with-docs": {
+      "native": {
+        "calls": 1,
+        "tokens": 211,
+        "precision": 0.8,
+        "recall": 1,
+        "tokensPerHit": 53
+      },
+      "code": {
+        "calls": 1,
+        "tokens": 149,
+        "precision": 1,
+        "recall": 0.75,
+        "tokensPerHit": 50
+      }
+    },
+    "calls-across-packages": {
+      "native": {
+        "calls": 1,
+        "tokens": 465,
+        "precision": 0.818,
+        "recall": 1,
+        "tokensPerHit": 26
+      },
+      "code": {
+        "calls": 1,
+        "tokens": 580,
+        "precision": 1,
+        "recall": 0.444,
+        "tokensPerHit": 73,
+        "complete": {
+          "calls": 2,
+          "tokens": 1405,
+          "precision": 0.9,
+          "recall": 1,
+          "tokensPerHit": 78
+        }
       }
     }
   }

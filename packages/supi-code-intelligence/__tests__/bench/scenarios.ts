@@ -127,6 +127,42 @@ const SETTINGS_MODULE_IMPLEMENTATIONS = [
   "supi-settings/__tests__/unit/settings-ui.test.ts:36-37",
 ].map((site) => `packages/${site}`);
 
+/** Callers of the session method `resolve`; `path.resolve` and promise `resolve` share the name. */
+const SESSION_RESOLVE_CALLS = [
+  "src/tool/code_resolve/execute.ts:17",
+  "__tests__/integration/refactor-rename-enrollment.test.ts:35",
+  ...[143, 149, 156].map(
+    (line) =>
+      `__tests__/integration/substrate/lsp/latex-target-public-tool.integration.test.ts:${line}`,
+  ),
+  ...[381, 403, 408, 411, 530, 558].map(
+    (line) => `__tests__/integration/workspace-session-contract.test.ts:${line}`,
+  ),
+  "__tests__/unit/session/structural-workflow-control.test.ts:110",
+].map((site) => `${CI}/${site}`);
+
+/** Calls across packages; mocks, README snippets, and the declaration are not calls. */
+const REGISTER_SETTINGS_CALLS = [
+  "supi-agent/src/config.ts:53",
+  "supi-bash-timeout/src/settings-registration.ts:6",
+  "supi-cache/src/settings-registration.ts:12",
+  "supi-code-intelligence/src/config.ts:138",
+  "supi-code-intelligence/src/gradle/consent.ts:204",
+  "supi-code-intelligence/src/substrate/lsp/settings.ts:217",
+  "supi-consulting/src/settings.ts:39",
+  "supi-context/src/settings-registration.ts:9",
+  "supi-core/__tests__/unit/settings/settings-schema.test.ts:280",
+  "supi-core/__tests__/unit/settings/settings-schema.test.ts:307",
+  "supi-core/__tests__/unit/settings/settings-schema.test.ts:343",
+  "supi-debug/src/debug.ts:27",
+  "supi-insights/src/insights.ts:80",
+  "supi-prompt-improver/src/config.ts:28",
+  "supi-prompt-suggestions/src/config/settings.ts:23",
+  "supi-review/src/config.ts:124",
+  "supi-skills/src/skill-settings.ts:59",
+  "supi-web/src/settings-registration.ts:84",
+].map((site) => `packages/${site}`);
+
 /** Entry points and central modules an agent needs to start working in the package. */
 const PACKAGE_ENTRY_PATHS = [
   "package.json",
@@ -341,5 +377,57 @@ export const scenarios: readonly BenchScenario[] = [
     // registerSettings() count too; typed empty arrays and Partial<> do not.
     truth: SETTINGS_MODULE_IMPLEMENTATIONS,
     truthText: /SettingsModule|registerSettings\(pi, \{/,
+  },
+  {
+    id: "method-callers",
+    question: "Who calls WorkspaceCodeIntelligenceSession.resolve()?",
+    // A competent agent greps the receiver naming convention, not bare `.resolve(`.
+    native: [grep("session\\.resolve\\(", CI)],
+    code: [
+      {
+        tool: "code_graph",
+        args: {
+          target: { symbol: { query: "resolve", scope: `${CI}/src/session/session.ts` } },
+        },
+      },
+      (outputs) => {
+        const handle = candidateHandle(outputs, "(`Method`)");
+        return handle ? { tool: "code_graph", args: { target: { handle } } } : null;
+      },
+    ],
+    truth: SESSION_RESOLVE_CALLS,
+    truthText: /\.resolve\(/,
+  },
+  {
+    id: "constant-with-docs",
+    // Expected loss for code_*: semantic references cover code, not Markdown.
+    question: "Where is DEFAULT_WORKFLOW_DEADLINE_MS used or documented?",
+    native: [grep("\\bDEFAULT_WORKFLOW_DEADLINE_MS\\b", CI)],
+    code: [
+      {
+        tool: "code_graph",
+        args: { target: { symbol: { query: "DEFAULT_WORKFLOW_DEADLINE_MS" } } },
+      },
+    ],
+    truth: [
+      `${CI}/CLAUDE.md:27`,
+      `${CI}/src/tool/infra/workflow-control.ts:16`,
+      `${CI}/src/ui/status-command.ts:9`,
+      `${CI}/src/ui/status-command.ts:114`,
+    ],
+    truthText: /DEFAULT_WORKFLOW_DEADLINE_MS/,
+  },
+  {
+    id: "calls-across-packages",
+    question: "Where is registerSettings called across packages?",
+    native: [grep("\\bregisterSettings\\(")],
+    code: [
+      {
+        tool: "code_find",
+        args: { mode: "ast", kind: "call", query: "registerSettings", scope: ["packages"] },
+      },
+    ],
+    truth: REGISTER_SETTINGS_CALLS,
+    truthText: /registerSettings\(/,
   },
 ];
