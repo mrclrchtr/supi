@@ -10,3 +10,6 @@ node_modules/
 packages/*/dist/
 packages/*/tsconfig.tsbuildinfo
 packages/*/__tests__/**/tsconfig.tsbuildinfo
+
+# Cargo build output of the Rust language-baseline fixture (rust-analyzer flycheck)
+packages/supi-code-intelligence/__tests__/fixtures/language-baseline/rust/target/
