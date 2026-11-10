@@ -559,7 +559,7 @@ function printReport(
     }),
   );
   console.log(
-    `code_* tool surface: ~${current.codeToolSurfaceTokens} tokens per request` +
+    `code_* tool surface: ~${current.codeToolSurfaceTokens} context tokens (cached prefix; full price only on cold start or cache miss)` +
       diff(current.codeToolSurfaceTokens, previous?.codeToolSurfaceTokens),
   );
   printBalance(current);
@@ -578,9 +578,10 @@ function fullCell(
 
 /**
  * Suite-level balance on complete answers: output tokens saved per question
- * against the tool surface every request pays. A rough break-even, not a
- * session model: it ignores prompt caching and that saved output also stays
- * in later requests.
+ * against the tool surface as context occupancy. The surface sits in the
+ * cached prompt prefix, so its price per request is mostly `cacheRead`; saved
+ * output also stays in later requests (and is cached there too). Break-even
+ * therefore compares context size per session, not price per request.
  */
 function printBalance(current: Baseline): void {
   printBalanceLine(current, "Complete answers", (m) => (m.complete ?? m).tokens);
@@ -603,8 +604,8 @@ function printBalanceLine(
   const savedPerQuestion = (native - code) / arms.length;
   const breakEven =
     savedPerQuestion > 0
-      ? `one request's tool surface equals the savings of ~${(current.codeToolSurfaceTokens / savedPerQuestion).toFixed(1)} questions`
-      : "no savings to offset the tool surface";
+      ? `the tool surface's context size equals the savings of ~${(current.codeToolSurfaceTokens / savedPerQuestion).toFixed(1)} questions per session`
+      : "no output savings to offset the tool surface's context size";
   console.log(
     `${label}, ${arms.length} questions: native ${native} / code ${code} tokens ` +
       `(${Math.round(savedPerQuestion)} saved per question; ${breakEven}).`,
