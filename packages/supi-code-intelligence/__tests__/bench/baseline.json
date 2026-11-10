@@ -70,10 +70,10 @@
     "definition-signature": {
       "native": {
         "calls": 2,
-        "tokens": 342,
+        "tokens": 171,
         "precision": 1,
         "recall": 1,
-        "tokensPerHit": 342
+        "tokensPerHit": 171
       },
       "code": {
         "calls": 2,
@@ -176,21 +176,33 @@
     "callees": {
       "native": {
         "calls": 2,
-        "tokens": 869
+        "tokens": 856,
+        "precision": 1,
+        "recall": 1,
+        "tokensPerHit": 214
       },
       "code": {
         "calls": 1,
-        "tokens": 141
+        "tokens": 141,
+        "precision": 1,
+        "recall": 1,
+        "tokensPerHit": 35
       }
     },
     "implementations": {
       "native": {
         "calls": 1,
-        "tokens": 1171
+        "tokens": 1171,
+        "precision": 0.182,
+        "recall": 0.727,
+        "tokensPerHit": 146
       },
       "code": {
         "calls": 2,
-        "tokens": 338
+        "tokens": 338,
+        "precision": 0.875,
+        "recall": 0.545,
+        "tokensPerHit": 56
       }
     }
   }

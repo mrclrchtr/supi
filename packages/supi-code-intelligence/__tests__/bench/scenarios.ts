@@ -3,8 +3,9 @@
  * tools and once with code_* tools. Call sequences model a competent agent;
  * a function step receives earlier outputs (e.g. to pick a candidate handle).
  *
- * Ground truth (`truth`) is `path:line` against the pinned corpus commit and
- * must be re-derived whenever `CORPUS_COMMIT` changes.
+ * Ground truth (`truth`) is `path:line` or `path:start-end` against the pinned
+ * corpus commit and must be re-derived whenever `CORPUS_COMMIT` changes; the
+ * runner rejects entries whose lines do not match `truthText`.
  */
 
 /** Pinned SuPi commit used as the frozen corpus. */
@@ -14,6 +15,11 @@ export const CORPUS_COMMIT = "b0c23833bb5b1da0c8f4a1619ca7ffdb47fd5f20";
 export interface BenchCall {
   readonly tool: string;
   readonly args: Record<string, unknown>;
+  /**
+   * The output only locates where to look next (e.g. grep for a declaration
+   * before reading its body); its locations are not scored as answers.
+   */
+  readonly locate?: boolean;
 }
 
 /** A function step may return `null` to skip itself (e.g. no disambiguation needed). */
@@ -24,8 +30,14 @@ export interface BenchScenario {
   readonly question: string;
   readonly native: readonly BenchStep[];
   readonly code: readonly BenchStep[];
-  /** Expected answer locations as corpus-relative `path:line`. */
+  /**
+   * Expected answer locations as corpus-relative `path:line`, or
+   * `path:start-end` when tools legitimately report different lines of one
+   * construct (e.g. a return-type signature vs. the object literal it returns).
+   */
   readonly truth?: readonly string[];
+  /** Pattern every `truth` span must contain in the corpus; guards stale line numbers. */
+  readonly truthText?: RegExp;
   /**
    * Corpus-relative files a navigation answer should name (orientation
    * questions). Scored as path recall; precision is not meaningful for maps.
@@ -35,15 +47,36 @@ export interface BenchScenario {
 
 const CI = "packages/supi-code-intelligence";
 
-const grep = (pattern: string, path = "packages"): BenchCall => ({
+const grep = (pattern: string, path = "packages", locate = false): BenchCall => ({
   tool: "grep",
   args: { pattern, path },
+  ...(locate ? { locate } : {}),
 });
 const read = (path: string, offset?: number, limit?: number): BenchCall => ({
   tool: "read",
   args: { path, ...(offset ? { offset } : {}), ...(limit ? { limit } : {}) },
 });
 const ls = (path: string): BenchCall => ({ tool: "ls", args: { path } });
+/**
+ * Read `limit` lines from the first grep hit in the previous output, as an
+ * agent would after locating a declaration. Grep paths are relative to `base`.
+ */
+const readFromGrepHit =
+  (base: string, limit: number) =>
+  (outputs: readonly string[]): BenchCall | null => {
+    const hit = /^([\w./@-]+\.\w+):(\d+):/m.exec(outputs.at(-1) ?? "");
+    return hit ? read(`${base}/${hit[1]}`, Number(hit[2]), limit) : null;
+  };
+/** Inspect the first `path:line:character` a code_resolve answer reports. */
+const inspectResolved = (outputs: readonly string[]): BenchCall | null => {
+  const hit = /`([\w./@-]+\.\w+):(\d+):(\d+)`/.exec(outputs.at(-1) ?? "");
+  return hit
+    ? {
+        tool: "code_inspect",
+        args: { point: { file: hit[1], line: Number(hit[2]), character: Number(hit[3]) } },
+      }
+    : null;
+};
 /**
  * Candidate handle when the previous output asked for disambiguation: the
  * first one, or the first on a line naming `pathHint` (as an agent would pick).
@@ -80,6 +113,20 @@ const SESSION_DECLARATIONS = "^(export )?(async )?(function|class|interface|type
 /** The class and two module functions; re-export statements forward other modules' names. */
 const SESSION_TOP_LEVEL = [140, 484, 492].map((line) => `${CI}/src/session/session.ts:${line}`);
 
+const SETTINGS_MODULE_IMPLEMENTATIONS = [
+  "supi-agent/src/profile-settings.ts:88-89",
+  "supi-code-intelligence/src/config.ts:138",
+  "supi-code-intelligence/src/gradle/consent.ts:204",
+  "supi-consulting/src/settings.ts:39",
+  "supi-core/src/settings/settings-schema.ts:421-422",
+  "supi-skills/src/skill-settings.ts:32-33",
+  "supi-web/src/settings-registration.ts:43",
+  "supi-core/__tests__/unit/settings/settings-registry.test.ts:9-10",
+  "supi-settings/__tests__/unit/scoped-settings-list.test.ts:30-31",
+  "supi-settings/__tests__/unit/scoped-settings-list.test.ts:151",
+  "supi-settings/__tests__/unit/settings-ui.test.ts:36-37",
+].map((site) => `packages/${site}`);
+
 /** Entry points and central modules an agent needs to start working in the package. */
 const PACKAGE_ENTRY_PATHS = [
   "package.json",
@@ -109,6 +156,7 @@ export const scenarios: readonly BenchScenario[] = [
     native: [grep("\\btoWorkflowControl\\b")],
     code: [{ tool: "code_graph", args: { target: workflowControl } }],
     truth: WORKFLOW_CONTROL_SITES,
+    truthText: /toWorkflowControl/,
   },
   {
     id: "refs-unique-all",
@@ -116,6 +164,7 @@ export const scenarios: readonly BenchScenario[] = [
     native: [grep("\\btoWorkflowControl\\b")],
     code: [{ tool: "code_graph", args: { target: workflowControl, maxResults: 50 } }],
     truth: WORKFLOW_CONTROL_SITES,
+    truthText: /toWorkflowControl/,
   },
   {
     id: "refs-ambiguous",
@@ -137,6 +186,7 @@ export const scenarios: readonly BenchScenario[] = [
     truth: [26, 56, 69, 84, 99, 128].map(
       (line) => `${CI}/src/session/orientation/context-facts.ts:${line}`,
     ),
+    truthText: /resultData/,
   },
   {
     id: "refs-ambiguous-unscoped",
@@ -152,19 +202,18 @@ export const scenarios: readonly BenchScenario[] = [
     truth: [26, 56, 69, 84, 99, 128].map(
       (line) => `${CI}/src/session/orientation/context-facts.ts:${line}`,
     ),
+    truthText: /resultData/,
   },
   {
     id: "definition-signature",
     question: "Where is createSessionCache defined and what does it return?",
-    native: [grep("function createSessionCache"), read(`${CI}/src/app/app.ts`, 50, 30)],
+    native: [grep("function createSessionCache"), readFromGrepHit("packages", 15)],
     code: [
       { tool: "code_resolve", args: { target: { symbol: { query: "createSessionCache" } } } },
-      {
-        tool: "code_inspect",
-        args: { point: { file: `${CI}/src/app/app.ts`, line: 57, character: 17 } },
-      },
+      inspectResolved,
     ],
     truth: [`${CI}/src/app/app.ts:57`],
+    truthText: /createSessionCache/,
   },
   {
     id: "file-outline-default",
@@ -172,6 +221,7 @@ export const scenarios: readonly BenchScenario[] = [
     native: [grep(SESSION_DECLARATIONS, `${CI}/src/session/session.ts`)],
     code: [{ tool: "code_resolve", args: { target: { file: `${CI}/src/session/session.ts` } } }],
     truth: SESSION_TOP_LEVEL,
+    truthText: /^(export )?(class|function) /m,
   },
   {
     id: "file-outline",
@@ -184,6 +234,7 @@ export const scenarios: readonly BenchScenario[] = [
       },
     ],
     truth: SESSION_TOP_LEVEL,
+    truthText: /^(export )?(class|function) /m,
   },
   {
     id: "find-calls",
@@ -204,6 +255,7 @@ export const scenarios: readonly BenchScenario[] = [
     truth: [47, 50, 56].map(
       (line) => `${CI}/src/tool/code_orientation/workspace-output.ts:${line}`,
     ),
+    truthText: /selectDirectoryNavigation\(/,
   },
   {
     id: "find-imports",
@@ -246,9 +298,10 @@ export const scenarios: readonly BenchScenario[] = [
   {
     id: "callees",
     question: "What does registerCodeIntelligenceTools call?",
+    // The agent does not know where the function ends; 80 lines is a typical window.
     native: [
-      grep("function registerCodeIntelligenceTools"),
-      read(`${CI}/src/tool/register.ts`, 84, 77),
+      grep("function registerCodeIntelligenceTools", "packages", true),
+      readFromGrepHit("packages", 80),
     ],
     code: [
       {
@@ -259,6 +312,9 @@ export const scenarios: readonly BenchScenario[] = [
         },
       },
     ],
+    // Direct calls; the nested `execute` callback runs later, not during registration.
+    truth: [95, 96, 97, 101].map((line) => `${CI}/src/tool/register.ts:${line}`),
+    truthText: /\w\(/,
   },
   {
     id: "implementations",
@@ -280,5 +336,10 @@ export const scenarios: readonly BenchScenario[] = [
           : null;
       },
     ],
+    // Object literals typed as SettingsModule, spanning a declared return type
+    // to the literal it returns. Contextually typed arguments to
+    // registerSettings() count too; typed empty arrays and Partial<> do not.
+    truth: SETTINGS_MODULE_IMPLEMENTATIONS,
+    truthText: /SettingsModule|registerSettings\(pi, \{/,
   },
 ];

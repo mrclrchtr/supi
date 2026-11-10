@@ -5,9 +5,10 @@
  *   pnpm bench:code-intelligence            # compare with baseline.json
  *   pnpm bench:code-intelligence --update   # rewrite baseline.json
  *   pnpm bench:code-intelligence --dump     # also write raw outputs to bench/out/
+ *   pnpm bench:code-intelligence --check    # exit 1 when metrics differ from baseline.json
  */
 /* biome-ignore-all lint/suspicious/noConsole: CLI report output */
-import { mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { createGrepTool, createLsTool, createReadTool } from "@earendil-works/pi-coding-agent";
 import { createPiMock, getTool, makeCtx } from "@mrclrchtr/supi-test-utils";
@@ -46,6 +47,7 @@ const BASELINE = join(import.meta.dirname, "baseline.json");
 const OUT = join(import.meta.dirname, "out");
 const update = process.argv.includes("--update");
 const dump = process.argv.includes("--dump");
+const check = process.argv.includes("--check");
 
 /** Same heuristic PI uses for context estimation. */
 const estimateTokens = (text: string) => Math.ceil(text.length / 4);
@@ -62,8 +64,10 @@ const workspace = await createRealLanguageWorkspace({
 });
 corpus.dispose();
 const cwd = workspace.cwd;
+let exitCode = 0;
 
 try {
+  validateTruth(scenarios, cwd);
   const pi = createPiMock();
   registerCodeIntelligenceTools(pi as never, () => workspace.session);
   const ctx = makeCtx({ cwd });
@@ -109,6 +113,7 @@ try {
   };
   const previous = readBaseline();
   printReport(current, previous, latency);
+  if (check) exitCode = checkBaseline(current, previous);
   if (update) {
     writeFileSync(BASELINE, `${JSON.stringify(current, null, 2)}\n`);
     console.log(`Baseline written: ${relative(process.cwd(), BASELINE)}`);
@@ -116,7 +121,19 @@ try {
 } finally {
   await workspace.dispose();
 }
-process.exit(0);
+process.exit(exitCode);
+
+/**
+ * What an arm surfaced. `found` are reported answer locations (wrong ones
+ * lower precision); `seen` are lines of read windows, which count only when
+ * they hit the truth, because unrelated window lines are already paid for in
+ * tokens; `paths` are named expected files.
+ */
+interface Evidence {
+  found: Set<string>;
+  seen: Set<string>;
+  paths: Set<string>;
+}
 
 async function runArm(
   execute: (call: BenchCall) => Promise<string>,
@@ -125,8 +142,7 @@ async function runArm(
   cwd: string,
 ): Promise<{ metrics: ArmMetrics; outputs: string[]; ms: number }> {
   const outputs: string[] = [];
-  const found = new Set<string>();
-  const foundPaths = new Set<string>();
+  const evidence: Evidence = { found: new Set(), seen: new Set(), paths: new Set() };
   let tokens = 0;
   const started = performance.now();
   let calls = 0;
@@ -137,43 +153,72 @@ async function runArm(
     const output = await execute(call);
     outputs.push(output);
     tokens += estimateTokens(call.tool + JSON.stringify(call.args)) + estimateTokens(output);
-    const base = call.tool === "grep" ? grepBase(cwd, String(call.args.path ?? ".")) : cwd;
-    for (const location of locations(output, base, cwd)) found.add(location);
-    for (const path of namedPaths(call, output, scenario.truthPaths ?? [], cwd))
-      foundPaths.add(path);
+    collectEvidence(evidence, { call, output }, scenario, cwd);
   }
   const ms = Math.round(performance.now() - started);
-  return { metrics: score(scenario, { calls, tokens }, found, foundPaths), outputs, ms };
+  const metrics = score(scenario, { calls, tokens }, evidence);
+  if (metrics.recall === 0) {
+    // Every scenario has a non-empty answer: zero hits means the extractors no
+    // longer understand the output format, not that the tool got worse.
+    throw new Error(`${scenario.id}: no expected location or path recognized; update extractors`);
+  }
+  return { metrics, outputs, ms };
+}
+
+function collectEvidence(
+  evidence: Evidence,
+  { call, output }: { call: BenchCall; output: string },
+  scenario: BenchScenario,
+  cwd: string,
+): void {
+  if (call.tool === "read") {
+    for (const line of readWindow(call, output, cwd)) evidence.seen.add(line);
+  } else if (!call.locate) {
+    const base = call.tool === "grep" ? grepBase(cwd, String(call.args.path ?? ".")) : cwd;
+    for (const location of locations(output, base, cwd)) evidence.found.add(location);
+  }
+  for (const path of namedPaths(call, output, scenario.truthPaths ?? [], cwd)) {
+    evidence.paths.add(path);
+  }
 }
 
 /** Add accuracy and cost-per-hit metrics against the scenario's ground truth. */
-function score(
-  scenario: BenchScenario,
-  base: ArmMetrics,
-  found: ReadonlySet<string>,
-  foundPaths: ReadonlySet<string>,
-): ArmMetrics {
+function score(scenario: BenchScenario, base: ArmMetrics, evidence: Evidence): ArmMetrics {
   const metrics = { ...base };
   const perHit = (hits: number) =>
     hits ? { tokensPerHit: Math.round(metrics.tokens / hits) } : {};
   if (scenario.truth) {
-    const expected = new Set(scenario.truth);
-    const hits = [...found].filter((location) => expected.has(location)).length;
-    metrics.precision = round(found.size ? hits / found.size : 0);
-    metrics.recall = round(hits / expected.size);
+    const { precision, hits } = scoreLocations(scenario.truth.map(parseSpan), evidence);
+    metrics.precision = precision;
+    metrics.recall = round(hits / scenario.truth.length);
     Object.assign(metrics, perHit(hits));
   }
   if (scenario.truthPaths) {
-    metrics.recall = round(foundPaths.size / scenario.truthPaths.length);
-    Object.assign(metrics, perHit(foundPaths.size));
+    metrics.recall = round(evidence.paths.size / scenario.truthPaths.length);
+    Object.assign(metrics, perHit(evidence.paths.size));
   }
   return metrics;
+}
+
+/** Precision over reported plus truth-hitting read lines; hits are distinct truth spans covered. */
+function scoreLocations(
+  spans: readonly Span[],
+  { found, seen }: Evidence,
+): { precision: number; hits: number } {
+  const matches = (location: string) => spans.filter((span) => inSpan(span, location));
+  const reported = [...found];
+  const correct = reported.filter((location) => matches(location).length > 0).length;
+  const seenOnly = [...seen].filter((line) => !found.has(line) && matches(line).length > 0).length;
+  const answered = reported.length + seenOnly;
+  const hits = new Set([...reported, ...seen].flatMap(matches)).size;
+  return { precision: round(answered ? (correct + seenOnly) / answered : 0), hits };
 }
 
 /**
  * Extract answer locations as `path:line`. Handles grep (`path:12:`) and
  * code_* (`` `path`: L12:3, L40 `` / `` `path:12:3` `` / file outline rows
- * `` — L12:3 `` under `` # File outline of `path` `` / code_find rows
+ * `` — L12:3 `` under `` # File outline of `path` `` / code_graph callee rows
+ * `` - `name` — L12:3 `` under `` Target: … — `path` `` / code_find rows
  * `` - `name` (kind) L12:3–L12:9 `` under `` ### path ``). "Read Next" hints are
  * navigation suggestions, not answers, and are excluded.
  */
@@ -185,6 +230,11 @@ function locations(text: string, base: string, cwd: string): Set<string> {
     for (const m of answer.matchAll(/ — L(\d+):\d+/g)) out.add(`${outlineFile}:${m[1]}`);
   }
   for (const location of findRowLocations(answer, cwd)) out.add(location);
+  // code_graph callee rows (`` - `callee` — L12:3 ``) belong to the target's file.
+  const targetFile = /^Target: `[^`]+` — `([^`]+)`/m.exec(answer)?.[1];
+  if (targetFile) {
+    for (const m of answer.matchAll(/^- `[^`]+` — L(\d+):\d+/gm)) out.add(`${targetFile}:${m[1]}`);
+  }
   const norm = (path: string) => relative(cwd, resolve(base, path));
   for (const m of answer.matchAll(/^([\w./@-]+\.\w+):(\d+):/gm)) {
     out.add(`${norm(m[1] as string)}:${m[2]}`);
@@ -239,6 +289,82 @@ function namedPaths(
       return new RegExp(`(^|[^\\w./-])(\\./)?${escaped}($|[^\\w./-])`, "m").test(output);
     });
   });
+}
+
+interface Span {
+  path: string;
+  start: number;
+  end: number;
+}
+
+/** Parse a truth entry `path:line` or `path:start-end`. */
+function parseSpan(entry: string): Span {
+  const m = /^(.+):(\d+)(?:-(\d+))?$/.exec(entry);
+  if (!m) throw new Error(`Invalid truth entry: ${entry}`);
+  const start = Number(m[2]);
+  return { path: m[1] as string, start, end: Number(m[3] ?? start) };
+}
+
+function inSpan(span: Span, location: string): boolean {
+  const cut = location.lastIndexOf(":");
+  const line = Number(location.slice(cut + 1));
+  return location.slice(0, cut) === span.path && line >= span.start && line <= span.end;
+}
+
+/**
+ * Fail fast on stale ground truth: every span must exist in the corpus and
+ * contain the scenario's `truthText` (line numbers drift between commits).
+ */
+function validateTruth(all: readonly BenchScenario[], root: string): void {
+  const problems = all.flatMap((scenario) => [
+    ...(scenario.truth ?? []).flatMap((entry) => spanProblem(scenario, entry, root)),
+    ...(scenario.truthPaths ?? [])
+      .filter((path) => !existsSync(join(root, path)))
+      .map((path) => `${scenario.id}: missing path ${path}`),
+  ]);
+  if (problems.length) throw new Error(`Stale ground truth:\n${problems.join("\n")}`);
+}
+
+function spanProblem(scenario: BenchScenario, entry: string, root: string): string[] {
+  const span = parseSpan(entry);
+  const file = join(root, span.path);
+  if (!existsSync(file)) return [`${scenario.id}: missing file ${span.path}`];
+  const lines = readFileSync(file, "utf8").split("\n");
+  const text = lines.slice(span.start - 1, span.end).join("\n");
+  const pattern = scenario.truthText ?? /\S/;
+  return span.end <= lines.length && pattern.test(text)
+    ? []
+    : [`${scenario.id}: ${entry} does not match ${pattern}`];
+}
+
+/**
+ * Corpus lines a read call displayed. PI's read output has no line numbers;
+ * a trailing continuation notice (`[N more lines …]`) is not file content.
+ */
+function readWindow(call: BenchCall, output: string, cwd: string): string[] {
+  const args = call.args as { path: string; offset?: number };
+  const path = relative(cwd, resolve(cwd, args.path));
+  const body = output.replace(/\n*\[\d+ more lines in file\.[^\]]*\]\s*$/, "");
+  const start = args.offset ?? 1;
+  return body.split("\n").map((_, index) => `${path}:${start + index}`);
+}
+
+/** Compare deterministic metrics with the baseline; returns the process exit code. */
+function checkBaseline(current: Baseline, previous: Baseline | undefined): number {
+  if (!previous || previous.corpusCommit !== current.corpusCommit) {
+    console.error("--check: no baseline for this corpus commit; run with --update first.");
+    return 1;
+  }
+  const { scenarios: now, ...nowMeta } = current;
+  const { scenarios: before, ...beforeMeta } = previous;
+  const changed = [...new Set([...Object.keys(now), ...Object.keys(before)])].filter(
+    (id) => JSON.stringify(now[id]) !== JSON.stringify(before[id]),
+  );
+  if (JSON.stringify(nowMeta) !== JSON.stringify(beforeMeta)) changed.push("(tool surface)");
+  if (!changed.length) return 0;
+  console.error(`--check: metrics differ from baseline: ${changed.join(", ")}`);
+  console.error("Review the diff; if intended, run with --update and commit baseline.json.");
+  return 1;
 }
 
 /** grep prints paths relative to a searched directory, or the bare name for a searched file. */

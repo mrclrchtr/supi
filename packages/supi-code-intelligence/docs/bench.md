@@ -6,6 +6,7 @@ Deterministic comparison of native PI tools (`grep`, `read`) and `code_*` tools 
 pnpm bench:code-intelligence            # run and diff against baseline.json
 pnpm bench:code-intelligence --update   # rewrite baseline.json
 pnpm bench:code-intelligence --dump     # also write raw outputs to __tests__/bench/out/
+pnpm bench:code-intelligence --check    # exit 1 when deterministic metrics differ from baseline.json
 ```
 
 Requires git history for `CORPUS_COMMIT` and the TypeScript LSP from root dev dependencies. Not part of CI.
@@ -33,11 +34,13 @@ SuPi's `packages/` tree at `CORPUS_COMMIT`, extracted with `git archive` (binari
 | --- | --- | --- |
 | `tokens` | yes | chars/4 of call arguments plus model-visible output, the estimate PI uses. Not a provider tokenizer. |
 | `calls` | yes | Executed steps; conditional steps that return `null` are not counted. |
-| `precision` / `recall` | yes | `path:line` locations in the answer against `truth`. "Read Next" hints are excluded. Only for scenarios with `truth`. |
+| `precision` / `recall` | yes | Answer locations against `truth` spans (`path:line` or `path:start-end`). "Read Next" hints and `locate` steps are excluded. Lines shown by `read` count only when they hit a span: unrelated window lines are already paid for in tokens. Recall counts covered spans. Only for scenarios with `truth`. |
 | `recall` (paths) | yes | For `truthPaths` scenarios (orientation, multi-line imports): share of expected files the answer names, workspace- or focus-relative, or reads. No precision: a map may list more than the question needs. |
 | `tokensPerHit` | yes | `tokens` divided by correct locations or paths. Compares cost per useful fact across arms with different recall. |
 | `codeToolSurfaceTokens` | yes | Per-request cost of all registered `code_*` definitions (description, schema, snippet, guidelines). |
 | latency | no | Printed only; machine-dependent. |
+
+Before running, every `truth` span is checked against the corpus and must match the scenario's `truthText`; stale line numbers abort the run. An arm that recognizes none of the expected locations or paths also aborts, since that indicates an output format the extractors no longer parse rather than a tool regression.
 
 All arms run once as warm-up before measurement. Cold TypeScript project loading omits cross-project references nondeterministically.
 
@@ -51,7 +54,9 @@ All arms run once as warm-up before measurement. Cold TypeScript project loading
 ## Adding scenarios
 
 - Model a competent agent's minimal sequence for each arm. Do not handicap either side.
-- Add `truth` whenever the answer is a set of locations; use `truthPaths` when the answer is a set of files.
+- Add `truth` and `truthText` whenever the answer is a set of locations; use `truthPaths` when the answer is a set of files. Use a span when tools legitimately report different lines of one construct.
+- Derive follow-up arguments (read offsets, inspect points) from earlier outputs with function steps. Hard-coded positions leak the answer and hide whether the first output was sufficient.
+- Mark pure locating calls (e.g. grep for a declaration before reading its body) with `locate: true` so their hits are not scored as answers.
 - Use a function step for data-dependent follow-ups (e.g. disambiguation handles); return `null` when not needed.
 
 ## Limits
