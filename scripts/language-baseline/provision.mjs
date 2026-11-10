@@ -17,7 +17,7 @@ import { Readable, Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { fileURLToPath } from "node:url";
 import { createGunzip } from "node:zlib";
-import { selectClangArtifact } from "./clang-artifacts.mjs";
+import { clangArchiveMembers, selectClangArtifact } from "./clang-artifacts.mjs";
 
 if (process.env.CI !== "true" || !process.env.RUNNER_TEMP) {
   throw new Error("Run language-server provisioning only in an isolated CI job.");
@@ -35,6 +35,8 @@ const jdtlsHome = join(home, "jdtls");
 const pythonHome = join(home, "basedpyright");
 const rustupHome = join(home, "rustup");
 const cargoHome = join(home, "cargo");
+// Optional directory restored by actions/cache; its key includes every pinned artifact hash.
+const cacheRoot = process.env.SUPI_LANGUAGE_BASELINE_CACHE;
 
 rmSync(home, { recursive: true, force: true });
 mkdirSync(bin, { recursive: true });
@@ -89,11 +91,24 @@ function rustHost() {
 }
 
 async function installClangToolchain(pin) {
-  const archive = join(home, pin.file);
-  const destination = join(home, "llvm");
-  await download(pin.url, archive, pin.sha256);
-  mkdirSync(destination, { recursive: true });
-  run("tar", ["-xJf", archive, "-C", destination]);
+  const destination = cacheRoot ? join(cacheRoot, "llvm", pin.sha256) : join(home, "llvm");
+  const marker = join(destination, ".artifact.json");
+  if (!existsSync(marker)) {
+    const archive = join(home, pin.file);
+    rmSync(destination, { recursive: true, force: true });
+    await download(pin.url, archive, pin.sha256);
+    mkdirSync(destination, { recursive: true });
+    run("tar", [
+      "-xJf",
+      archive,
+      "-C",
+      destination,
+      ...clangArchiveMembers(pin, pins.referenceServers.clangd.version, process.platform),
+    ]);
+    rmSync(archive, { force: true });
+    // Written last so an interrupted extraction is never reused from the cache.
+    writeFileSync(marker, `${JSON.stringify({ file: pin.file, sha256: pin.sha256 })}\n`);
+  }
 
   const llvmBin = findClangBin(destination);
   if (!llvmBin) {

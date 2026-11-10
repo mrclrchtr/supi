@@ -14,7 +14,7 @@ on:
         type: string
         default: ""
   pull_request:
-    types: [opened, synchronize, reopened, edited, ready_for_review]
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches: [main]
 
@@ -29,7 +29,7 @@ concurrency:
 
 jobs:
   ci-plan:
-    runs-on: avrea-ubuntu-latest-2-vcpu
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
       mode: ${{ steps.plan.outputs.mode }}
@@ -57,7 +57,7 @@ jobs:
   actionlint:
     needs: ci-plan
     if: needs.ci-plan.outputs.mode != 'none'
-    runs-on: avrea-ubuntu-latest-2-vcpu
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - name: Checkout verification commit
@@ -71,7 +71,7 @@ jobs:
   conventional-commits:
     needs: ci-plan
     if: needs.ci-plan.outputs.mode != 'none'
-    runs-on: avrea-ubuntu-latest-2-vcpu
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - name: Checkout verification commit
@@ -118,7 +118,7 @@ jobs:
   workspace-checks:
     needs: ci-plan
     if: needs.ci-plan.outputs.mode != 'none'
-    runs-on: avrea-ubuntu-latest-2-vcpu
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
       RELEASE_SHA: ${{ needs.ci-plan.outputs.sha }}
@@ -167,7 +167,7 @@ jobs:
   tests:
     needs: ci-plan
     if: needs.ci-plan.outputs.mode == 'full'
-    runs-on: avrea-ubuntu-latest-2-vcpu
+    runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - name: Checkout verification commit
@@ -190,7 +190,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [avrea-ubuntu-latest-2-vcpu, macos-latest]
+        os: [ubuntu-latest, macos-latest]
     steps:
       - name: Checkout verification commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -212,7 +212,15 @@ jobs:
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: ${{ env.SUPI_BASELINE_GO_VERSION }}
+      # Only main and manual full runs write this cache; PRs never run the language baseline.
+      - name: Restore pinned LLVM subset
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/supi-language-baseline-cache
+          key: language-baseline-llvm-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/language-baseline/pins.json', 'scripts/language-baseline/clang-artifacts.mjs') }}
       - name: Provision pinned reference servers
+        env:
+          SUPI_LANGUAGE_BASELINE_CACHE: ${{ runner.temp }}/supi-language-baseline-cache
         run: node scripts/language-baseline/provision.mjs
       - name: Verify TypeScript installation selection and lifecycle
         run: >-
@@ -241,10 +249,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [avrea-ubuntu-latest-2-vcpu, macos-latest, windows-latest]
+        os: [ubuntu-latest, macos-latest, windows-latest]
         node: ["24"]
         include:
-          - os: avrea-ubuntu-latest-2-vcpu
+          - os: ubuntu-latest
             node: "22.19.0"
     steps:
       - name: Checkout verification commit
@@ -264,7 +272,7 @@ jobs:
   verify:
     if: always() && (needs.ci-plan.result != 'success' || needs.ci-plan.outputs.mode != 'none')
     needs: [ci-plan, actionlint, conventional-commits, workspace-checks, tests, installer, language-baseline]
-    runs-on: avrea-ubuntu-latest-2-vcpu
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - name: Require exactly the checks selected for this verification mode
@@ -300,7 +308,7 @@ jobs:
       !cancelled() && github.ref == 'refs/heads/main' &&
       needs.ci-plan.result == 'success' && needs.verify.result == 'success' &&
       needs.ci-plan.outputs.mode == 'full' && needs.ci-plan.outputs.release-pr != ''
-    runs-on: avrea-ubuntu-latest-2-vcpu
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     concurrency:
       group: create-release-${{ needs.ci-plan.outputs.version }}

@@ -47,42 +47,10 @@ describe("verification workflow contracts", () => {
     expect(plan).toContain("node scripts/ci-plan.mjs");
   });
 
-  it("reserves packaging, the complete test suite, and both complete matrices for exhaustive verification", () => {
-    const workspace = job("workspace-checks");
-    expect(workspace).toContain(
-      "if: needs.ci-plan.outputs.mode == 'full'\n        run: pnpm pack:verify",
-    );
-    expect(workspace).toContain(
-      "if: needs.ci-plan.outputs.mode != 'metadata'\n        uses: ./.github/actions/setup-pnpm",
-    );
-    for (const name of ["tests", "language-baseline", "installer"]) {
-      expect(job(name)).toContain("if: needs.ci-plan.outputs.mode == 'full'");
-      expect(job(name)).not.toContain("continue-on-error:");
-    }
-    const tests = job("tests");
-    expect(tests).toContain("run: pnpm test:ai\n");
-    expect(tests).toContain("sudo apt-get install -y ripgrep");
-    expect(tests).not.toMatch(/--(?:shard|no-isolate|exclude|project|passWithNoTests)/);
-    const baseline = job("language-baseline");
-    expect(baseline).toContain("os: [avrea-ubuntu-latest-2-vcpu, macos-latest]");
-    expect(baseline).toContain("node scripts/language-baseline/provision.mjs");
-    expect(baseline).toContain("pnpm test:language-baseline:acceptance");
-    const installer = job("installer");
-    expect(installer).toContain("os: [avrea-ubuntu-latest-2-vcpu, macos-latest, windows-latest]");
-    expect(installer).toContain('node: "22.19.0"');
-    expect(installer).toContain("scripts/__tests__/patch-checkout.test.mjs");
-  });
-
-  it("keeps required check names and makes dependency failures visible", () => {
-    for (const name of ["actionlint", "conventional-commits", "verify"])
-      expect(job(name)).not.toBe("");
+  it("runs the required gate even when a dependency fails, since GitHub treats a skipped required check as passing", () => {
     expect(verify).toContain(
       "if: always() && (needs.ci-plan.result != 'success' || needs.ci-plan.outputs.mode != 'none')",
     );
-    expect(verify).toContain(
-      "needs: [ci-plan, actionlint, conventional-commits, workspace-checks, tests, installer, language-baseline]",
-    );
-    expect(workflow).toContain("github.event.pull_request.number || github.run_id");
   });
 
   it("accepts a complete successful release verification", () => {

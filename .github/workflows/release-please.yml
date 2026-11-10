@@ -16,7 +16,7 @@ concurrency:
 jobs:
   release-please:
     if: github.ref == 'refs/heads/main'
-    runs-on: avrea-ubuntu-latest-2-vcpu
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - name: Create release-please app token

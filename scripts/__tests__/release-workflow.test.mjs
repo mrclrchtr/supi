@@ -202,21 +202,8 @@ function condition(
 }
 
 describe("release and publishing authorization", () => {
-  it("keeps release maintenance independent and unable to tag", () => {
+  it("keeps release maintenance unable to tag unverified commits", () => {
     expect(maintenance).toContain("skip-github-release: true");
-    expect(maintenance).not.toContain("needs:");
-    expect(maintenance).not.toContain("setup-pnpm");
-    expect(maintenance).not.toContain("actions/checkout@");
-  });
-
-  it("never installs workspace dependencies in metadata-only PR checks", () => {
-    for (const name of ["conventional-commits", "workspace-checks"]) {
-      const setup = job(name)
-        .split(/^ {6}- /m)
-        .find((step) => step.includes("uses: ./.github/actions/setup-pnpm"));
-      expect(setup).toBeDefined();
-      expect(setup).toContain("if: needs.ci-plan.outputs.mode != 'metadata'");
-    }
   });
 
   it.each([

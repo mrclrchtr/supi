@@ -77,7 +77,9 @@ gh workflow run ci.yml --repo mrclrchtr/supi --ref main -f publish_tag=v1.2.3
 
 ## Runner policy
 
-- Non-publishing Linux jobs use `avrea-ubuntu-latest-2-vcpu`, including Linux matrix legs and the minimum-Node installer check.
+- All jobs use free GitHub-hosted runners (`ubuntu-latest`, `macos-latest`, `windows-latest`); the repository is public, so standard runner minutes cost nothing.
+- `ci.yml` ignores `pull_request` `edited` events so Release Please body updates do not rerun every check. `pr-title.yml` revalidates title-only edits without dependencies.
+- Language-baseline provisioning extracts only the LLVM members it needs (clangd, clang drivers, builtin and libc++ headers) and caches them by OS, architecture, and the hashes of `pins.json` and `clang-artifacts.mjs`. A completion marker prevents reusing an interrupted extraction; other servers are still provisioned fresh.
 - Language acceptance retains Linux and macOS. Installer verification retains Linux, macOS, Windows, and the minimum Node runtime, including the skill-patch line-ending regression.
 - npm publishing uses the official GitHub-hosted `ubuntu-latest` runner for trusted publishing, for automatic releases and manual retries.
 

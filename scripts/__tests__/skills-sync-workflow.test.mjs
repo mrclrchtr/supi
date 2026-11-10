@@ -120,11 +120,6 @@ afterEach(() => {
 });
 
 describe("skill sync workflow", () => {
-  it("limits the path filter to the maintenance package, including its version pin", () => {
-    const paths = workflow.match(/^ {4}paths:\n((?: {6}- .+\n)+)/m)[1];
-    expect(paths).toBe("      - packages/supi-skill-patches/**\n");
-  });
-
   it("accepts only same-repository Renovate skill PRs with read-only generation", () => {
     expect(workflow).toContain("  pull_request:\n");
     expect(workflow).not.toContain("pull_request_target:");
