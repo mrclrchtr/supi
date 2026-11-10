@@ -1,6 +1,7 @@
 ---
 name: evaluate-code-tools
-description: Evaluate Code Intelligence (`code_*`) tools from the tool-output benchmark, session usage, retrospectives, and open issues. Use when asked whether a code_* change helped, to compare tool behavior before and after a commit, or where the tools are weakest and what to improve next.
+description: Evaluate Code Intelligence (`code_*`) tools from benchmark, session usage, retrospectives, and open issues; judge one change or rank current weaknesses.
+disable-model-invocation: true
 metadata:
   internal: true
 ---
