@@ -55,6 +55,7 @@ Records carry `promptRevision` when the producer recorded one; compare findings 
 | `--sessions-dir <path>` | Override the session storage directory to scan recursively. Otherwise use `PI_CODING_AGENT_SESSION_DIR`, project/global `sessionDir`, then `<PI_CODING_AGENT_DIR or ~/.pi/agent>/sessions`, in that order. Relative paths use the current working directory. |
 | `--source <name>` | Select `supi-agent` or `supi-review`. Defaults to both producers. |
 | `--since <date\|Nd>` | Inclusive report start date: ISO date (`2026-06-01`), timestamp (`2026-06-01T12:00:00Z`), or days ago (`30d`). Defaults to all dates; no upper-date filter is supported. |
+| `--since-commit <rev>` | Only reports from session segments whose recorded SuPi commit (Debug `runtime-provenance`, written at each `session_start`) is at least as new as `<rev>`, resolved with Git in the current directory. Reports without provenance are excluded and counted as `coverage.unknownProvenance`; records show `commit` and `dirty`. |
 | `--max-sessions <n>` | Limit discovered session files to scan, before workspace/date/source filtering. Accepts `1`–`100000`; defaults to `5000`. A reached cap makes scan coverage incomplete. |
 | `--output <path>` | Required for collection. Write the complete matching snapshot to a new JSON evidence file; existing files are preserved. |
 

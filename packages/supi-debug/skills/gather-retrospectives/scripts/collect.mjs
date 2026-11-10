@@ -6,6 +6,12 @@ import { homedir } from "node:os";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
+import {
+  admitByCommit,
+  provenanceOf,
+  resolveCommit,
+  SINCE_COMMIT_LIMITATION,
+} from "./provenance.mjs";
 import { displayPage, readEvidence, summarize } from "./snapshot.mjs";
 
 const help = `Collect stored Agent Run retrospectives without modifying sessions.
@@ -16,6 +22,9 @@ Usage: node collect.mjs --output <new-file.json> [collection options]
   --sessions-dir <path>  Override PI storage discovery
   --source <name>        supi-agent or supi-review (default: both, not a topic filter)
   --since <date|Nd>      Inclusive ISO date/time or number of days ago
+  --since-commit <rev>   Only reports from sessions whose recorded SuPi commit is
+                         at least as new as <rev> (resolved with git in cwd);
+                         reports without runtime provenance are excluded and counted
   --max-sessions <n>     Bound session scans (default: 5000)
   --output <path>        Save all matching reports; existing files are preserved
   --read <path>          Read a saved snapshot without accessing session storage
@@ -101,6 +110,7 @@ function readOptions(values, display) {
     "sessions-dir",
     "source",
     "since",
+    "since-commit",
     "max-sessions",
     "output",
   ];
@@ -119,6 +129,7 @@ async function options() {
       "sessions-dir": { type: "string" },
       source: { type: "string" },
       since: { type: "string" },
+      "since-commit": { type: "string" },
       limit: { type: "string", default: "20" },
       offset: { type: "string", default: "0" },
       "max-sessions": { type: "string" },
@@ -154,6 +165,7 @@ async function options() {
     sessionsDir: await sessionDirectory(values["sessions-dir"]),
     source: values.source ?? null,
     since: sinceTimestamp(values.since),
+    sinceCommit: resolveCommit(values["since-commit"]),
     maxSessions: integer(values["max-sessions"] ?? "5000", "--max-sessions", 1, 100000),
     output: localPath(values.output),
     display,
@@ -267,17 +279,24 @@ async function readHeader(line, path, state) {
   return session;
 }
 
+function trackProvenance(entry, state) {
+  const provenance = provenanceOf(entry);
+  if (provenance) state.provenanceContext = { provenance };
+  return Boolean(provenance);
+}
+
 function collectLine(line, context, state) {
   if (!line.trim()) return;
   const { config, coverage, reports } = state;
   const entry = parseEntry(line, coverage);
+  if (trackProvenance(entry, state)) return;
   if (
     entry?.type !== "custom" ||
     entry.customType !== "supi-debug-event" ||
     entry.data?.category !== "agent-run-retrospective"
   )
     return;
-  const item = report(entry, context);
+  const item = report(entry, { ...context, ...state.provenanceContext });
   if (!item) {
     coverage.malformedEntries++;
     return;
@@ -287,6 +306,7 @@ function collectLine(line, context, state) {
     (config.since !== null && item.timestamp < config.since)
   )
     return;
+  if (!admitByCommit(item, config.sinceCommit, coverage)) return;
   coverage.matchingEvents++;
   if (reports.has(item.ref)) coverage.duplicateEvents++;
   else reports.set(item.ref, item);
@@ -314,6 +334,8 @@ async function scanSession(path, state) {
   const lines = jsonLines(input);
   let lineNumber = 0;
   let session;
+  // Provenance applies to entries after it until the next session_start record.
+  state.provenanceContext = {};
   try {
     for await (const line of lines) {
       lineNumber++;
@@ -346,6 +368,7 @@ async function collect(config) {
     ignoredSymlinks: 0,
     sessionLimitReached: false,
     readFailures: 0,
+    unknownProvenance: 0,
     failures: [],
   };
   const reports = new Map();
@@ -372,6 +395,7 @@ async function collect(config) {
       "Stored text is best-effort sanitized, not guaranteed free of sensitive task details.",
       "Successful-task selection and optional logging prevent population failure-rate estimates.",
       "Source identifies the producer, not the topic; suggestions are not verified improvements.",
+      ...(config.sinceCommit ? [SINCE_COMMIT_LIMITATION] : []),
     ],
     records: sorted,
   };

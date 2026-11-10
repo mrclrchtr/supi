@@ -91,6 +91,7 @@ function createRenderer(evidence, records, { evidenceFile, options, scriptFile }
         workspace: filters.workspace,
         source: filters.source,
         since: filters.since === null ? null : new Date(filters.since).toISOString(),
+        ...(filters.sinceCommit ? { sinceCommit: filters.sinceCommit } : {}),
       },
       coverage: counts,
       summary,
@@ -154,6 +155,9 @@ export function displayPage(evidence, evidenceFile, options, scriptFile) {
       date: new Date(record.timestamp).toISOString(),
       status: record.status,
       ...(record.promptRevision === undefined ? {} : { promptRevision: record.promptRevision }),
+      ...(record.provenance?.commit
+        ? { commit: record.provenance.commit.slice(0, 12), dirty: record.provenance.dirty === true }
+        : {}),
       file: relative(filters.sessionsDir, record.sessionFile),
       line: record.line,
       text: record.text?.slice(textOffset),

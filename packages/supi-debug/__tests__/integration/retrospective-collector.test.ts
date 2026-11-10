@@ -303,6 +303,61 @@ describe("retrospective collector CLI", () => {
     expect(preview.records[1]).not.toHaveProperty("promptRevision");
   });
 
+  it("filters by recorded runtime provenance with --since-commit and counts unknown sessions", async () => {
+    const gitArgs = ["-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false"];
+    const commitAt = async (date: string) => {
+      const env = { ...process.env, GIT_COMMITTER_DATE: date, GIT_AUTHOR_DATE: date };
+      await execute("git", [...gitArgs, "commit", "-q", "--allow-empty", "-m", date], {
+        cwd: workspace,
+        env,
+      });
+      return (await execute("git", ["rev-parse", "HEAD"], { cwd: workspace })).stdout.trim();
+    };
+    await execute("git", ["init", "-q"], { cwd: workspace });
+    const old = await commitAt("2026-01-01T00:00:00Z");
+    const fresh = await commitAt("2026-02-01T00:00:00Z");
+    const provenance = (commit: string, commitTime: string, dirty = false) => ({
+      type: "custom",
+      customType: "supi-debug-event",
+      data: {
+        id: 2,
+        timestamp: 900,
+        source: "supi-debug",
+        level: "info",
+        category: "runtime-provenance",
+        message: "SuPi runtime provenance",
+        data: { version: "1.0.0", commit, commitTime, dirty, reason: "startup" },
+      },
+    });
+    await session("old.jsonl", workspace, [
+      provenance(old, "2026-01-01T00:00:00Z"),
+      retrospective("old", "Old code."),
+    ]);
+    await session("new.jsonl", workspace, [
+      provenance(old, "2026-01-01T00:00:00Z"),
+      retrospective("before-reload", "Before reload."),
+      provenance(fresh, "2026-02-01T00:00:00Z", true),
+      retrospective("after-reload", "After reload."),
+    ]);
+    await session("unknown.jsonl", workspace, [retrospective("unknown", "No provenance.")]);
+
+    const { preview, evidence } = await collect(["--since-commit", fresh]);
+
+    expect(evidence.records.map((record: { runKey: string }) => record.runKey)).toEqual([
+      "after-reload",
+    ]);
+    expect(evidence.records[0].provenance).toMatchObject({ commit: fresh, dirty: true });
+    expect(evidence.coverage.unknownProvenance).toBe(1);
+    expect(preview.scope.sinceCommit).toMatchObject({ rev: fresh, commit: fresh });
+    expect(preview.records[0]).toMatchObject({ commit: fresh.slice(0, 12), dirty: true });
+  });
+
+  it("rejects an unresolvable --since-commit", async () => {
+    await expect(collect(["--since-commit", "does-not-exist"])).rejects.toThrow(
+      /could not resolve does-not-exist/,
+    );
+  });
+
   it("keeps legacy events without run keys and failed assessments without inventing text", async () => {
     const report = retrospective("legacy", "Legacy evidence.");
     const { runKey: _runKey, ...data } = report.data.data;

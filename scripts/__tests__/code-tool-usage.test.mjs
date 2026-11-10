@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { analyze, classifyFollowUp, sessionCalls } from "../code-tool-usage.mjs";
+import { analyze, classifyFollowUp, segmentsSince, sessionCalls } from "../code-tool-usage.mjs";
 
 const orientation = {
   name: "code_orientation",
@@ -81,5 +81,35 @@ describe("analyze", () => {
       sessions: 1,
       medianCallsBeforeEdit: 0,
     });
+  });
+});
+
+describe("segmentsSince", () => {
+  const provenance = (commitTime) => ({
+    type: "custom",
+    customType: "supi-debug-event",
+    data: { source: "supi-debug", category: "runtime-provenance", data: { commitTime } },
+  });
+  const call = (id, name) => [
+    { message: { role: "assistant", content: [{ type: "toolCall", id, name, arguments: {} }] } },
+    { message: { role: "toolResult", toolCallId: id, toolName: name, content: [] } },
+  ];
+
+  it("keeps only reload segments recorded at or after the requested commit", () => {
+    const coverage = { unknownProvenance: 0 };
+    const segments = segmentsSince(
+      [
+        ...call("0", "code_find"),
+        provenance("2026-01-01T00:00:00Z"),
+        ...call("1", "code_graph"),
+        provenance("2026-02-01T00:00:00Z"),
+        ...call("2", "code_resolve"),
+      ],
+      { commitTime: "2026-02-01T00:00:00Z" },
+      coverage,
+    );
+
+    expect(segments.map((calls) => calls.map((item) => item.name))).toEqual([["code_resolve"]]);
+    expect(coverage.unknownProvenance).toBe(1);
   });
 });
