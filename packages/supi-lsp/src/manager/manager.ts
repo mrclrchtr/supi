@@ -148,6 +148,7 @@ import {
   workspaceSymbolCollectionResult,
   workspaceSymbolCoverageGap,
 } from "./manager-workspace-symbol.ts";
+import { isFileLocalTopLevelDeclaration } from "./typescript-file-local.ts";
 
 type UnavailableReason = "missing-command" | "start-failed" | "runtime-error";
 
@@ -591,13 +592,20 @@ export class LspManager {
    *
    * Implementation requests not known to use the native backend report every
    * other project instead: tsserver searches only the file's own project.
+   *
+   * No gap applies when `position` (zero-based) names a top-level declaration
+   * its module does not export: no other project can reference it.
    */
   typeScriptProjectCoverageGap(
     client: LspClient,
     filePath: string,
     request: "references" | "implementation",
-    resultFiles: readonly string[] = [],
+    evidence: {
+      readonly resultFiles?: readonly string[];
+      readonly position?: { readonly line: number; readonly character: number };
+    } = {},
   ): string | null {
+    const { resultFiles = [], position } = evidence;
     if (client.name !== "typescript") return null;
     const rootKey = path.resolve(client.root);
     let configs = this.typeScriptProjectConfigs.get(rootKey);
@@ -606,6 +614,7 @@ export class LspManager {
       this.typeScriptProjectConfigs.set(rootKey, configs);
     }
     const file = resolveSessionPath(this.cwd, filePath);
+    if (position && isFileLocalTopLevelDeclaration(file, position)) return null;
     if (request === "implementation" && client.typescriptSelection?.backend !== "native") {
       const skipped = findSkippedImplementationProjects({ file, cwd: this.cwd, configs });
       return skipped.length > 0 ? singleProjectImplementationReason(skipped) : null;

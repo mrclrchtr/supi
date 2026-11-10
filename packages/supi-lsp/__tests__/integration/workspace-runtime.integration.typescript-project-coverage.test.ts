@@ -86,6 +86,31 @@ describe.skipIf(!HAS_TS_LSP)("TypeScript project coverage for project-wide queri
     );
   }, 60_000);
 
+  it("keeps references complete for an unexported declaration other projects cannot reach", async () => {
+    tmpDir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "ts-project-coverage-")));
+    const compilerOptions = { strict: true, noEmit: true, target: "ES2022", module: "ESNext" };
+    write(tmpDir, "tsconfig.json", JSON.stringify({ compilerOptions, include: ["src/**/*.ts"] }));
+    write(
+      tmpDir,
+      "__tests__/tsconfig.json",
+      JSON.stringify({ compilerOptions, include: ["**/*.ts", "../src/**/*.ts"] }),
+    );
+    const source = write(
+      tmpDir,
+      "src/value.ts",
+      "function helper() {\n  return 1;\n}\nexport const value = helper();\n",
+    );
+    write(tmpDir, "__tests__/value.test.ts", 'export { value } from "../src/value";\n');
+    const owner = createWorkspaceLspRuntimeOwner(new LspManager(TS_CONFIG, tmpDir));
+    shutdown = owner.shutdown;
+
+    const helper = await owner.runtime.references(source, { line: 0, character: 9 });
+    expect(helper.kind).toBe("completed");
+    // The exported value in the same file still reports the unloaded test project.
+    const value = await owner.runtime.references(source, { line: 3, character: 13 });
+    expect(value.kind).toBe("partial");
+  }, 60_000);
+
   it("reports tsserver implementations as single-project even after other projects load", async () => {
     tmpDir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "ts-project-coverage-")));
     const compilerOptions = { strict: true, noEmit: true, target: "ES2022", module: "ESNext" };

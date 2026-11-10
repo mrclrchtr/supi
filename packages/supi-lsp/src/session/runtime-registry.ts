@@ -197,7 +197,7 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
     if (!client) return unavailableFileQuery("references", resolvedPath);
     return this.withProjectCoverage(
       client,
-      resolvedPath,
+      { file: resolvedPath, position },
       "references",
       mapCodeQueryResult(
         await client.references(resolvedPath, position, control),
@@ -220,7 +220,7 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
     if (!client) return unavailableFileQuery("implementation", resolvedPath);
     return this.withProjectCoverage(
       client,
-      resolvedPath,
+      { file: resolvedPath, position },
       "implementation",
       await client.implementation(resolvedPath, position, control),
     );
@@ -232,17 +232,15 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
    */
   private withProjectCoverage<T extends Location[] | Location | LocationLink[] | null>(
     client: NonNullable<Awaited<ReturnType<LspManager["ensureFileOpen"]>>>,
-    filePath: string,
+    target: { readonly file: string; readonly position: Position },
     request: "references" | "implementation",
     result: CodeQueryResult<T>,
   ): CodeQueryResult<T> {
     if (result.kind !== "completed") return result;
-    const gap = this.manager.typeScriptProjectCoverageGap(
-      client,
-      filePath,
-      request,
-      locationFiles(result.data),
-    );
+    const gap = this.manager.typeScriptProjectCoverageGap(client, target.file, request, {
+      resultFiles: locationFiles(result.data),
+      position: target.position,
+    });
     return gap ? partialCodeQuery(result.data, gap) : result;
   }
 
