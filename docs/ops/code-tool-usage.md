@@ -8,7 +8,7 @@ node scripts/code-tool-usage.mjs --since 30d --output r.json  # also write JSON 
 node scripts/code-tool-usage.mjs --help
 ```
 
-`--since-commit <rev>` keeps only session segments whose recorded SuPi commit is at least as new as `<rev>`. Segments start at each Debug `runtime-provenance` record (startup, reload, resume, …), so a long session counts from its last reload. Requires Debug capture; segments without provenance are excluded and reported as `unknownProvenanceSegments`.
+`--since-commit <rev>` keeps only session segments whose recorded SuPi commit is at least as new as `<rev>`. Segments start at each Debug `runtime-provenance` record (startup, reload, resume, …), so a long session counts from its last reload. `--before-commit <rev>` keeps segments older than `<rev>`; together they select a window, e.g. before and after one change. Requires Debug capture; segments without provenance are excluded and reported as `unknownProvenanceSegments`.
 
 Defaults: sessions whose `cwd` is in the current directory tree; storage from `--sessions-dir`, `PI_CODING_AGENT_SESSION_DIR`, then `<PI_CODING_AGENT_DIR or ~/.pi/agent>/sessions`. `--since` filters by session file modification time.
 

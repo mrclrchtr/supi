@@ -12,7 +12,6 @@ import { isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import {
-  admitByCommit,
   provenanceOf,
   resolveCommit,
 } from "../packages/supi-debug/skills/gather-retrospectives/scripts/provenance.mjs";
@@ -231,10 +230,11 @@ function sessionFiles(directory) {
 
 /**
  * Split a session at each runtime-provenance record (startup, reload, …) and
- * keep the segments whose recorded code is at least as new as `sinceCommit`.
- * Segments without provenance are counted in `coverage.unknownProvenance`.
+ * keep the segments whose recorded code is within the commit window: at least
+ * as new as `sinceCommit` and older than `beforeCommit`. Segments without
+ * provenance are counted in `coverage.unknownProvenance`.
  */
-export function segmentsSince(entries, sinceCommit, coverage) {
+export function segmentsInWindow(entries, { sinceCommit, beforeCommit }, coverage) {
   const segments = [];
   let current = { provenance: undefined, entries: [] };
   for (const entry of entries) {
@@ -248,13 +248,24 @@ export function segmentsSince(entries, sinceCommit, coverage) {
   }
   segments.push(current);
   return segments
-    .filter((segment) => sessionCalls(segment.entries).length > 0)
-    .filter((segment) => admitByCommit(segment, sinceCommit, coverage))
-    .map((segment) => sessionCalls(segment.entries));
+    .map((segment) => ({ ...segment, calls: sessionCalls(segment.entries) }))
+    .filter((segment) => segment.calls.length > 0)
+    .filter((segment) => inWindow(segment, { sinceCommit, beforeCommit }, coverage))
+    .map((segment) => segment.calls);
+}
+
+function inWindow(segment, { sinceCommit, beforeCommit }, coverage) {
+  const time = Date.parse(segment.provenance?.commitTime ?? "");
+  if (!Number.isFinite(time)) {
+    coverage.unknownProvenance++;
+    return false;
+  }
+  if (sinceCommit && time < Date.parse(sinceCommit.commitTime)) return false;
+  return !(beforeCommit && time >= Date.parse(beforeCommit.commitTime));
 }
 
 /** Parse one session file into analyzable call lists; empty when out of scope. */
-function readSession(file, { workspace, since, sinceCommit, coverage }) {
+function readSession(file, { workspace, since, window, coverage }) {
   if (since && statSync(file).mtimeMs < since) return [];
   const entries = [];
   for (const line of readFileSync(file, "utf8").split("\n")) {
@@ -268,7 +279,9 @@ function readSession(file, { workspace, since, sinceCommit, coverage }) {
   const header = entries[0];
   if (header?.type !== "session" || typeof header.cwd !== "string") return [];
   if (workspace && !within(workspace, canonical(header.cwd))) return [];
-  return sinceCommit ? segmentsSince(entries, sinceCommit, coverage) : [sessionCalls(entries)];
+  return window.sinceCommit || window.beforeCommit
+    ? segmentsInWindow(entries, window, coverage)
+    : [sessionCalls(entries)];
 }
 
 function sinceTimestamp(value) {
@@ -315,6 +328,7 @@ function main() {
       "sessions-dir": { type: "string" },
       since: { type: "string" },
       "since-commit": { type: "string" },
+      "before-commit": { type: "string" },
       output: { type: "string" },
       help: { type: "boolean" },
     },
@@ -330,6 +344,8 @@ function main() {
   --since-commit <rev>  Only session segments whose recorded SuPi commit is at
                         least as new as <rev>; needs Debug capture (runtime
                         provenance). Each reload segment counts as a session.
+  --before-commit <rev> Only session segments whose recorded SuPi commit is
+                        older than <rev>; combine with --since-commit for a window
   --output <path>       Also write the JSON report`);
     return;
   }
@@ -342,19 +358,24 @@ function main() {
     ? undefined
     : canonical(values.workspace ?? process.cwd());
   const since = sinceTimestamp(values.since);
-  const sinceCommit = resolveCommit(values["since-commit"]);
+  const window = {
+    sinceCommit: resolveCommit(values["since-commit"], "--since-commit"),
+    beforeCommit: resolveCommit(values["before-commit"], "--before-commit"),
+  };
   const coverage = { unknownProvenance: 0 };
   const sessions = sessionFiles(sessionsDir).flatMap((file) =>
-    readSession(file, { workspace, since, sinceCommit, coverage }),
+    readSession(file, { workspace, since, window, coverage }),
   );
   const report = {
     scope: {
       sessionsDir,
       workspace: workspace ?? null,
       since: since ? new Date(since).toISOString() : null,
-      sinceCommit,
+      ...window,
     },
-    ...(sinceCommit ? { unknownProvenanceSegments: coverage.unknownProvenance } : {}),
+    ...(window.sinceCommit || window.beforeCommit
+      ? { unknownProvenanceSegments: coverage.unknownProvenance }
+      : {}),
     ...analyze(sessions),
   };
   printReport(report);

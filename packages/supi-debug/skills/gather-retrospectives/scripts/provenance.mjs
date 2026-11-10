@@ -5,7 +5,7 @@ export const SINCE_COMMIT_LIMITATION =
   "--since-commit compares commit times; sessions without runtime provenance (Debug capture off, or older than provenance recording) are excluded and counted as unknownProvenance. Dirty sessions ran uncommitted changes.";
 
 /** Resolve a revision to its commit and committer time in the current repository. */
-export function resolveCommit(rev) {
+export function resolveCommit(rev, flag = "--since-commit") {
   if (!rev) return null;
   try {
     const [commit, commitTime] = execFileSync(
@@ -17,7 +17,7 @@ export function resolveCommit(rev) {
       .split("\n");
     return { rev, commit, commitTime };
   } catch (error) {
-    throw new Error(`--since-commit could not resolve ${rev} in the current Git repository.`, {
+    throw new Error(`${flag} could not resolve ${rev} in the current Git repository.`, {
       cause: error,
     });
   }

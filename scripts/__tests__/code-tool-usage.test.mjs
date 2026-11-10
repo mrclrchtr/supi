@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { analyze, classifyFollowUp, segmentsSince, sessionCalls } from "../code-tool-usage.mjs";
+import { analyze, classifyFollowUp, segmentsInWindow, sessionCalls } from "../code-tool-usage.mjs";
 
 const orientation = {
   name: "code_orientation",
@@ -84,7 +84,7 @@ describe("analyze", () => {
   });
 });
 
-describe("segmentsSince", () => {
+describe("segmentsInWindow", () => {
   const provenance = (commitTime) => ({
     type: "custom",
     customType: "supi-debug-event",
@@ -95,21 +95,24 @@ describe("segmentsSince", () => {
     { message: { role: "toolResult", toolCallId: id, toolName: name, content: [] } },
   ];
 
-  it("keeps only reload segments recorded at or after the requested commit", () => {
-    const coverage = { unknownProvenance: 0 };
-    const segments = segmentsSince(
-      [
-        ...call("0", "code_find"),
-        provenance("2026-01-01T00:00:00Z"),
-        ...call("1", "code_graph"),
-        provenance("2026-02-01T00:00:00Z"),
-        ...call("2", "code_resolve"),
-      ],
-      { commitTime: "2026-02-01T00:00:00Z" },
-      coverage,
-    );
+  const entries = [
+    ...call("0", "code_find"),
+    provenance("2026-01-01T00:00:00Z"),
+    ...call("1", "code_graph"),
+    provenance("2026-02-01T00:00:00Z"),
+    ...call("2", "code_resolve"),
+  ];
+  const names = (segments) => segments.map((calls) => calls.map((item) => item.name));
+  const change = { commitTime: "2026-02-01T00:00:00Z" };
 
-    expect(segments.map((calls) => calls.map((item) => item.name))).toEqual([["code_resolve"]]);
-    expect(coverage.unknownProvenance).toBe(1);
+  it("splits at reloads and keeps segments on each side of a commit", () => {
+    const coverage = { unknownProvenance: 0 };
+    expect(names(segmentsInWindow(entries, { sinceCommit: change }, coverage))).toEqual([
+      ["code_resolve"],
+    ]);
+    expect(names(segmentsInWindow(entries, { beforeCommit: change }, coverage))).toEqual([
+      ["code_graph"],
+    ]);
+    expect(coverage.unknownProvenance).toBe(2);
   });
 });
