@@ -24,9 +24,11 @@ const questionnaire = normalizeQuestionnaire({
 
 function makeUi(onForm: (component: Component & { handleInput(data: string): void }) => void) {
   let overlay: boolean | undefined;
+  let blocked: unknown;
   const ui: AskUserFormUi = {
     custom: async (factory, options) => {
       overlay = options?.overlay;
+      blocked = options?.blocked;
       return await new Promise((resolve) => {
         const component = factory(
           { terminal: { rows: 40 }, requestRender() {} } as TUI,
@@ -38,7 +40,7 @@ function makeUi(onForm: (component: Component & { handleInput(data: string): voi
       });
     },
   };
-  return { ui, getOverlay: () => overlay };
+  return { ui, getOverlay: () => overlay, getBlocked: () => blocked };
 }
 
 describe("reusable form API", () => {
@@ -66,8 +68,8 @@ describe("reusable form API", () => {
     });
   });
 
-  it("uses an overlay when the caller requests it", async () => {
-    const { ui, getOverlay } = makeUi((form) => {
+  it("uses an overlay that reports Pi as blocked when the caller requests it", async () => {
+    const { ui, getOverlay, getBlocked } = makeUi((form) => {
       form.handleInput("\r");
       form.handleInput("\r");
     });
@@ -75,6 +77,7 @@ describe("reusable form API", () => {
     const result = await openAskUserForm(questionnaire, { ui, overlay: true });
 
     expect(getOverlay()).toBe(true);
+    expect(getBlocked()).toEqual({ kind: "question", message: "Waiting for your answer" });
     expect(result).toMatchObject({ outcome: "submitted" });
   });
 
