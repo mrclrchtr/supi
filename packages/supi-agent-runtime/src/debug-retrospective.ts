@@ -6,6 +6,8 @@ const RETROSPECTIVE_PROMPT = `Reflect briefly on the task you just completed. Ba
 
 Focus on missing or unnecessary context from the parent, unclear tool guidance, suboptimal tool results, and tool failures or misuse. For each useful finding, name the observed friction and the specific change that might help. Clearly distinguish observations from untested suggestions. Do not invent savings estimates or generic recommendations. If nothing notable occurred, say so.
 
+If this run had Code Intelligence (\`code_*\`) tools, also report each call whose result was incomplete, oversized, ambiguous, or failed: the tool, the problem, and the follow-up call it forced. If you chose other tools for a navigation question these tools cover, say briefly why.
+
 The task result has already been published. Do not continue the task, submit another result, use tools, or repeat sensitive task content unnecessarily. Return only this retrospective.`;
 
 /**

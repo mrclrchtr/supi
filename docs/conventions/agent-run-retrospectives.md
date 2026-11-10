@@ -58,6 +58,8 @@ Starting wording; not a new structured-output protocol:
 >
 > Focus on missing or unnecessary context from the parent, unclear tool guidance, suboptimal tool results, and tool failures or misuse. For each useful finding, name the observed friction and the specific change that might help. Clearly distinguish observations from untested suggestions. Do not invent savings estimates or generic recommendations. If nothing notable occurred, say so.
 >
+> If this run had Code Intelligence (`code_*`) tools, also report each call whose result was incomplete, oversized, ambiguous, or failed: the tool, the problem, and the follow-up call it forced. If you chose other tools for a navigation question these tools cover, say briefly why.
+>
 > Do not continue the task, use tools, or repeat sensitive task content unnecessarily.
 
 Adapt the existing [`/supi-tooling-retro` prompt](../../packages/supi-debug/prompts/supi-tooling-retro.md) rather than introducing a reporting framework. Its interactive evidence queries and lengthy output template are not required here.
