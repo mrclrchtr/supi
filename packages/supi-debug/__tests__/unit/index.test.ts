@@ -18,6 +18,14 @@ const mockFns = vi.hoisted(() => ({
   subscribeDebugEvents: vi.fn(() => vi.fn()),
   subscribeDebugPersistence: vi.fn<(sink: (event: unknown) => void) => () => void>(() => vi.fn()),
   maybeLogLoadStatus: vi.fn(),
+  isDebugRegistryEnabled: vi.fn(() => true),
+  recordDebugEvent: vi.fn(),
+  collectRuntimeProvenance: vi.fn(async () => ({ version: "1.2.3", commit: "abc" })),
+}));
+
+vi.mock("../../src/provenance.ts", () => ({
+  RUNTIME_PROVENANCE_CATEGORY: "runtime-provenance",
+  collectRuntimeProvenance: mockFns.collectRuntimeProvenance,
 }));
 
 vi.mock("@mrclrchtr/supi-core/config", () => ({
@@ -49,6 +57,8 @@ vi.mock("@mrclrchtr/supi-core/debug", () => ({
   },
   getDebugEvents: mockFns.getDebugEvents,
   getDebugSummary: mockFns.getDebugSummary,
+  isDebugRegistryEnabled: mockFns.isDebugRegistryEnabled,
+  recordDebugEvent: mockFns.recordDebugEvent,
   isDebugLevel: mockFns.isDebugLevel,
   isDebugOperationId: mockFns.isDebugOperationId,
   matchesDebugEventQuery: mockFns.matchesDebugEventQuery,
@@ -178,6 +188,25 @@ describe("supi-debug extension setup", () => {
 
     expect(mockFns.clearDebugEvents).toHaveBeenCalledOnce();
     expect(mockFns.loadSupiConfig).toHaveBeenCalledWith("debug", "/repo", expect.any(Object));
+  });
+
+  it("records runtime provenance on session_start only while capture is enabled", async () => {
+    const pi = setup();
+    const start = pi.handlers.get("session_start")?.[0];
+
+    await start?.({ reason: "reload" }, { cwd: "/repo" });
+    expect(mockFns.recordDebugEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        category: "runtime-provenance",
+        cwd: "/repo",
+        data: { version: "1.2.3", commit: "abc", reason: "reload" },
+      }),
+    );
+
+    mockFns.recordDebugEvent.mockClear();
+    mockFns.isDebugRegistryEnabled.mockReturnValueOnce(false);
+    await start?.({ reason: "startup" }, { cwd: "/repo" });
+    expect(mockFns.recordDebugEvent).not.toHaveBeenCalled();
   });
 
   it("logs the load inventory after resource discovery", async () => {

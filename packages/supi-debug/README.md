@@ -53,6 +53,7 @@ The collector excludes older interactive `/supi-tooling-retro` reports. It does 
 - the event buffer is cleared on `session_start`
 - if debug capture is disabled, no events are retained
 - agent-facing access is blocked, sanitized, or raw depending on settings
+- each `session_start` (startup, reload, new, resume, fork) records one `runtime-provenance` event: the package `version`, the `reason`, and — only when SuPi loads from its own workspace checkout — `commit`, `commitTime`, and `dirty` (tracked files changed). Evidence collectors use it to filter sessions by code state
 
 ### Identity disclosure
 

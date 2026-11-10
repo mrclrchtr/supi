@@ -13,3 +13,4 @@ Producers publish events through `supi-core`'s shared debug registry. This exten
 - A Debug Operation ID means explicit direct request ownership. It is not a security identity, distributed trace, raw Pi Tool-call identity, or time overlap.
 - `applyDebugConfig()` must be called synchronously at extension load and on each `session_start` — config changes via settings also call `syncLiveDebugRegistry()` immediately.
 - When debug is disabled, `clearDebugEvents()` is called to flush the buffer. Re-enabling starts fresh.
+- `runtime-provenance` reads Git only when the package sits at `packages/<name>` of a checkout whose root `package.json` is `@mrclrchtr/supi-workspace`; otherwise a host repository's commit would be misattributed. Git failures omit fields, never fail `session_start`.

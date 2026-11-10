@@ -5,6 +5,8 @@ import { registerContextProvider } from "@mrclrchtr/supi-core/context";
 import {
   clearDebugEvents,
   getDebugSummary,
+  isDebugRegistryEnabled,
+  recordDebugEvent,
   subscribeDebugPersistence,
 } from "@mrclrchtr/supi-core/debug";
 import { defineConfigSettings, registerSettings } from "@mrclrchtr/supi-core/settings";
@@ -16,6 +18,7 @@ import {
   normalizeMaxEvents,
   syncLiveDebugRegistry,
 } from "./config.ts";
+import { collectRuntimeProvenance, RUNTIME_PROVENANCE_CATEGORY } from "./provenance.ts";
 import { registerDebugMessageRenderer } from "./renderer.ts";
 import { DEBUG_EVENT_ENTRY_TYPE } from "./session-events.ts";
 import { maybeLogLoadStatus } from "./status-log.ts";
@@ -68,6 +71,23 @@ function registerDebugSettings(pi: ExtensionAPI): void {
   );
 }
 
+/**
+ * Record which SuPi code this session runs, once per `session_start` (startup,
+ * reload, new, resume, fork), so evidence collectors can filter by code state.
+ */
+async function recordRuntimeProvenance(cwd: string, reason: string): Promise<void> {
+  if (!isDebugRegistryEnabled()) return;
+  const provenance = await collectRuntimeProvenance(baseDir);
+  recordDebugEvent({
+    source: "supi-debug",
+    level: "info",
+    category: RUNTIME_PROVENANCE_CATEGORY,
+    message: "SuPi runtime provenance",
+    cwd,
+    data: { ...provenance, reason },
+  });
+}
+
 function buildSummaryData(): Record<string, string | number> | null {
   const summary = getDebugSummary();
   if (!summary) return null;
@@ -97,9 +117,10 @@ export default function debugExtension(pi: ExtensionAPI) {
     getData: buildSummaryData,
   });
 
-  pi.on("session_start", async (_event, ctx) => {
+  pi.on("session_start", async (event, ctx) => {
     clearDebugEvents();
     applyDebugConfig(ctx.cwd);
+    await recordRuntimeProvenance(ctx.cwd, event.reason);
   });
 
   pi.on("resources_discover", async (_event, ctx) => {
