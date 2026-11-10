@@ -56,7 +56,7 @@ All arms run once as warm-up before measurement. Cold TypeScript project loading
 
 ## Limits
 
-- Fixed call sequences: real agents may phrase grep differently, misuse `code_*`, or still read files afterward. Agent-level effects need an LLM A/B run (see [Terminal-Bench workflow](../../../docs/ops/benchmarking-terminal-bench.md)).
+- Fixed call sequences: real agents may phrase grep differently, misuse `code_*`, or still read files afterward. The [code tool usage report](../../../docs/ops/code-tool-usage.md) measures observed follow-up behavior from session logs. Agent-level effects need an LLM A/B run (see [Terminal-Bench workflow](../../../docs/ops/benchmarking-terminal-bench.md)).
 - TypeScript only.
 - Path recall checks that a file is named, not that the agent would recognize it as relevant. Captured snapshot files are not followed, matching observed agent behavior.
 - Break-even: `codeToolSurfaceTokens` is paid on every request; saved output also persists in later requests, so the package pays off once cumulative per-session savings exceed the surface cost.
