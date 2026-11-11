@@ -834,247 +834,253 @@ describe("code_find tool", () => {
       });
     });
 
-    it("finds full-expression call sites with a real tree-sitter provider", async () => {
-      const srcDir = path.join(tmpDir, "src");
-      mkdirSync(srcDir, { recursive: true });
-      writeFileSync(
-        path.join(srcDir, "target.ts"),
-        [
-          "interface Query { trim(): string }",
-          "interface Params { query: Query }",
-          "function process(params: Params) {",
-          "  const result = params.query.trim();",
-          "  return result;",
-          "}",
-          "",
-        ].join("\n"),
-      );
-
-      const session = createTreeSitterSession(tmpDir);
-      getDefaultWorkspaceRuntime().registerStructural(tmpDir, createTreeSitterProvider(session));
-      const tool = getCodeFindTool();
-
-      try {
-        const result = (await tool.execute(
-          "test-ast-call-integration",
-          { query: "params.query.trim", mode: "ast", kind: "call", scope: ["src"] },
-          undefined,
-          undefined,
-          makeCtx({ cwd: tmpDir }),
-        )) as TextToolResult;
-
-        const text = result.content[0].text;
-        expect(text).toContain("params.query.trim");
-        expect(text).toContain("src/target.ts");
-        expect(text).toContain("AST call results are name-based");
-      } finally {
-        await session.dispose();
-      }
-    });
-
-    it("returns exact same-line call ranges in the registered public tool", async () => {
-      const srcDir = path.join(tmpDir, "src");
-      mkdirSync(srcDir, { recursive: true });
-      writeFileSync(path.join(srcDir, "calls.ts"), "function invoke() {}\ninvoke(); invoke();\n");
-      const session = createTreeSitterSession(tmpDir);
-      getDefaultWorkspaceRuntime().registerStructural(tmpDir, createTreeSitterProvider(session));
-      const tool = getCodeFindTool();
-      try {
-        const result = (await tool.execute(
-          "test-ast-same-line-calls",
-          { query: "invoke", mode: "ast", kind: "call", scope: ["src"] },
-          undefined,
-          undefined,
-          makeCtx({ cwd: tmpDir }),
-        )) as TextToolResult & {
-          details?: {
-            data: {
-              astMatches?: Array<{
-                line: number;
-                startCharacter: number;
-                endLine: number;
-                endCharacter: number;
-              }>;
-            };
-          };
-        };
-        const matches = result.details?.data.astMatches ?? [];
-        expect(matches).toHaveLength(2);
-        expect(matches[0]?.line).toBe(2);
-        expect(matches[1]?.startCharacter).toBeGreaterThan(matches[0]?.startCharacter ?? 0);
-        expect(result.content[0].text).toContain("L2:1–L2:7");
-      } finally {
-        await session.dispose();
-      }
-    });
-
-    it("keeps recovered AST matches and error ranges as partial public evidence", async () => {
-      const srcDir = path.join(tmpDir, "src");
-      mkdirSync(srcDir, { recursive: true });
-      writeFileSync(
-        path.join(srcDir, "recovered.ts"),
-        "function kept() {}\nconst unfinished = call(\n",
-      );
-      const session = createTreeSitterSession(tmpDir);
-      getDefaultWorkspaceRuntime().registerStructural(tmpDir, createTreeSitterProvider(session));
-      const tool = getCodeFindTool();
-      try {
-        const result = (await tool.execute(
-          "test-ast-recovered-partial",
-          { query: "kept", mode: "ast", kind: "definition", scope: ["src"] },
-          undefined,
-          undefined,
-          makeCtx({ cwd: tmpDir }),
-        )) as TextToolResult & {
-          details?: {
-            data: {
-              astMatches?: Array<{ name: string }>;
-              structuralFailures?: Array<{
-                file: string;
-                errorRanges?: Array<{ start: { line: number } }>;
-              }>;
-              scan?: {
-                limitations: Array<{ reason: string; pathCount: number; examples: string[] }>;
-              };
-              evidenceLists?: Array<{
-                totalCount: number | null;
-                partialReason: string | null;
-              }>;
-            };
-          };
-        };
-        expect(result.content[0].text).toContain("kept");
-        expect(result.content[0].text).toContain("1 file had partial syntax evidence");
-        expect(result.content[0].text).toContain("Tree-sitter recovered syntax");
-        expect(result.content[0].text).toContain("syntax-recovery: 1 path");
-        expect(result.content[0].text).not.toContain("provider-failure");
-        expect(result.content[0].text).not.toContain("could not be analyzed");
-        expect(result.details?.data.astMatches?.map((match) => match.name)).toContain("kept");
-        expect(result.details?.data.structuralFailures?.[0]?.errorRanges?.[0]?.start.line).toBe(1);
-        expect(result.details?.data.scan?.limitations).toContainEqual({
-          reason: "syntax-recovery",
-          pathCount: 1,
-          examples: ["src/recovered.ts"],
-        });
-        expect(result.details?.data.scan?.limitations).not.toContainEqual(
-          expect.objectContaining({ reason: "provider-failure" }),
+    // Each case starts a tree-sitter worker and loads WASM grammars cold; under full-suite CI
+    // load that alone can exceed the global 2 s test timeout.
+    describe("with a real tree-sitter provider", { timeout: 10_000 }, () => {
+      it("finds full-expression call sites with a real tree-sitter provider", async () => {
+        const srcDir = path.join(tmpDir, "src");
+        mkdirSync(srcDir, { recursive: true });
+        writeFileSync(
+          path.join(srcDir, "target.ts"),
+          [
+            "interface Query { trim(): string }",
+            "interface Params { query: Query }",
+            "function process(params: Params) {",
+            "  const result = params.query.trim();",
+            "  return result;",
+            "}",
+            "",
+          ].join("\n"),
         );
-        expect(result.details?.data.evidenceLists?.[0]).toMatchObject({
-          totalCount: null,
-          partialReason: "provider-limited",
-        });
-      } finally {
-        await session.dispose();
-      }
-    });
 
-    it("matches Rust traits as interfaces and returns their native kind", async () => {
-      const srcDir = path.join(tmpDir, "src");
-      mkdirSync(srcDir, { recursive: true });
-      writeFileSync(path.join(srcDir, "trait.rs"), "trait Speak { fn speak(&self); }\n");
-      const session = createTreeSitterSession(tmpDir);
-      getDefaultWorkspaceRuntime().registerStructural(tmpDir, createTreeSitterProvider(session));
-      const tool = getCodeFindTool();
-      try {
-        const result = (await tool.execute(
-          "test-ast-rust-native-kind",
-          { query: "Speak", mode: "ast", kind: "interface", scope: ["src"] },
-          undefined,
-          undefined,
-          makeCtx({ cwd: tmpDir }),
-        )) as TextToolResult & {
-          details?: {
-            data: {
-              astMatches?: Array<{ kind: string; commonKind?: string; nativeKind?: string }>;
+        const session = createTreeSitterSession(tmpDir);
+        getDefaultWorkspaceRuntime().registerStructural(tmpDir, createTreeSitterProvider(session));
+        const tool = getCodeFindTool();
+
+        try {
+          const result = (await tool.execute(
+            "test-ast-call-integration",
+            { query: "params.query.trim", mode: "ast", kind: "call", scope: ["src"] },
+            undefined,
+            undefined,
+            makeCtx({ cwd: tmpDir }),
+          )) as TextToolResult;
+
+          const text = result.content[0].text;
+          expect(text).toContain("params.query.trim");
+          expect(text).toContain("src/target.ts");
+          expect(text).toContain("AST call results are name-based");
+        } finally {
+          await session.dispose();
+        }
+      });
+
+      it("returns exact same-line call ranges in the registered public tool", async () => {
+        const srcDir = path.join(tmpDir, "src");
+        mkdirSync(srcDir, { recursive: true });
+        writeFileSync(path.join(srcDir, "calls.ts"), "function invoke() {}\ninvoke(); invoke();\n");
+        const session = createTreeSitterSession(tmpDir);
+        getDefaultWorkspaceRuntime().registerStructural(tmpDir, createTreeSitterProvider(session));
+        const tool = getCodeFindTool();
+        try {
+          const result = (await tool.execute(
+            "test-ast-same-line-calls",
+            { query: "invoke", mode: "ast", kind: "call", scope: ["src"] },
+            undefined,
+            undefined,
+            makeCtx({ cwd: tmpDir }),
+          )) as TextToolResult & {
+            details?: {
+              data: {
+                astMatches?: Array<{
+                  line: number;
+                  startCharacter: number;
+                  endLine: number;
+                  endCharacter: number;
+                }>;
+              };
             };
           };
-        };
-        expect(result.content[0].text).toContain("(trait)");
-        expect(result.details?.data.astMatches?.[0]).toMatchObject({
-          kind: "trait",
-          commonKind: "interface",
-          nativeKind: "trait",
-        });
-      } finally {
-        await session.dispose();
-      }
-    });
+          const matches = result.details?.data.astMatches ?? [];
+          expect(matches).toHaveLength(2);
+          expect(matches[0]?.line).toBe(2);
+          expect(matches[1]?.startCharacter).toBeGreaterThan(matches[0]?.startCharacter ?? 0);
+          expect(result.content[0].text).toContain("L2:1–L2:7");
+        } finally {
+          await session.dispose();
+        }
+      });
 
-    it("finds Python import targets through the registered public tool", async () => {
-      const srcDir = path.join(tmpDir, "src");
-      mkdirSync(srcDir, { recursive: true });
-      writeFileSync(path.join(srcDir, "imports.py"), "from ..pkg.sub import Thing as Alias\n");
-      const session = createTreeSitterSession(tmpDir);
-      getDefaultWorkspaceRuntime().registerStructural(tmpDir, createTreeSitterProvider(session));
-      const tool = getCodeFindTool();
-      try {
-        const result = (await tool.execute(
-          "test-ast-python-import",
-          { query: "..pkg.sub", mode: "ast", kind: "import", scope: ["src"] },
-          undefined,
-          undefined,
-          makeCtx({ cwd: tmpDir }),
-        )) as TextToolResult & {
-          details?: {
-            data: { astMatches?: Array<{ name: string; line: number; startCharacter: number }> };
+      it("keeps recovered AST matches and error ranges as partial public evidence", async () => {
+        const srcDir = path.join(tmpDir, "src");
+        mkdirSync(srcDir, { recursive: true });
+        writeFileSync(
+          path.join(srcDir, "recovered.ts"),
+          "function kept() {}\nconst unfinished = call(\n",
+        );
+        const session = createTreeSitterSession(tmpDir);
+        getDefaultWorkspaceRuntime().registerStructural(tmpDir, createTreeSitterProvider(session));
+        const tool = getCodeFindTool();
+        try {
+          const result = (await tool.execute(
+            "test-ast-recovered-partial",
+            { query: "kept", mode: "ast", kind: "definition", scope: ["src"] },
+            undefined,
+            undefined,
+            makeCtx({ cwd: tmpDir }),
+          )) as TextToolResult & {
+            details?: {
+              data: {
+                astMatches?: Array<{ name: string }>;
+                structuralFailures?: Array<{
+                  file: string;
+                  errorRanges?: Array<{ start: { line: number } }>;
+                }>;
+                scan?: {
+                  limitations: Array<{ reason: string; pathCount: number; examples: string[] }>;
+                };
+                evidenceLists?: Array<{
+                  totalCount: number | null;
+                  partialReason: string | null;
+                }>;
+              };
+            };
           };
-        };
-        expect(result.content[0].text).toContain("..pkg.sub");
-        expect(result.content[0].text).toContain("src/imports.py");
-        expect(result.details?.data.astMatches?.[0]).toMatchObject({
-          name: "..pkg.sub",
-          line: 1,
-          startCharacter: 1,
-        });
-      } finally {
-        await session.dispose();
-      }
-    });
+          expect(result.content[0].text).toContain("kept");
+          expect(result.content[0].text).toContain("1 file had partial syntax evidence");
+          expect(result.content[0].text).toContain("Tree-sitter recovered syntax");
+          expect(result.content[0].text).toContain("syntax-recovery: 1 path");
+          expect(result.content[0].text).not.toContain("provider-failure");
+          expect(result.content[0].text).not.toContain("could not be analyzed");
+          expect(result.details?.data.astMatches?.map((match) => match.name)).toContain("kept");
+          expect(result.details?.data.structuralFailures?.[0]?.errorRanges?.[0]?.start.line).toBe(
+            1,
+          );
+          expect(result.details?.data.scan?.limitations).toContainEqual({
+            reason: "syntax-recovery",
+            pathCount: 1,
+            examples: ["src/recovered.ts"],
+          });
+          expect(result.details?.data.scan?.limitations).not.toContainEqual(
+            expect.objectContaining({ reason: "provider-failure" }),
+          );
+          expect(result.details?.data.evidenceLists?.[0]).toMatchObject({
+            totalCount: null,
+            partialReason: "provider-limited",
+          });
+        } finally {
+          await session.dispose();
+        }
+      });
 
-    it("does not match a call name that appears only inside another call's arguments", async () => {
-      const srcDir = path.join(tmpDir, "src");
-      mkdirSync(srcDir, { recursive: true });
-      writeFileSync(
-        path.join(srcDir, "target.ts"),
-        [
-          "declare const values: string[];",
-          "declare function canonicalDeclarationKind(value: string): string;",
-          "const selected = values",
-          "  .filter((value) => canonicalDeclarationKind(value))",
-          "  .sort();",
-          // biome-ignore lint/security/noSecrets: source fixture exercises a nested string argument
-          'const joined = [canonicalDeclarationKind("x")].join(",");',
-          "void selected;",
-          "void joined;",
-          "",
-        ].join("\n"),
-      );
+      it("matches Rust traits as interfaces and returns their native kind", async () => {
+        const srcDir = path.join(tmpDir, "src");
+        mkdirSync(srcDir, { recursive: true });
+        writeFileSync(path.join(srcDir, "trait.rs"), "trait Speak { fn speak(&self); }\n");
+        const session = createTreeSitterSession(tmpDir);
+        getDefaultWorkspaceRuntime().registerStructural(tmpDir, createTreeSitterProvider(session));
+        const tool = getCodeFindTool();
+        try {
+          const result = (await tool.execute(
+            "test-ast-rust-native-kind",
+            { query: "Speak", mode: "ast", kind: "interface", scope: ["src"] },
+            undefined,
+            undefined,
+            makeCtx({ cwd: tmpDir }),
+          )) as TextToolResult & {
+            details?: {
+              data: {
+                astMatches?: Array<{ kind: string; commonKind?: string; nativeKind?: string }>;
+              };
+            };
+          };
+          expect(result.content[0].text).toContain("(trait)");
+          expect(result.details?.data.astMatches?.[0]).toMatchObject({
+            kind: "trait",
+            commonKind: "interface",
+            nativeKind: "trait",
+          });
+        } finally {
+          await session.dispose();
+        }
+      });
 
-      const session = createTreeSitterSession(tmpDir);
-      getDefaultWorkspaceRuntime().registerStructural(tmpDir, createTreeSitterProvider(session));
-      const tool = getCodeFindTool();
+      it("finds Python import targets through the registered public tool", async () => {
+        const srcDir = path.join(tmpDir, "src");
+        mkdirSync(srcDir, { recursive: true });
+        writeFileSync(path.join(srcDir, "imports.py"), "from ..pkg.sub import Thing as Alias\n");
+        const session = createTreeSitterSession(tmpDir);
+        getDefaultWorkspaceRuntime().registerStructural(tmpDir, createTreeSitterProvider(session));
+        const tool = getCodeFindTool();
+        try {
+          const result = (await tool.execute(
+            "test-ast-python-import",
+            { query: "..pkg.sub", mode: "ast", kind: "import", scope: ["src"] },
+            undefined,
+            undefined,
+            makeCtx({ cwd: tmpDir }),
+          )) as TextToolResult & {
+            details?: {
+              data: { astMatches?: Array<{ name: string; line: number; startCharacter: number }> };
+            };
+          };
+          expect(result.content[0].text).toContain("..pkg.sub");
+          expect(result.content[0].text).toContain("src/imports.py");
+          expect(result.details?.data.astMatches?.[0]).toMatchObject({
+            name: "..pkg.sub",
+            line: 1,
+            startCharacter: 1,
+          });
+        } finally {
+          await session.dispose();
+        }
+      });
 
-      try {
-        const result = (await tool.execute(
-          "test-ast-call-argument-name",
-          {
-            query: "canonicalDeclarationKind",
-            mode: "ast",
-            kind: "call",
-            scope: ["src"],
-          },
-          undefined,
-          undefined,
-          makeCtx({ cwd: tmpDir }),
-        )) as TextToolResult;
+      it("does not match a call name that appears only inside another call's arguments", async () => {
+        const srcDir = path.join(tmpDir, "src");
+        mkdirSync(srcDir, { recursive: true });
+        writeFileSync(
+          path.join(srcDir, "target.ts"),
+          [
+            "declare const values: string[];",
+            "declare function canonicalDeclarationKind(value: string): string;",
+            "const selected = values",
+            "  .filter((value) => canonicalDeclarationKind(value))",
+            "  .sort();",
+            // biome-ignore lint/security/noSecrets: source fixture exercises a nested string argument
+            'const joined = [canonicalDeclarationKind("x")].join(",");',
+            "void selected;",
+            "void joined;",
+            "",
+          ].join("\n"),
+        );
 
-        const text = result.content[0].text;
-        expect(text).toContain("`canonicalDeclarationKind` (call)");
-        expect(text).not.toContain("values .filter");
-        expect(text).not.toContain("].join");
-      } finally {
-        await session.dispose();
-      }
+        const session = createTreeSitterSession(tmpDir);
+        getDefaultWorkspaceRuntime().registerStructural(tmpDir, createTreeSitterProvider(session));
+        const tool = getCodeFindTool();
+
+        try {
+          const result = (await tool.execute(
+            "test-ast-call-argument-name",
+            {
+              query: "canonicalDeclarationKind",
+              mode: "ast",
+              kind: "call",
+              scope: ["src"],
+            },
+            undefined,
+            undefined,
+            makeCtx({ cwd: tmpDir }),
+          )) as TextToolResult;
+
+          const text = result.content[0].text;
+          expect(text).toContain("`canonicalDeclarationKind` (call)");
+          expect(text).not.toContain("values .filter");
+          expect(text).not.toContain("].join");
+        } finally {
+          await session.dispose();
+        }
+      });
     });
   });
 
