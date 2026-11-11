@@ -1,6 +1,7 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import { Text } from "@earendil-works/pi-tui";
-import type { BatchTaskResult } from "../agent_run/batch-types.ts";
+import { type Container, Text } from "@earendil-works/pi-tui";
+import type { BatchProgressState, BatchTaskResult } from "../agent_run/batch-types.ts";
+import { renderPartial } from "../agent_run/render.ts";
 import type { AgentRunResultDetails } from "../agent_run/result.ts";
 import { renderBatchCall, renderBatchError } from "../background-render.ts";
 
@@ -15,9 +16,18 @@ export function renderResult(
   options: { expanded: boolean; isPartial: boolean },
   theme: Theme,
   context: { isError?: boolean } = {},
-): Text {
+): Container | Text {
   if (context.isError) return renderBatchError(result, theme);
-  if (options.isPartial) return new Text(theme.fg("dim", "Waiting for Agent Run results…"), 0, 0);
+  if (options.isPartial) {
+    const progress = result.details as Partial<BatchProgressState> | undefined;
+    if (!progress?.tasks) return new Text(theme.fg("dim", "Waiting for Agent Run results…"), 0, 0);
+    return renderPartial(
+      progress as BatchProgressState,
+      options.expanded,
+      theme,
+      "Waiting for Agent Run",
+    );
+  }
   const details = result.details as
     | (AgentRunResultDetails & {
         complete?: boolean;

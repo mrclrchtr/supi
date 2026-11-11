@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { renderResult as renderAgentResult } from "../../src/tool/agent_result/render.ts";
 import { renderCall, renderResult } from "../../src/tool/agent_run/render.ts";
 
 const mockTheme = {
@@ -243,5 +244,37 @@ describe("renderResult", () => {
 
     expect(text).toContain("Agent Run failed: Provider rejected the request");
     expect(expandedText).toContain("Details omitted");
+  });
+});
+
+describe("agent_result wait rendering", () => {
+  it("shows live per-task progress while waiting", () => {
+    const result = renderAgentResult(
+      {
+        details: {
+          batchId: "batch-1",
+          tasks: [
+            {
+              taskId: "audit",
+              profileId: "explore",
+              conversationId: "c1",
+              status: "running",
+              turns: 3,
+              toolUses: 5,
+              recentActivity: ["read src/a.ts"],
+            },
+          ],
+          completedCount: 0,
+          totalCount: 1,
+        },
+      },
+      { expanded: false, isPartial: true },
+      mockTheme as never,
+    );
+    const text = result.render(240).join("\n");
+
+    expect(text).toContain("Waiting for Agent Run · 0 of 1 tasks finished");
+    expect(text).toContain("audit (explore) · running");
+    expect(text).toContain("activity: read src/a.ts");
   });
 });

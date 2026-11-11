@@ -233,14 +233,16 @@ function formatLiveTask(task: BatchTaskProgress, theme: Theme, expanded: boolean
   return `${statusColor(task.status, theme)} ${theme.fg("dim", detail)}`;
 }
 
-function renderPartial(
+/** Render live per-task batch progress; `title` names the waiting surface. */
+export function renderPartial(
   details: BatchProgressState | undefined,
   expanded: boolean,
   theme: Theme,
+  title = "Agent Run",
 ): Container | Text {
   const completed = details?.completedCount ?? 0;
   const total = details?.totalCount ?? 0;
-  const label = total > 0 ? `Agent Run · ${completed} of ${total} tasks finished` : "Agent Run";
+  const label = total > 0 ? `${title} · ${completed} of ${total} tasks finished` : title;
   const tasks = details?.tasks ?? [];
   const header = theme.fg("warning", `● ${label}`);
 

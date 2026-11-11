@@ -2,9 +2,36 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type { TSchema } from "typebox";
 import { Value } from "typebox/value";
 import type { DelegationController } from "../../delegation/controller.ts";
+import type { DelegationBatchHandle } from "../agent_run/batch-types.ts";
 import { buildCollectedResult } from "./result.ts";
 
 type Execute = NonNullable<Parameters<ExtensionAPI["registerTool"]>[0]["execute"]>;
+type OnUpdate = NonNullable<Parameters<Execute>[3]>;
+
+const PROGRESS_POLL_MS = 1_000;
+
+/** Push live batch progress while waiting; the handle has no subscription, so poll and dedupe. */
+function streamProgress(
+  handle: DelegationBatchHandle,
+  batchId: string,
+  onUpdate: OnUpdate,
+): () => void {
+  let last = "";
+  const push = () => {
+    const progress = handle.progress();
+    const key = JSON.stringify(progress);
+    if (key === last) return;
+    last = key;
+    onUpdate({
+      content: [{ type: "text", text: "Waiting for Agent Run results…" }],
+      details: { batchId, ...progress },
+    });
+  };
+  push();
+  const timer = setInterval(push, PROGRESS_POLL_MS);
+  timer.unref?.();
+  return () => clearInterval(timer);
+}
 
 /** Own collection ordering: wait, revalidate, assemble output, then reserve its Usage. */
 export function makeAgentResultExecute(
@@ -17,11 +44,14 @@ export function makeAgentResultExecute(
     const params = input as { batchId: string; wait?: boolean };
     const batch = controller.get(params.batchId, ctx);
     if (params.wait) {
-      onUpdate?.({
-        content: [{ type: "text", text: "Waiting for Agent Run results…" }],
-        details: { batchId: params.batchId },
-      });
-      await controller.wait(batch, signal ?? ctx.signal);
+      const stopProgress = onUpdate
+        ? streamProgress(batch.handle, params.batchId, onUpdate)
+        : undefined;
+      try {
+        await controller.wait(batch, signal ?? ctx.signal);
+      } finally {
+        stopProgress?.();
+      }
     }
     if ((signal ?? ctx.signal)?.aborted) throw new Error("Delegation collection canceled.");
     controller.get(params.batchId, ctx);
