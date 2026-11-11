@@ -79,6 +79,40 @@ describe("TypeScript syntax completeness", () => {
   );
 
   it.each(["ts", "tsx"])(
+    "retains import-type members with type arguments in %s without recovery",
+    async (extension) => {
+      const cwd = mkdtempSync(join(tmpdir(), "supi-typescript-syntax-"));
+      const file = `generic-members.${extension}`;
+      writeFileSync(
+        join(cwd, file),
+        [
+          'let value: import("./api").Static<T>;',
+          'let values: import("./api").Static<T>[] | null;',
+          'function parse<T>(): { parsed: import("./api").Static<T> } | null { return null; }',
+          'const cast = input as import("./api").Box<string>;',
+        ].join("\n"),
+      );
+      const session = createTreeSitterSession(cwd);
+      try {
+        const node = await session.nodeAt(file, 1, 5);
+        expect(node.kind).toBe("success");
+        const result = await session.query(file, "(type_arguments) @types");
+        expect(result.kind).toBe("success");
+        if (result.kind !== "success") return;
+        expect(result.data.map((capture) => capture.text)).toEqual([
+          "<T>",
+          "<T>",
+          "<T>",
+          "<string>",
+        ]);
+      } finally {
+        await session.dispose();
+        rmSync(cwd, { recursive: true, force: true });
+      }
+    },
+  );
+
+  it.each(["ts", "tsx"])(
     "preserves dynamic imports and comparison expressions in %s",
     async (extension) => {
       const cwd = mkdtempSync(join(tmpdir(), "supi-typescript-syntax-"));

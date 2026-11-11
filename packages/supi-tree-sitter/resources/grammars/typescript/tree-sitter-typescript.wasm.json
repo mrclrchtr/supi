@@ -22,7 +22,11 @@
     {
       "id": "import-type-generic-calls-v1",
       "file": "common/define-grammar.js"
+    },
+    {
+      "id": "import-type-member-type-arguments-v1",
+      "file": "common/define-grammar.js"
     }
   ],
-  "sha256": "86ba3af6f8214c90f32af1ea82214a0c1da87c9e2f5ea47c19577ba5b6c78bfb"
+  "sha256": "d9e67877e2da665b26ab837bccd036e267cf1b5f521073e76352ec4af22ded4c"
 }

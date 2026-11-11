@@ -2,6 +2,7 @@
 
 ## [11.3.1]
 
+- TypeScript and TSX files with import types that take type arguments, such as `import("typebox").Static<T>`, now parse completely. Previously, AST results (`code_find`, file outlines, callees) for directories containing such a file were marked incomplete, so an empty search could not confirm that a name does not exist.
 - `code_orientation` with a directory focus again shows the focused package's declared entry points (such as `exports` and `main` paths) inline, and lists all direct files in one compact line instead of the first ten, unless `maxResults` is set. Sections moved to captured details are named in one note instead of a separate "Captured navigation" section.
 - `code_graph` references and implementations with the TypeScript server now report an incomplete result, naming the unloaded projects, when another `tsconfig.json` that includes the target file (such as a `__tests__` project that includes `../src`) has no open file. Previously, matches from such projects were silently missing and the result looked complete. Top-level declarations that their module does not export stay complete, because no other project can reference them.
 - With the TypeScript 6 or earlier server (tsserver), `code_graph` implementations in workspaces with several TypeScript projects are now reported as incomplete: tsserver searches implementations only in the target file's project. The note suggests references or TypeScript 7 instead of opening more files.

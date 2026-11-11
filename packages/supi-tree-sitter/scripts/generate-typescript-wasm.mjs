@@ -23,6 +23,7 @@ const PATCHES = [
   { id: "type-only-star-reexports-v1", file: PATCH_FILE },
   { id: "import-types-as-primary-types-v1", file: PATCH_FILE },
   { id: "import-type-generic-calls-v1", file: PATCH_FILE },
+  { id: "import-type-member-type-arguments-v1", file: PATCH_FILE },
 ];
 const DIALECTS = ["typescript", "tsx"];
 const USAGE = `Usage: node scripts/generate-typescript-wasm.mjs [--check]
@@ -161,6 +162,24 @@ export function patchTypescriptGrammar(directory) {
     "[$.call_expression, $._type_query_call_expression_in_type_annotation]",
     "[$.member_expression, $._type_query_member_expression_in_type_annotation]",
   ];
+  // Allow `import("m").Member<T>`; mirrors upstream PR #365 for issue #322.
+  source = replaceRule(
+    source,
+    `        field('property', choice(
+          $.private_property_identifier,
+          alias($.identifier, $.property_identifier),
+        )),
+      ),
+      _type_query_call_expression_in_type_annotation: $ => seq(`,
+    `        field('property', choice(
+          $.private_property_identifier,
+          alias($.identifier, $.property_identifier),
+        )),
+        optional($.type_arguments),
+      ),
+      _type_query_call_expression_in_type_annotation: $ => seq(`,
+    "import-type member",
+  );
   for (const conflict of importTypeConflicts) {
     source = replaceRule(source, `      ${conflict},\n`, "", conflict);
   }
@@ -168,7 +187,7 @@ export function patchTypescriptGrammar(directory) {
   source = replaceRule(
     source,
     conflictsHeader,
-    `${conflictsHeader}${importTypeConflicts.map((conflict) => `      ${conflict},\n`).join("")}`,
+    `${conflictsHeader}${[...importTypeConflicts, "[$._type_query_member_expression_in_type_annotation]"].map((conflict) => `      ${conflict},\n`).join("")}`,
     "import-type conflicts",
   );
   writeFileSync(path, source);
