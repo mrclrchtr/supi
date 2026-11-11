@@ -230,6 +230,28 @@ describe("export extraction", () => {
     }
   });
 
+  it("reports exported import aliases but not UMD namespace declarations", async () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), "ts-exports-"));
+    writeFileSync(
+      path.join(dir, "a.ts"),
+      "export import X = Y.Z;\nexport as namespace G;\nexport const q = 1;\n",
+    );
+    const runtime = new TreeSitterRuntime(dir);
+    try {
+      const result = await extractExports(runtime, "a.ts");
+      expect(result.kind).toBe("success");
+      if (result.kind === "success") {
+        expect(result.data.map((e) => [e.kind, e.name])).toEqual([
+          ["alias", "X"],
+          ["variable", "q"],
+        ]);
+      }
+    } finally {
+      runtime.dispose();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it("extracts generator, abstract, ambient, namespace, and namespace re-exports", async () => {
     const runtime = new TreeSitterRuntime(FIXTURE_DIR);
     const result = await extractExports(runtime, "export-edge.ts");

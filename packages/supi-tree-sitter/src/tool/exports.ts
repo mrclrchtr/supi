@@ -95,6 +95,7 @@ const DECLARATION_EXPORT_NODE_TYPES = new Set([
   "ambient_declaration",
   "internal_module",
   "module",
+  "import_alias",
 ]);
 
 function extractDeclarationExport(
@@ -112,7 +113,11 @@ function extractDeclarationExport(
     return;
   }
 
-  const name = getDeclarationName(decl);
+  // `export import X = Y.Z` exports the alias `X`, which may name a value, type, or namespace.
+  const name =
+    decl.type === "import_alias"
+      ? (decl.children.find((child) => child.type === "identifier")?.text ?? null)
+      : getDeclarationName(decl);
   if (!name) return;
 
   exports.push({
@@ -178,6 +183,8 @@ function exportKindForDeclaration(type: string): string {
     case "internal_module":
     case "module":
       return "namespace";
+    case "import_alias":
+      return "alias";
     default:
       return type.replace(/_declaration$/, "");
   }
