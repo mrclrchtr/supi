@@ -1,13 +1,9 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, realpathSync } from "node:fs";
-import { createRequire } from "node:module";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 import { javaRuntimeBuildMarker, requireBinaryDigest } from "./prerequisite-evidence.mjs";
 
-const root = resolve(fileURLToPath(new URL("../..", import.meta.url)));
 const pins = JSON.parse(readFileSync(new URL("./pins.json", import.meta.url), "utf8"));
-const packageJson = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
 
 function requireVersion(command, args, expected, label) {
   if (!command) throw new Error(`${label} command is not set.`);
@@ -69,70 +65,9 @@ function requireJdtlsVersion(command) {
 if (process.versions.node !== pins.toolchains.node) {
   throw new Error(`Node ${pins.toolchains.node} is required; found ${process.versions.node}.`);
 }
-/**
- * npm-managed baseline packages are pinned exactly in the root package.json (and the lockfile),
- * which Renovate updates. Read expected versions from there instead of duplicating them in
- * pins.json, where they would drift.
- */
-function exactDevDependency(name) {
-  const spec = packageJson.devDependencies?.[name];
-  const version = spec?.replace(/^npm:[^@]+@/, "");
-  if (!version || !/^\d+\.\d+\.\d+$/.test(version)) {
-    throw new Error(
-      `Root devDependency ${name} must be pinned to an exact version; found ${spec}.`,
-    );
-  }
-  return version;
-}
-
-const pnpmVersion = /^pnpm@(\d+\.\d+\.\d+)$/.exec(packageJson.packageManager ?? "")?.[1];
-if (!pnpmVersion) {
-  throw new Error("The root packageManager must pin an exact pnpm version.");
-}
-requireVersion("pnpm", ["--version"], pnpmVersion, "pnpm");
-
+// pnpm, TypeScript, and typescript-language-server come from package.json and the frozen
+// lockfile, which CI installs exactly. Do not duplicate their versions here.
 const servers = pins.referenceServers;
-const require = createRequire(import.meta.url);
-const nativePin = servers.typescriptNative;
-const nativeVersion = exactDevDependency(nativePin.package);
-if (!packageJson.devDependencies[nativePin.package].startsWith(`npm:${nativePin.identity}@`)) {
-  throw new Error(`${nativePin.package} must alias ${nativePin.identity}.`);
-}
-const nativeManifest = require.resolve(`${nativePin.package}/package.json`);
-requirePackageVersion(nativeManifest, nativePin.identity, nativeVersion);
-const nativeMetadata = JSON.parse(readFileSync(nativeManifest, "utf8"));
-requireVersion(
-  process.execPath,
-  [join(dirname(nativeManifest), nativeMetadata.bin.tsc), "--version"],
-  nativeVersion,
-  "native TypeScript",
-);
-const tsPin = servers.typescriptLanguageServer;
-const wrapperPin = tsPin.compatibilityWrapper;
-requirePackageVersion(
-  require.resolve(`${tsPin.compilerPackage}/lib/tsserver.js`),
-  tsPin.compilerPackage,
-  exactDevDependency(tsPin.compilerPackage),
-);
-const wrapperManifest = require.resolve(`${wrapperPin.package}/package.json`);
-requirePackageVersion(wrapperManifest, wrapperPin.package, exactDevDependency(wrapperPin.package));
-// The wrapper's dependency range does not fix its compiler; the lockfile does. Require the major.
-const wrapperCompiler = packageVersion(
-  createRequire(wrapperManifest).resolve("@typescript/old/lib/tsserver.js"),
-  "typescript",
-);
-if (!wrapperCompiler.startsWith(`${wrapperPin.compilerMajor}.`)) {
-  throw new Error(
-    `${wrapperPin.package} must provide TypeScript ${wrapperPin.compilerMajor}.x; found ${wrapperCompiler}.`,
-  );
-}
-requireVersion(
-  process.env.CODE_BASELINE_TYPESCRIPT_SERVER ??
-    join(root, "node_modules/.bin/typescript-language-server"),
-  ["--version"],
-  exactDevDependency(tsPin.package),
-  "typescript-language-server",
-);
 requirePackageVersion(
   process.env.CODE_BASELINE_PYTHON_SERVER,
   servers.basedpyright.package,

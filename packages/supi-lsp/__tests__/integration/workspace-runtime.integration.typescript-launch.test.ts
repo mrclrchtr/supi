@@ -10,6 +10,13 @@ import { createWorkspaceLspRuntimeOwner } from "../../src/session/runtime-regist
 const require = createRequire(import.meta.url);
 const wrapper = path.dirname(require.resolve("@typescript/typescript6/package.json"));
 const ordinary = path.dirname(require.resolve("typescript/package.json"));
+const versionOf = (manifest: string): string =>
+  (JSON.parse(fs.readFileSync(manifest, "utf8")) as { version: string }).version;
+const wrapperVersion = versionOf(path.join(wrapper, "package.json"));
+const wrapperCompilerVersion = versionOf(
+  createRequire(path.join(wrapper, "package.json")).resolve("@typescript/old/package.json"),
+);
+const ordinaryVersion = versionOf(path.join(ordinary, "package.json"));
 let root: string | undefined;
 let owner: ReturnType<typeof createWorkspaceLspRuntimeOwner> | undefined;
 afterEach(async () => {
@@ -67,8 +74,8 @@ it("retries fresh package paths, starts the real wrapper, and confirms diagnosti
       typescript: {
         backend: "tsserver",
         packageName: "typescript",
-        wrapperVersion: "6.0.2",
-        compilerVersion: "6.0.3",
+        wrapperVersion,
+        compilerVersion: wrapperCompilerVersion,
       },
     },
   ]);
@@ -91,12 +98,12 @@ it("retries fresh package paths, starts the real wrapper, and confirms diagnosti
   fs.unlinkSync(link);
   fs.symlinkSync(ordinary, link, "dir");
   await runtime.hover(file, { line: 0, character: 14 });
-  expect(runtime.getProjectServers()[0]?.typescript?.wrapperVersion).toBe("6.0.2");
+  expect(runtime.getProjectServers()[0]?.typescript?.wrapperVersion).toBe(wrapperVersion);
   expect(await manager.restartClientsForFiles([file])).toMatchObject([{ restarted: true }]);
   expect(runtime.getProjectServers()[0]?.typescript).toEqual({
     backend: "tsserver",
     packageName: "typescript",
-    compilerVersion: "6.0.3",
+    compilerVersion: ordinaryVersion,
   });
   await owner.shutdown();
   expect(runtime.getProjectServers()).toEqual([]);

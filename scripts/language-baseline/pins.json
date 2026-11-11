@@ -1,18 +1,6 @@
 {
   "schemaVersion": 1,
   "referenceServers": {
-    "typescriptNative": {
-      "package": "@typescript/native",
-      "identity": "typescript"
-    },
-    "typescriptLanguageServer": {
-      "package": "typescript-language-server",
-      "compilerPackage": "typescript",
-      "compatibilityWrapper": {
-        "package": "@typescript/typescript6",
-        "compilerMajor": 6
-      }
-    },
     "basedpyright": {
       "version": "1.40.2",
       "package": "basedpyright",
