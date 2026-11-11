@@ -102,5 +102,15 @@ export function validatePublicPositionBounds(
 
 /** Split source into logical lines without CRLF line-ending bytes. */
 export function splitSourceLines(source: string): string[] {
-  return source.replace(/\r\n?/g, "\n").split("\n");
+  if (lastSplit?.source === source) return lastSplit.lines;
+  const lines = source.replace(/\r\n?/g, "\n").split("\n");
+  lastSplit = { source, lines };
+  return lines;
 }
+
+/**
+ * Single-entry cache: range conversion calls this once per node on the same
+ * source, so re-splitting each time made extraction quadratic in file size.
+ * Callers must not mutate the returned array.
+ */
+let lastSplit: { source: string; lines: string[] } | undefined;
