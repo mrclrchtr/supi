@@ -12,150 +12,98 @@ afterEach(() => {
 });
 const root = "repos/mrclrchtr/supi";
 const response = (body) => ({ body });
+const untagged = { [`GET ${root}/git/ref/tags/v6.3.1`]: { status: 404 } };
 
-function pushResponses(pr = repo.pr) {
-  return {
-    [`GET ${root}/commits/${repo.sha}/pulls?per_page=100&page=1`]: response([pr]),
-    [`GET ${root}/pulls/42`]: response(pr),
-  };
+function ordinaryCommit(subject = "fix: ordinary change") {
+  repo.git(["commit", "--allow-empty", "-qm", subject]);
+  return repo.git(["rev-parse", "HEAD"]);
 }
 
-function releaseMerge() {
-  const base = repo.sha;
-  repo.git(["checkout", "-qb", "release"]);
-  for (const path of [
-    "package.json",
-    "packages/a-app/package.json",
-    "packages/z-core/package.json",
-  ]) {
-    repo.updateJson(path, { version: "6.3.2" });
-  }
-  repo.writeJson(".release-please-manifest.json", { ".": "6.3.2" });
-  writeFileSync(join(repo.cwd, "CHANGELOG.md"), "# Changelog\n\n## 6.3.2\n\n* Fix\n");
-  repo.git(["add", "CHANGELOG.md"]);
-  const head = repo.commit();
-  repo.git(["checkout", "-q", "main"]);
-  repo.git(["merge", "--no-ff", "release", "-m", "chore: release 6.3.2"]);
-  const sha = repo.git(["rev-parse", "HEAD"]);
-  const pr = {
-    ...repo.pr,
-    merged: false,
-    title: "chore: release 6.3.2",
-    base: { ...repo.pr.base, sha: base },
-    head: { ...repo.pr.head, sha: head },
-  };
-  return { sha, pr };
-}
-
-function runPr(pr, sha = repo.sha) {
+function push(sha = repo.sha, responses = untagged) {
   return repo.runScript("ci-plan.mjs", {
-    event: { pull_request: pr },
-    overrides: { GITHUB_EVENT_NAME: "pull_request", GITHUB_SHA: sha },
+    event: { after: sha },
+    responses,
+    overrides: { GITHUB_SHA: sha },
   });
 }
 
 describe("fast PR verification", () => {
-  it("uses fast checks for ordinary PRs without GitHub API access", () => {
-    const result = runPr({ ...repo.pr, user: { login: "contributor" } });
+  it("uses fast checks for every PR without GitHub API access, including release commits", () => {
+    const result = repo.runScript("ci-plan.mjs", {
+      event: { pull_request: { title: "chore: release 6.3.1" } },
+      overrides: { GITHUB_EVENT_NAME: "pull_request" },
+    });
     expect(result.status, result.stderr).toBe(0);
-    expect(result.outputs).toEqual({ mode: "pr", sha: repo.sha, version: "", "release-pr": "" });
+    expect(result.outputs).toEqual({ mode: "pr", sha: repo.sha, version: "", release: "" });
     expect(result.calls).toEqual([]);
   });
-
-  it("only grants the metadata path to a trusted version-only release PR", () => {
-    const { sha, pr } = releaseMerge();
-    const result = runPr(pr, sha);
-    expect(result.status, result.stderr).toBe(0);
-    expect(result.outputs).toEqual({ mode: "metadata", sha, version: "6.3.2", "release-pr": "" });
-    for (const untrusted of [
-      { user: { login: "contributor", type: "User" } },
-      { head: { ...pr.head, repo: { full_name: "fork/supi" } } },
-      { head: { ...pr.head, ref: "release-lookalike" } },
-      { labels: [] },
-      { title: "chore: release 99.0.0" },
-    ]) {
-      expect(runPr({ ...pr, ...untrusted }, sha).outputs.mode).toBe("pr");
-    }
-  }, 10_000);
-
-  it.each(["dependency", "code", "symlink", "stale-parent"])(
-    "falls back to ordinary checks for unexpected %s changes",
-    (change) => {
-      const { pr } = releaseMerge();
-      repo.git(["reset", "--hard", pr.head.sha]);
-      if (change === "dependency")
-        repo.updateJson("package.json", { dependencies: { unexpected: "1.0.0" } });
-      if (change === "code") {
-        writeFileSync(join(repo.cwd, "unexpected.mjs"), "throw new Error('unexpected');\n");
-        repo.git(["add", "unexpected.mjs"]);
-      }
-      if (change === "symlink") {
-        repo.git(["rm", "CHANGELOG.md"]);
-        repo.git([
-          "update-index",
-          "--add",
-          "--cacheinfo",
-          `120000,${repo.git(["hash-object", "package.json"])},CHANGELOG.md`,
-        ]);
-      }
-      repo.git(["commit", "--allow-empty", "-am", "test: unexpected changes"]);
-      const head = repo.git(["rev-parse", "HEAD"]);
-      repo.git(["checkout", "--detach", pr.base.sha]);
-      repo.git(["merge", "--no-ff", head, "-m", "test: PR merge"]);
-      const sha = repo.git(["rev-parse", "HEAD"]);
-      const updated = { ...pr, head: { ...pr.head, sha: head } };
-      if (change === "stale-parent") updated.base = { ...pr.base, sha: "a".repeat(40) };
-      expect(runPr(updated, sha).outputs.mode).toBe("pr");
-    },
-  );
 });
 
 describe("release candidate planning", () => {
-  it("does no heavy work on an ordinary main push", () => {
-    const result = repo.runScript("ci-plan.mjs", {
-      responses: {
-        [`GET ${root}/commits/${repo.sha}/pulls?per_page=100&page=1`]: response([]),
-      },
-    });
+  it("does no heavy work or API access on an ordinary main push", () => {
+    const sha = ordinaryCommit();
+    const result = push(sha, {});
     expect(result.status, result.stderr).toBe(0);
     expect(result.outputs.mode).toBe("none");
+    expect(result.calls).toEqual([]);
   });
 
-  it("selects full verification and a fixed SHA for a merged release PR", () => {
-    const result = repo.runScript("ci-plan.mjs", { responses: pushResponses() });
+  it("selects full verification and the pushed SHA for an untagged Release Commit", () => {
+    const result = push();
     expect(result.status, result.stderr).toBe(0);
     expect(result.outputs).toEqual({
       mode: "full",
       sha: repo.sha,
       version: "6.3.1",
-      "release-pr": "42",
+      release: "true",
     });
   });
 
-  it("reads all association pages rather than missing a queued release", () => {
-    const responses = pushResponses();
-    responses[`GET ${root}/commits/${repo.sha}/pulls?per_page=100&page=1`] = response(
-      Array.from({ length: 100 }, () => ({ user: {} })),
-    );
-    responses[`GET ${root}/commits/${repo.sha}/pulls?per_page=100&page=2`] = response([repo.pr]);
-    expect(repo.runScript("ci-plan.mjs", { responses }).outputs.mode).toBe("full");
+  it("accepts a re-pushed Release Commit for a still-untagged version", () => {
+    repo.git(["commit", "--allow-empty", "-qm", "fix: verification failure"]);
+    const sha = ordinaryCommit("chore: release 6.3.1");
+    expect(push(sha).outputs).toMatchObject({ mode: "full", sha, version: "6.3.1" });
   });
 
-  it.each([
-    { merged: false },
-    { merge_commit_sha: "a".repeat(40) },
-    { title: "chore: release 99.0.0" },
-    { user: { login: "contributor", type: "User" } },
-  ])("fails closed when the detailed candidate no longer matches: %j", (fields) => {
-    const responses = pushResponses();
-    responses[`GET ${root}/pulls/42`] = response({ ...repo.pr, ...fields });
-    const result = repo.runScript("ci-plan.mjs", { responses });
+  it.each(["package-version", "changelog-version", "empty-notes", "bad-version", "squash-suffix"])(
+    "fails planning instead of skipping a malformed Release Commit: %s",
+    (fault) => {
+      let subject = "chore: release 6.3.1";
+      if (fault === "package-version") repo.updateJson("package.json", { version: "6.3.0" });
+      if (fault === "changelog-version")
+        writeFileSync(join(repo.cwd, "CHANGELOG.md"), "## 6.3.0\n\n* Old\n");
+      if (fault === "empty-notes") writeFileSync(join(repo.cwd, "CHANGELOG.md"), "## 6.3.1\n\n");
+      if (fault === "bad-version") subject = "chore: release latest";
+      if (fault === "squash-suffix") subject = "chore: release 6.3.1 (#42)";
+      repo.git(["add", "-A"]);
+      repo.git(["commit", "--allow-empty", "-qm", subject]);
+      const result = push(repo.git(["rev-parse", "HEAD"]));
+      expect(result.status).not.toBe(0);
+      expect(result.outputs).toEqual({});
+    },
+  );
+
+  it("rejects a Release Commit whose version is already tagged at another commit", () => {
+    const result = push(repo.sha, {
+      [`GET ${root}/git/ref/tags/v6.3.1`]: response({ object: {} }),
+      [`GET ${root}/commits/v6.3.1`]: response({ sha: "a".repeat(40) }),
+    });
     expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("prepare a new version");
     expect(result.outputs).toEqual({});
   });
 
+  it("keeps a candidate whose tag already points at it, so tag/release recovery can finish", () => {
+    const result = push(repo.sha, {
+      [`GET ${root}/git/ref/tags/v6.3.1`]: response({ object: {} }),
+      [`GET ${root}/commits/v6.3.1`]: response({ sha: repo.sha }),
+    });
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.outputs.release).toBe("true");
+  });
+
   it("does not turn API failures into a successful no-release decision", () => {
-    const result = repo.runScript("ci-plan.mjs", { responses: {} });
+    const result = push(repo.sha, { [`GET ${root}/git/ref/tags/v6.3.1`]: { status: 500 } });
     expect(result.status).not.toBe(0);
     expect(result.outputs).toEqual({});
   });
@@ -173,24 +121,46 @@ describe("manual verification and retries", () => {
   it("runs exhaustive checks without release creation when no retry is selected", () => {
     const result = dispatch();
     expect(result.status, result.stderr).toBe(0);
-    expect(result.outputs).toEqual({ mode: "full", sha: repo.sha, version: "", "release-pr": "" });
+    expect(result.outputs).toEqual({ mode: "full", sha: repo.sha, version: "", release: "" });
   });
 
-  it("retries a merged candidate at its SHA even after main advances", () => {
-    repo.updateJson("package.json", { version: "6.4.0" });
-    const main = repo.commit();
-    const result = dispatch(
-      { release_pr: "42" },
-      { [`GET ${root}/pulls/42`]: response(repo.pr) },
-      { GITHUB_SHA: main },
-    );
+  it("retries a Release Commit at its SHA even after main advances", () => {
+    const main = ordinaryCommit();
+    const result = dispatch({ release_sha: repo.sha }, untagged, { GITHUB_SHA: main });
     expect(result.status, result.stderr).toBe(0);
     expect(result.outputs).toEqual({
       mode: "full",
       sha: repo.sha,
       version: "6.3.1",
-      "release-pr": "42",
+      release: "true",
     });
+  });
+
+  it("rejects a Release Commit superseded by a newer one for the same version", () => {
+    repo.git(["commit", "--allow-empty", "-qm", "fix: verification failure"]);
+    const main = ordinaryCommit("chore: release 6.3.1");
+    const result = dispatch({ release_sha: repo.sha }, untagged, { GITHUB_SHA: main });
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("superseded");
+    expect(result.calls).toEqual([]);
+  });
+
+  it("rejects a valid Release Commit that is not on main before API access", () => {
+    repo.git(["checkout", "-qb", "side"]);
+    const side = ordinaryCommit("chore: release 6.3.1");
+    repo.git(["checkout", "-q", "main"]);
+    const main = ordinaryCommit();
+    const result = dispatch({ release_sha: side }, untagged, { GITHUB_SHA: main });
+    expect(result.status).not.toBe(0);
+    expect(result.outputs).toEqual({});
+    expect(result.calls).toEqual([]);
+  });
+
+  it("rejects a release_sha that is not a Release Commit", () => {
+    const main = ordinaryCommit();
+    const result = dispatch({ release_sha: main }, untagged, { GITHUB_SHA: main });
+    expect(result.status).not.toBe(0);
+    expect(result.outputs).toEqual({});
   });
 
   it("verifies an annotated tag's commit rather than the newer main checkout", () => {
@@ -208,21 +178,18 @@ describe("manual verification and retries", () => {
       { GITHUB_SHA: main },
     );
     expect(result.status, result.stderr).toBe(0);
-    expect(result.outputs).toEqual({
-      mode: "full",
-      sha: repo.sha,
-      version: "6.3.1",
-      "release-pr": "",
-    });
+    expect(result.outputs).toEqual({ mode: "full", sha: repo.sha, version: "6.3.1", release: "" });
   });
 
   it.each([
-    [{ publish_tag: "v6.3.1", release_pr: "42" }, {}],
+    [{ publish_tag: "v6.3.1", release_sha: "a".repeat(40) }, {}],
     [{ publish_tag: "main" }, {}],
     [{ publish_tag: "v6.3.1\nx=y" }, {}],
-    [{ release_pr: "--help" }, {}],
-    [{ release_pr: "42" }, { GITHUB_REF: "refs/heads/other" }],
+    [{ release_sha: "--help" }, {}],
+    [{ release_sha: "a".repeat(40) }, {}],
+    [{ release_sha: "SHA" }, { GITHUB_REF: "refs/heads/other" }],
   ])("rejects invalid retry input before API access: %j", (inputs, overrides) => {
+    if (inputs.release_sha === "SHA") inputs.release_sha = repo.sha;
     const result = dispatch(inputs, {}, overrides);
     expect(result.status).not.toBe(0);
     expect(result.outputs).toEqual({});

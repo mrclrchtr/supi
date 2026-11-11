@@ -55,14 +55,13 @@ export function createReleaseFixture({ version = "6.3.1" } = {}) {
   }
 
   function commit() {
-    git(["add", "package.json", ".release-please-manifest.json", "packages"]);
+    git(["add", "package.json", "packages"]);
     git(["commit", "-qm", "test: release fixture"]);
     return git(["rev-parse", "HEAD"]);
   }
 
   git(["init", "-q", "--initial-branch=main"]);
   writeJson("package.json", { name: "release-fixture", version, private: true });
-  writeJson(".release-please-manifest.json", { ".": version });
   writeJson("packages/a-app/package.json", {
     name: "@mrclrchtr/test-app",
     version,

@@ -60,9 +60,9 @@ export function validateReleaseIdentity(releaseSha, releaseVersion) {
 
 /**
  * Check the release identity and all public package versions before tagging or npm access.
- * RELEASE_SHA and RELEASE_VERSION identify a trusted merged release PR or a
+ * RELEASE_SHA and RELEASE_VERSION identify a validated Release Commit on main or a
  * validated published GitHub release tag selected by a manual retry.
- * Read packages only from the current checkout. Never select a subset from paths_released.
+ * Read packages only from the current checkout. Never publish a subset of public packages.
  * The workflow also checks required inputs before checkout, when this script is not available.
  *
  * @returns {Map<string, object>} Validated public manifests, keyed by package path.
@@ -74,11 +74,6 @@ export function validateReleaseCheckout() {
   const head = execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim();
   if (head !== releaseSha) throw invalidField("HEAD", JSON.stringify(releaseSha), head);
   requireVersion("package.json#version", readJsonObject("package.json").version, releaseVersion);
-  requireVersion(
-    '.release-please-manifest.json["."]',
-    readJsonObject(".release-please-manifest.json")["."],
-    releaseVersion,
-  );
 
   const packages = new Map();
   for (const entry of readdirSync("packages", { withFileTypes: true })) {

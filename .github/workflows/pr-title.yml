@@ -1,7 +1,7 @@
 name: PR title
 
 # ci.yml validates the title on open/push but ignores `edited`, so body-only edits
-# (for example Release Please updating its notes) no longer rerun all checks.
+# no longer rerun all checks.
 on:
   pull_request:
     types: [edited]

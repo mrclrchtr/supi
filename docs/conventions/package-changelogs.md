@@ -2,7 +2,7 @@
 
 ## Status
 
-Implemented. Package notes are maintained manually on `main`; Release Please remains unchanged.
+Implemented. Package notes are curated by hand (usually by an agent) during [release preparation](release-preparation.md) or earlier on `main`.
 
 ## Confirmed decisions
 
@@ -10,15 +10,15 @@ Implemented. Package notes are maintained manually on `main`; Release Please rem
 | --- | --- |
 | Presentation | Use Pi's built-in Extension Updates only. No SuPi-specific dialog or changelog command. |
 | Editorial ownership | Maintain distinct release notes for each Extension Package. Do not derive all package notes from the SuPi Release Notes. |
-| Shared release notes | Keep the Release Please-owned root changelog and GitHub release generation unchanged. Package notes supplement that release-wide record. |
+| Shared release notes | The root changelog and GitHub release body come from [release preparation](release-preparation.md). Package notes supplement that release-wide record. |
 | Content boundary | Describe user-visible behavior delivered by the installed package, including relevant bundled capabilities. Do not copy internal dependency changes without user impact. |
 | Introduction | Begin with a short introduction entry at the first release shipping package changelogs. Do not reconstruct older package histories. Accept Pi's silent first-seen baseline. |
 | Retention | Retain package entries after introduction so users skipping releases can see intervening changes. |
 | Unchanged packages | Do not add a section solely because the shared release version increased. Omit empty or “no changes” entries. |
 | Source files | Check in a real `CHANGELOG.md` at each Extension Package root and use Pi's default path. No external symlinks, custom paths, or pack-time generation of release-note text. |
 | Structural release gate | Missing or formally invalid changelogs and missing tarball entries block release. Content completeness remains an editorial review responsibility. |
-| Editorial workflow | Update package changelogs by hand and commit them to `main` before release. Do not edit package notes on the Release Please branch or integrate package-note finalization with Release Please. |
-| Release automation boundary | Release Please continues to update the root changelog and existing version metadata only. Do not add package-note generation, an `Unreleased` finalization step, or release-branch write automation. |
+| Editorial workflow | Update package changelogs by hand, either in earlier commits on `main` or in the Release Commit itself. `pnpm release:prepare` prints per-package commit drafts as editorial input only. |
+| Release automation boundary | Preparation bumps versions and drafts the root changelog only. Do not write package notes automatically or add an `Unreleased` finalization step. |
 | Forthcoming releases | Package changelogs on `main` may already contain the planned next release version while package manifests still carry the previous version. Correct headings manually if the planned release version changes. |
 
 ## Scope
@@ -34,7 +34,7 @@ Implemented. Package notes are maintained manually on `main`; Release Please rem
 
 1. Before release, review user-relevant changes for each Extension Package, including visible effects of bundled capabilities.
 2. Add concise English notes under the planned final shared release version in each affected package's `CHANGELOG.md`.
-3. Commit those files to `main` in a manually authored changelog commit. Package notes are ordinary repository content, not Release Please-managed files.
+3. Commit those files to `main`, in an earlier commit or in the Release Commit. Package notes are ordinary repository content.
 4. If the planned release version changes, correct the affected package headings manually before releasing.
 5. Review the final release candidate for content completeness and version accuracy. Do not create entries for unchanged packages.
 
@@ -52,7 +52,7 @@ The introduction entry establishes each package's history; subsequent entries mu
 | Unchanged packages | Accept a most-recent changelog entry older than the package version. Do not require a section for every shared release. |
 | Editorial review | Check that the manually chosen versions and notes match the intended release. Structural checks cannot determine which changes deserve notes or detect every omitted user-facing change. |
 
-Do not infer user relevance from touched file paths or synthesize placeholder notes. Do not widen the trusted metadata-only release-PR allowlist for this feature. Ordinary package-note commits to `main` do not require changing Release Please's update logic.
+Do not infer user relevance from touched file paths or synthesize placeholder notes.
 
 ## Implementation entry points
 
@@ -62,8 +62,6 @@ Do not infer user relevance from touched file paths or synthesize placeholder no
 - [Release checkout validation](../../scripts/release-validation.mjs) rejects invalid or future notes before tag creation or registry access.
 - Both [direct publication](../../scripts/publish.mjs) and [release publication](../../scripts/publish-released.mjs) enforce version bounds and verify their packed artifacts before npm publication.
 - The existing packaging and release test suites cover these boundaries; Pi's own UI behavior is not duplicated in a new test framework.
-
-`release-please-config.json`, the Release Please maintenance workflow, version ownership, and root changelog generation remain unchanged.
 
 ## Acceptance criteria
 
@@ -97,8 +95,7 @@ Do not infer user relevance from touched file paths or synthesize placeholder no
 - Installed Pi `docs/packages.md`, section **Show a changelog**.
 - Installed Pi `dist/modes/interactive/interactive-mode.js`, extension changelog collection at startup.
 - Installed Pi `dist/utils/changelog.js` and `dist/core/package-manager.js`.
-- [Release configuration](../../release-please-config.json).
-- [Release PR maintenance workflow](../../.github/workflows/release-please.yml).
+- [Release preparation](release-preparation.md).
 - [Release creation](../../scripts/create-release.mjs).
 - [Staged packaging](../../scripts/pack-staged.mjs).
 - [CI and release gates](ci-verification.md).

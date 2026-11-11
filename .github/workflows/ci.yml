@@ -8,8 +8,8 @@ on:
         required: false
         type: string
         default: ""
-      release_pr:
-        description: "Verify and retry a merged release PR before tagging"
+      release_sha:
+        description: "Verify and retry an untagged release commit on main"
         required: false
         type: string
         default: ""
@@ -20,7 +20,6 @@ on:
 
 permissions:
   contents: read
-  pull-requests: read
 
 # PR updates supersede old checks. Distinct main commits must not replace queued release candidates.
 concurrency:
@@ -35,7 +34,7 @@ jobs:
       mode: ${{ steps.plan.outputs.mode }}
       sha: ${{ steps.plan.outputs.sha }}
       version: ${{ steps.plan.outputs.version }}
-      release-pr: ${{ steps.plan.outputs.release-pr }}
+      release: ${{ steps.plan.outputs.release }}
     steps:
       - name: Checkout exact event commit with comparison history
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -81,7 +80,6 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - name: Set up workspace dependencies
-        if: needs.ci-plan.outputs.mode != 'metadata'
         uses: ./.github/actions/setup-pnpm
       - name: Validate PR title
         if: github.event_name == 'pull_request'
@@ -97,23 +95,11 @@ jobs:
         if: github.event_name != 'pull_request'
         run: pnpm exec commitlint --last --verbose
       - name: Validate PR commits
-        if: github.event_name == 'pull_request' && needs.ci-plan.outputs.mode != 'metadata'
+        if: github.event_name == 'pull_request'
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: pnpm exec commitlint --from "$BASE_SHA" --to "$HEAD_SHA" --verbose
-      - name: Validate the metadata-only release commit without dependencies
-        if: needs.ci-plan.outputs.mode == 'metadata'
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          RELEASE_VERSION: ${{ needs.ci-plan.outputs.version }}
-        run: |
-          subject=$(git log --format=%s "$BASE_SHA..$HEAD_SHA")
-          if [[ "$subject" != "chore: release $RELEASE_VERSION" ]]; then
-            echo '::error::Expected exactly one conventional release commit'
-            exit 1
-          fi
 
   workspace-checks:
     needs: ci-plan
@@ -132,26 +118,9 @@ jobs:
       - name: Validate release metadata before dependencies
         if: needs.ci-plan.outputs.version != ''
         run: node scripts/release-validation.mjs
-      - name: Check release-please config coverage
-        run: |
-          publishable=$(mktemp)
-          configured=$(mktemp)
-          for dir in packages/*/; do
-            if [ -f "$dir/package.json" ] && [ "$(jq -r '.private // false' "$dir/package.json")" = "false" ]; then
-              echo "${dir%/}"
-            fi
-          done | sort > "$publishable"
-          jq -r '.packages["."]["extra-files"][] // empty' release-please-config.json | sed 's|/package\.json$||' | sort > "$configured"
-          if ! diff -q "$publishable" "$configured"; then
-            echo "::error::Mismatch between publishable packages and release-please config"
-            diff "$publishable" "$configured" || true
-            exit 1
-          fi
       - name: Set up workspace dependencies
-        if: needs.ci-plan.outputs.mode != 'metadata'
         uses: ./.github/actions/setup-pnpm
       - name: Run fast workspace checks
-        if: needs.ci-plan.outputs.mode != 'metadata'
         run: |
           pnpm --filter @mrclrchtr/supi-tree-sitter check:all-wasm
           pnpm biome:ai
@@ -159,7 +128,7 @@ jobs:
           pnpm skills:check
       - name: Check CI planning and release safety contracts
         if: needs.ci-plan.outputs.mode == 'pr'
-        run: pnpm vitest run scripts/__tests__/ci-plan.test.mjs scripts/__tests__/release-workflow.test.mjs scripts/__tests__/verify-workflow.test.mjs --reporter=agent
+        run: pnpm vitest run scripts/__tests__/ci-plan.test.mjs scripts/__tests__/release-workflow.test.mjs scripts/__tests__/verify-workflow.test.mjs scripts/__tests__/release-prepare.test.mjs --reporter=agent
       - name: Verify staged package tarballs
         if: needs.ci-plan.outputs.mode == 'full'
         run: pnpm pack:verify
@@ -292,7 +261,7 @@ jobs:
           fi
           case "$MODE" in
             full) expected=success ;;
-            pr|metadata) expected=skipped ;;
+            pr) expected=skipped ;;
             *) echo '::error::Unknown verification mode'; exit 1 ;;
           esac
           for result in "$TEST_RESULT" "$INSTALLER_RESULT" "$LANGUAGE_BASELINE_RESULT"; do
@@ -307,7 +276,7 @@ jobs:
     if: >-
       !cancelled() && github.ref == 'refs/heads/main' &&
       needs.ci-plan.result == 'success' && needs.verify.result == 'success' &&
-      needs.ci-plan.outputs.mode == 'full' && needs.ci-plan.outputs.release-pr != ''
+      needs.ci-plan.outputs.mode == 'full' && needs.ci-plan.outputs.release == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     concurrency:
@@ -315,11 +284,9 @@ jobs:
       cancel-in-progress: false
     permissions:
       contents: write
-      pull-requests: read
     env:
       RELEASE_SHA: ${{ needs.ci-plan.outputs.sha }}
       RELEASE_VERSION: ${{ needs.ci-plan.outputs.version }}
-      RELEASE_PR: ${{ needs.ci-plan.outputs.release-pr }}
     steps:
       - name: Checkout verified release candidate
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -334,8 +301,6 @@ jobs:
           client-id: ${{ vars.MRCLRCHTR_BOT_CLIENT_ID }}
           private-key: ${{ secrets.MRCLRCHTR_BOT_PRIVATE_KEY }}
           permission-contents: write
-          permission-issues: write
-          permission-pull-requests: write
       - name: Checkout release tooling from the workflow commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

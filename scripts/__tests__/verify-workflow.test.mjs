@@ -57,25 +57,22 @@ describe("verification workflow contracts", () => {
     expect(runGate().status).toBe(0);
   });
 
-  it.each(["pr", "metadata"])(
-    "accepts intentionally skipped exhaustive jobs only in %s mode",
-    (mode) => {
-      expect(
-        runGate({
-          MODE: mode,
-          TEST_RESULT: "skipped",
-          INSTALLER_RESULT: "skipped",
-          LANGUAGE_BASELINE_RESULT: "skipped",
-        }).status,
-      ).toBe(0);
-      expect(runGate({ MODE: mode }).status).toBe(1);
-    },
-  );
+  it.each(["pr"])("accepts intentionally skipped exhaustive jobs only in %s mode", (mode) => {
+    expect(
+      runGate({
+        MODE: mode,
+        TEST_RESULT: "skipped",
+        INSTALLER_RESULT: "skipped",
+        LANGUAGE_BASELINE_RESULT: "skipped",
+      }).status,
+    ).toBe(0);
+    expect(runGate({ MODE: mode }).status).toBe(1);
+  });
 
   it.each(["PLAN_RESULT", "ACTIONLINT_RESULT", "COMMITS_RESULT", "WORKSPACE_RESULT"])(
     "requires %s in every verification mode",
     (field) => {
-      for (const mode of ["full", "pr", "metadata"]) {
+      for (const mode of ["full", "pr"]) {
         const expected = mode === "full" ? "success" : "skipped";
         const baseline = {
           MODE: mode,
@@ -103,7 +100,7 @@ describe("verification workflow contracts", () => {
       for (const result of ["success", "failure", "cancelled", ""]) {
         expect(
           runGate({
-            MODE: "metadata",
+            MODE: "pr",
             TEST_RESULT: "skipped",
             INSTALLER_RESULT: "skipped",
             LANGUAGE_BASELINE_RESULT: "skipped",

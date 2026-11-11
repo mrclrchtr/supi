@@ -101,7 +101,7 @@ Register a `SettingsModule` with `registerSettings()` from `@mrclrchtr/supi-core
 
 Use staging, not direct `pnpm pack` (which can emit `../` dependencies). Staging dereferences workspace symlinks, exports npm-compatible manifests (rewrites `workspace:`, strips dev dependencies, preserves bundles), runs `npm pack`, and validates paths/manifests and extraction.
 
-For Extension Package changelog authoring, inclusion, and release-version checks, follow [the package changelog convention](docs/conventions/package-changelogs.md). Package notes are hand-maintained on `main`; Release Please owns only the root changelog and existing version metadata.
+For Extension Package changelog authoring, inclusion, and release-version checks, follow [the package changelog convention](docs/conventions/package-changelogs.md). Package notes are hand-curated; release preparation drafts only the root changelog.
 
 ```bash
 node scripts/publish.mjs packages/supi-lsp           # pack + verify
@@ -110,9 +110,9 @@ node scripts/publish.mjs packages/supi-lsp --publish # pack + verify + publish
 
 ## Release & tagging convention
 
-- Release-please creates one `vX.Y.Z` tag and GitHub release, not per-package tags.
-- Packages in `release-please-config.json` `extra-files` share the root version and breaking-change bumps. Private `supi-test-utils` and `supi-skill-patches` are outside lockstep.
-- Release-please owns `.release-please-manifest.json`; never edit it manually.
+- To release, follow `.pi/skills/release/SKILL.md` ([release preparation](docs/conventions/release-preparation.md)). Versions change only through `pnpm release:prepare`.
+- CI creates one `vX.Y.Z` tag and GitHub release per Release Commit (`chore: release X.Y.Z` on main), not per-package tags. Never move or delete tags.
+- Root and every non-private package share the version. Private `supi-test-utils` and `supi-skill-patches` are outside lockstep.
 
 ## Agent skills
 

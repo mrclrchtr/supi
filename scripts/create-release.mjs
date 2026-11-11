@@ -1,32 +1,27 @@
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
-import { github, requireReleasePullRequest } from "./release-github.mjs";
+import {
+  firstChangelogSection,
+  requireNewestReleaseCommit,
+  requireReleaseCommit,
+} from "./release-candidate.mjs";
+import { github } from "./release-github.mjs";
 import { validateReleaseCheckout } from "./release-validation.mjs";
 
-/** Create/recover a release at the verified SHA; never ask Release Please to choose a moving target. */
+/** Create/recover the tag and GitHub release at the verified Release Commit; never move a tag. */
 function createRelease() {
   validateReleaseCheckout();
-  const {
-    RELEASE_SHA: sha,
-    RELEASE_VERSION: version,
-    RELEASE_PR: number,
-    GITHUB_REPOSITORY: repository,
-  } = process.env;
-  if (!/^[1-9][0-9]*$/.test(number ?? "")) throw new Error("Expected a release PR number");
-  const root = `repos/${repository}`;
-  const pr = github(`${root}/pulls/${number}`);
-  requireReleasePullRequest(pr, repository, sha, version);
+  const { RELEASE_SHA: sha, RELEASE_VERSION: version, GITHUB_REPOSITORY: repository } = process.env;
+  if (requireReleaseCommit(sha) !== version) {
+    throw new Error("The release commit does not match RELEASE_VERSION");
+  }
   // A newer main is fine; a candidate removed from main by a force push is not.
   execFileSync("git", ["merge-base", "--is-ancestor", sha, "origin/main"], { stdio: "pipe" });
+  requireNewestReleaseCommit(sha, version, "origin/main");
 
-  const section = readFileSync("CHANGELOG.md", "utf8").split(/^## /m)[1];
-  const heading = section?.split("\n")[0];
-  const headingVersion = heading?.match(/^(?:\[([^\]]+)\]|(\S+))/);
-  if ((headingVersion?.[1] ?? headingVersion?.[2]) !== version) {
-    throw new Error("The first changelog entry must match the release version");
-  }
-  const notes = section.slice(section.indexOf("\n") + 1).trim();
-  if (!notes) throw new Error("Expected non-empty release notes");
+  // The edited first changelog section at the verified commit is the GitHub release body.
+  const changelog = execFileSync("git", ["show", `${sha}:CHANGELOG.md`], { encoding: "utf8" });
+  const { notes } = firstChangelogSection(changelog);
+  const root = `repos/${repository}`;
   const tag = `v${version}`;
   const tagPath = encodeURIComponent(tag);
   const existingTag = github(`${root}/git/ref/tags/${tagPath}`, { allowMissing: true });
@@ -56,15 +51,6 @@ function createRelease() {
       },
     });
   }
-  // Release Please uses these labels to distinguish outstanding merges from completed releases.
-  github(`${root}/issues/${number}/labels`, {
-    method: "POST",
-    body: { labels: ["autorelease: tagged"] },
-  });
-  github(`${root}/issues/${number}/labels/${encodeURIComponent("autorelease: pending")}`, {
-    method: "DELETE",
-    allowMissing: true,
-  });
   console.log(`Release ${tag} is ready at verified commit ${sha}.`);
 }
 

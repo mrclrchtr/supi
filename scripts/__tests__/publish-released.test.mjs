@@ -46,8 +46,6 @@ describe("release identity validation", () => {
   it.each([
     ["package.json", { version: "6.3.0" }, "version"],
     ["package.json", { version: undefined }, "version"],
-    [".release-please-manifest.json", { ".": "6.3.0" }, '["."]'],
-    [".release-please-manifest.json", { ".": undefined }, '["."]'],
     ["packages/a-app/package.json", { version: "6.3.0" }, "version"],
     ["packages/z-core/package.json", { version: "6.3.0" }, "version"],
     ["packages/z-core/package.json", { version: undefined }, "version"],
@@ -69,7 +67,7 @@ describe("release identity validation", () => {
     }
   });
 
-  it.each(["package.json", ".release-please-manifest.json", "packages/z-core/package.json"])(
+  it.each(["package.json", "packages/z-core/package.json"])(
     "rejects unreadable or invalid JSON in %s",
     (path) => {
       writeFileSync(join(fixture.cwd, path), "not JSON");
@@ -168,8 +166,7 @@ describe("release publication", { timeout: 15_000 }, () => {
   });
 
   it("publishes every public package at the release version in dependency order", () => {
-    // A stale path list must not restrict the release checkout's package set.
-    const result = fixture.run({ PATHS_RELEASED: '["packages/a-app"]' });
+    const result = fixture.run();
     expect(result.status, result.stderr).toBe(0);
     const events = fixture.events();
     expect(events.map((event) => event.args[0])).toEqual([
@@ -267,7 +264,6 @@ describe("release publication", { timeout: 15_000 }, () => {
 
   it("accepts a valid prerelease version without changing it", () => {
     fixture.updateJson("package.json", { version: "7.0.0-rc.1+build.2" });
-    fixture.writeJson(".release-please-manifest.json", { ".": "7.0.0-rc.1+build.2" });
     fixture.updateJson("packages/a-app/package.json", { version: "7.0.0-rc.1+build.2" });
     fixture.updateJson("packages/z-core/package.json", { version: "7.0.0-rc.1+build.2" });
     const result = fixture.run({

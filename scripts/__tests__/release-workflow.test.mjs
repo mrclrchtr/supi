@@ -1,5 +1,4 @@
 // biome-ignore-all lint/suspicious/noTemplateCurlyInString: GitHub Actions expressions are literal test data.
-import { spawnSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { runInNewContext } from "node:vm";
@@ -7,10 +6,6 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createCiFixture } from "./helpers/ci-fixture.mjs";
 
 const workflow = readFileSync(new URL("../../.github/workflows/ci.yml", import.meta.url), "utf8");
-const maintenance = readFileSync(
-  new URL("../../.github/workflows/release-please.yml", import.meta.url),
-  "utf8",
-);
 const job = (name) => workflow.split(`\n  ${name}:\n`)[1]?.split(/^ {2}[\w-]+:\n/m)[0] ?? "";
 const root = "repos/mrclrchtr/supi";
 const response = (body) => ({ body });
@@ -24,13 +19,10 @@ afterEach(() => {
 
 function responses() {
   return {
-    [`GET ${root}/pulls/42`]: response(repo.pr),
     [`GET ${root}/git/ref/tags/v6.3.1`]: { status: 404 },
     [`GET ${root}/releases/tags/v6.3.1`]: { status: 404 },
     [`POST ${root}/git/refs`]: response({}),
     [`POST ${root}/releases`]: response({}),
-    [`POST ${root}/issues/42/labels`]: response([]),
-    [`DELETE ${root}/issues/42/labels/autorelease%3A%20pending`]: response(undefined),
   };
 }
 const writes = (result) => result.calls.filter(({ method }) => method !== "GET");
@@ -61,39 +53,44 @@ describe("verified-commit release creation", () => {
           prerelease: false,
         },
       },
-      {
-        endpoint: `${root}/issues/42/labels`,
-        method: "POST",
-        body: { labels: ["autorelease: tagged"] },
-      },
-      { endpoint: `${root}/issues/42/labels/autorelease%3A%20pending`, method: "DELETE" },
     ]);
   });
 
-  it.each([
-    "checkout",
-    "package-version",
-    "pr-sha",
-    "pr-author",
-    "pr-open",
-    "changelog",
-    "ancestry",
-  ])("rejects invalid %s before any write", (fault) => {
-    const api = responses();
-    const overrides = {};
-    if (fault === "checkout") overrides.RELEASE_SHA = "a".repeat(40);
-    if (fault === "package-version")
-      repo.updateJson("packages/a-app/package.json", { version: "9.0.0" });
-    if (fault === "pr-sha")
-      api[`GET ${root}/pulls/42`] = response({ ...repo.pr, merge_commit_sha: "b".repeat(40) });
-    if (fault === "pr-author")
-      api[`GET ${root}/pulls/42`] = response({ ...repo.pr, user: { login: "contributor" } });
-    if (fault === "pr-open") api[`GET ${root}/pulls/42`] = response({ ...repo.pr, merged: false });
-    if (fault === "changelog")
-      writeFileSync(join(repo.cwd, "CHANGELOG.md"), "## 6.4.0\n\nWrong release\n");
-    if (fault === "ancestry") repo.git(["update-ref", "refs/remotes/origin/main", `${repo.sha}~1`]);
-    const result = repo.runScript("create-release.mjs", { responses: api, overrides });
+  it.each(["checkout", "package-version", "subject", "changelog", "ancestry"])(
+    "rejects invalid %s before any write",
+    (fault) => {
+      const api = responses();
+      const overrides = {};
+      if (fault === "checkout") overrides.RELEASE_SHA = "a".repeat(40);
+      if (fault === "package-version")
+        repo.updateJson("packages/a-app/package.json", { version: "9.0.0" });
+      if (fault === "subject") {
+        repo.git(["commit", "--amend", "-qm", "fix: not a release"]);
+        overrides.RELEASE_SHA = repo.git(["rev-parse", "HEAD"]);
+        repo.git(["update-ref", "refs/remotes/origin/main", overrides.RELEASE_SHA]);
+      }
+      if (fault === "changelog") {
+        writeFileSync(join(repo.cwd, "CHANGELOG.md"), "## 6.4.0\n\nWrong release\n");
+        repo.git(["commit", "-qam", "chore: release 6.3.1"]);
+        overrides.RELEASE_SHA = repo.git(["rev-parse", "HEAD"]);
+        repo.git(["update-ref", "refs/remotes/origin/main", overrides.RELEASE_SHA]);
+      }
+      if (fault === "ancestry")
+        repo.git(["update-ref", "refs/remotes/origin/main", `${repo.sha}~1`]);
+      const result = repo.runScript("create-release.mjs", { responses: api, overrides });
+      expect(result.status).not.toBe(0);
+      expect(writes(result)).toEqual([]);
+    },
+  );
+
+  it("refuses to tag a Release Commit superseded on main by a newer one for the same version", () => {
+    repo.git(["commit", "--allow-empty", "-qm", "fix: verification failure"]);
+    repo.git(["commit", "--allow-empty", "-qm", "chore: release 6.3.1"]);
+    repo.git(["update-ref", "refs/remotes/origin/main", "HEAD"]);
+    repo.git(["checkout", "-q", "--detach", repo.sha]);
+    const result = repo.runScript("create-release.mjs", { responses: responses() });
     expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("superseded");
     expect(writes(result)).toEqual([]);
   });
 
@@ -132,7 +129,6 @@ describe("verified-commit release creation", () => {
       expect(writes(result).filter(({ endpoint }) => endpoint === `${root}/releases`)).toHaveLength(
         exists ? 0 : 1,
       );
-      expect(writes(result).at(-1).method).toBe("DELETE");
     },
   );
 
@@ -178,7 +174,7 @@ function condition(
     tag = "",
     mode = "full",
     version = "6.3.1",
-    releasePr = "42",
+    isRelease = "true",
     plan = "success",
     verify = "success",
     release = "success",
@@ -194,7 +190,7 @@ function condition(
     github: { event_name: event, ref },
     inputs: { publish_tag: tag },
     needs: {
-      "ci-plan": { result: plan, outputs: { mode, version, "release-pr": releasePr } },
+      "ci-plan": { result: plan, outputs: { mode, version, release: isRelease } },
       verify: { result: verify },
       "create-release": { result: release },
     },
@@ -202,44 +198,6 @@ function condition(
 }
 
 describe("release and publishing authorization", () => {
-  it("keeps release maintenance unable to tag unverified commits", () => {
-    expect(maintenance).toContain("skip-github-release: true");
-  });
-
-  it.each([
-    ["chore: release 6.3.1", false, 0],
-    ["chore: release 6.3.0", false, 1],
-    ["not conventional", false, 1],
-    ["chore: release 6.3.1", true, 1],
-  ])(
-    "validates the exact single metadata release commit: %s (multiple: %s)",
-    (subject, multiple, expected) => {
-      const base = repo.git(["rev-parse", "HEAD~1"]);
-      repo.git(["commit", "--amend", "-m", subject]);
-      if (multiple) repo.git(["commit", "--allow-empty", "-m", subject]);
-      const step = job("conventional-commits")
-        .split(/^ {6}- /m)
-        .find((entry) =>
-          entry.startsWith(
-            "name: Validate the metadata-only release commit without dependencies\n",
-          ),
-        );
-      expect(step).toBeDefined();
-      const command = step.split("run: |\n")[1].replace(/^ {10}/gm, "");
-      const result = spawnSync("bash", ["-e", "-o", "pipefail", "-c", command], {
-        cwd: repo.cwd,
-        encoding: "utf8",
-        env: {
-          ...repo.env,
-          BASE_SHA: base,
-          HEAD_SHA: repo.git(["rev-parse", "HEAD"]),
-          RELEASE_VERSION: "6.3.1",
-        },
-      });
-      expect(result.status, result.stderr).toBe(expected);
-    },
-  );
-
   it("requires successful exhaustive verification before tagging or publishing", () => {
     expect(condition("create-release")).toBe(true);
     expect(condition("publish")).toBe(true);
@@ -248,7 +206,6 @@ describe("release and publishing authorization", () => {
       { verify: "failure" },
       { verify: "cancelled" },
       { verify: "skipped" },
-      { mode: "metadata" },
       { mode: "pr" },
       { mode: "none" },
       { ref: "refs/heads/other" },
@@ -257,13 +214,13 @@ describe("release and publishing authorization", () => {
       expect(condition("create-release", overrides), JSON.stringify(overrides)).toBe(false);
       expect(condition("publish", overrides), JSON.stringify(overrides)).toBe(false);
     }
-    expect(condition("create-release", { releasePr: "" })).toBe(false);
+    expect(condition("create-release", { isRelease: "" })).toBe(false);
     expect(condition("publish", { version: "" })).toBe(false);
     expect(condition("publish", { release: "failure" })).toBe(false);
   });
 
   it("only permits the no-new-release publishing path for explicit manual tag retries", () => {
-    const manual = { event: "workflow_dispatch", releasePr: "", release: "skipped" };
+    const manual = { event: "workflow_dispatch", isRelease: "", release: "skipped" };
     expect(condition("publish", manual)).toBe(false);
     expect(condition("publish", { ...manual, tag: "v6.3.1" })).toBe(true);
     expect(condition("publish", { ...manual, event: "pull_request", tag: "v6.3.1" })).toBe(false);

@@ -1,0 +1,51 @@
+# git-cliff drafts SuPi Release Notes for `pnpm release:prepare`.
+# The draft is editorial input: agents curate it before the release commit.
+# See docs/conventions/release-preparation.md.
+
+[changelog]
+header = ""
+body = """
+{%- set repo = "https://github.com/mrclrchtr/supi" -%}
+{% if version -%}
+## [{{ version | trim_start_matches(pat="v") }}]({{ repo }}/compare/{{ previous.version }}...{{ version }}) ({{ timestamp | date(format="%Y-%m-%d") }})
+{% else -%}
+## Unreleased
+{% endif %}
+{%- set breaking = commits | filter(attribute="breaking", value=true) -%}
+{% if breaking | length > 0 %}
+### ⚠ BREAKING CHANGES
+
+{% for commit in breaking -%}
+* {% if commit.scope %}**{{ commit.scope }}:** {% endif %}{{ commit.breaking_description | default(value=commit.message) }}
+{% endfor -%}
+{% endif -%}
+{% for group, group_commits in commits | group_by(attribute="group") %}
+### {{ group | striptags | trim }}
+
+{% for commit in group_commits -%}
+* {% if commit.scope %}**{{ commit.scope }}:** {% endif %}{{ commit.message | split(pat="\n") | first | trim }} ([{{ commit.id | truncate(length=7, end="") }}]({{ repo }}/commit/{{ commit.id }})){% for footer in commit.footers %}{% if footer.token | lower == "closes" or footer.token | lower == "fixes" %}, closes [#{{ footer.value | trim_start_matches(pat="#") }}]({{ repo }}/issues/{{ footer.value | trim_start_matches(pat="#") }}){% endif %}{% endfor %}
+{% endfor -%}
+{% endfor %}
+"""
+footer = ""
+trim = true
+
+[git]
+conventional_commits = true
+filter_unconventional = true
+split_commits = false
+protect_breaking_commits = true
+sort_commits = "oldest"
+tag_pattern = "^v[0-9]+\\.[0-9]+\\.[0-9]+$"
+commit_parsers = [
+  { message = "^chore: release ", skip = true },
+  { message = "^feat", group = "<!-- 0 -->Features" },
+  { message = "^fix", group = "<!-- 1 -->Bug Fixes" },
+  { message = "^perf", group = "<!-- 2 -->Performance Improvements" },
+  { message = "^revert", group = "<!-- 3 -->Reverts" },
+  { message = ".*", skip = true },
+]
+
+[bump]
+features_always_bump_minor = true
+breaking_always_bump_major = true
