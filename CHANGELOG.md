@@ -1,5 +1,40 @@
 # Changelog
 
+## [11.4.0](https://github.com/mrclrchtr/supi/compare/v11.3.0...v11.4.0) (2026-11-11)
+
+
+### Features
+
+* **agent-runtime:** ask retrospectives about code_* tool friction ([d56e416](https://github.com/mrclrchtr/supi/commit/d56e4161fc26bb3a1fde54d9fa90b2770b5456ad))
+* **agent-runtime:** record retrospective prompt revision ([c829725](https://github.com/mrclrchtr/supi/commit/c8297250ddbd51d9c312ad0d3e828a98e2d9262b))
+* **ask-user:** report blocked status for overlay forms ([33f8234](https://github.com/mrclrchtr/supi/commit/33f8234171b043d6ccb8ebbfd806c845eca06d19))
+* **code-intelligence:** inline directory entry points and direct files ([0a479f7](https://github.com/mrclrchtr/supi/commit/0a479f79f2c9a43a508beb302df50995a944eda5))
+* **code-intelligence:** list only own declarations in file outlines ([2abf143](https://github.com/mrclrchtr/supi/commit/2abf1436051fdd4e548b2e3d3d09338ec38c5dfa))
+* **debug:** ask for retrospective scope and gather only new reports ([a224500](https://github.com/mrclrchtr/supi/commit/a224500d6c4f6cd96dd99a276a8614b7c214cd1f))
+* **debug:** filter session evidence by recorded SuPi commit ([12d693f](https://github.com/mrclrchtr/supi/commit/12d693f0b341b93d708a3a7df604afb78dba454e))
+* **debug:** record runtime provenance per session ([ea305ad](https://github.com/mrclrchtr/supi/commit/ea305ad35a88f7679da07706b67e2bd35f21bb73))
+* **scripts:** report code_* tool usage from Pi sessions ([13272d5](https://github.com/mrclrchtr/supi/commit/13272d5c0f879683f56f0bd91809a8c8ceabf219))
+* **scripts:** select code_* usage before a commit ([95c1fd4](https://github.com/mrclrchtr/supi/commit/95c1fd4390c00c0265dfc7a546ae462f75e2a580))
+* **skills:** add evaluate-code-tools project skill ([daca9a7](https://github.com/mrclrchtr/supi/commit/daca9a702ddac1a774b976feee8d660730d22a98))
+
+
+### Bug Fixes
+
+* **code-intelligence:** count barrel re-exports and merge decorated Python declarations ([267f5b2](https://github.com/mrclrchtr/supi/commit/267f5b253e6d3e1f96268c456a311f76d69ac34f))
+* **code-intelligence:** ignore nested reads in instruction dedup ([af1f28c](https://github.com/mrclrchtr/supi/commit/af1f28c16086926adfd9816eeea84792d68a866b))
+* **code-intelligence:** point empty symbol queries to structural search ([5d0912a](https://github.com/mrclrchtr/supi/commit/5d0912abc853d82b98ed511d146838cd9a01e281)), closes [#576](https://github.com/mrclrchtr/supi/issues/576)
+* **code-intelligence:** skip instruction files already read in full ([e40758e](https://github.com/mrclrchtr/supi/commit/e40758e8fc69b66320c9655ddb93ca555ac4fd90))
+* **deps:** update dependency hk to v2.12.0 ([244cb3c](https://github.com/mrclrchtr/supi/commit/244cb3ce98d13294a7b8742144c33f704f08c406))
+* **deps:** update routine non-major dependencies ([4fe3b39](https://github.com/mrclrchtr/supi/commit/4fe3b39b09b8e3c07566b2025a4a9198eda58f45))
+* **deps:** upgrade Pi to 1.5.1 ([0f2f010](https://github.com/mrclrchtr/supi/commit/0f2f0107008108a5006221069a84b51451fa5100))
+* **lsp:** accept result evidence for TypeScript project coverage ([72b95c7](https://github.com/mrclrchtr/supi/commit/72b95c79d9e53c20934cbf983dfb7e92236ecd21))
+* **lsp:** flag tsserver implementations as single-project ([a8a32ad](https://github.com/mrclrchtr/supi/commit/a8a32ad5c675afee97ca90d74a2c9959ce5c9053))
+* **lsp:** keep references complete for unexported TypeScript declarations ([1ad1e58](https://github.com/mrclrchtr/supi/commit/1ad1e5841e40b15ba04101738ff5095981c2d503))
+* **lsp:** report partial TypeScript references for unloaded projects ([4c1bd07](https://github.com/mrclrchtr/supi/commit/4c1bd079c4d5b82646b140422271bf3d1fdb163a))
+* **prompt-suggestions:** steer suggestions toward user commands ([33a7f14](https://github.com/mrclrchtr/supi/commit/33a7f140b5572066d059e21545cd05860d893ff7))
+* **tree-sitter:** parse import types with type arguments ([557d5e8](https://github.com/mrclrchtr/supi/commit/557d5e864d7d53767fe9c99fb46406dc9d602898)), closes [#577](https://github.com/mrclrchtr/supi/issues/577)
+* **web:** steer library questions toward Context7 docs tools ([88a0bbd](https://github.com/mrclrchtr/supi/commit/88a0bbd5eea759e594743f773fc07ff7f3f8187b))
+
 ## [11.3.0](https://github.com/mrclrchtr/supi/compare/v11.2.0...v11.3.0) (2026-11-09)
 
 
