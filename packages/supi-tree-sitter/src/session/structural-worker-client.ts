@@ -331,8 +331,9 @@ export class StructuralWorkerClient {
     try {
       throwIfCodeRequestInterrupted(active.control);
     } catch (error) {
+      // Keep the chunk handshake alive so the Worker can send its terminal message
+      // instead of waiting for the hard stop.
       this.#interrupt(active, error);
-      return;
     }
     active.chunks.push(Uint8Array.from(message.payload));
     active.nextSequence += 1;
@@ -433,7 +434,7 @@ export class StructuralWorkerClient {
       return;
     }
     const worker = this.#worker;
-    if (this.#active !== request || !worker) return;
+    if (this.#active !== request || !worker || request.hardStopTimer) return;
     Atomics.store(request.cancellationFlag, 0, 1);
     if (
       !this.#send(worker, {
