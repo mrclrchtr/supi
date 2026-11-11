@@ -7,7 +7,7 @@
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { isFullRead, WorkspaceCodeIntelligenceSession } from "../session/session.ts";
+import { WorkspaceCodeIntelligenceSession } from "../session/session.ts";
 
 /**
  * The code-intelligence app object.
@@ -72,8 +72,10 @@ export function createSessionCache(): {
  * Create the code-intelligence app and wire it to pi lifecycle events.
  *
  * Registers:
- * - `session_start` — creates a session for the new cwd, checks branch
- *   for existing overview
+ * - `session_start` / `session_tree` — create or restore the session for the
+ *   cwd from the active branch (overview and instruction dedup state)
+ * - `tool_result` — records full `read` results for instruction dedup
+ * - `session_compact` — resets instruction dedup state
  * - `session_shutdown` — releases all sessions and clears per-session stores
  */
 export function createCodeIntelligenceApp(pi: ExtensionAPI): CodeIntelligenceApp {
@@ -92,12 +94,11 @@ export function createCodeIntelligenceApp(pi: ExtensionAPI): CodeIntelligenceApp
   });
 
   pi.on("tool_result", (event, ctx) => {
-    if (event.toolName !== "read" || !isFullRead(event.input, event.isError, event.details)) return;
-    sessions.get(ctx.cwd)?.markFileReadInFull(event.input.path);
+    sessions.get(ctx.cwd)?.recordToolResult(event);
   });
 
   pi.on("session_compact", (_event, ctx) => {
-    sessions.get(ctx.cwd)?.resetSurfacedInstructionDirs();
+    sessions.get(ctx.cwd)?.resetInstructionDedup();
   });
 
   pi.on("session_shutdown", () => {

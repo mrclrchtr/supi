@@ -192,7 +192,7 @@ describe("structural workflow request control", () => {
           throw new Error("unused");
         },
         nativeInstructionPaths: new Set(),
-        readInstructionPaths: new Set(),
+        fullyReadPaths: new Set(),
         surfacedInstructionDirs: new Set(),
         projectTrusted: false,
       },

@@ -17,8 +17,13 @@
  */
 
 import { realpathSync } from "node:fs";
+import * as os from "node:os";
 import * as path from "node:path";
-import type { SessionEntry } from "@earendil-works/pi-coding-agent";
+import type {
+  ReadToolDetails,
+  SessionEntry,
+  ToolResultEvent,
+} from "@earendil-works/pi-coding-agent";
 import {
   type AutomaticLspPathPolicy,
   createDefaultAutomaticLspPathPolicy,
@@ -351,7 +356,7 @@ export class WorkspaceCodeIntelligenceSession {
       {
         ...this.targetWorkflowDeps(),
         nativeInstructionPaths: this.#nativeInstructionPaths,
-        readInstructionPaths: this.#fullyReadPaths,
+        fullyReadPaths: this.#fullyReadPaths,
         surfacedInstructionDirs: this.#surfacedInstructionDirs,
         gradleObserver: this.#gradleObserver,
         projectTrusted: this.#projectTrusted,
@@ -416,17 +421,31 @@ export class WorkspaceCodeIntelligenceSession {
   }
 
   /**
-   * Remember a file the agent read in full, so code_orientation does not embed
-   * it again as an instruction file until the next compaction.
+   * Record a model-issued `read` that returned a whole file, so code_orientation
+   * does not embed it again as an instruction file until the next compaction.
+   * Reads issued by another tool (e.g. a codemode script) are ignored: their
+   * results reach only the calling tool, not the model, and are not in the
+   * transcript used for branch reconstruction.
    */
-  markFileReadInFull(filePath: string): void {
+  recordToolResult(event: ToolResultEvent): void {
+    if (event.toolName !== "read" || event.parentToolCallId !== undefined) return;
+    if (isFullRead(event.input, event.isError, event.details))
+      this.#markFileReadInFull(event.input.path);
+  }
+
+  #markFileReadInFull(filePath: string): void {
     this.#fullyReadPaths.add(this.#realPath(filePath));
   }
 
-  // Resolve to real path so dedup aligns with the realpath-aware
-  // instruction-file lookup in findInstructionFilesForDirectory.
+  // Resolve like Pi's read tool (`@` prefix, `~`), then to the real path so
+  // dedup aligns with the realpath-aware lookup in findInstructionFilesForDirectory.
   #realPath(filePath: string): string {
-    const resolved = path.resolve(this.cwd, filePath.replace(/^@/, ""));
+    const unprefixed = filePath.replace(/^@/, "");
+    const expanded =
+      unprefixed === "~" || unprefixed.startsWith("~/")
+        ? path.join(os.homedir(), unprefixed.slice(1))
+        : unprefixed;
+    const resolved = path.resolve(this.cwd, expanded);
     try {
       return path.resolve(realpathSync(resolved));
     } catch {
@@ -441,8 +460,8 @@ export class WorkspaceCodeIntelligenceSession {
     }
   }
 
-  /** Clear instruction-file dedup state after compaction. */
-  resetSurfacedInstructionDirs(): void {
+  /** Clear instruction-file dedup state (surfaced directories, full reads) after compaction. */
+  resetInstructionDedup(): void {
     this.#surfacedInstructionDirs.clear();
     this.#fullyReadPaths.clear();
   }
@@ -457,7 +476,7 @@ export class WorkspaceCodeIntelligenceSession {
         this.#surfacedInstructionDirs.add(path.resolve(this.cwd, directory));
       }
     }
-    for (const filePath of extractFullReadPaths(entries)) this.markFileReadInFull(filePath);
+    for (const filePath of extractFullReadPaths(entries)) this.#markFileReadInFull(filePath);
   }
 
   // ── Private session stores ───────────────────────────────────────
@@ -528,17 +547,14 @@ function extractInstructionDirectories(entry: SessionEntry): string[] {
  * Whether a `read` call returned the whole file: no `offset`/`limit`, no error,
  * and no output truncation.
  */
-export function isFullRead(
+function isFullRead(
   input: Record<string, unknown> | undefined,
   isError: boolean,
   details: unknown,
 ): input is { path: string } {
   if (isError || typeof input?.path !== "string") return false;
   if (input.offset !== undefined || input.limit !== undefined) return false;
-  return (
-    (details as { truncation?: { truncated?: boolean } } | undefined)?.truncation?.truncated !==
-    true
-  );
+  return (details as ReadToolDetails | undefined)?.truncation?.truncated !== true;
 }
 
 function extractFullReadPaths(entries: SessionEntry[]): string[] {

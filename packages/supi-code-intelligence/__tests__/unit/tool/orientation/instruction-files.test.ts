@@ -322,11 +322,11 @@ describe("code_orientation instruction-file limits and deduplication", () => {
     );
   });
 
-  it("still surfaces instruction files whose read was truncated or failed", async () => {
-    writeJson("packages/foo/package.json", { name: "foo" });
-    writeJson("packages/bar/package.json", { name: "bar" });
-    writeFile("packages/foo/CLAUDE.md", "# Foo\n");
-    writeFile("packages/bar/CLAUDE.md", "# Bar\n");
+  it("still surfaces instruction files whose read was truncated, failed, or nested", async () => {
+    for (const name of ["foo", "bar", "baz"]) {
+      writeJson(`packages/${name}/package.json`, { name });
+      writeFile(`packages/${name}/CLAUDE.md`, `# ${name}\n`);
+    }
 
     const pi = createPiMock();
     extensionWithIsolatedHome(pi);
@@ -338,6 +338,11 @@ describe("code_orientation instruction-file limits and deduplication", () => {
       ctx,
     );
     await pi.emit("tool_result", { ...readResult("packages/bar/CLAUDE.md"), isError: true }, ctx);
+    await pi.emit(
+      "tool_result",
+      { ...readResult("packages/baz/CLAUDE.md"), parentToolCallId: "codemode-1" },
+      ctx,
+    );
 
     expect((await orientDirectory(pi, "packages/foo")).text).toContain(
       "### packages/foo/CLAUDE.md",
@@ -345,6 +350,26 @@ describe("code_orientation instruction-file limits and deduplication", () => {
     expect((await orientDirectory(pi, "packages/bar")).text).toContain(
       "### packages/bar/CLAUDE.md",
     );
+    expect((await orientDirectory(pi, "packages/baz")).text).toContain(
+      "### packages/baz/CLAUDE.md",
+    );
+  });
+
+  it("matches full reads by the path forms Pi's read tool accepts", async () => {
+    writeJson("packages/foo/package.json", { name: "foo" });
+    writeJson("packages/bar/package.json", { name: "bar" });
+    writeFile("packages/foo/CLAUDE.md", "# Foo\n");
+    writeFile("packages/bar/CLAUDE.md", "# Bar\n");
+
+    const pi = createPiMock();
+    extensionWithIsolatedHome(pi);
+    const ctx = makeCtx({ cwd: tmpDir });
+    await pi.emit("session_start", {}, ctx);
+    await pi.emit("tool_result", readResult("@packages/foo/CLAUDE.md"), ctx);
+    await pi.emit("tool_result", readResult(path.join(tmpDir, "packages/bar/CLAUDE.md")), ctx);
+
+    expect((await orientDirectory(pi, "packages/foo")).text).not.toContain("## Instructions");
+    expect((await orientDirectory(pi, "packages/bar")).text).not.toContain("## Instructions");
   });
 
   it("deduplicates surfaced directories until compaction", async () => {
