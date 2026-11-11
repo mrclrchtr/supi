@@ -87,6 +87,7 @@ gh workflow run ci.yml --repo mrclrchtr/supi --ref main -f publish_tag=v1.2.3
 
 - Routine Renovate minor, patch, pin, and digest updates share a group unless a later dedicated-group rule applies. Existing schedules and routine automerge remain enabled.
 - npm major, minor, and patch updates must be at least 7 days old before Renovate proposes them. Strict internal checks and required release timestamps prevent missing metadata from bypassing the cooldown.
+- npm-managed language-baseline packages (TypeScript, TLS, the TS6 wrapper) and pnpm are pinned only in the root `package.json`. `scripts/language-baseline/pins.json` names these packages without versions, so Renovate updates cannot leave it stale; it pins only artifacts and toolchains that npm does not manage.
 - Security-alert PRs bypass Renovate's cooldown but require manual merge. pnpm's install-time cooldown still applies; urgent fixes need a reviewed, version-specific `minimumReleaseAgeExclude` exception rather than disabling the policy globally.
 - GitHub Actions digest and digest-pin changes require manual merge: release timestamps cannot reliably age a moved tag. Upstream skills remain separate and manually reviewed; Pi remains manually upgraded.
 - `pnpm-workspace.yaml` enforces the same 7-day cooldown for direct and transitive npm packages, including frozen-lockfile installs and lockfile maintenance. Resolution fails rather than accepting too-new versions or missing publication dates.

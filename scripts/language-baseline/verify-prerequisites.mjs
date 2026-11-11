@@ -69,58 +69,68 @@ function requireJdtlsVersion(command) {
 if (process.versions.node !== pins.toolchains.node) {
   throw new Error(`Node ${pins.toolchains.node} is required; found ${process.versions.node}.`);
 }
-if (packageJson.packageManager !== `pnpm@${pins.toolchains.pnpm}`) {
-  throw new Error("The root pnpm package manager does not match pins.json.");
+/**
+ * npm-managed baseline packages are pinned exactly in the root package.json (and the lockfile),
+ * which Renovate updates. Read expected versions from there instead of duplicating them in
+ * pins.json, where they would drift.
+ */
+function exactDevDependency(name) {
+  const spec = packageJson.devDependencies?.[name];
+  const version = spec?.replace(/^npm:[^@]+@/, "");
+  if (!version || !/^\d+\.\d+\.\d+$/.test(version)) {
+    throw new Error(
+      `Root devDependency ${name} must be pinned to an exact version; found ${spec}.`,
+    );
+  }
+  return version;
 }
-if (
-  packageJson.devDependencies?.[pins.referenceServers.typescriptLanguageServer.package] !==
-  pins.referenceServers.typescriptLanguageServer.version
-) {
-  throw new Error("The root TypeScript language-server dependency does not match pins.json.");
+
+const pnpmVersion = /^pnpm@(\d+\.\d+\.\d+)$/.exec(packageJson.packageManager ?? "")?.[1];
+if (!pnpmVersion) {
+  throw new Error("The root packageManager must pin an exact pnpm version.");
 }
-requireVersion("pnpm", ["--version"], pins.toolchains.pnpm, "pnpm");
+requireVersion("pnpm", ["--version"], pnpmVersion, "pnpm");
 
 const servers = pins.referenceServers;
 const require = createRequire(import.meta.url);
 const nativePin = servers.typescriptNative;
-if (
-  packageJson.devDependencies?.[nativePin.package] !==
-  `npm:${nativePin.identity}@${nativePin.version}`
-) {
-  throw new Error("The test-only native TypeScript alias does not match pins.json.");
+const nativeVersion = exactDevDependency(nativePin.package);
+if (!packageJson.devDependencies[nativePin.package].startsWith(`npm:${nativePin.identity}@`)) {
+  throw new Error(`${nativePin.package} must alias ${nativePin.identity}.`);
 }
 const nativeManifest = require.resolve(`${nativePin.package}/package.json`);
-requirePackageVersion(nativeManifest, nativePin.identity, nativePin.version);
+requirePackageVersion(nativeManifest, nativePin.identity, nativeVersion);
 const nativeMetadata = JSON.parse(readFileSync(nativeManifest, "utf8"));
 requireVersion(
   process.execPath,
   [join(dirname(nativeManifest), nativeMetadata.bin.tsc), "--version"],
-  nativePin.version,
+  nativeVersion,
   "native TypeScript",
 );
 const tsPin = servers.typescriptLanguageServer;
 const wrapperPin = tsPin.compatibilityWrapper;
-if (packageJson.devDependencies?.[wrapperPin.package] !== wrapperPin.version) {
-  throw new Error("The test-only TypeScript wrapper dependency does not match pins.json.");
-}
 requirePackageVersion(
-  require.resolve("typescript/lib/tsserver.js"),
-  "typescript",
-  tsPin.compilerVersion,
+  require.resolve(`${tsPin.compilerPackage}/lib/tsserver.js`),
+  tsPin.compilerPackage,
+  exactDevDependency(tsPin.compilerPackage),
 );
 const wrapperManifest = require.resolve(`${wrapperPin.package}/package.json`);
-requirePackageVersion(wrapperManifest, wrapperPin.package, wrapperPin.version);
-const wrapperRequire = createRequire(wrapperManifest);
-requirePackageVersion(
-  wrapperRequire.resolve("@typescript/old/lib/tsserver.js"),
+requirePackageVersion(wrapperManifest, wrapperPin.package, exactDevDependency(wrapperPin.package));
+// The wrapper's dependency range does not fix its compiler; the lockfile does. Require the major.
+const wrapperCompiler = packageVersion(
+  createRequire(wrapperManifest).resolve("@typescript/old/lib/tsserver.js"),
   "typescript",
-  wrapperPin.compilerVersion,
 );
+if (!wrapperCompiler.startsWith(`${wrapperPin.compilerMajor}.`)) {
+  throw new Error(
+    `${wrapperPin.package} must provide TypeScript ${wrapperPin.compilerMajor}.x; found ${wrapperCompiler}.`,
+  );
+}
 requireVersion(
   process.env.CODE_BASELINE_TYPESCRIPT_SERVER ??
     join(root, "node_modules/.bin/typescript-language-server"),
   ["--version"],
-  servers.typescriptLanguageServer.version,
+  exactDevDependency(tsPin.package),
   "typescript-language-server",
 );
 requirePackageVersion(
