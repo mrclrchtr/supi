@@ -7,7 +7,7 @@
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { WorkspaceCodeIntelligenceSession } from "../session/session.ts";
+import { isFullRead, WorkspaceCodeIntelligenceSession } from "../session/session.ts";
 
 /**
  * The code-intelligence app object.
@@ -89,6 +89,11 @@ export function createCodeIntelligenceApp(pi: ExtensionAPI): CodeIntelligenceApp
     const session = sessions.get(ctx.cwd);
     if (!session) return;
     restoreBranchOverviewState(session, ctx.sessionManager.getBranch());
+  });
+
+  pi.on("tool_result", (event, ctx) => {
+    if (event.toolName !== "read" || !isFullRead(event.input, event.isError, event.details)) return;
+    sessions.get(ctx.cwd)?.markFileReadInFull(event.input.path);
   });
 
   pi.on("session_compact", (_event, ctx) => {

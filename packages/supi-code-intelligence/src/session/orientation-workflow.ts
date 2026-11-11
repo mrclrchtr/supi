@@ -30,6 +30,8 @@ import { reportProgress, throwIfAborted, type WorkflowControl } from "./workflow
 export interface OrientationWorkflowDeps extends TargetWorkflowDeps {
   readonly capability: CapabilityAdapter;
   readonly nativeInstructionPaths: Set<string>;
+  /** Absolute files read in full since the latest compaction; not embedded again. */
+  readonly readInstructionPaths: Set<string>;
   readonly surfacedInstructionDirs: Set<string>;
   /** Whether the project is trusted — controls instruction-file discovery. */
   readonly projectTrusted: boolean;
@@ -245,7 +247,7 @@ function addInstructionFiles(
     directory: focusPath,
     cwd: deps.cwd,
     fileNames: config.instructionFileNames,
-    nativeContextPaths: deps.nativeInstructionPaths,
+    nativeContextPaths: new Set([...deps.nativeInstructionPaths, ...deps.readInstructionPaths]),
     surfacedDirectories: deps.surfacedInstructionDirs,
     projectTrusted: deps.projectTrusted,
   });

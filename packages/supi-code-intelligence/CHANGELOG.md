@@ -2,6 +2,7 @@
 
 ## [11.3.1]
 
+- `code_orientation` with a directory focus no longer embeds an instruction file (such as `CLAUDE.md`) that the agent already read in full with `read` since the latest compaction. Reads with `offset` or `limit`, truncated reads, and failed reads do not count. In observed sessions, about a quarter of embedded instruction text repeated a file the agent had just read.
 - A symbol query with no workspace-symbol match now explains that only files in projects the language server has loaded are searched, and points to an AST definition search with `code_find`, a `target.file` lookup, or an anchor. Previously it suggested retrying `code_resolve`, the tool that had just failed ([#576](https://github.com/mrclrchtr/supi/issues/576)).
 - TypeScript and TSX files with import types that take type arguments, such as `import("typebox").Static<T>`, now parse completely. Previously, AST results (`code_find`, file outlines, callees) for directories containing such a file were marked incomplete, so an empty search could not confirm that a name does not exist.
 - `code_orientation` with a directory focus again shows the focused package's declared entry points (such as `exports` and `main` paths) inline, and lists all direct files in one compact line instead of the first ten, unless `maxResults` is set. Sections moved to captured details are named in one note instead of a separate "Captured navigation" section.

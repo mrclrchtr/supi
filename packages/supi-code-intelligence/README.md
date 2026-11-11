@@ -317,7 +317,7 @@ The first matching rule wins; no match keeps the extension default. Patterns are
 
 Global association values and untrusted project values do not apply. The workspace provider host captures one rule set for AST grammar selection and LSP document language IDs. Restart Pi, or release all sessions that share the host and reload, to use changed rules. This setting has no settings-overlay editor. It does not bypass exclusions or establish compiler flags.
 
-Directory orientation checks the path from the workspace root to the focused directory. It selects the first valid configured instruction file per directory, skips files already loaded by Pi or shown on the active branch, and shows at most 200 lines per file. Resolved instruction paths must stay inside the workspace. These snippets are tool output, not additions to Pi's system prompt.
+Directory orientation checks the path from the workspace root to the focused directory. It selects the first valid configured instruction file per directory, skips files already loaded by Pi, shown on the active branch, or read in full with `read` since the latest compaction, and shows at most 200 lines per file. Resolved instruction paths must stay inside the workspace. These snippets are tool output, not additions to Pi's system prompt.
 
 ## Privacy and security
 

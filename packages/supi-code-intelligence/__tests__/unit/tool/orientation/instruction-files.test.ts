@@ -297,6 +297,56 @@ describe("code_orientation instruction-file limits and deduplication", () => {
     expect(result.text).not.toContain("## Instructions");
   });
 
+  it("skips instruction files the agent already read in full until compaction", async () => {
+    writeJson("packages/foo/package.json", { name: "foo" });
+    writeJson("packages/bar/package.json", { name: "bar" });
+    writeFile("packages/foo/CLAUDE.md", "# Foo\n");
+    writeFile("packages/bar/CLAUDE.md", "# Bar\n");
+
+    const pi = createPiMock();
+    extensionWithIsolatedHome(pi);
+    const ctx = makeCtx({ cwd: tmpDir });
+    await pi.emit("session_start", {}, ctx);
+    await pi.emit("tool_result", readResult("packages/foo/CLAUDE.md"), ctx);
+    await pi.emit("tool_result", readResult("packages/bar/CLAUDE.md", { limit: 1 }), ctx);
+
+    expect((await orientDirectory(pi, "packages/foo")).text).not.toContain("## Instructions");
+    expect((await orientDirectory(pi, "packages/bar")).text).toContain(
+      "### packages/bar/CLAUDE.md",
+    );
+
+    await pi.emit("session_compact", {}, ctx);
+
+    expect((await orientDirectory(pi, "packages/foo")).text).toContain(
+      "### packages/foo/CLAUDE.md",
+    );
+  });
+
+  it("still surfaces instruction files whose read was truncated or failed", async () => {
+    writeJson("packages/foo/package.json", { name: "foo" });
+    writeJson("packages/bar/package.json", { name: "bar" });
+    writeFile("packages/foo/CLAUDE.md", "# Foo\n");
+    writeFile("packages/bar/CLAUDE.md", "# Bar\n");
+
+    const pi = createPiMock();
+    extensionWithIsolatedHome(pi);
+    const ctx = makeCtx({ cwd: tmpDir });
+    await pi.emit("session_start", {}, ctx);
+    await pi.emit(
+      "tool_result",
+      { ...readResult("packages/foo/CLAUDE.md"), details: { truncation: { truncated: true } } },
+      ctx,
+    );
+    await pi.emit("tool_result", { ...readResult("packages/bar/CLAUDE.md"), isError: true }, ctx);
+
+    expect((await orientDirectory(pi, "packages/foo")).text).toContain(
+      "### packages/foo/CLAUDE.md",
+    );
+    expect((await orientDirectory(pi, "packages/bar")).text).toContain(
+      "### packages/bar/CLAUDE.md",
+    );
+  });
+
   it("deduplicates surfaced directories until compaction", async () => {
     writeJson("packages/foo/package.json", { name: "foo" });
     writeFile("packages/foo/src/index.ts", "export const foo = 1;\n");
@@ -332,6 +382,35 @@ describe("code_orientation instruction-file reconstruction", () => {
     );
 
     expect((await orientDirectory(pi, "packages/foo")).text).not.toContain("## Instructions");
+  });
+
+  it("reconstructs full reads of instruction files after the latest compaction", async () => {
+    writeJson("packages/foo/package.json", { name: "foo" });
+    writeJson("packages/bar/package.json", { name: "bar" });
+    writeFile("packages/foo/CLAUDE.md", "# Foo\n");
+    writeFile("packages/bar/CLAUDE.md", "# Bar\n");
+
+    const pi = createPiMock();
+    extensionWithIsolatedHome(pi);
+    const sessionStart = getHandlerOrThrow(pi, "session_start");
+    await sessionStart(
+      {},
+      makeCtx({
+        cwd: tmpDir,
+        sessionManager: {
+          getBranch: () => [
+            ...readEntries("r1", "packages/bar/CLAUDE.md"),
+            { type: "compaction" },
+            ...readEntries("r2", "packages/foo/CLAUDE.md"),
+          ],
+        },
+      }),
+    );
+
+    expect((await orientDirectory(pi, "packages/foo")).text).not.toContain("## Instructions");
+    expect((await orientDirectory(pi, "packages/bar")).text).toContain(
+      "### packages/bar/CLAUDE.md",
+    );
   });
 
   it("ignores instruction details before the latest compaction", async () => {
@@ -396,4 +475,32 @@ function orientationResultEntry(directory: string) {
       },
     },
   };
+}
+
+function readResult(relPath: string, input: Record<string, unknown> = {}) {
+  return {
+    type: "tool_result",
+    toolCallId: `read-${relPath}`,
+    toolName: "read",
+    input: { path: relPath, ...input },
+    content: [{ type: "text", text: "" }],
+    details: undefined,
+    isError: false,
+  };
+}
+
+function readEntries(id: string, relPath: string) {
+  return [
+    {
+      type: "message",
+      message: {
+        role: "assistant",
+        content: [{ type: "toolCall", id, name: "read", arguments: { path: relPath } }],
+      },
+    },
+    {
+      type: "message",
+      message: { role: "toolResult", toolCallId: id, toolName: "read", isError: false },
+    },
+  ];
 }

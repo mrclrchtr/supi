@@ -164,6 +164,9 @@ export class WorkspaceCodeIntelligenceSession {
   /** Absolute directories whose instruction files were already surfaced by code_orientation. */
   readonly #surfacedInstructionDirs = new Set<string>();
 
+  /** Absolute files the agent read in full with `read` since the latest compaction. */
+  readonly #fullyReadPaths = new Set<string>();
+
   /**
    * Optional LSP controller reference — attached by LSP lifecycle module
    * for Capability Warning evaluation and server management.
@@ -348,6 +351,7 @@ export class WorkspaceCodeIntelligenceSession {
       {
         ...this.targetWorkflowDeps(),
         nativeInstructionPaths: this.#nativeInstructionPaths,
+        readInstructionPaths: this.#fullyReadPaths,
         surfacedInstructionDirs: this.#surfacedInstructionDirs,
         gradleObserver: this.#gradleObserver,
         projectTrusted: this.#projectTrusted,
@@ -408,15 +412,25 @@ export class WorkspaceCodeIntelligenceSession {
 
   /** Remember instruction/context file paths already loaded by PI natively. */
   captureNativeInstructionPaths(files: Array<{ path: string }>): void {
-    for (const file of files) {
-      const resolved = path.resolve(this.cwd, file.path);
-      // Resolve to real path so dedup aligns with the realpath-aware
-      // instruction-file lookup in findInstructionFilesForDirectory.
-      try {
-        this.#nativeInstructionPaths.add(path.resolve(realpathSync(resolved)));
-      } catch {
-        this.#nativeInstructionPaths.add(resolved);
-      }
+    for (const file of files) this.#nativeInstructionPaths.add(this.#realPath(file.path));
+  }
+
+  /**
+   * Remember a file the agent read in full, so code_orientation does not embed
+   * it again as an instruction file until the next compaction.
+   */
+  markFileReadInFull(filePath: string): void {
+    this.#fullyReadPaths.add(this.#realPath(filePath));
+  }
+
+  // Resolve to real path so dedup aligns with the realpath-aware
+  // instruction-file lookup in findInstructionFilesForDirectory.
+  #realPath(filePath: string): string {
+    const resolved = path.resolve(this.cwd, filePath.replace(/^@/, ""));
+    try {
+      return path.resolve(realpathSync(resolved));
+    } catch {
+      return resolved;
     }
   }
 
@@ -430,17 +444,20 @@ export class WorkspaceCodeIntelligenceSession {
   /** Clear instruction-file dedup state after compaction. */
   resetSurfacedInstructionDirs(): void {
     this.#surfacedInstructionDirs.clear();
+    this.#fullyReadPaths.clear();
   }
 
   /** Reconstruct surfaced instruction directories from branch tool-result details after compaction. */
   reconstructInstructionState(branch: SessionEntry[]): void {
     this.#surfacedInstructionDirs.clear();
+    this.#fullyReadPaths.clear();
     const entries = entriesAfterLatestCompaction(branch);
     for (const entry of entries) {
       for (const directory of extractInstructionDirectories(entry)) {
         this.#surfacedInstructionDirs.add(path.resolve(this.cwd, directory));
       }
     }
+    for (const filePath of extractFullReadPaths(entries)) this.markFileReadInFull(filePath);
   }
 
   // ── Private session stores ───────────────────────────────────────
@@ -472,6 +489,7 @@ export class WorkspaceCodeIntelligenceSession {
     this.#refactorPlans.clear();
     this.#workflowTargets.clear();
     this.#surfacedInstructionDirs.clear();
+    this.#fullyReadPaths.clear();
     this.#nativeInstructionPaths.clear();
     this.#maintenanceState = createLspMaintenanceState();
     this.#lspController = null;
@@ -504,4 +522,45 @@ function extractInstructionDirectories(entry: SessionEntry): string[] {
   return files
     .map((file) => file.directory)
     .filter((directory): directory is string => typeof directory === "string");
+}
+
+/**
+ * Whether a `read` call returned the whole file: no `offset`/`limit`, no error,
+ * and no output truncation.
+ */
+export function isFullRead(
+  input: Record<string, unknown> | undefined,
+  isError: boolean,
+  details: unknown,
+): input is { path: string } {
+  if (isError || typeof input?.path !== "string") return false;
+  if (input.offset !== undefined || input.limit !== undefined) return false;
+  return (
+    (details as { truncation?: { truncated?: boolean } } | undefined)?.truncation?.truncated !==
+    true
+  );
+}
+
+function extractFullReadPaths(entries: SessionEntry[]): string[] {
+  const calls = new Map<string, Record<string, unknown>>();
+  const paths: string[] = [];
+  for (const entry of entries) {
+    if (entry.type !== "message") continue;
+    const message = entry.message;
+    if (message.role === "assistant") collectReadCalls(message.content, calls);
+    if (message.role !== "toolResult" || message.toolName !== "read") continue;
+    const input = calls.get(message.toolCallId);
+    if (isFullRead(input, message.isError, message.details)) paths.push(input.path);
+  }
+  return paths;
+}
+
+function collectReadCalls(
+  content: ReadonlyArray<{ type: string; id?: string; name?: string; arguments?: unknown }>,
+  calls: Map<string, Record<string, unknown>>,
+): void {
+  for (const item of content) {
+    if (item.type !== "toolCall" || item.name !== "read" || typeof item.id !== "string") continue;
+    calls.set(item.id, item.arguments as Record<string, unknown>);
+  }
 }
