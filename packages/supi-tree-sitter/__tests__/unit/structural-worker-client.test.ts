@@ -255,6 +255,65 @@ describe("StructuralWorkerClient", () => {
     }
   });
 
+  it("settles a cooperative cancellation without restarting the Worker", async () => {
+    const workers: FakeWorker[] = [];
+    const client = new StructuralWorkerClient("/workspace", ({ generation }) => {
+      const worker = new FakeWorker();
+      workers.push(worker);
+      queueMicrotask(() => worker.emit(ready(generation)));
+      return worker;
+    });
+    try {
+      const abortController = new AbortController();
+      const first = client.execute(
+        { operation: "outline", file: "first.ts" },
+        { signal: abortController.signal },
+      );
+      const firstOutcome = first.then(
+        () => "completed",
+        (error: Error) => error.message,
+      );
+      await vi.waitFor(() => expect(requests(workers[0])).toEqual(["first.ts"]));
+      abortController.abort(new Error("stop first"));
+      await vi.waitFor(() => expect(posts(workers[0], "cancel")).toHaveLength(1));
+
+      // The Worker stops cooperatively: it reports the cancellation, waits for the
+      // acknowledgement, then sends its terminal message.
+      const active = request(workers[0], 0);
+      const [payload] = encodeStructuralResult({
+        kind: "runtime-error",
+        message: "Structural request cancelled",
+      });
+      if (!payload) throw new Error("Expected result chunk");
+      workers[0]?.emit({
+        kind: "chunk",
+        version: STRUCTURAL_WORKER_PROTOCOL_VERSION,
+        generation: 1,
+        requestId: active.requestId,
+        sequence: 0,
+        final: true,
+        encodedBytes: payload.byteLength,
+        payload,
+      });
+      await vi.waitFor(() => expect(posts(workers[0], "chunk-ack")).toHaveLength(1));
+      workers[0]?.emit({
+        kind: "terminal",
+        version: STRUCTURAL_WORKER_PROTOCOL_VERSION,
+        generation: 1,
+        requestId: active.requestId,
+        outcome: "cancelled",
+      });
+
+      await expect(firstOutcome).resolves.toBe("stop first");
+      void client.execute({ operation: "outline", file: "second.ts" });
+      await vi.waitFor(() => expect(requests(workers[0])).toEqual(["first.ts", "second.ts"]));
+      expect(workers[0]?.terminate).not.toHaveBeenCalled();
+      expect(workers).toHaveLength(1);
+    } finally {
+      await client.dispose();
+    }
+  });
+
   it("keeps FIFO order and request-owned restart timing across an active hard stop", async () => {
     configureDebugRegistry({ enabled: true, maxEvents: 10 });
     vi.useFakeTimers();
@@ -317,6 +376,10 @@ describe("StructuralWorkerClient", () => {
 
 function ready(generation: number) {
   return { kind: "ready", version: STRUCTURAL_WORKER_PROTOCOL_VERSION, generation };
+}
+
+function posts(worker: FakeWorker | undefined, kind: string): unknown[] {
+  return worker?.posts.filter((post) => (post as { kind?: string }).kind === kind) ?? [];
 }
 
 function requests(worker: FakeWorker | undefined): string[] {
