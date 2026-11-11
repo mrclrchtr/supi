@@ -4,6 +4,7 @@ import type {
   RefactorResult,
   SemanticProvider,
 } from "@mrclrchtr/supi-code-runtime/api";
+import { EXTRACTION_NAME_LIMITATION } from "../config/operation-support.ts";
 import type { WorkspaceLspRuntime } from "../session/runtime-registry.ts";
 import {
   collectCodeActionResults,
@@ -62,7 +63,7 @@ async function planRefactor(
     case "extract_variable":
       return {
         kind: "unavailable",
-        reason: `Refactor operation "${request.operation}" is unavailable: standard LSP code actions do not provide a safe exact extraction-name contract.`,
+        reason: `Refactor operation "${request.operation}" is unavailable. ${EXTRACTION_NAME_LIMITATION}`,
       };
     case "update_imports":
       return runFilteredCodeActionRefactor({

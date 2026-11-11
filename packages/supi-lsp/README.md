@@ -60,7 +60,7 @@ A configured route is not a ready server. Features depend on the active server, 
 | Diagnostics | Native pull, the eligible TypeScript request adapter, or ambient push. Push observation alone cannot confirm that a file is clean. See the diagnostic policy below. |
 | `rename_symbol` | Requires server rename support and validated text edits; uses `prepareRename` when advertised. |
 | `update_imports` / `delete_dead_code` | Requires matching `source.organizeImports` / (`source.removeUnused` or `source.removeUnusedImports`) code actions that produce validated text edits. Imports-only advertisement reports limited support, not arbitrary unused-declaration removal. |
-| `extract_function` / `extract_variable` | Unavailable for all languages: standard LSP code actions do not provide a safe exact extraction-name contract. |
+| `extract_function` / `extract_variable` | Unavailable for all languages: LSP extraction actions choose a generated name, and typescript-language-server applies extraction edits through a command before an interactive rename, so no exact-name preview exists. Use the edit tool. |
 
 The [operation-support model](src/config/operation-support.ts) separates server advertisement from SuPi planning limits. A server can advertise an action that SuPi cannot safely turn into a plan.
 
@@ -332,9 +332,12 @@ unused-declaration support. Edit-only actions are validated before planning. Com
 resource operations, snippets, annotations, malformed actions, and stale responses
 stay unavailable. Distinct matching plans return an ambiguous result instead of
 selecting the first action. Rename uses `prepareRename` when the server advertises
-it and otherwise uses direct standard rename. Standard LSP does not provide
-a safe exact extraction-name contract, so `extract_function` and `extract_variable`
-plans report a SuPi planning limitation instead of selecting a generated name.
+it and otherwise uses direct standard rename. Standard LSP extraction actions
+choose a generated name, and typescript-language-server's `_typescript.applyRefactoring`
+command applies edits before requesting an interactive rename at `renameLocation`.
+No previewable exact-name plan exists, so `extract_function` and `extract_variable`
+plans report a SuPi planning limitation instead of selecting a generated name
+([#467](https://github.com/mrclrchtr/supi/issues/467)).
 
 Rename responses that need additional document state can trigger one bounded discovery/enrollment retry. SuPi validates edit shape and canonical mutation paths, enrolls at most 64 affected files on the same route, and requests fresh edits. The first response is not a plan. Numeric versions must still match. A null version for an open document requires verified synchronized-content evidence; the plan retains the request fingerprint and client version. Missing snapshots, changed inputs, a larger follow-up edit set, and unsafe edits remain unavailable. Planning and apply revalidate these preconditions; no version is discarded to make an edit fit.
 

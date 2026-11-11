@@ -1,5 +1,6 @@
 import type { RefactorResult, SemanticProvider } from "@mrclrchtr/supi-code-runtime/api";
 import { describe, expect, it, vi } from "vitest";
+import { EXTRACTION_NAME_LIMITATION } from "../../src/config/operation-support.ts";
 import { createLspSemanticProvider } from "../../src/provider/lsp-semantic-provider.ts";
 import type { WorkspaceLspRuntime } from "../../src/session/runtime-registry.ts";
 
@@ -442,8 +443,7 @@ describe("LspRefactorProvider", () => {
       expect(codeActionsSpy).not.toHaveBeenCalled();
       expect(result).toEqual({
         kind: "unavailable",
-        reason:
-          'Refactor operation "extract_function" is unavailable: standard LSP code actions do not provide a safe exact extraction-name contract.',
+        reason: `Refactor operation "extract_function" is unavailable. ${EXTRACTION_NAME_LIMITATION}`,
       });
     });
 

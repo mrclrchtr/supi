@@ -24,8 +24,7 @@ The provider maps semantic requests to `WorkspaceLspRuntime`. Read-only semantic
 Public code-intelligence refactors currently use:
 
 - `rename_symbol` → `textDocument/prepareRename` when advertised, then `textDocument/rename`
-- `extract_function` → unavailable: standard LSP has no safe exact extraction-name contract
-- `extract_variable` → unavailable: standard LSP has no safe exact extraction-name contract
+- `extract_function` / `extract_variable` → unavailable: LSP actions pick a generated name; typescript-language-server applies edits via `_typescript.applyRefactoring` then requests interactive rename, so no exact-name preview exists (#467)
 - `update_imports` → `source.organizeImports` code actions
 - `delete_dead_code` → `source.removeUnused` code actions
 

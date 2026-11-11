@@ -166,7 +166,7 @@ Candidate selection for Graph, Resolve, and Orientation uses one structured tran
 
 ### Refactor checks
 
-The planner accepts one target handle or anchor and one operation: `rename_symbol`, `extract_function`, `extract_variable`, `update_imports`, or `delete_dead_code`. Rename, import updates, and dead-code removal depend on the language server and validated edits. Function and variable extraction are currently unavailable for all languages: standard LSP code actions do not provide a safe exact extraction-name contract. Unsupported operations do not fall back to text edits.
+The planner accepts one target handle or anchor and one operation: `rename_symbol`, `extract_function`, `extract_variable`, `update_imports`, or `delete_dead_code`. Rename, import updates, and dead-code removal depend on the language server and validated edits. Function and variable extraction are currently unavailable for all languages: LSP extraction actions choose a generated name, and typescript-language-server applies extraction edits before an interactive rename, so no exact-name preview exists; use the edit tool instead. Unsupported operations do not fall back to text edits.
 
 `delete_dead_code` accepts precise `source.removeUnused` or `source.removeUnusedImports` actions (including dotted descendants), not title-based guesses or `source.fixAll`. Native TypeScript 7 is qualified for unused-import removal only; it does not imply removal of arbitrary unused declarations or TLS/native parity. An imports-only advertisement appears as limited SuPi support with the reason in `code_health`. Different matching edit plans remain ambiguous rather than selecting an action automatically.
 

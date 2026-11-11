@@ -40,8 +40,13 @@ export const REFACTOR_CODE_ACTION_KINDS = {
   readonly string[]
 >;
 
-const EXTRACTION_NAME_LIMITATION =
-  "Standard LSP code actions do not provide a safe exact extraction-name contract.";
+/**
+ * Why extraction stays unavailable. LSP extraction actions pick a generated name;
+ * typescript-language-server applies extraction edits inside a command and then
+ * asks the client for an interactive rename, so no previewable exact-name plan exists.
+ */
+export const EXTRACTION_NAME_LIMITATION =
+  "LSP extraction code actions choose a generated name, and typescript-language-server applies extraction edits through a command before requesting an interactive rename, so SuPi cannot preview an exact requested name. Use the edit tool for extraction.";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
