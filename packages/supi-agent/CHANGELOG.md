@@ -1,6 +1,6 @@
 # Changelog
 
-## [11.3.1]
+## [11.4.0]
 
 - Agent Run retrospectives (opt-in via `debug.agentRunRetrospectivesEnabled`) now also ask about Code Intelligence (`code_*`) results that were incomplete, oversized, ambiguous, or failed, and record a `promptRevision` so older and newer reports can be told apart.
 

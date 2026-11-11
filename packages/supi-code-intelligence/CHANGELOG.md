@@ -1,6 +1,6 @@
 # Changelog
 
-## [11.3.1]
+## [11.4.0]
 
 - `code_orientation` with a directory focus no longer embeds an instruction file (such as `CLAUDE.md`) that the agent already read in full with `read` since the latest compaction. Reads with `offset` or `limit`, truncated reads, and failed reads do not count. In observed sessions, about a quarter of embedded instruction text repeated a file the agent had just read.
 - A symbol query with no workspace-symbol match now explains that only files in projects the language server has loaded are searched, and points to an AST definition search with `code_find`, a `target.file` lookup, or an anchor. Previously it suggested retrying `code_resolve`, the tool that had just failed ([#576](https://github.com/mrclrchtr/supi/issues/576)).

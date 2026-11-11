@@ -1,6 +1,6 @@
 # Changelog
 
-## [11.3.1]
+## [11.4.0]
 
 - Guides agents toward the library documentation tools for library and framework usage questions, while keeping web search available for issues, release notes, and news.
 
