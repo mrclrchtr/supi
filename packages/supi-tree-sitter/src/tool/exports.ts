@@ -91,6 +91,7 @@ const DECLARATION_EXPORT_NODE_TYPES = new Set([
   "type_alias_declaration",
   "enum_declaration",
   "lexical_declaration",
+  "variable_declaration",
   "ambient_declaration",
   "internal_module",
   "module",
@@ -101,7 +102,7 @@ function extractDeclarationExport(
   source: string,
   exports: ExportRecord[],
 ): void {
-  if (decl.type === "lexical_declaration") {
+  if (decl.type === "lexical_declaration" || decl.type === "variable_declaration") {
     extractLexicalDeclarationExports(decl, source, exports);
     return;
   }
@@ -143,7 +144,7 @@ function extractAmbientDeclarationExport(
   const nested = decl.children.find((child) => child.type !== "declare" && child.type !== ";");
   if (!nested) return;
 
-  if (nested.type === "lexical_declaration") {
+  if (nested.type === "lexical_declaration" || nested.type === "variable_declaration") {
     extractLexicalDeclarationExports(nested, source, exports);
     return;
   }
@@ -217,8 +218,9 @@ function extractDefaultExport(node: SyntaxNodeLike, source: string, exports: Exp
   });
 }
 
+/** Return the `from "module"` specifier; a string value such as `export default "x"` is not one. */
 function findStringChild(node: SyntaxNodeLike): SyntaxNodeLike | undefined {
-  return node.children.find((child) => child.type === "string");
+  return node.childForFieldName("source") ?? undefined;
 }
 
 function extractReExport(

@@ -206,6 +206,30 @@ describe("export extraction", () => {
     runtime.dispose();
   });
 
+  it("reports default string exports and var declarations accurately", async () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), "ts-exports-"));
+    writeFileSync(
+      path.join(dir, "a.js"),
+      'export default "foo";\nexport var a = 1, b = 2;\nexport * from "./m";\n',
+    );
+    const runtime = new TreeSitterRuntime(dir);
+    try {
+      const result = await extractExports(runtime, "a.js");
+      expect(result.kind).toBe("success");
+      if (result.kind === "success") {
+        expect(result.data.map((e) => [e.kind, e.name, e.moduleSpecifier])).toEqual([
+          ["default export", '"foo"', undefined],
+          ["variable", "a", undefined],
+          ["variable", "b", undefined],
+          ["re-export", "*", "./m"],
+        ]);
+      }
+    } finally {
+      runtime.dispose();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it("extracts generator, abstract, ambient, namespace, and namespace re-exports", async () => {
     const runtime = new TreeSitterRuntime(FIXTURE_DIR);
     const result = await extractExports(runtime, "export-edge.ts");
