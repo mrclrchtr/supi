@@ -85,6 +85,22 @@ describe("resolveSymbolTarget", () => {
     expect(workspaceSymbols).toHaveBeenCalledWith("Widget", control, ["/project/src"]);
   });
 
+  it("points a complete empty search to structural search, not a code_resolve retry", async () => {
+    const result = await resolveSymbolTarget(
+      "handleHello",
+      "/project",
+      { workspaceSymbols: vi.fn().mockResolvedValue(completedCodeQuery([])) } as never,
+      { path: "supabase" },
+    );
+
+    expect(result.kind).toBe("error");
+    const message = result.kind === "error" ? result.message : "";
+    expect(message).toContain("Symbol not found: `handleHello` in path `supabase`.");
+    expect(message).toContain("projects the language server has loaded");
+    expect(message).toContain('`code_find` with `mode: "ast"`');
+    expect(message).not.toContain("Try `code_resolve` to search");
+  });
+
   it("does not report not-found when route evidence is incomplete", async () => {
     const result = await resolveSymbolTarget("Widget", "/project", {
       workspaceSymbols: vi
