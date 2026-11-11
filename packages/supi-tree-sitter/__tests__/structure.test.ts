@@ -293,6 +293,28 @@ describe("export extraction", () => {
   });
 });
 
+describe("coordinates with a lone carriage return", () => {
+  it("keeps later ranges aligned with Tree-sitter rows", async () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), "ts-cr-"));
+    writeFileSync(
+      path.join(dir, "cr.js"),
+      "const s = `x\ry`;\nfunction longFunctionName(a) { return call(a); }\n",
+    );
+    const runtime = new TreeSitterRuntime(dir);
+    try {
+      const result = await lookupNodeAt(runtime, "cr.js", 2, 10);
+      expect(result.kind).toBe("success");
+      if (result.kind === "success") {
+        expect(result.data.text).toBe("longFunctionName");
+        expect(result.data.range.endCharacter).toBe(26);
+      }
+    } finally {
+      runtime.dispose();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
 describe("node_at lookup", () => {
   it("finds the identifier node at a function name position", async () => {
     const runtime = new TreeSitterRuntime(FIXTURE_DIR);

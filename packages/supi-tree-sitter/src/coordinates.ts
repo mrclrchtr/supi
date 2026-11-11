@@ -100,10 +100,13 @@ export function validatePublicPositionBounds(
   return null;
 }
 
-/** Split source into logical lines without CRLF line-ending bytes. */
+/**
+ * Split source into Tree-sitter rows, dropping the `\r` of CRLF endings.
+ * Tree-sitter rows break only on `\n`, so a lone `\r` is not a line break here.
+ */
 export function splitSourceLines(source: string): string[] {
   if (lastSplit?.source === source) return lastSplit.lines;
-  const lines = source.replace(/\r\n?/g, "\n").split("\n");
+  const lines = source.split(/\r?\n/);
   lastSplit = { source, lines };
   return lines;
 }
