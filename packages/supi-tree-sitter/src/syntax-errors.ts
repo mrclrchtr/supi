@@ -4,7 +4,9 @@ import type { GrammarId, SourceRange } from "./types.ts";
 
 /** Return whether a parsed tree contains an explicit or recovered syntax error. */
 export function hasSyntaxErrors(root: SyntaxNodeLike): boolean {
+  // web-tree-sitter's hasError already covers ERROR and missing descendants.
   if (root.hasError === true) return true;
+  if (root.hasError === false) return false;
   if (root.type === "ERROR" || root.isMissing === true) return true;
   return (root.children ?? []).some(hasSyntaxErrors);
 }

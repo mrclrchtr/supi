@@ -13,11 +13,7 @@ import {
   type StructuralTimingEvent,
   startStructuralTiming,
 } from "../session/structural-timing.ts";
-import {
-  collectSyntaxErrorRanges,
-  hasSyntaxErrors,
-  withSyntaxCompleteness,
-} from "../syntax-errors.ts";
+import { withSyntaxCompleteness } from "../syntax-errors.ts";
 import type { GrammarId, QueryCapture, TreeSitterResult } from "../types.ts";
 import {
   ParsedFileReadError,
@@ -172,8 +168,6 @@ export class TreeSitterRuntime {
           source: string;
           resolvedPath: string;
           grammarId: GrammarId;
-          hasSyntaxErrors: boolean;
-          errorRanges: ReturnType<typeof collectSyntaxErrorRanges>;
         };
       }
     | Exclude<TreeSitterResult<never>, { kind: "success" | "partial" }>
@@ -249,8 +243,6 @@ export class TreeSitterRuntime {
           source: parsed.source,
           resolvedPath: parsed.resolvedPath,
           grammarId: parsed.grammarId,
-          hasSyntaxErrors: hasSyntaxErrors(parsed.tree.rootNode),
-          errorRanges: collectSyntaxErrorRanges(parsed.tree.rootNode, parsed.source),
         },
       };
     } catch (err: unknown) {
