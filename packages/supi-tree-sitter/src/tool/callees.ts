@@ -8,7 +8,7 @@ import type { SyntaxNodeLike } from "../syntax-node.ts";
 import type { GrammarId, SourceRange, TreeSitterResult } from "../types.ts";
 import { isTypeOnlyImportCapture } from "../worker/call-context.ts";
 import { queryParsedFile, type TreeSitterRuntime } from "../worker/runtime.ts";
-import { normalizeCallName } from "./call-name.ts";
+import { dropKotlinTrailingLambdaPrefixes, normalizeCallName } from "./call-name.ts";
 import { createCalleeDisplayName, createSourceLineStarts } from "./callee-display-name.ts";
 import { extractScopeName } from "./scope.ts";
 
@@ -218,7 +218,7 @@ export async function lookupCalleesAt(
     }
 
     const callees = filterCalleeCaptures(
-      queryResult.data,
+      dropKotlinTrailingLambdaPrefixes(queryResult.data, grammarId),
       grammarId,
       enclosingNode,
       scopes,

@@ -4,7 +4,7 @@ import type { CodeRequestControl } from "@mrclrchtr/supi-code-runtime/api";
 import type { CallSiteMatch, GrammarId, TreeSitterResult } from "../types.ts";
 import { isTypeOnlyImportCapture } from "../worker/call-context.ts";
 import { queryParsedFile, type TreeSitterRuntime } from "../worker/runtime.ts";
-import { normalizeCallName } from "./call-name.ts";
+import { dropKotlinTrailingLambdaPrefixes, normalizeCallName } from "./call-name.ts";
 
 // ── Per-grammar call-site queries ─────────────────────────────────────
 
@@ -84,7 +84,7 @@ export async function extractCallSites(
     const seen = new Set<string>();
     const matches: CallSiteMatch[] = [];
 
-    for (const capture of queryResult.data) {
+    for (const capture of dropKotlinTrailingLambdaPrefixes(queryResult.data, grammarId)) {
       if (isTypeOnlyImportCapture(tree.rootNode, capture, grammarId)) continue;
       // Normalize: trim whitespace and collapse internal whitespace to single space
       const name = normalizeCallName(capture.text, grammarId, capture.nodeType);

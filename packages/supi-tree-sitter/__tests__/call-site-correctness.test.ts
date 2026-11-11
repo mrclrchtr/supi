@@ -198,6 +198,24 @@ describe("full-source-shape call sites", () => {
     }
   });
 
+  it("reports a Kotlin call with a trailing lambda once", async () => {
+    writeFileSync(
+      join(cwd, "lambda.kt"),
+      ["fun main() {", "  bar(1) { it }", "  a.b(c).d { x }", "}"].join("\n"),
+    );
+    const session = createTreeSitterSession(cwd);
+
+    try {
+      const result = await session.callSites("lambda.kt");
+
+      expect(result).toMatchObject({ kind: "success" });
+      if (result.kind !== "success") return;
+      expect(result.data.map(({ name }) => name)).toEqual(["bar", "a.b(c).d", "a.b"]);
+    } finally {
+      await session.dispose();
+    }
+  });
+
   it("extracts Ruby receiver and method callees", async () => {
     writeFileSync(join(cwd, "sample.rb"), ["obj.method(1)", "plain(2)"].join("\n"));
     const session = createTreeSitterSession(cwd);

@@ -17,6 +17,31 @@ export function normalizeCallName(text: string, grammarId: GrammarId, nodeType: 
   }
 }
 
+/**
+ * Kotlin nests `f(x) { }` as an outer call wrapping an inner `f(x)`. Drop a capture when a
+ * longer capture starts at the same position and only adds a trailing lambda.
+ */
+export function dropKotlinTrailingLambdaPrefixes<
+  T extends {
+    text: string;
+    range: { startLine: number; startCharacter: number; endLine: number; endCharacter: number };
+  },
+>(captures: readonly T[], grammarId: GrammarId): T[] {
+  if (grammarId !== "kotlin") return [...captures];
+  return captures.filter(
+    (inner) =>
+      !captures.some(
+        (outer) =>
+          outer !== inner &&
+          outer.range.startLine === inner.range.startLine &&
+          outer.range.startCharacter === inner.range.startCharacter &&
+          outer.text.length > inner.text.length &&
+          outer.text.startsWith(inner.text) &&
+          outer.text.slice(inner.text.length).trimStart().startsWith("{"),
+      ),
+  );
+}
+
 function stripKotlinCallSuffix(text: string): string {
   const lambda = topLevelIndex(text, "{");
   const withoutLambda = lambda >= 0 ? text.slice(0, lambda).trim() : text;
