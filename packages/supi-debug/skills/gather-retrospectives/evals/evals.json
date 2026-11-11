@@ -13,7 +13,8 @@
         "Excludes the other project and quoted event copies from evidence counts, and never outputs rawData.",
         "Provides original session locations and labels suggested changes as untested.",
         "Avoids duplicate evidence reads and routine --help calls for the standard invocation.",
-        "Keeps the report within 250 words while retaining findings, coverage, and source references."
+        "Keeps the report within 250 words while retaining findings, coverage, and source references.",
+        "Applies the stated scope without asking scope questions and passes --no-record so no last-gather marker is written outside the output directory."
       ]
     },
     {
@@ -28,7 +29,8 @@
         "Explains optional capture or successful-task selection as an evidence limit.",
         "Provides an evidence artifact or precise source locations.",
         "Finishes after collection without rereading empty evidence or requesting routine --help.",
-        "Keeps the empty-result report within 120 words while preserving coverage and selection limits."
+        "Keeps the empty-result report within 120 words while preserving coverage and selection limits.",
+        "Applies the stated scope without asking scope questions and passes --no-record so no last-gather marker is written outside the output directory."
       ]
     },
     {
@@ -43,7 +45,20 @@
         "Uses supported collector commands rather than handwritten JSON extraction to retrieve undisplayed assessments.",
         "Distinguishes complete scan coverage from display completion and finishes reading before making exhaustive claims.",
         "Provides original source locations, labels proposals as untested, and preserves all session inputs.",
-        "Keeps the user-facing summary within 200 words and links one complete evidence snapshot."
+        "Keeps the user-facing summary within 200 words and links one complete evidence snapshot.",
+        "Applies the stated scope without asking scope questions and passes --no-record so no last-gather marker is written outside the output directory."
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "Gather retrospective feedback about supi-agent from the supplied session directory.",
+      "expected_output": "Before running the collector, asks one combined scope question covering workspace, time range, and source, with recommended defaults (current workspace, since last gather or all dates, both producers). Ends the turn without collecting and states what it will do with the defaults, including whether the last-gather marker is updated. Runs non-interactively; the run ends at the question.",
+      "files": ["evals/files/sessions"],
+      "expectations": [
+        "Asks one combined question covering workspace, time range, and source before any collector run.",
+        "Offers recommended defaults, offers since-last-gather when a marker exists or says that none exists, and does not treat the supi-agent topic as a --source filter.",
+        "Does not widen scope to other workspaces without explicit approval.",
+        "Ends the turn after the question without running the collector, and states what it will do with the recommended defaults, including whether this gather updates the last-gather marker."
       ]
     }
   ]

@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
 import { createReadStream } from "node:fs";
-import { readdir, readFile, realpath, writeFile } from "node:fs/promises";
-import { homedir } from "node:os";
-import { isAbsolute, join, relative, resolve, sep } from "node:path";
+import { readdir, writeFile } from "node:fs/promises";
+import { isAbsolute, join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
+import { recordable, recordGather, sinceOptions } from "./gather-state.mjs";
+import { agentDirectory, canonicalPath, localPath, sessionDirectory } from "./paths.mjs";
 import {
   admitByCommit,
   provenanceOf,
@@ -22,6 +23,9 @@ Usage: node collect.mjs --output <new-file.json> [collection options]
   --sessions-dir <path>  Override PI storage discovery
   --source <name>        supi-agent or supi-review (default: both, not a topic filter)
   --since <date|Nd>      Inclusive ISO date/time or number of days ago
+  --since-last           Start at the previous gather for the same storage,
+                         workspace, and source (all dates when none is recorded)
+  --no-record            Do not update the last-gather marker
   --since-commit <rev>   Only reports from sessions whose recorded SuPi commit is
                          at least as new as <rev> (resolved with git in cwd);
                          reports without runtime provenance are excluded and counted
@@ -40,44 +44,6 @@ with explicit textRange offsets. coverage.complete describes the scan, not displ
 Storage precedence: flag, PI_CODING_AGENT_SESSION_DIR, project/global sessionDir,
 then <PI_CODING_AGENT_DIR or ~/.pi/agent>/sessions. Relative paths use cwd.
 `;
-
-function localPath(path) {
-  return resolve(
-    path === "~" ? homedir() : path.startsWith("~/") ? join(homedir(), path.slice(2)) : path,
-  );
-}
-
-async function canonicalPath(path) {
-  const absolute = localPath(path);
-  try {
-    return await realpath(absolute);
-  } catch (error) {
-    if (error.code === "ENOENT") return absolute;
-    throw error;
-  }
-}
-
-async function settings(path) {
-  try {
-    return JSON.parse(await readFile(path, "utf8"));
-  } catch (error) {
-    if (error.code === "ENOENT") return {};
-    throw new Error(`Cannot read settings: ${path}`, { cause: error });
-  }
-}
-
-async function sessionDirectory(explicit) {
-  if (explicit) return localPath(explicit);
-  if (process.env.PI_CODING_AGENT_SESSION_DIR)
-    return localPath(process.env.PI_CODING_AGENT_SESSION_DIR);
-  const agentDir = localPath(process.env.PI_CODING_AGENT_DIR || join(homedir(), ".pi/agent"));
-  const project = await settings(join(process.cwd(), ".pi/settings.json"));
-  if (typeof project.sessionDir === "string") return localPath(project.sessionDir);
-  const global = await settings(join(agentDir, "settings.json"));
-  return typeof global.sessionDir === "string"
-    ? localPath(global.sessionDir)
-    : join(agentDir, "sessions");
-}
 
 function integer(value, name, min, max) {
   const parsed = Number(value);
@@ -110,6 +76,8 @@ function readOptions(values, display) {
     "sessions-dir",
     "source",
     "since",
+    "since-last",
+    "no-record",
     "since-commit",
     "max-sessions",
     "output",
@@ -121,6 +89,21 @@ function readOptions(values, display) {
   return { read: localPath(values.read), display };
 }
 
+function validateCollection(values) {
+  if (values.refs !== undefined || values["text-offset"] !== undefined)
+    throw new Error("--refs and --text-offset require --read.");
+  if (!values.output) throw new Error("--output must name a new JSON evidence file.");
+  if (values.workspace && values["all-workspaces"])
+    throw new Error("Choose --workspace or --all-workspaces, not both.");
+  if (values.since && values["since-last"])
+    throw new Error("Choose --since or --since-last, not both.");
+  if (values.source && !["supi-agent", "supi-review"].includes(values.source)) {
+    throw new Error(
+      "--source must be supi-agent or supi-review; topic relevance is assessed separately.",
+    );
+  }
+}
+
 async function options() {
   const { values } = parseArgs({
     options: {
@@ -129,6 +112,8 @@ async function options() {
       "sessions-dir": { type: "string" },
       source: { type: "string" },
       since: { type: "string" },
+      "since-last": { type: "boolean" },
+      "no-record": { type: "boolean" },
       "since-commit": { type: "string" },
       limit: { type: "string", default: "20" },
       offset: { type: "string", default: "0" },
@@ -148,23 +133,20 @@ async function options() {
     refs: values.refs?.split(",") ?? null,
   };
   if (values.read) return readOptions(values, display);
-  if (values.refs !== undefined || values["text-offset"] !== undefined)
-    throw new Error("--refs and --text-offset require --read.");
-  if (!values.output) throw new Error("--output must name a new JSON evidence file.");
-  if (values.workspace && values["all-workspaces"])
-    throw new Error("Choose --workspace or --all-workspaces, not both.");
-  if (values.source && !["supi-agent", "supi-review"].includes(values.source)) {
-    throw new Error(
-      "--source must be supi-agent or supi-review; topic relevance is assessed separately.",
-    );
-  }
-  return {
+  validateCollection(values);
+  const scope = {
     workspace: values["all-workspaces"]
       ? null
       : await canonicalPath(values.workspace || process.cwd()),
     sessionsDir: await sessionDirectory(values["sessions-dir"]),
     source: values.source ?? null,
-    since: sinceTimestamp(values.since),
+  };
+  return {
+    ...scope,
+    ...(await sinceOptions(agentDirectory(), scope, values["since-last"] === true, () =>
+      sinceTimestamp(values.since),
+    )),
+    noRecord: values["no-record"] === true,
     sinceCommit: resolveCommit(values["since-commit"]),
     maxSessions: integer(values["max-sessions"] ?? "5000", "--max-sessions", 1, 100000),
     output: localPath(values.output),
@@ -377,7 +359,7 @@ async function collect(config) {
   const sorted = [...reports.values()].sort(
     (a, b) => b.timestamp - a.timestamp || a.ref.localeCompare(b.ref),
   );
-  const { display: _display, output: _output, ...filters } = config;
+  const { display: _display, output: _output, stateFile: _stateFile, ...filters } = config;
   return {
     version: 1,
     filters,
@@ -405,14 +387,19 @@ try {
   const config = await options();
   if (!config) process.stdout.write(help);
   else {
+    const startedAt = Date.now();
     const evidence = config.read ? await readEvidence(config.read) : await collect(config);
     const evidenceFile = config.read ?? config.output;
     if (!config.read) {
       evidence.summary = summarize(evidence.records);
+      evidence.filters.recordedGather = recordable(config, evidence.coverage)
+        ? new Date(startedAt).toISOString()
+        : null;
       await writeFile(evidenceFile, `${JSON.stringify(evidence, null, 2)}\n`, {
         flag: "wx",
         mode: 0o600,
       });
+      if (evidence.filters.recordedGather) await recordGather(config.stateFile, config, startedAt);
     }
     process.stdout.write(
       `${JSON.stringify(displayPage(evidence, evidenceFile, config.display, fileURLToPath(import.meta.url)))}\n`,

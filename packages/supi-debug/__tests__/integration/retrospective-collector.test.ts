@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promis
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { promisify } from "node:util";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const execute = promisify(execFile);
 const script = new URL("../../skills/gather-retrospectives/scripts/collect.mjs", import.meta.url);
@@ -18,9 +18,12 @@ beforeEach(async () => {
   workspace = join(root, "project");
   output = join(root, "evidence.json");
   await Promise.all([mkdir(sessions), mkdir(workspace)]);
+  // Keep last-gather markers out of the real agent directory.
+  vi.stubEnv("PI_CODING_AGENT_DIR", join(root, "agent"));
 });
 
 afterEach(async () => {
+  vi.unstubAllEnvs();
   await rm(root, { recursive: true, force: true });
 });
 
@@ -287,6 +290,40 @@ describe("retrospective collector CLI", () => {
     ]);
     expect(JSON.parse(result.stdout).coverage.uniqueReports).toBe(1);
     expect(JSON.parse(await readFile(output, "utf8")).records[0].runKey).toBe("new");
+  });
+
+  it("--since-last collects only reports after the previous gather of the same scope", async () => {
+    const now = Date.now();
+    await session("a.jsonl", workspace, [retrospective("old", "Old.", "supi-agent", now - 60_000)]);
+    const first = await collect(["--since-last"]);
+    expect(first.preview.scope).toMatchObject({ since: null, previousGather: null });
+    expect(first.evidence.records).toHaveLength(1);
+    const marker = first.preview.scope.recordedGather;
+    expect(marker).toEqual(expect.any(String));
+
+    // Another scope keeps its own marker; a commit or gap-leaving filter does not advance it.
+    await rm(output);
+    expect((await collect(["--source", "supi-review"])).preview.scope.previousGather).toBeNull();
+
+    await session("b.jsonl", workspace, [retrospective("new", "New.", "supi-agent", now + 60_000)]);
+    await rm(output);
+    const second = await collect(["--since-last"]);
+    expect(second.preview.scope).toMatchObject({ since: marker, previousGather: marker });
+    expect(second.evidence.records.map((record: { runKey: string }) => record.runKey)).toEqual([
+      "new",
+    ]);
+
+    await rm(output);
+    const unrecorded = await collect(["--since-last", "--no-record"]);
+    expect(unrecorded.preview.scope).toMatchObject({
+      previousGather: second.preview.scope.recordedGather,
+      recordedGather: null,
+    });
+
+    await rm(output);
+    const gap = await collect(["--since", new Date(now + 3_600_000).toISOString()]);
+    expect(gap.preview.scope.recordedGather).toBeNull();
+    await expect(collect(["--since", "30d", "--since-last"])).rejects.toMatchObject({ code: 1 });
   });
 
   it("carries numeric prompt revisions and omits invalid ones", async () => {

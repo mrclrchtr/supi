@@ -74,6 +74,18 @@ function selectRecords(allRecords, options) {
   return records;
 }
 
+function displayScope(filters) {
+  return {
+    workspace: filters.workspace,
+    source: filters.source,
+    since: filters.since === null ? null : new Date(filters.since).toISOString(),
+    ...(filters.sinceCommit ? { sinceCommit: filters.sinceCommit } : {}),
+    ...(filters.sinceLast ? { sinceLast: true } : {}),
+    previousGather: filters.previousGather ?? null,
+    recordedGather: filters.recordedGather ?? null,
+  };
+}
+
 function createRenderer(evidence, records, { evidenceFile, options, scriptFile }) {
   const { filters, coverage, records: allRecords } = evidence;
   const { failures: _failures, ...counts } = coverage;
@@ -87,12 +99,7 @@ function createRenderer(evidence, records, { evidenceFile, options, scriptFile }
     return {
       evidenceFile,
       sessionsDir: filters.sessionsDir,
-      scope: {
-        workspace: filters.workspace,
-        source: filters.source,
-        since: filters.since === null ? null : new Date(filters.since).toISOString(),
-        ...(filters.sinceCommit ? { sinceCommit: filters.sinceCommit } : {}),
-      },
+      scope: displayScope(filters),
       coverage: counts,
       summary,
       display: {
