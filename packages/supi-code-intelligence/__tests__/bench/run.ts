@@ -416,7 +416,8 @@ function namedPaths(
       if (name.startsWith("..")) return false;
       const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       // Manifest values keep their written `./` prefix; it names the same file.
-      return new RegExp(`(^|[^\\w./-])(\\./)?${escaped}($|[^\\w./-])`, "m").test(output);
+      // Listings mark directories with a trailing `/`; it names the same directory.
+      return new RegExp(`(^|[^\\w./-])(\\./)?${escaped}/?($|[^\\w./-])`, "m").test(output);
     });
   });
 }

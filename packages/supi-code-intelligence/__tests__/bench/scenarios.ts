@@ -223,6 +223,40 @@ const PACKAGE_ENTRY_PATHS = [
   "src/tool/register.ts",
   "src/session/session.ts",
 ].map((path) => `${CI}/${path}`);
+/**
+ * Root manifest and workspace package directories at `CORPUS_COMMIT`. The
+ * corpus holds no README or workspace file, so these are the entry facts.
+ */
+const WORKSPACE_PATHS = [
+  "package.json",
+  ...[
+    "agent-runtime",
+    "agent",
+    "ask-user",
+    "bash-timeout",
+    "cache",
+    "claude-md",
+    "code-intelligence",
+    "code-runtime",
+    "consulting",
+    "context",
+    "core",
+    "debug",
+    "extras",
+    "insights",
+    "installer",
+    "lsp",
+    "prompt-improver",
+    "prompt-suggestions",
+    "review",
+    "settings",
+    "skill-patches",
+    "skills",
+    "test-utils",
+    "tree-sitter",
+    "web",
+  ].map((name) => `packages/supi-${name}`),
+];
 /** Workflow modules of the session layer, one per public tool family. */
 const SESSION_WORKFLOW_PATHS = [
   "session.ts",
@@ -386,6 +420,16 @@ export const scenarios: readonly BenchScenario[] = [
     native: [ls(CI), ls(`${CI}/src`), read(`${CI}/package.json`)],
     code: [{ tool: "code_orientation", args: { focus: { path: CI } } }],
     truthPaths: PACKAGE_ENTRY_PATHS,
+  },
+  {
+    // Measures the explicit call, as counted in `USAGE_WEIGHTS`; the
+    // first-turn Workspace Overview is part of the session context instead.
+    id: "orient-workspace",
+    category: "orientation-workspace",
+    question: "What does this workspace contain and where are its packages?",
+    native: [ls("."), ls("packages")],
+    code: [{ tool: "code_orientation", args: {} }],
+    truthPaths: WORKSPACE_PATHS,
   },
   {
     id: "orient-directory",

@@ -197,6 +197,26 @@
         "tokensPerHit": 86
       }
     },
+    "orient-workspace": {
+      "native": {
+        "calls": 2,
+        "tokens": 124,
+        "recall": 1,
+        "tokensPerHit": 5
+      },
+      "code": {
+        "calls": 1,
+        "tokens": 881,
+        "recall": 0.346,
+        "tokensPerHit": 98,
+        "complete": {
+          "calls": 2,
+          "tokens": 2564,
+          "recall": 1,
+          "tokensPerHit": 99
+        }
+      }
+    },
     "orient-directory": {
       "native": {
         "calls": 1,
