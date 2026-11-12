@@ -1,6 +1,7 @@
 // Unit tests for LSP pull diagnostic capability detection — static provider
 // from the initialize result, and dynamic registration state per client.
 
+import { createCFamilyFileAssociationResolver } from "@mrclrchtr/supi-code-runtime/api";
 import { describe, expect, it, vi } from "vitest";
 import { LspClient } from "../../src/client/client.ts";
 import {
@@ -123,6 +124,16 @@ describe("LSP document selector matching", () => {
     expect(isDocumentSelectorApplicable([{ pattern: "*.ts" }], uri)).toBe(true);
     expect(isDocumentSelectorApplicable([{ pattern: "src/*.ts" }], uri)).toBe(false);
     expect(isDocumentSelectorApplicable([{ pattern: "**/*.js" }], uri)).toBe(false);
+  });
+
+  it("matches selector languages against the associated C-family document ID", () => {
+    const associations = createCFamilyFileAssociationResolver("/project", [
+      { pattern: "**/*.h", language: "cpp" },
+    ]);
+    const header = "file:///project/include/api.h";
+
+    expect(isDocumentSelectorApplicable([{ language: "cpp" }], header, associations)).toBe(true);
+    expect(isDocumentSelectorApplicable([{ language: "c" }], header, associations)).toBe(false);
   });
 
   it("fails closed for malformed selector shapes and glob syntax", () => {

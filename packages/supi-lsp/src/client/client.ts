@@ -548,6 +548,8 @@ export class LspClient {
   private readonly diagnostics: ClientDiagnostics;
   /** Dynamic capability registrations for this client instance only. */
   private readonly dynamicRegistrations = new ClientDynamicRegistrations();
+  /** Workspace association snapshot shared by `didOpen` and selector matching. */
+  private readonly fileAssociations: CFamilyFileAssociationResolver | undefined;
 
   // ── Readiness (work-done-progress) ──────────────────────────────────
   private trackedTokens = new Map<ProgressToken, "created" | "active" | "ended">();
@@ -576,6 +578,7 @@ export class LspClient {
   ) {
     this.name = name;
     this.root = root;
+    this.fileAssociations = fileAssociations;
     this.settingsSnapshot = cloneSettings(config.settings);
     const nativeDiagnosticAdapter: DiagnosticRequestAdapter = {
       supports: (uri) => this.hasApplicableDiagnosticProvider(uri),
@@ -1053,12 +1056,18 @@ export class LspClient {
     if (
       staticRecord !== undefined &&
       isValidDiagnosticOptions(staticRecord) &&
-      isDocumentSelectorApplicable(staticRecord.documentSelector, uri)
+      isDocumentSelectorApplicable(staticRecord.documentSelector, uri, this.fileAssociations)
     ) {
       return staticRecord;
     }
     for (const registration of this.dynamicRegistrations.get(DOCUMENT_DIAGNOSTIC_METHOD)) {
-      if (isDocumentSelectorApplicable(registration.options.documentSelector, uri)) {
+      if (
+        isDocumentSelectorApplicable(
+          registration.options.documentSelector,
+          uri,
+          this.fileAssociations,
+        )
+      ) {
         return registration.options;
       }
     }

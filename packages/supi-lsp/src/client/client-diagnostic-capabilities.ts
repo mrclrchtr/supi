@@ -7,6 +7,7 @@
 // dynamic set for `textDocument/diagnostic` is non-empty.
 
 import { posix as posixPath } from "node:path";
+import type { CFamilyFileAssociationResolver } from "@mrclrchtr/supi-code-runtime/api";
 import { uriToFile } from "@mrclrchtr/supi-core/path";
 import { detectLanguageId } from "../utils.ts";
 
@@ -51,12 +52,21 @@ export function isValidDocumentSelector(value: unknown): boolean {
   );
 }
 
-/** Match one valid document selector against a file URI. */
-export function isDocumentSelectorApplicable(selector: unknown, uri: string): boolean {
+/**
+ * Match one valid document selector against a file URI.
+ *
+ * Pass the client's file associations so the language matches the ID sent in
+ * `didOpen` (for example, a `.h` file associated with `cpp`).
+ */
+export function isDocumentSelectorApplicable(
+  selector: unknown,
+  uri: string,
+  associations?: CFamilyFileAssociationResolver,
+): boolean {
   if (selector === undefined || selector === null) return true;
   if (!isValidDocumentSelector(selector)) return false;
   if (!Array.isArray(selector) || selector.length === 0) return false;
-  const language = detectLanguageId(uriToFile(uri));
+  const language = detectLanguageId(uriToFile(uri), associations);
   const scheme = readUriScheme(uri);
   const filePath = uriToFile(uri).replaceAll("\\", "/");
   return selector.some((entry) => {

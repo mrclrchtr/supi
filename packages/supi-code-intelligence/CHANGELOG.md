@@ -3,6 +3,7 @@
 ## [11.5.0]
 
 - An explicit `code_health` refresh that runs while a crashed language server is being replaced no longer makes the replacement fail. Previously, the request waiting on that replacement got no server and the recovery was recorded as cancelled, even though the new server was running.
+- C and C++ headers mapped to another language by `code-intelligence.fileAssociations` (for example `**/*.h` as `cpp`) now use the language server's own diagnostics when the server registers them for that language. Previously, these headers were matched against the default C language, so the server's diagnostics for C++ never applied to them, and C-only diagnostics could be requested for files opened as C++.
 
 ## [11.4.0]
 
