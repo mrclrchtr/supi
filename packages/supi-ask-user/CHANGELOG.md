@@ -1,7 +1,8 @@
 # Changelog
 
-## [11.5.0]
+## [12.0.0]
 
+- **Breaking:** `ask_user` rejects unknown fields on the form, its questions, and their options instead of ignoring them.
 - `ask_user` now declares read-only tool annotations, so permission extensions that read `pi.getAllTools()` do not ask for confirmation before showing a form ([#582](https://github.com/mrclrchtr/supi/issues/582)).
 
 ## [11.4.0]

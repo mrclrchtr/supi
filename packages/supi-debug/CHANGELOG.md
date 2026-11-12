@@ -1,7 +1,9 @@
 # Changelog
 
-## [11.5.0]
+## [12.0.0]
 
+- **Breaking:** `debug` rejects unknown parameters instead of ignoring them, and `limit` must be at least 1.
+- The `level` and `operationId` schemas no longer send a stray `~optional` keyword to the provider.
 - Codemode now lists the `debug` tool under a `debug` namespace heading, so scripts can find them with `describeNamespace("debug")` or `searchTools(query, { namespace: "debug" })`. It is annotated read-only ([#582](https://github.com/mrclrchtr/supi/issues/582)).
 
 ## [11.4.0]

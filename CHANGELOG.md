@@ -1,5 +1,51 @@
 # Changelog
 
+## [12.0.0](https://github.com/mrclrchtr/supi/compare/v11.4.0...v12.0.0) (2026-11-13)
+
+SuPi 12.0.0 reworks `code_refactor_plan` around per-operation scopes and command-captured code actions, aligns tool input names and shapes across packages, groups codemode tools into namespaces with audited permission annotations, and makes structural analysis faster and more accurate.
+
+### ⚠ BREAKING CHANGES
+
+* **code-intelligence:** `code_refactor_plan` takes only `operation`, and each operation carries its own scope: `rename_symbol: { target, newName }`, `code_action: { file, range, kind, title? }`, and `source_action: { file, kind, title? }`. `extract_function`, `extract_variable`, `update_imports`, and `delete_dead_code` are removed. Migration: move `target` into `rename_symbol`; replace `update_imports` with `source_action` kind `source.organizeImports`, `delete_dead_code` with `source.removeUnused` or `source.removeUnusedImports`, and extraction with `code_action` kind `refactor.extract` ([#583](https://github.com/mrclrchtr/supi/issues/583))
+* **code-intelligence:** `code_find` takes one `search` selector instead of flat `query`, `mode`, and `kind`, and `scope` is renamed to `scopes`. Migration: `{ query, mode: "ast", kind, scope }` becomes `{ search: { ast: { kind, query } }, scopes }`; a semantic search is `{ search: { semantic: { query } } }`
+* **code-intelligence:** `code_inspect` takes and returns `anchor` instead of `point`
+* **web:** Web tool parameters are camelCase: `outputMode`, `fetchMode`, `absLinks`, and `timeoutMs` on `web_fetch_md`, `libraryName` on `web_docs_search`, and `libraryId` on `web_docs_fetch`
+* **debug, cache, ask-user:** `debug`, `cache_forensics`, and `ask_user` reject unknown parameters instead of ignoring them; `debug.limit` and `cache_forensics.maxSessions` must be at least 1
+
+### Code Intelligence & LSP
+
+* `code_action` and `source_action` select server code actions by kind prefix and optional exact title, without a symbol anchor. Extraction now works where the server returns exact edits (gopls, rust-analyzer, jdtls); ambiguous matches list each candidate's kind and title ([#583](https://github.com/mrclrchtr/supi/issues/583))
+* `code_refactor_plan` previews command-only code actions, such as kotlin-lsp extract variable and organize imports, and clangd tweaks. SuPi runs the selected command, captures and refuses the pushed edit so no file changes, and shows the edit's source in the plan ([#584](https://github.com/mrclrchtr/supi/issues/584))
+* Ranges outside the file and files outside the workspace or the routed server's project root are rejected before the server is asked; cursor ranges are accepted
+* Refactor previews merge fragmented same-line edits into one before/after entry, and concurrent-edit failures say "Retry after concurrent edits finish."
+* `code_health` lists the `refactor*`/`source*` kinds each server advertises and states shared operation limits once instead of per operation
+* `code_inspect` shortens large syntax-node text to a 12-line preview with a line-range pointer, instead of printing the whole file for an anchor on a blank line
+* Kotlin locals and parameters can be targeted by anchor when kotlin-lsp lists no document symbol for them
+* An explicit `code_health` refresh during crash recovery no longer cancels the replacement server
+* C/C++ headers remapped through `code-intelligence.fileAssociations` now get the server's diagnostics for the mapped language
+
+### Structural Analysis
+
+* AST requests on large files are much faster: an 8,000-line TypeScript file's call-site extraction dropped from about 10 s to 0.3 s; parses also skip unused syntax-error walks
+* Cancelling a structural request no longer restarts the Worker and discards cached parse trees
+* JavaScript/TypeScript exports are more accurate: `export default "foo"`, every name in `export var a, b`, and `export import X = Y.Z` aliases
+* Java, Kotlin, and Ruby call ranges cover only the callee, and Kotlin trailing-lambda calls are reported once
+* Positions after a lone carriage return are correct again
+
+### Tools & Codemode
+
+* Codemode groups tools under `code`, `web`, `review`, `debug`, `context`, and `cache` namespaces, usable with `describeNamespace()` and `searchTools(query, { namespace })` ([#582](https://github.com/mrclrchtr/supi/issues/582))
+* The `debug` and `code_inspect` schemas no longer send a stray `~optional` keyword to the provider
+* Every SuPi tool, including Review child tools, declares audited `readOnlyHint`, `destructiveHint`, `idempotentHint`, and `openWorldHint` annotations for permission extensions ([#582](https://github.com/mrclrchtr/supi/issues/582))
+
+### Agents
+
+* `agent_result` shows live per-task status and activity while it waits
+
+### Dependencies
+
+* Update pnpm to v12.18.0
+
 ## [11.4.0](https://github.com/mrclrchtr/supi/compare/v11.3.0...v11.4.0) (2026-11-11)
 
 SuPi 11.4.0 makes Code Intelligence results more complete and honest about their gaps, adds runtime provenance to Debug and retrospectives, and upgrades Pi to 1.5.1.

@@ -1,7 +1,9 @@
 # Changelog
 
-## [11.5.0]
+## [12.0.0]
 
+- While `agent_result` waits, its row now shows each task's live status and activity instead of a static "Waiting for Agent Run results…" line.
+- Child sessions use the bundled Code Intelligence 12.0.0: `code_refactor_plan` takes per-operation scopes (`rename_symbol`, `code_action`, `source_action`), `code_find` takes a `search` selector with `scopes`, `code_inspect` takes `anchor`, and structural analysis is faster and more accurate on large files ([#583](https://github.com/mrclrchtr/supi/issues/583)).
 - The `agent_*` tools now declare audited `readOnlyHint`, `destructiveHint`, `idempotentHint`, and `openWorldHint` annotations for permission extensions. `agent_run` is marked destructive and open-world because child sessions may get shell, edit, and Web tools ([#582](https://github.com/mrclrchtr/supi/issues/582)).
 
 ## [11.4.0]
