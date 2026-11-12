@@ -1256,20 +1256,26 @@ export class LspClient {
    */
   async captureCommandEdits(
     command: Command,
-    options: { timeoutMs: number; control?: CodeRequestControl },
+    options: {
+      timeoutMs: number;
+      graceMs?: number;
+      drainMs?: number;
+      control?: CodeRequestControl;
+    },
   ): Promise<CommandEditCaptureResult> {
+    const rpc = this.rpc;
+    if (!rpc || this._status !== "running") {
+      return {
+        kind: "unavailable",
+        reason: "The server command is unavailable because the client is not running.",
+      };
+    }
     return runCommandEditCapture({
       command,
       ...options,
       window: this.editCapture,
-      sendRequest: (method, params, requestOptions) => {
-        if (!this.rpc || this._status !== "running") {
-          throw new Error(
-            `LSP request ${method} is unavailable because the client is not running.`,
-          );
-        }
-        return this.rpc.sendRequest(method, params, requestOptions);
-      },
+      sendRequestOwned: (method, params, requestOptions) =>
+        rpc.sendRequestOwned(method, params, requestOptions),
       resynchronize: (file) => this.diagnostics.resynchronizeOpenDocument(file),
     });
   }

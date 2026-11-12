@@ -15,10 +15,17 @@ import type {
 } from "@mrclrchtr/supi-code-runtime/api";
 import { isCodeActionKindWithin } from "../config/operation-support.ts";
 import type { CodeAction, Command } from "../config/types.ts";
-import type { WorkspaceLspRuntime } from "../session/runtime-registry.ts";
+import type { WorkspaceLspRuntime } from "../session/workspace-lsp-runtime.ts";
 import { normalizeSemanticEdit } from "./semantic-edit-normalizer.ts";
 
 const CAPTURE_ELIGIBLE_KINDS = ["refactor", "source.organizeImports", "source.fixAll"] as const;
+
+/**
+ * Stable reason for command-only actions SuPi will not run: an ineligible kind
+ * or a command the server does not list.
+ */
+export const COMMAND_ONLY_ACTION_REASON =
+  "Matching code actions only run a server command that SuPi does not run for preview.";
 
 /** A code action whose only effect is a server command. */
 export type CommandOnlyAction = CodeAction & { command: Command; kind: string };
@@ -74,7 +81,7 @@ export async function captureCommandAction(options: {
   control?: CodeRequestControl;
 }): Promise<RefactorResult> {
   const { lsp, file, action, control } = options;
-  const response = await lsp.captureCommandEdits(file, action.command, control);
+  const response = await lsp.captureCodeActionEdit(file, action, control);
   if (!response) {
     return { kind: "unavailable", reason: "No routed LSP client could run the command." };
   }

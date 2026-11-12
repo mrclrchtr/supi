@@ -71,6 +71,10 @@ describe("LspClient command edit capture", () => {
     const versionBefore = client.getOpenDocumentVersion(file);
 
     const result = await client.captureCommandEdits(command("capture.single"), { timeoutMs: 2000 });
+    await waitFor(
+      async () => replies(),
+      (current) => current.length === 1,
+    );
 
     expect(result).toMatchObject({
       kind: "captured",
@@ -107,13 +111,16 @@ describe("LspClient command edit capture", () => {
       kind: "unavailable",
       reason: "The server command produced 2 edits; only one can be previewed.",
     });
-    expect(replies()).toHaveLength(2);
+    await waitFor(
+      async () => replies(),
+      (current) => current.length === 2,
+    );
     expect(replies().every((reply) => reply.applied === false)).toBe(true);
   });
 
   it("times out a command that never answers and closes the window", async () => {
     await expect(
-      client.captureCommandEdits(command("capture.hang"), { timeoutMs: 100 }),
+      client.captureCommandEdits(command("capture.hang"), { timeoutMs: 100, drainMs: 0 }),
     ).resolves.toEqual({
       kind: "unavailable",
       reason: "The server command did not finish within 100 ms.",
@@ -127,6 +134,7 @@ describe("LspClient command edit capture", () => {
     const abort = new AbortController();
     const pending = client.captureCommandEdits(command("capture.hang"), {
       timeoutMs: 5000,
+      drainMs: 0,
       control: { signal: abort.signal },
     });
     abort.abort();
@@ -150,8 +158,71 @@ describe("LspClient command edit capture", () => {
     expect(fs.readFileSync(file, "utf8")).toBe("value\n");
   });
 
+  it("captures an edit pushed shortly after the command answers", async () => {
+    await expect(
+      client.captureCommandEdits(command("capture.late"), { timeoutMs: 2000 }),
+    ).resolves.toMatchObject({ kind: "captured" });
+    await expect(
+      waitFor(
+        async () => replies(),
+        (current) => current.length === 1,
+      ),
+    ).resolves.toEqual([{ applied: false, failureReason: "SuPi captured this edit for preview." }]);
+  });
+
+  it("refuses new captures until a timed-out command settles, so its edit cannot leak", async () => {
+    await expect(
+      client.captureCommandEdits(command("capture.slow"), { timeoutMs: 100 }),
+    ).resolves.toMatchObject({ kind: "unavailable" });
+
+    await expect(
+      client.captureCommandEdits(command("capture.none"), { timeoutMs: 2000 }),
+    ).resolves.toEqual({
+      kind: "unavailable",
+      reason: "Another server command capture is running on this client; retry shortly.",
+    });
+    await waitFor(
+      async () => replies(),
+      (current) => current.length === 1,
+    );
+    await expect(
+      client.captureCommandEdits(command("capture.none"), { timeoutMs: 2000 }),
+    ).resolves.toEqual({ kind: "unavailable", reason: "The server command produced no edit." });
+  });
+
+  it("resyncs the full document under incremental sync", async () => {
+    await client.captureCommandEdits(command("capture.single"), { timeoutMs: 2000 });
+
+    const changes = await waitFor(
+      async () => logEntries().filter((entry) => entry.method === "textDocument/didChange"),
+      (current) => current.length > 0,
+    );
+    const change = changes.at(-1);
+    expect(change?.params).toMatchObject({ contentChanges: [{ text: "value\n" }] });
+    expect(change?.params).not.toMatchObject({ contentChanges: [{ range: expect.anything() }] });
+  });
+
+  it("reports a server error from the command as unavailable", async () => {
+    await expect(
+      client.captureCommandEdits(command("capture.fail"), { timeoutMs: 2000 }),
+    ).resolves.toEqual({ kind: "unavailable", reason: "The server command failed: boom" });
+  });
+
+  it("propagates a workflow deadline that expires during the command", async () => {
+    await expect(
+      client.captureCommandEdits(command("capture.hang"), {
+        timeoutMs: 5000,
+        drainMs: 0,
+        control: { deadline: Date.now() + 100 },
+      }),
+    ).rejects.toThrow("deadline");
+  });
+
   it("allows one capture at a time per client", async () => {
-    const first = client.captureCommandEdits(command("capture.hang"), { timeoutMs: 300 });
+    const first = client.captureCommandEdits(command("capture.hang"), {
+      timeoutMs: 300,
+      drainMs: 0,
+    });
 
     await expect(
       client.captureCommandEdits(command("capture.single"), { timeoutMs: 2000 }),

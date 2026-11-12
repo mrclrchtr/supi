@@ -275,3 +275,54 @@ describe("routed project-root boundary", () => {
     });
   });
 });
+
+describe("command-action capture eligibility", () => {
+  function runtimeWith(commands: string[] | undefined) {
+    const { root, target } = createFiles();
+    const client = {
+      name: "kotlin",
+      root,
+      serverCapabilities: commands ? { executeCommandProvider: { commands } } : {},
+      captureCommandEdits: vi.fn().mockResolvedValue({ kind: "unavailable", reason: "none" }),
+    };
+    const manager = {
+      getCwd: () => root,
+      ensureFileOpen: vi.fn().mockResolvedValue(client),
+    } as unknown as LspManager;
+    return { client, target, runtime: createWorkspaceLspRuntimeOwner(manager).runtime };
+  }
+
+  const action = (kind: string, command: string) => ({
+    title: "Action",
+    kind,
+    command: { title: "Action", command },
+  });
+
+  it.each([
+    ["an ineligible source kind", undefined, action("source.doc", "gopls.doc")],
+    ["an unlisted command", ["other"], action("refactor.extract", "refactor.extract")],
+    [
+      "an action with an edit",
+      undefined,
+      { ...action("refactor.extract", "refactor.extract"), edit: { changes: {} } },
+    ],
+  ])("never runs %s", async (_label, commands, candidate) => {
+    const { client, target, runtime } = runtimeWith(commands);
+
+    const response = await runtime.captureCodeActionEdit(target, candidate);
+
+    expect(client.captureCommandEdits).not.toHaveBeenCalled();
+    expect(response).toMatchObject({ value: null, reason: expect.stringContaining("SuPi") });
+  });
+
+  it("runs a listed eligible command", async () => {
+    const { client, target, runtime } = runtimeWith(["refactor.extract"]);
+
+    await runtime.captureCodeActionEdit(target, action("refactor.extract", "refactor.extract"));
+
+    expect(client.captureCommandEdits).toHaveBeenCalledWith(
+      { title: "Action", command: "refactor.extract" },
+      expect.objectContaining({ timeoutMs: expect.any(Number) }),
+    );
+  });
+});

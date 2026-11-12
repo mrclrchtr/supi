@@ -6,7 +6,10 @@
  * pushed edit is refused as unsolicited (LSP 3.17 `ApplyWorkspaceEditResult`).
  */
 
-import type { CodeRequestControl } from "@mrclrchtr/supi-code-runtime/api";
+import {
+  type CodeRequestControl,
+  isCodeRequestInterruption,
+} from "@mrclrchtr/supi-code-runtime/api";
 import { uriToFile } from "@mrclrchtr/supi-core/path";
 import type { Command, WorkspaceEdit } from "../config/types.ts";
 import { LSP_REQUEST_TIMEOUT_ERROR_CODE } from "../debug-telemetry.ts";
@@ -34,37 +37,74 @@ export type CommandEditCaptureResult =
     }
   | { readonly kind: "unavailable"; readonly reason: string };
 
-/** Records pushed edits for at most one open capture window per client. */
+/** Reply for an edit from a command SuPi stopped waiting for. */
+export const ABANDONED_EDIT_REPLY = {
+  applied: false,
+  failureReason: "SuPi stopped waiting for the command that produced this edit.",
+} as const;
+
+/**
+ * Records pushed edits for at most one capture per client. After a capture
+ * stops waiting (timeout, abort, deadline) the window keeps draining until the
+ * abandoned command settles, so its late edits are refused and can never be
+ * attributed to the next capture.
+ */
 export class EditCaptureWindow {
-  #edits: unknown[] | null = null;
+  #state: "idle" | "capturing" | "draining" = "idle";
+  #edits: unknown[] = [];
+  #onEdit: (() => void) | undefined;
 
-  /** Whether a capture window is open. */
-  get isOpen(): boolean {
-    return this.#edits !== null;
-  }
-
-  /** Open the window. Returns false when one is already open. */
+  /** Open the window. Returns false while another capture runs or drains. */
   open(): boolean {
-    if (this.#edits) return false;
+    if (this.#state !== "idle") return false;
+    this.#state = "capturing";
     this.#edits = [];
     return true;
   }
 
-  /** Close the window and return the edits pushed while it was open. */
+  /** Stop capturing and return the edits pushed so far. */
   close(): unknown[] {
-    const edits = this.#edits ?? [];
-    this.#edits = null;
+    const edits = this.#edits;
+    this.#edits = [];
+    this.#onEdit = undefined;
+    if (this.#state === "capturing") this.#state = "idle";
     return edits;
   }
 
+  /** Stop capturing but refuse new captures until `settled` resolves. */
+  drain(settled: Promise<void>): unknown[] {
+    const edits = this.close();
+    this.#state = "draining";
+    void settled.then(() => {
+      if (this.#state === "draining") this.#state = "idle";
+    });
+    return edits;
+  }
+
+  /** Wait up to `ms` for the first edit when none has arrived yet. */
+  async waitForEdit(ms: number): Promise<void> {
+    if (this.#edits.length > 0 || ms <= 0) return;
+    await new Promise<void>((resolve) => {
+      const timer = setTimeout(resolve, ms);
+      this.#onEdit = () => {
+        clearTimeout(timer);
+        resolve();
+      };
+    });
+  }
+
   /** Answer one `workspace/applyEdit` request; the edit is never applied. */
-  handleApplyEdit(params: unknown): typeof CAPTURED_EDIT_REPLY | typeof UNSOLICITED_EDIT_REPLY {
-    if (!this.#edits) return UNSOLICITED_EDIT_REPLY;
+  handleApplyEdit(
+    params: unknown,
+  ): typeof CAPTURED_EDIT_REPLY | typeof UNSOLICITED_EDIT_REPLY | typeof ABANDONED_EDIT_REPLY {
+    if (this.#state === "draining") return ABANDONED_EDIT_REPLY;
+    if (this.#state === "idle") return UNSOLICITED_EDIT_REPLY;
     const edit =
       typeof params === "object" && params !== null
         ? (params as { edit?: unknown }).edit
         : undefined;
     this.#edits.push(edit);
+    this.#onEdit?.();
     return CAPTURED_EDIT_REPLY;
   }
 }
@@ -89,26 +129,35 @@ export function editedDocumentUris(edit: unknown): string[] {
   return [...uris];
 }
 
+/** Default wait for an edit a server pushes just after answering the command. */
+const DEFAULT_GRACE_MS = 250;
+
 /** Collaborators for one command capture on one client. */
 export interface CommandEditCaptureOptions {
   readonly command: Command;
   /** Upper bound for the command to finish. */
   readonly timeoutMs: number;
+  /** Wait for an edit pushed after the command answers; LSP allows that order. */
+  readonly graceMs?: number;
+  /** Upper bound for refusing late edits from an abandoned command. */
+  readonly drainMs?: number;
   readonly control?: CodeRequestControl;
   readonly window: EditCaptureWindow;
-  sendRequest(
+  /** Send one request and expose when its transport lifetime ends. */
+  sendRequestOwned(
     method: string,
     params: unknown,
     options: { timeoutMs: number } & CodeRequestControl,
-  ): Promise<unknown>;
+  ): { result: Promise<unknown>; settled: Promise<void> };
   /** Re-send one open document; null when it is not open. */
   resynchronize(file: string): { from: number; to: number } | null;
 }
 
 /**
  * Run one command inside a capture window. Exactly one pushed edit becomes the
- * result; none, several, or a timeout are unavailable. Cancellation propagates.
- * The window always closes, and every touched open document is resynced.
+ * result; none, several, a timeout, or a server error are unavailable.
+ * Cancellation and deadline expiry propagate. Every touched open document is
+ * resynced, and an abandoned command keeps the window draining.
  */
 export async function runCommandEditCapture(
   options: CommandEditCaptureOptions,
@@ -120,30 +169,19 @@ export async function runCommandEditCapture(
       reason: "Another server command capture is running on this client; retry shortly.",
     };
   }
-  let edits: unknown[] = [];
-  let timedOut = false;
+  const request = options.sendRequestOwned(
+    "workspace/executeCommand",
+    { command: command.command, ...(command.arguments ? { arguments: command.arguments } : {}) },
+    { ...control, timeoutMs },
+  );
   try {
-    await options.sendRequest(
-      "workspace/executeCommand",
-      { command: command.command, ...(command.arguments ? { arguments: command.arguments } : {}) },
-      { ...control, timeoutMs },
-    );
+    await request.result;
   } catch (error) {
-    if (control?.signal?.aborted || !isTimeout(error)) {
-      edits = window.close();
-      resynchronizeEdits(edits, options.resynchronize);
-      throw error;
-    }
-    timedOut = true;
+    return abandonCapture(options, request.settled, error);
   }
-  edits = window.close();
+  await window.waitForEdit(options.graceMs ?? DEFAULT_GRACE_MS);
+  const edits = window.close();
   const resynced = resynchronizeEdits(edits, options.resynchronize);
-  if (timedOut) {
-    return {
-      kind: "unavailable",
-      reason: `The server command did not finish within ${timeoutMs} ms.`,
-    };
-  }
   if (edits.length === 0) {
     return { kind: "unavailable", reason: "The server command produced no edit." };
   }
@@ -154,6 +192,29 @@ export async function runCommandEditCapture(
     };
   }
   return { kind: "captured", edit: edits[0] as WorkspaceEdit, resynced };
+}
+
+/** Close or drain the window after the command failed, then report or rethrow. */
+function abandonCapture(
+  options: CommandEditCaptureOptions,
+  settled: Promise<void>,
+  error: unknown,
+): CommandEditCaptureResult {
+  const { window, timeoutMs, control } = options;
+  const drainMs = options.drainMs ?? timeoutMs;
+  const edits = drainMs > 0 ? window.drain(boundedSettle(settled, drainMs)) : window.close();
+  resynchronizeEdits(edits, options.resynchronize);
+  if (isCodeRequestInterruption(error, control)) throw error;
+  return {
+    kind: "unavailable",
+    reason: isTimeout(error)
+      ? `The server command did not finish within ${timeoutMs} ms.`
+      : `The server command failed: ${error instanceof Error ? error.message : String(error)}`,
+  };
+}
+
+function boundedSettle(settled: Promise<void>, ms: number): Promise<void> {
+  return Promise.race([settled, new Promise<void>((resolve) => setTimeout(resolve, ms))]);
 }
 
 function resynchronizeEdits(

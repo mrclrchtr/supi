@@ -73,6 +73,8 @@ interface SynchronizeDocumentOptions {
   documentSync: NormalizedDocumentSync;
   waiters: DiagnosticWaitRegistry;
   sendNotification: NotificationSender;
+  /** Send the whole text without a range, even under incremental sync (LSP allows both). */
+  fullText?: boolean;
 }
 
 function endPosition(content: string): { line: number; character: number } {
@@ -117,11 +119,9 @@ export function synchronizeDocument(options: SynchronizeDocumentOptions): void {
   retainDocumentSynchronization(options);
   options.document.version = options.version;
   options.document.synchronizationId = options.synchronizationId;
-  const changes = contentChanges(
-    options.document.content,
-    options.content,
-    options.documentSync.change,
-  );
+  const changes = options.fullText
+    ? [{ text: options.content }]
+    : contentChanges(options.document.content, options.content, options.documentSync.change);
   options.document.content = options.content;
   options.document.contentFingerprint = fingerprintDocumentContent(options.content);
   if (options.documentSync.change === TextDocumentSyncKind.None) return;
@@ -161,6 +161,7 @@ export function synchronizeTrackedDocument(options: {
   markUnversionedSyncMoment?(): void;
   clearFailedFile?(): void;
   open(): void;
+  fullText?: boolean;
 }): void {
   if (!options.document) {
     options.open();
@@ -177,6 +178,7 @@ export function synchronizeTrackedDocument(options: {
     documentSync: options.documentSync,
     waiters: options.waiters,
     sendNotification: options.sendNotification,
+    ...(options.fullText ? { fullText: true } : {}),
   });
   options.clearFailedFile?.();
 }

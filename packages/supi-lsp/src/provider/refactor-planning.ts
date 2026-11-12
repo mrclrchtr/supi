@@ -14,11 +14,15 @@ import type { CodeAction } from "../config/types.ts";
 import { raceRequestControl } from "../session/readiness.ts";
 import type { RoutedCodeActionResponse, WorkspaceLspRuntime } from "../session/runtime-registry.ts";
 import {
+  COMMAND_ONLY_ACTION_REASON,
   captureCommandAction,
   captureEligibleActions,
   commandCandidates,
   isCommandOnlyAction,
 } from "./refactor-command-capture.ts";
+
+export { COMMAND_ONLY_ACTION_REASON };
+
 import {
   normalizeSemanticEdit,
   type SemanticEditNormalizationContext,
@@ -91,13 +95,6 @@ export interface CodeActionRefactorOptions {
   label: "Code action" | "Source action";
   control?: CodeRequestControl;
 }
-
-/**
- * Stable reason for command-only actions SuPi will not run: an ineligible kind
- * or a command the server does not list.
- */
-export const COMMAND_ONLY_ACTION_REASON =
-  "Matching code actions only run a server command that SuPi does not run for preview.";
 
 /**
  * Plan one code action of the requested kind over a file range.

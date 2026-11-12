@@ -21,7 +21,7 @@ import { CodeActionTriggerKind } from "vscode-languageserver-types";
 import type { CommandEditCaptureResult } from "../client/client-edit-capture.ts";
 import { advertisedCodeActionKinds } from "../config/operation-support.ts";
 import type {
-  Command,
+  CodeAction,
   Diagnostic,
   DocumentSymbol,
   FileEvent,
@@ -41,6 +41,10 @@ import type {
   WorkspaceSentinelSyncResult,
 } from "../diagnostics/workspace-sentinels.ts";
 import type { LspManager } from "../manager/manager.ts";
+import {
+  COMMAND_ONLY_ACTION_REASON,
+  captureEligibleActions,
+} from "../provider/refactor-command-capture.ts";
 import { raceReadinessValue } from "./readiness.ts";
 import { outsideRouteRootReason } from "./route-boundary.ts";
 import type {
@@ -296,9 +300,9 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
     return this.manager.getOpenDocumentVersion(this.resolveFilePath(filePath));
   }
 
-  async captureCommandEdits(
+  async captureCodeActionEdit(
     filePath: string,
-    command: Command,
+    action: CodeAction,
     control?: CodeRequestControl,
   ): Promise<RoutedMutationResponse<CommandEditCaptureResult | null> | null> {
     const resolvedPath = this.resolveFilePath(filePath);
@@ -311,7 +315,12 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
     const authorizedMutationRoots = [client.root];
     const outside = outsideRouteRootReason(resolvedPath, client.root);
     if (outside) return { value: null, authorizedMutationRoots, reason: outside };
-    const value = await client.captureCommandEdits(command, {
+    const listed = client.serverCapabilities?.executeCommandProvider?.commands;
+    const [eligible] = captureEligibleActions([action], Array.isArray(listed) ? listed : undefined);
+    if (!eligible) {
+      return { value: null, authorizedMutationRoots, reason: COMMAND_ONLY_ACTION_REASON };
+    }
+    const value = await client.captureCommandEdits(eligible.command, {
       timeoutMs: COMMAND_CAPTURE_TIMEOUT_MS,
       ...(control ? { control } : {}),
     });

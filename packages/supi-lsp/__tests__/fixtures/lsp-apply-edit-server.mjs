@@ -5,7 +5,10 @@
 //   capture.none      no applyEdit
 //   capture.multiple  two applyEdits
 //   capture.hang      never answers executeCommand
-//   push.unsolicited  answers, then pushes one applyEdit outside any command
+//   capture.fail      answers with a JSON-RPC error
+//   capture.late      pushes one applyEdit after answering (within the grace period)
+//   capture.slow      pushes one applyEdit after 300 ms, then answers
+//   push.unsolicited  answers, then pushes one applyEdit 1 s later, outside any window
 // Every received message and every applyEdit reply is appended to the log.
 import * as fs from "node:fs";
 
@@ -64,9 +67,20 @@ async function executeCommand(message) {
       break;
     case "capture.hang":
       return;
+    case "capture.fail":
+      send({ jsonrpc: "2.0", id: message.id, error: { code: -32603, message: "boom" } });
+      return;
+    case "capture.late":
+      send({ jsonrpc: "2.0", id: message.id, result: null });
+      setTimeout(() => void pushEdit(uri, "// late\n"), 10);
+      return;
+    case "capture.slow":
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      await pushEdit(uri, "// slow\n");
+      break;
     case "push.unsolicited":
       send({ jsonrpc: "2.0", id: message.id, result: null });
-      setTimeout(() => void pushEdit(uri, "// unsolicited\n"), 10);
+      setTimeout(() => void pushEdit(uri, "// unsolicited\n"), 1000);
       return;
     default:
       break;
@@ -88,10 +102,13 @@ function handle(message) {
         id: message.id,
         result: {
           capabilities: {
-            textDocumentSync: { openClose: true, change: 1 },
+            textDocumentSync: { openClose: true, change: 2 },
             codeActionProvider: { codeActionKinds: ["refactor", "source"] },
             executeCommandProvider: {
               commands: [
+                "capture.fail",
+                "capture.late",
+                "capture.slow",
                 "capture.single",
                 "capture.none",
                 "capture.multiple",

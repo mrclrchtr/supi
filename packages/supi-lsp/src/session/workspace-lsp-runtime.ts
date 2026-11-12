@@ -3,7 +3,6 @@ import type { CommandEditCaptureResult } from "../client/client-edit-capture.ts"
 import type {
   CodeAction,
   CodeActionContext,
-  Command,
   DocumentSymbol,
   FileEvent,
   Hover,
@@ -176,12 +175,15 @@ export interface WorkspaceLspRuntime extends WorkspaceLspDiagnosticSurface {
     options?: WorkspaceCodeActionRequestOptions,
   ): Promise<RoutedCodeActionResponse | null>;
   /**
-   * Run one code-action command on the client routed to `filePath` and
-   * capture the single edit the server pushes. No pushed edit is applied.
+   * Run the command of one command-only code action on the client routed to
+   * `filePath` and capture the single edit the server pushes. No pushed edit is
+   * applied. The runtime enforces eligibility itself: a `refactor*`,
+   * `source.organizeImports*`, or `source.fixAll*` kind, and a command the
+   * server lists when it lists any; other actions are unavailable unrun.
    */
-  captureCommandEdits(
+  captureCodeActionEdit(
     filePath: string,
-    command: Command,
+    action: CodeAction,
     control?: CodeRequestControl,
   ): Promise<RoutedMutationResponse<CommandEditCaptureResult | null> | null>;
   getOpenDocumentVersion(filePath: string): number | null;

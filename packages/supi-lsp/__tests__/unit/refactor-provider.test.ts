@@ -597,13 +597,13 @@ describe("LspRefactorProvider", () => {
         value: unknown,
         overrides: Partial<WorkspaceLspRuntime> = {},
       ) {
-        const captureCommandEdits = vi.fn().mockResolvedValue(inDir(value));
-        const { provider } = providerWith(actions, { captureCommandEdits, ...overrides });
-        return { provider, captureCommandEdits };
+        const captureCodeActionEdit = vi.fn().mockResolvedValue(inDir(value));
+        const { provider } = providerWith(actions, { captureCodeActionEdit, ...overrides });
+        return { provider, captureCodeActionEdit };
       }
 
       it("captures the edit of one eligible action and rebases it to the resynced version", async () => {
-        const { provider, captureCommandEdits } = capturing(
+        const { provider, captureCodeActionEdit } = capturing(
           [commandAction("Extract variable", "refactor.extract.variable")],
           {
             kind: "captured",
@@ -620,9 +620,16 @@ describe("LspRefactorProvider", () => {
           kind: "refactor.extract",
         });
 
-        expect(captureCommandEdits).toHaveBeenCalledWith(
+        expect(captureCodeActionEdit).toHaveBeenCalledWith(
           file,
-          { title: "Extract variable", command: "refactor.extract.variable", arguments: [uri] },
+          expect.objectContaining({
+            title: "Extract variable",
+            command: {
+              title: "Extract variable",
+              command: "refactor.extract.variable",
+              arguments: [uri],
+            },
+          }),
           undefined,
         );
         expect(result).toMatchObject({
@@ -640,7 +647,7 @@ describe("LspRefactorProvider", () => {
       });
 
       it("captures an organize-imports source action", async () => {
-        const { provider, captureCommandEdits } = capturing(
+        const { provider, captureCodeActionEdit } = capturing(
           [commandAction("Organize imports", "source.organizeImports", "kotlin.organize.imports")],
           {
             kind: "captured",
@@ -655,7 +662,7 @@ describe("LspRefactorProvider", () => {
           kind: "source.organizeImports",
         });
 
-        expect(captureCommandEdits).toHaveBeenCalledTimes(1);
+        expect(captureCodeActionEdit).toHaveBeenCalledTimes(1);
         expect(result).toMatchObject({
           kind: "precise",
           action: { provenance: "captured-command" },
@@ -663,7 +670,7 @@ describe("LspRefactorProvider", () => {
       });
 
       it("never runs commands of ineligible source kinds", async () => {
-        const { provider, captureCommandEdits } = capturing(
+        const { provider, captureCodeActionEdit } = capturing(
           [commandAction("Browse documentation", "source.doc", "gopls.doc")],
           { kind: "captured", edit: versionedEdit(1, "x"), resynced: [] },
         );
@@ -674,12 +681,67 @@ describe("LspRefactorProvider", () => {
           kind: "source.doc",
         });
 
-        expect(captureCommandEdits).not.toHaveBeenCalled();
+        expect(captureCodeActionEdit).not.toHaveBeenCalled();
         expect(result).toMatchObject({ kind: "unavailable", reason: COMMAND_ONLY_ACTION_REASON });
       });
 
+      it.each([
+        [["other.command"], false],
+        [["refactor.extract.variable"], true],
+        [undefined, true],
+      ] as const)(
+        "runs an eligible command only when the server lists it (listed: %j)",
+        async (advertisedCommands, runs) => {
+          const captureCodeActionEdit = vi
+            .fn()
+            .mockResolvedValue(
+              inDir({ kind: "captured", edit: versionedEdit(1, "x"), resynced: [] }),
+            );
+          const codeActions = vi.fn().mockResolvedValue({
+            ...inDir([commandAction("Extract variable", "refactor.extract.variable")]),
+            ...(advertisedCommands ? { advertisedCommands } : {}),
+          });
+          const provider = createLspSemanticProvider(
+            createMockLsp({ codeActions, captureCodeActionEdit }),
+          );
+
+          const result = await provider.refactor?.({
+            operation: "code_action",
+            file,
+            range: extractRange,
+            kind: "refactor.extract",
+          });
+
+          expect(captureCodeActionEdit).toHaveBeenCalledTimes(runs ? 1 : 0);
+          if (!runs) {
+            expect(result).toMatchObject({
+              kind: "unavailable",
+              reason: COMMAND_ONLY_ACTION_REASON,
+            });
+          }
+        },
+      );
+
+      it("propagates an abort from the capture", async () => {
+        const abort = new Error("aborted");
+        const captureCodeActionEdit = vi.fn().mockRejectedValue(abort);
+        const { provider } = providerWith(
+          [commandAction("Extract variable", "refactor.extract.variable")],
+          { captureCodeActionEdit },
+        );
+
+        await expect(
+          provider.refactor?.({
+            operation: "code_action",
+            file,
+            range: extractRange,
+            kind: "refactor.extract",
+          }),
+        ).rejects.toBe(abort);
+      });
+
       it("reports several matching actions as ambiguous without running a command", async () => {
-        const { provider, captureCommandEdits } = capturing(
+        const { provider, captureCodeActionEdit } = capturing(
           [
             commandAction("Extract variable", "refactor.extract.variable"),
             commandAction("Extract constant", "refactor.extract.constant"),
@@ -694,7 +756,7 @@ describe("LspRefactorProvider", () => {
           kind: "refactor.extract",
         });
 
-        expect(captureCommandEdits).not.toHaveBeenCalled();
+        expect(captureCodeActionEdit).not.toHaveBeenCalled();
         expect(result).toMatchObject({
           kind: "ambiguous",
           candidates: [

@@ -237,22 +237,17 @@ export class ClientDiagnostics {
     for (const update of updates) {
       const document = this.#openDocs.get(update.document.uri);
       if (!document) throw new Error("Semantic input changed while synchronization was running.");
-      this.#synchronizeTrackedDocument(
-        update.document.uri,
-        update.document.filePath,
-        update.content,
-        document,
-      );
+      this.#synchronizeTrackedDocument(update.document, update.content, document);
       this.#failedUris.delete(update.document.uri);
     }
   }
 
   /** Apply one tracked-document change with the shared client state. */
   #synchronizeTrackedDocument(
-    uri: string,
-    filePath: string,
+    { uri, filePath }: { readonly uri: string; readonly filePath: string },
     content: string,
     document: OpenDocumentState,
+    options: { fullText?: boolean } = {},
   ): void {
     synchronizeTrackedDocument({
       uri,
@@ -267,6 +262,7 @@ export class ClientDiagnostics {
       markUnversionedSyncMoment: () => this.#unversionedPushSyncMoments.set(uri, Date.now()),
       clearFailedFile: () => this.#failedUris.delete(uri),
       open: () => this.didOpen(filePath, content),
+      ...(options.fullText ? { fullText: true } : {}),
     });
   }
 
@@ -394,12 +390,13 @@ export class ClientDiagnostics {
     const nextFingerprint = fingerprintDocumentContent(content);
     if (doc.contentFingerprint === nextFingerprint) return;
     this.#advanceInputRevision();
-    this.#synchronizeTrackedDocument(uri, filePath, content, doc);
+    this.#synchronizeTrackedDocument({ uri, filePath }, content, doc);
   }
 
   /**
-   * Re-send an open document's current content under a new version, even when
-   * the content is unchanged. Used after a server ran a command whose pushed
+   * Re-send an open document's tracked content under a new version, even when
+   * it is unchanged. The tracked content matches disk: semantic requests
+   * synchronize open documents with disk before they run. Used after a server ran a command whose pushed
    * edit was refused, so the server's model matches the client again.
    * Returns the versions before and after, or null when the document is not open.
    */
@@ -410,7 +407,9 @@ export class ClientDiagnostics {
     if (!doc) return null;
     const from = doc.version;
     this.#advanceInputRevision();
-    this.#synchronizeTrackedDocument(uri, filePath, doc.content, doc);
+    // Full text: the server may have changed its own copy, so a range computed
+    // from the client's content could no longer cover the whole document.
+    this.#synchronizeTrackedDocument({ uri, filePath }, doc.content, doc, { fullText: true });
     return { from, to: doc.version };
   }
 

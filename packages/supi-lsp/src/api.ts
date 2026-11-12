@@ -1,5 +1,6 @@
 // Public API surface for the LSP session-scoped service.
 
+export type { CommandEditCaptureResult } from "./client/client-edit-capture.ts";
 export { isMissingFileError } from "./client/client-file-state.ts";
 export {
   getExplicitlyDisabledLanguages,
