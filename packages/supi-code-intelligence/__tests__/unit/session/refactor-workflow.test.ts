@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -240,6 +240,45 @@ describe("runRefactorPlanWorkflow", () => {
       expect(requests).toEqual([]);
     },
   );
+
+  describe("files outside the workspace", () => {
+    let outside: string;
+    beforeEach(() => {
+      outside = mkdtempSync(path.join(os.tmpdir(), "refactor-outside-"));
+      writeFileSync(path.join(outside, "x.ts"), "export const x = 1;\n");
+    });
+    afterEach(() => rmSync(outside, { recursive: true, force: true }));
+
+    it("rejects an absolute path outside the workspace before calling the provider", async () => {
+      const requests: RefactorRequest[] = [];
+      const file = path.join(outside, "x.ts");
+      const outcome = await runRefactorPlanWorkflow(
+        { operation: { source_action: { file, kind: "source" } } },
+        depsWith(new TestCapabilityAdapter({ semantic: deleteFirstLineProvider(requests) })),
+      );
+
+      expect(outcome).toEqual({
+        kind: "invalid-input",
+        message: `operation.source_action.file must be inside the workspace: \`${file}\`.`,
+      });
+      expect(requests).toEqual([]);
+    });
+
+    it("rejects a workspace link to a file outside the workspace", async () => {
+      const requests: RefactorRequest[] = [];
+      symlinkSync(path.join(outside, "x.ts"), path.join(cwd, "src", "link.ts"));
+      const outcome = await runRefactorPlanWorkflow(
+        { operation: { source_action: { file: "src/link.ts", kind: "source" } } },
+        depsWith(new TestCapabilityAdapter({ semantic: deleteFirstLineProvider(requests) })),
+      );
+
+      expect(outcome).toEqual({
+        kind: "invalid-input",
+        message: "operation.source_action.file must be inside the workspace: `src/link.ts`.",
+      });
+      expect(requests).toEqual([]);
+    });
+  });
 
   it.each([null, 1])(
     "rejects changed content before storing a version %s rename plan",
