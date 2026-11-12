@@ -4,6 +4,11 @@
 
 - An explicit `code_health` refresh that runs while a crashed language server is being replaced no longer makes the replacement fail. Previously, the request waiting on that replacement got no server and the recovery was recorded as cancelled, even though the new server was running.
 - C and C++ headers mapped to another language by `code-intelligence.fileAssociations` (for example `**/*.h` as `cpp`) now use the language server's own diagnostics when the server registers them for that language. Previously, these headers were matched against the default C language, so the server's diagnostics for C++ never applied to them, and C-only diagnostics could be requested for files opened as C++.
+- Cancelling a structural request, or reaching its deadline, no longer restarts the structural Worker. Previously every cancellation waited for the hard-stop timeout and discarded cached parse trees, so the next AST request parsed again from scratch.
+- AST results for large files are much faster: converting node positions re-split the whole file for every node, which made extraction slow down quadratically with file size. On an 8,000-line TypeScript file, call-site extraction dropped from about 10 s to 0.3 s, and outline and export extraction from several seconds to under 0.2 s, so these requests no longer hit their deadlines on large files.
+- Export extraction for JavaScript and TypeScript is more accurate: `export default "foo"` is reported as a default export instead of `export * from "foo"`, every name in `export var a, b` is listed, and `export import X = Y.Z` is listed as an `alias` export.
+- In files containing a carriage return that is not part of a CRLF line ending (for example inside a template literal), AST positions after that character are correct again. Previously later lines were shifted, so ranges were truncated and some valid `code_inspect` positions were rejected as beyond the end of the line.
+- Call ranges for Java, Kotlin, and Ruby now cover only the called expression (such as `a.b` in `a.b(1)`), as in other languages, instead of the whole call with its arguments and block. A Kotlin call with a trailing lambda, such as `bar(1) { it }`, is now reported once instead of twice in call search and `code_graph` callees.
 
 ## [11.4.0]
 
