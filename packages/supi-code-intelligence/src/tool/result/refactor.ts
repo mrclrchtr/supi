@@ -5,6 +5,7 @@ import { toDisplayPath } from "../../analysis/search/paths.ts";
 import type { RefactorPlan } from "../../session/refactor-plans.ts";
 import { assembledNextQueries, assembleToolResult, type ToolResultAssembly } from "./assembly.ts";
 import { createToolDisplaySection } from "./display.ts";
+import { previewEditCount } from "./refactor-preview.ts";
 import type { SearchDetails, ToolDisplaySection } from "./types.ts";
 
 export interface RefactorPlanAssemblyData {
@@ -45,7 +46,7 @@ export function assembleRefactorPlanDetails(
   const edits = createEvidenceList({
     key: "refactor.edits",
     items: [...plan.edits.edits],
-    maxResults,
+    maxResults: previewEditCount(plan.edits.edits, maxResults),
   });
   const evidenceSource = plan.evidenceSource ?? "semantic";
   const provenance = [

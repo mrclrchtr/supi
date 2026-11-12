@@ -1,3 +1,6 @@
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { initTheme } from "@earendil-works/pi-coding-agent";
 import { beforeAll, describe, expect, it } from "vitest";
 import type { ApplyResult } from "../../../src/analysis/refactor/apply.ts";
@@ -69,6 +72,50 @@ describe("refactor result projections", () => {
         },
       ],
     });
+  });
+
+  it("combines character-level edits on one line into one readable preview entry", () => {
+    // kotlin-lsp renames `total` to `sumDoubled` with minimal edits: t|otal → sumD|o|ub|l|ed.
+    const dir = mkdtempSync(join(tmpdir(), "refactor-preview-"));
+    try {
+      const file = join(dir, "Main.kt");
+      writeFileSync(file, "fun total(): Int = 1\nval x = total() + total()\n");
+      const pieces = (line: number, base: number) =>
+        [
+          [0, 1, "sumD"],
+          [2, 4, "ub"],
+          [5, 5, "ed"],
+        ].map(([from, to, newText]) => ({
+          file,
+          range: {
+            start: { line, character: base + Number(from) },
+            end: { line, character: base + Number(to) },
+          },
+          newText: String(newText),
+        }));
+      const plan: RefactorPlan = {
+        ...makePlan(),
+        file,
+        authorizedMutationRoots: [dir],
+        edits: { edits: [...pieces(0, 4), ...pieces(1, 8), ...pieces(1, 18)] },
+      };
+
+      const assembly = assembleRefactorPlanDetails(plan, dir, 5);
+      const markdown = renderRefactorPlanMarkdown(assembly);
+
+      expect(markdown).toContain("**Total edits:** 9");
+      expect(markdown).toContain(
+        "- `Main.kt` L1:5 → L1:10 (3 edits)\n  ```\n  - total\n  + sumDoubled\n  ```",
+      );
+      expect(markdown).toContain(
+        "- `Main.kt` L2:9 → L2:24 (6 edits)\n  ```\n  - total() + total\n  + sumDoubled() + sumDoubled\n  ```",
+      );
+      expect(markdown).not.toContain("sumD\n");
+      // The limit grows to the end of a line group, so no group is cut in half.
+      expect(markdown).toContain("**Shown edits:** 9");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it("projects apply facts without an automatic code_health hint", () => {

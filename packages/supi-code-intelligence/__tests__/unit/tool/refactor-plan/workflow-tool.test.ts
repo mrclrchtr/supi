@@ -580,3 +580,26 @@ describe("code_refactor_plan / code_refactor_apply workflow wrappers", () => {
     expect(readFileSync(file, "utf-8")).toBe("newName();\n");
   });
 });
+
+describe("refactor workflow unavailable reasons", () => {
+  it.each([
+    [
+      "LSP request textDocument/codeAction failed: Semantic input changed while synchronization was running.",
+      "LSP request textDocument/codeAction failed: Semantic input changed while synchronization was running. Retry after concurrent edits finish.",
+    ],
+    ["No semantic provider is active.", "No semantic provider is active."],
+  ])("explains how to recover from %j", async (reason, expected) => {
+    const { projectDir } = createProjectFile();
+    registerSemantic(
+      projectDir,
+      createSemanticProvider({ refactor: async () => ({ kind: "unavailable", reason }) }),
+    );
+
+    await expect(
+      executeRefactorPlanTool(
+        { operation: { source_action: { file: "src/index.ts", kind: "source.organizeImports" } } },
+        { cwd: projectDir, session: sessionCache.getOrCreate(projectDir) } as never,
+      ),
+    ).rejects.toThrow(new Error(expected));
+  });
+});

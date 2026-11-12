@@ -5,6 +5,7 @@ import type { CodeIntelResult, CodeIntelToolExecCtx } from "../../types/index.ts
 import { renderRefactorPlanResult } from "../refactor-markdown.ts";
 import { searchErrorResult } from "../result/errors.ts";
 import { assembleRefactorPlanDetails } from "../result/refactor.ts";
+import { refactorUnavailableReason } from "../result/refactor-unavailable.ts";
 import { AMBIGUOUS_NEXT_ACTION, structuredRefactorPlan } from "./structured.ts";
 
 type RefactorPlanOutcome = Awaited<ReturnType<CodeIntelToolExecCtx["session"]["planRefactor"]>>;
@@ -14,7 +15,7 @@ export function finishRefactorPlanResult(
   outcome: RefactorPlanOutcome,
   cwd: string,
 ): CodeIntelResult {
-  if (outcome.kind === "unavailable") throw new Error(outcome.reason);
+  if (outcome.kind === "unavailable") throw new Error(refactorUnavailableReason(outcome.reason));
   if (outcome.kind === "invalid-input") {
     return {
       ...searchErrorResult(`**Error:** ${outcome.message}`, {

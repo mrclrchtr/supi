@@ -2,6 +2,7 @@ import { renderEvidenceListDisclosure } from "../analysis/evidence.ts";
 import { toDisplayPath } from "../analysis/search/paths.ts";
 import { assembledNextQueries } from "./result/assembly.ts";
 import type { RefactorApplyResultAssembly, RefactorPlanResultAssembly } from "./result/refactor.ts";
+import { buildRefactorPreview, type RefactorPreviewEntry } from "./result/refactor-preview.ts";
 
 /** Render a refactor plan from its canonical assembled evidence. */
 export function renderRefactorPlanResult(assembly: RefactorPlanResultAssembly): string {
@@ -37,14 +38,8 @@ export function renderRefactorPlanResult(assembly: RefactorPlanResultAssembly): 
   lines.push("");
   lines.push("## Preview");
   lines.push("");
-  for (const edit of edits.items) {
-    const range = edit.range;
-    lines.push(
-      `- \`${toDisplayPath(cwd, edit.file)}\` L${range.start.line + 1}:${range.start.character + 1} → L${range.end.line + 1}:${range.end.character + 1}`,
-    );
-    lines.push("  ```");
-    lines.push(`  ${edit.newText.split("\n").join("\n  ")}`);
-    lines.push("  ```");
+  for (const entry of buildRefactorPreview(edits.items)) {
+    lines.push(...renderPreviewEntry(entry, cwd));
   }
   const disclosure = renderEvidenceListDisclosure(edits);
   if (disclosure) {
@@ -112,4 +107,26 @@ function actionSource(provenance: "edit" | "captured-command" | undefined): stri
     return "edit captured from the server command; it was refused, not applied";
   }
   return null;
+}
+
+/** Render one server edit as its replacement text, or a combined line as before/after. */
+function renderPreviewEntry(entry: RefactorPreviewEntry, cwd: string): string[] {
+  if (entry.kind === "line") {
+    const at = `L${entry.line + 1}`;
+    return [
+      `- \`${toDisplayPath(cwd, entry.file)}\` ${at}:${entry.startCharacter + 1} → ${at}:${entry.endCharacter + 1} (${entry.editCount} edits)`,
+      "  ```",
+      `  - ${entry.before}`,
+      `  + ${entry.after}`,
+      "  ```",
+    ];
+  }
+  const { edit } = entry;
+  const range = edit.range;
+  return [
+    `- \`${toDisplayPath(cwd, edit.file)}\` L${range.start.line + 1}:${range.start.character + 1} → L${range.end.line + 1}:${range.end.character + 1}`,
+    "  ```",
+    `  ${edit.newText.split("\n").join("\n  ")}`,
+    "  ```",
+  ];
 }
