@@ -1,10 +1,17 @@
 /** File-wide call-site extraction using per-grammar tree-sitter queries. */
 
 import type { CodeRequestControl } from "@mrclrchtr/supi-code-runtime/api";
-import type { CallSiteMatch, GrammarId, TreeSitterResult } from "../types.ts";
+import type {
+  CallSiteMatch,
+  GrammarId,
+  QueryCapture,
+  SourceRange,
+  TreeSitterResult,
+} from "../types.ts";
 import { isTypeOnlyImportCapture } from "../worker/call-context.ts";
 import { queryParsedFile, type TreeSitterRuntime } from "../worker/runtime.ts";
-import { dropKotlinTrailingLambdaPrefixes, normalizeCallName } from "./call-name.ts";
+import { normalizeCallName } from "./call-name.ts";
+import { calleeRangeForCallNode, findCaptureNode } from "./call-range.ts";
 
 // ── Per-grammar call-site queries ─────────────────────────────────────
 
@@ -84,23 +91,25 @@ export async function extractCallSites(
     const seen = new Set<string>();
     const matches: CallSiteMatch[] = [];
 
-    for (const capture of dropKotlinTrailingLambdaPrefixes(queryResult.data, grammarId)) {
+    for (const capture of queryResult.data) {
       if (isTypeOnlyImportCapture(tree.rootNode, capture, grammarId)) continue;
       // Normalize: trim whitespace and collapse internal whitespace to single space
       const name = normalizeCallName(capture.text, grammarId, capture.nodeType);
       if (name.length === 0) continue;
 
+      const range = callSiteRange(tree.rootNode, capture, grammarId, source);
+
       // Collapse duplicate captures only when they identify the same source range.
-      const key = `${capture.range.startLine}:${capture.range.startCharacter}:${capture.range.endLine}:${capture.range.endCharacter}`;
+      const key = `${range.startLine}:${range.startCharacter}:${range.endLine}:${range.endCharacter}`;
       if (seen.has(key)) continue;
       seen.add(key);
 
       matches.push({
         name,
-        startLine: capture.range.startLine,
-        startCharacter: capture.range.startCharacter,
-        endLine: capture.range.endLine,
-        endCharacter: capture.range.endCharacter,
+        startLine: range.startLine,
+        startCharacter: range.startCharacter,
+        endLine: range.endLine,
+        endCharacter: range.endCharacter,
       });
     }
 
@@ -110,4 +119,15 @@ export async function extractCallSites(
   } finally {
     tree.delete();
   }
+}
+
+/** Narrow whole-call captures to their callee so ranges match the other grammars. */
+function callSiteRange(
+  root: Parameters<typeof findCaptureNode>[0],
+  capture: QueryCapture,
+  grammarId: GrammarId,
+  source: string,
+): SourceRange {
+  const node = findCaptureNode(root, capture);
+  return (node && calleeRangeForCallNode(node, grammarId, source)) ?? capture.range;
 }

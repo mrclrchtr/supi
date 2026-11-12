@@ -8,7 +8,8 @@ import type { SyntaxNodeLike } from "../syntax-node.ts";
 import type { GrammarId, SourceRange, TreeSitterResult } from "../types.ts";
 import { isTypeOnlyImportCapture } from "../worker/call-context.ts";
 import { queryParsedFile, type TreeSitterRuntime } from "../worker/runtime.ts";
-import { dropKotlinTrailingLambdaPrefixes, normalizeCallName } from "./call-name.ts";
+import { normalizeCallName } from "./call-name.ts";
+import { calleeRangeForCallNode } from "./call-range.ts";
 import { createCalleeDisplayName, createSourceLineStarts } from "./callee-display-name.ts";
 import { extractScopeName } from "./scope.ts";
 
@@ -218,7 +219,7 @@ export async function lookupCalleesAt(
     }
 
     const callees = filterCalleeCaptures(
-      dropKotlinTrailingLambdaPrefixes(queryResult.data, grammarId),
+      queryResult.data,
       grammarId,
       enclosingNode,
       scopes,
@@ -387,11 +388,13 @@ function filterCalleeCaptures(
 
     if (isTypeOnlyImportCapture(enclosingNode, capture, grammarId)) continue;
     const name = normalizeCallName(capture.text, grammarId, capture.nodeType);
-    const rangeKey = sourceRangeKey(capture.range);
+    const syntaxNode = syntaxNodes.get(captureNodeKey(capture));
+    const range =
+      (syntaxNode && calleeRangeForCallNode(syntaxNode, grammarId, source)) ?? capture.range;
+    const rangeKey = sourceRangeKey(range);
     if (name.length === 0 || seenRanges.has(rangeKey)) continue;
     seenRanges.add(rangeKey);
 
-    const syntaxNode = syntaxNodes.get(captureNodeKey(capture));
     const displayName = syntaxNode
       ? createCalleeDisplayName({
           node: syntaxNode,
@@ -404,7 +407,7 @@ function filterCalleeCaptures(
     callees.push({
       name,
       ...(displayName === undefined ? {} : { displayName }),
-      range: capture.range,
+      range,
     });
   }
 

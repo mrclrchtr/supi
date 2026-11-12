@@ -211,6 +211,43 @@ describe("full-source-shape call sites", () => {
       expect(result).toMatchObject({ kind: "success" });
       if (result.kind !== "success") return;
       expect(result.data.map(({ name }) => name)).toEqual(["bar", "a.b(c).d", "a.b"]);
+
+      const callees = await session.calleesAt("lambda.kt", 2, 3);
+      expect(callees).toMatchObject({ kind: "success" });
+      if (callees.kind !== "success") return;
+      expect(callees.data.callees.map(({ name }) => name)).toEqual(["bar", "a.b", "a.b(c).d"]);
+    } finally {
+      await session.dispose();
+    }
+  });
+
+  it("reports whole-call grammar ranges over the callee, not the call", async () => {
+    writeFileSync(
+      join(cwd, "A.java"),
+      ["class A { void m() {", '  a.b(")").c();', "} }"].join("\n"),
+    );
+    writeFileSync(join(cwd, "k.kt"), ["fun m() {", "  f(1)(2)", "}"].join("\n"));
+    writeFileSync(join(cwd, "r.rb"), ["def m", "  x.y 1 do end", "end"].join("\n"));
+    const session = createTreeSitterSession(cwd);
+    const spans = async (file: string) => {
+      const result = await session.callSites(file);
+      expect(result).toMatchObject({ kind: "success" });
+      if (result.kind !== "success") return [];
+      return result.data.map((call) => `${call.name}@${call.startCharacter}-${call.endCharacter}`);
+    };
+
+    try {
+      expect(await spans("A.java")).toEqual(['a.b(")").c@3-13', "a.b@3-6"]);
+      expect(await spans("k.kt")).toEqual(["f(1)@3-7", "f@3-4"]);
+      expect(await spans("r.rb")).toEqual(["x.y@3-6"]);
+
+      const callees = await session.calleesAt("A.java", 2, 3);
+      expect(callees).toMatchObject({ kind: "success" });
+      if (callees.kind !== "success") return;
+      expect(callees.data.callees.map(({ range }) => range)).toEqual([
+        { startLine: 2, startCharacter: 3, endLine: 2, endCharacter: 6 },
+        { startLine: 2, startCharacter: 3, endLine: 2, endCharacter: 13 },
+      ]);
     } finally {
       await session.dispose();
     }
