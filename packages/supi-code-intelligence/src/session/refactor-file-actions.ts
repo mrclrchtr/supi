@@ -1,8 +1,7 @@
 /** Code- and source-action refactor planning for one named file. */
 
-import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import type { RefactorRequest, SourceRange } from "@mrclrchtr/supi-code-runtime/api";
-import { isWithinOrEqual } from "@mrclrchtr/supi-core/project";
 import { toLspPosition } from "@mrclrchtr/supi-lsp/api";
 import { normalizePath } from "../analysis/search/paths.ts";
 import {
@@ -36,7 +35,7 @@ export async function planFileAction(
         }
       : { name: "source_action" as const, selection: operation.source_action, range: undefined };
   const file = normalizePath(selection.file, deps.cwd);
-  const fileError = validateActionFile(file, selection.file, `operation.${name}.file`, deps.cwd);
+  const fileError = validateActionFile(file, selection.file, `operation.${name}.file`);
   if (fileError) return { kind: "invalid-input", message: fileError };
   const rangeError = range
     ? validateRangeWithinFile(file, selection.file, range, `operation.${name}.range`)
@@ -74,22 +73,13 @@ export async function planFileAction(
 }
 
 /**
- * Check that an action file exists, is a file, and resolves inside the
- * workspace. Real paths are compared so a workspace link cannot reach an
- * outside file; apply still enforces the server's own mutation roots.
+ * Check that an action file exists and is a file. The routed language server
+ * enforces its own project root before any request.
  */
-function validateActionFile(
-  file: string,
-  input: string,
-  label: string,
-  cwd: string,
-): string | null {
+function validateActionFile(file: string, input: string, label: string): string | null {
   if (!existsSync(file)) return `File not found: \`${input}\``;
   if (statSync(file).isDirectory()) {
     return `${label} must be a file, not a directory: \`${input}\`.`;
-  }
-  if (!isWithinOrEqual(realpathSync(cwd), realpathSync(file))) {
-    return `${label} must be inside the workspace: \`${input}\`.`;
   }
   return null;
 }

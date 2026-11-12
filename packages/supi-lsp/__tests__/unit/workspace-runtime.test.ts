@@ -116,7 +116,7 @@ describe("workspace runtime behavior", () => {
       codeActions: [{ title: "Fix it" }],
     };
     const client = {
-      root: "/routed/project",
+      root: "/project/src",
       definition: async () => completedCodeQuery(facts.definition),
       references: async () => completedCodeQuery(facts.references),
       implementation: async () => completedCodeQuery(facts.implementation),
@@ -143,11 +143,11 @@ describe("workspace runtime behavior", () => {
       completedCodeQuery(facts.documentSymbols),
       {
         value: facts.rename,
-        authorizedMutationRoots: ["/routed/project"],
+        authorizedMutationRoots: ["/project/src"],
       },
       {
         value: facts.codeActions,
-        authorizedMutationRoots: ["/routed/project"],
+        authorizedMutationRoots: ["/project/src"],
       },
     ]);
   });

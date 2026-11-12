@@ -228,3 +228,50 @@ describe("workspace LSP rename snapshots", () => {
     expect(client.renameDetailedWithSnapshots).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("routed project-root boundary", () => {
+  function outsideClient() {
+    const { root } = createFiles();
+    const outside = createFiles();
+    const client = {
+      name: "go",
+      root,
+      renameDetailedWithSnapshots: vi.fn(),
+      codeActionsDetailed: vi.fn(),
+      getDiagnostics: () => [],
+    };
+    const manager = {
+      getCwd: () => root,
+      ensureFileOpen: vi.fn().mockResolvedValue(client),
+    } as unknown as LspManager;
+    return {
+      client,
+      target: outside.target,
+      runtime: createWorkspaceLspRuntimeOwner(manager).runtime,
+    };
+  }
+
+  it("refuses a rename for a file outside the routed server root without a request", async () => {
+    const { client, target, runtime } = outsideClient();
+
+    const response = await runtime.rename(target, { line: 1, character: 5 }, "Renamed");
+
+    expect(client.renameDetailedWithSnapshots).not.toHaveBeenCalled();
+    expect(response).toMatchObject({
+      value: null,
+      reason: expect.stringContaining("outside the language server's project root"),
+    });
+  });
+
+  it("refuses code actions for a file outside the routed server root without a request", async () => {
+    const { client, target, runtime } = outsideClient();
+
+    const response = await runtime.codeActions(target, { line: 0, character: 0 });
+
+    expect(client.codeActionsDetailed).not.toHaveBeenCalled();
+    expect(response).toMatchObject({
+      value: null,
+      reason: expect.stringContaining("outside the language server's project root"),
+    });
+  });
+});

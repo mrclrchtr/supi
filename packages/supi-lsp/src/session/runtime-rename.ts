@@ -5,6 +5,7 @@ import type { SemanticInputDocumentSnapshot } from "../client/client-semantic-in
 import type { Position, WorkspaceEdit } from "../config/types.ts";
 import type { LspManager } from "../manager/manager.ts";
 import { discoverSemanticEditFiles } from "../provider/semantic-edit-discovery.ts";
+import { outsideRouteRootReason } from "./route-boundary.ts";
 import type {
   RoutedMutationDocumentSnapshot,
   RoutedMutationResponse,
@@ -26,6 +27,8 @@ export async function runRoutedRename(options: {
   });
   if (!client) return null;
   const authorizedMutationRoots = [client.root];
+  const outside = outsideRouteRootReason(file, client.root);
+  if (outside) return { value: null, authorizedMutationRoots, reason: outside };
 
   if (typeof client.renameDetailedWithSnapshots === "function") {
     return renameWithSnapshots({

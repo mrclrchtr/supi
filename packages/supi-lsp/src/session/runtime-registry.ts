@@ -40,6 +40,7 @@ import type {
 } from "../diagnostics/workspace-sentinels.ts";
 import type { LspManager } from "../manager/manager.ts";
 import { raceReadinessValue } from "./readiness.ts";
+import { outsideRouteRootReason } from "./route-boundary.ts";
 import type {
   DiagnosticEvidenceSummary,
   ProcessCrashRecoveryReport,
@@ -303,6 +304,10 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
       control,
     });
     if (!client) return null;
+    const outside = outsideRouteRootReason(resolvedPath, client.root);
+    if (outside) {
+      return { value: null, authorizedMutationRoots: [client.root], reason: outside };
+    }
 
     const range = isRange(positionOrRange)
       ? positionOrRange
