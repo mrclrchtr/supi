@@ -15,6 +15,13 @@ export function buildConsultingRunParameters(agent: string, catalogue: readonly 
 export const consultingRunSpec = {
   name: CONSULTING_RUN_TOOL_NAME,
   label: CONSULTING_RUN_TOOL_LABEL,
+  // Sends the prompt (and optionally workspace evidence) to an external agent with web access.
+  annotations: {
+    readOnlyHint: false,
+    destructiveHint: false,
+    idempotentHint: false,
+    openWorldHint: true,
+  },
   exposure: "model-only",
   executionMode: "parallel",
 } as const;

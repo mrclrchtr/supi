@@ -1,4 +1,5 @@
-// Wire-shape integrity for every registered SuPi tool schema.
+// Wire-shape integrity for every registered SuPi tool schema, plus the completeness and
+// coherence of each spec's annotation hints.
 //
 // Provider APIs reject function schemas whose top level is not a plain
 // object, and a corrupted build (for example an import cycle that leaves a
@@ -28,6 +29,8 @@ async function collectTools() {
   // agent_run parameters depend on the runtime profile catalogue; the
   // factory with an unloaded catalogue is the canonical static shape.
   add("supi-agent", "agent_run", { ...m.agentRunSpec, parameters: m.buildAgentRunParameters() });
+  m = await import(`${PACKAGES}/supi-agent/src/tool/agent_list/spec.ts`);
+  add("supi-agent", "agent_list", m.agentListSpec);
   m = await import(`${PACKAGES}/supi-agent/src/tool/agent_result/spec.ts`);
   add("supi-agent", "agent_result", m.agentResultSpec);
   m = await import(`${PACKAGES}/supi-agent/src/tool/agent_cancel/spec.ts`);
@@ -59,7 +62,7 @@ describe("tool schema wire integrity", () => {
     timeout: 20_000,
   }, async () => {
     const tools = await collectTools();
-    expect(tools.length).toBeGreaterThanOrEqual(22);
+    expect(tools.length).toBeGreaterThanOrEqual(23);
 
     for (const { pkg, name, spec } of tools) {
       expect(spec.parameters, `${pkg} :: ${name} has no parameter schema`).toBeDefined();
@@ -92,5 +95,44 @@ describe("tool schema wire integrity", () => {
         );
       }
     }
+  });
+
+  it("declares a complete, coherent annotation set on every registered tool", {
+    timeout: 20_000,
+  }, async () => {
+    const tools = await collectTools();
+    // consulting_run builds parameters from a runtime catalogue, so it is not in the schema list.
+    const consulting = await import(`${PACKAGES}/supi-consulting/src/tool/consulting_run/spec.ts`);
+    tools.push({
+      pkg: "supi-consulting",
+      name: "consulting_run",
+      spec: consulting.consultingRunSpec,
+    });
+
+    for (const { pkg, name, spec } of tools) {
+      const hints = spec.annotations;
+      const label = `${pkg} :: ${name}`;
+      // Missing hints fall back to the pessimistic MCP defaults, so every hint must be explicit.
+      for (const hint of ["readOnlyHint", "destructiveHint", "idempotentHint", "openWorldHint"]) {
+        expect(typeof hints?.[hint], `${label} ${hint}`).toBe("boolean");
+      }
+      if (hints.readOnlyHint) {
+        expect(hints.destructiveHint, `${label} read-only yet destructive`).toBe(false);
+        expect(hints.idempotentHint, `${label} read-only yet not idempotent`).toBe(true);
+      }
+      // Web tools and external consultations reach services outside the workspace.
+      if (name.startsWith("web_") || name === "consulting_run") {
+        expect(hints.openWorldHint, `${label} openWorldHint`).toBe(true);
+      }
+    }
+
+    const byName = new Map(tools.map(({ name, spec }) => [name, spec.annotations]));
+    // The only SuPi tool that overwrites workspace files.
+    expect(byName.get("code_refactor_apply")).toMatchObject({
+      readOnlyHint: false,
+      destructiveHint: true,
+    });
+    // Plans preview edits without writing files.
+    expect(byName.get("code_refactor_plan")).toMatchObject({ readOnlyHint: true });
   });
 });

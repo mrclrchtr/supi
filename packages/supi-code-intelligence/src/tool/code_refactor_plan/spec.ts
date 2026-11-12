@@ -12,6 +12,13 @@ export const CODE_REFACTOR_PLAN_TOOL_LABEL = "Code Refactor Plan";
 export const codeRefactorPlanSpec = {
   name: CODE_REFACTOR_PLAN_TOOL_NAME,
   label: CODE_REFACTOR_PLAN_TOOL_LABEL,
+  // Previews only: server-pushed edits are captured and refused; no file changes.
+  annotations: {
+    readOnlyHint: true,
+    destructiveHint: false,
+    idempotentHint: true,
+    openWorldHint: false,
+  },
   parameters: Type.Object(
     {
       operation: RefactorOperationParam,

@@ -17,6 +17,7 @@ function fakeSpec(
   return {
     name: "code_find",
     label: "Fake Find",
+    annotations: { readOnlyHint: true },
     parameters: Type.Object({}, { additionalProperties: false }),
     run,
   };

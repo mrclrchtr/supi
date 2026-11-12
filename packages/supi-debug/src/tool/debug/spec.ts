@@ -10,6 +10,12 @@ export const DEBUG_TOOL_LABEL = "SuPi Debug";
 export const debugSpec = {
   name: DEBUG_TOOL_NAME,
   label: DEBUG_TOOL_LABEL,
+  annotations: {
+    readOnlyHint: true,
+    destructiveHint: false,
+    idempotentHint: true,
+    openWorldHint: false,
+  },
   parameters: Type.Object({
     operationId: Type.Optional({
       ...debugOperationIdSchema,

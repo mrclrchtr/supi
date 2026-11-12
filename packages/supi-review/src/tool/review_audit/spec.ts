@@ -41,6 +41,13 @@ const reviewAuditParameters = Type.Object(
 export const reviewAuditSpec = {
   name: REVIEW_AUDIT_TOOL_NAME,
   label: REVIEW_AUDIT_TOOL_LABEL,
+  // Reading prunes only expired SuPi-owned replay files that no call can return.
+  annotations: {
+    readOnlyHint: true,
+    destructiveHint: false,
+    idempotentHint: true,
+    openWorldHint: false,
+  },
   parameters: reviewAuditParameters,
   outputSchema: reviewAuditOutputSchema,
 } as const;

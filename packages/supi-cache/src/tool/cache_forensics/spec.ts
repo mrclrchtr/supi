@@ -10,6 +10,12 @@ export const CACHE_FORENSICS_TOOL_LABEL = "Cache Forensics";
 export const cacheForensicsSpec = {
   name: CACHE_FORENSICS_TOOL_NAME,
   label: CACHE_FORENSICS_TOOL_LABEL,
+  annotations: {
+    readOnlyHint: true,
+    destructiveHint: false,
+    idempotentHint: true,
+    openWorldHint: false,
+  },
   parameters: Type.Object({
     pattern: Type.Enum(["hotspots", "breakdown", "correlate", "idle"], {
       type: "string",

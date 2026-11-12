@@ -12,6 +12,12 @@ export const CODE_RESOLVE_TOOL_LABEL = "Code Resolve";
 export const codeResolveSpec = {
   name: CODE_RESOLVE_TOOL_NAME,
   label: CODE_RESOLVE_TOOL_LABEL,
+  annotations: {
+    readOnlyHint: true,
+    destructiveHint: false,
+    idempotentHint: true,
+    openWorldHint: false,
+  },
   outputSchema: ResolveOutputSchema,
   parameters: Type.Object(
     {

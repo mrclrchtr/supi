@@ -1,4 +1,5 @@
 import type { BuildSystemPromptOptions, ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { CONTEXT_TOOL_NAMESPACE } from "../namespace.ts";
 import { makeContextReportExecute } from "./execute.ts";
 import { promptSnippet, toolDescription } from "./guidance.ts";
 import { renderContextToolCall, renderContextToolResult } from "./render.ts";
@@ -11,6 +12,7 @@ export function registerContextReportTool(
 ): void {
   pi.registerTool({
     ...contextReportSpec,
+    namespace: CONTEXT_TOOL_NAMESPACE,
     description: toolDescription,
     promptSnippet,
     execute: makeContextReportExecute(pi, getOptions),

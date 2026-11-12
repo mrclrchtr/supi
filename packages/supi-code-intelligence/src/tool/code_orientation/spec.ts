@@ -12,6 +12,14 @@ export const CODE_ORIENTATION_TOOL_LABEL = "Code Orientation";
 export const codeOrientationSpec = {
   name: CODE_ORIENTATION_TOOL_NAME,
   label: CODE_ORIENTATION_TOOL_LABEL,
+  // Read-only by default. Gradle observation runs project build logic only after an explicit
+  // per-project allow; that consent covers its effects, so the hints describe the default path.
+  annotations: {
+    readOnlyHint: true,
+    destructiveHint: false,
+    idempotentHint: true,
+    openWorldHint: true,
+  },
   outputSchema: OrientationOutputSchema,
   parameters: Type.Object(
     {

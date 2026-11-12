@@ -236,6 +236,22 @@ it("routes all five native tools through Pi default codemode, preserves recovery
       expect([...Value.Errors(schema, event.structuredContent)]).toEqual([]);
       expect(JSON.parse(JSON.stringify(event.structuredContent))).toEqual(event.structuredContent);
     }
+    // Scripts discover the code tools as one namespace with on-demand usage guidance.
+    const discovered = await runScript(
+      'const ns = await describeNamespace("code"); return { name: ns.name, tools: ns.tools, guided: ns.instructions.includes("code_refactor_apply") };',
+    );
+    expect(discovered.isError).toBe(false);
+    const discoveredText = discovered.content
+      .filter((block) => block.type === "text")
+      .map((block) => block.text)
+      .join("\n");
+    expect(discoveredText).toContain(
+      JSON.stringify({
+        name: "code",
+        tools: CODE_INTELLIGENCE_TOOL_SPECS.map((spec) => spec.name),
+        guided: true,
+      }),
+    );
     // Corrective outcomes remain data rather than becoming execution failures.
     const invalid = await runScript(
       'return (await tools.code_refactor_apply({ planId: "missing" })).kind;',

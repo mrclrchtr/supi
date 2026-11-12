@@ -17,6 +17,12 @@ export const WEB_FETCH_MD_TOOL_LABEL = "Web Fetch";
 export const webFetchMdSpec = {
   name: WEB_FETCH_MD_TOOL_NAME,
   label: WEB_FETCH_MD_TOOL_LABEL,
+  annotations: {
+    readOnlyHint: true,
+    destructiveHint: false,
+    idempotentHint: true,
+    openWorldHint: true,
+  },
   parameters: webFetchMdParameters,
   outputSchema: webFetchMdOutputSchema,
   execute: runWebFetch,

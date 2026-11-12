@@ -8,6 +8,12 @@ export const CONTEXT_REPORT_TOOL_LABEL = "Context Usage";
 export const contextReportSpec = {
   name: CONTEXT_REPORT_TOOL_NAME,
   label: CONTEXT_REPORT_TOOL_LABEL,
+  annotations: {
+    readOnlyHint: true,
+    destructiveHint: false,
+    idempotentHint: true,
+    openWorldHint: false,
+  },
   outputSchema: contextReportOutputSchema,
   parameters: Type.Object({
     mode: Type.Optional(

@@ -1,5 +1,9 @@
 # Changelog
 
+## [11.5.0]
+
+- `consulting_run` now declares tool annotations that mark it as open-world and not read-only, for permission extensions that read `pi.getAllTools()` ([#582](https://github.com/mrclrchtr/supi/issues/582)).
+
 ## [11.3.0]
 
 - Added package-specific release notes for bounded agent consultations.

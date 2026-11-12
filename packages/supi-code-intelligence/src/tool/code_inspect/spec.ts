@@ -12,6 +12,12 @@ export const CODE_INSPECT_TOOL_LABEL = "Code Inspect";
 export const codeInspectSpec = {
   name: CODE_INSPECT_TOOL_NAME,
   label: CODE_INSPECT_TOOL_LABEL,
+  annotations: {
+    readOnlyHint: true,
+    destructiveHint: false,
+    idempotentHint: true,
+    openWorldHint: false,
+  },
   outputSchema: InspectOutputSchema,
   parameters: Type.Object(
     {

@@ -1,5 +1,9 @@
 # Changelog
 
+## [11.5.0]
+
+- Codemode now lists the `debug` tool under a `debug` namespace heading, so scripts can find them with `describeNamespace("debug")` or `searchTools(query, { namespace: "debug" })`. It is annotated read-only ([#582](https://github.com/mrclrchtr/supi/issues/582)).
+
 ## [11.4.0]
 
 - With Debug capture enabled, each session start, reload, resume, or fork records a `runtime-provenance` event with the package version and, when SuPi runs from its own Git checkout, the commit, commit time, and whether tracked files had uncommitted changes.

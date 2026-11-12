@@ -11,6 +11,13 @@ export const CODE_REFACTOR_APPLY_TOOL_LABEL = "Code Refactor Apply";
 export const codeRefactorApplySpec = {
   name: CODE_REFACTOR_APPLY_TOOL_NAME,
   label: CODE_REFACTOR_APPLY_TOOL_LABEL,
+  // Overwrites workspace files; a repeated planId is rejected because Apply consumes the plan.
+  annotations: {
+    readOnlyHint: false,
+    destructiveHint: true,
+    idempotentHint: true,
+    openWorldHint: false,
+  },
   parameters: Type.Object(
     {
       planId: Type.String({

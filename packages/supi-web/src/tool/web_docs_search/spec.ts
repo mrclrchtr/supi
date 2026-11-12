@@ -24,6 +24,12 @@ export type WebDocsSearchInput = Static<typeof webDocsSearchParameters>;
 export const webDocsSearchSpec = {
   name: WEB_DOCS_SEARCH_TOOL_NAME,
   label: WEB_DOCS_SEARCH_TOOL_LABEL,
+  annotations: {
+    readOnlyHint: true,
+    destructiveHint: false,
+    idempotentHint: true,
+    openWorldHint: true,
+  },
   parameters: webDocsSearchParameters,
   outputSchema: webDocsSearchOutputSchema,
   execute: runSearch,

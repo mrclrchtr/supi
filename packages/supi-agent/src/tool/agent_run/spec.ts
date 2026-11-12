@@ -24,6 +24,13 @@ export function buildAgentRunParameters(): TSchema {
 export const agentRunSpec = {
   name: AGENT_RUN_TOOL_NAME,
   label: AGENT_RUN_TOOL_LABEL,
+  // Child sessions may get shell, edit, and Web tools depending on the profile.
+  annotations: {
+    readOnlyHint: false,
+    destructiveHint: true,
+    idempotentHint: false,
+    openWorldHint: true,
+  },
   // Start Agent Runs only through direct model calls.
   exposure: "model-only",
   executionMode: "sequential",

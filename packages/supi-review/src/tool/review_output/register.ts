@@ -1,5 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type { ReviewArtifactStore } from "../../session/review-artifact-store.ts";
+import { REVIEW_TOOL_NAMESPACE } from "../namespace.ts";
 import { executeReviewOutput } from "./execute.ts";
 import { promptGuidelines, promptSnippet, toolDescription } from "./guidance.ts";
 import { renderOutputCall, renderOutputResult } from "./render.ts";
@@ -9,6 +10,7 @@ import { reviewOutputSpec } from "./spec.ts";
 export function registerReviewOutputTool(pi: ExtensionAPI, store: ReviewArtifactStore): void {
   pi.registerTool({
     ...reviewOutputSpec,
+    namespace: REVIEW_TOOL_NAMESPACE,
     description: toolDescription,
     promptSnippet,
     promptGuidelines: [...promptGuidelines],

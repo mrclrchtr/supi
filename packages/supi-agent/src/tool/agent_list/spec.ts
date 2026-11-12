@@ -7,6 +7,12 @@ export const AGENT_LIST_PAGE_SIZE = 50;
 export const agentListSpec = {
   name: AGENT_LIST_TOOL_NAME,
   label: "Agent List",
+  annotations: {
+    readOnlyHint: true,
+    destructiveHint: false,
+    idempotentHint: true,
+    openWorldHint: false,
+  },
   exposure: "model-only",
   executionMode: "sequential",
   parameters: Type.Object(

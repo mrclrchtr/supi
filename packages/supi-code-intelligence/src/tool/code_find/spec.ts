@@ -14,6 +14,12 @@ export const CODE_FIND_TOOL_LABEL = "Code Find";
 export const codeFindSpec = {
   name: CODE_FIND_TOOL_NAME,
   label: CODE_FIND_TOOL_LABEL,
+  annotations: {
+    readOnlyHint: true,
+    destructiveHint: false,
+    idempotentHint: true,
+    openWorldHint: false,
+  },
   outputSchema: FindOutputSchema,
   parameters: Type.Object(
     {

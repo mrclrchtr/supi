@@ -1,4 +1,5 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { WEB_TOOL_NAMESPACE } from "../namespace.ts";
 import { createWebFetchExecute } from "./execute.ts";
 import { getWebFetchPromptSurface } from "./guidance.ts";
 import { renderWebFetchCall, renderWebFetchResult } from "./render.ts";
@@ -12,6 +13,7 @@ export function registerWebFetchMdTool(pi: ExtensionAPI, configCwd?: string): vo
   const surface = getWebFetchPromptSurface();
   pi.registerTool({
     ...webFetchMdSpec,
+    namespace: WEB_TOOL_NAMESPACE,
     ...(configCwd ? { execute: createWebFetchExecute(configCwd) } : {}),
     description: surface.description,
     promptSnippet: surface.promptSnippet,

@@ -12,6 +12,12 @@ export const CODE_HEALTH_TOOL_LABEL = "Code Health";
 export const codeHealthSpec = {
   name: CODE_HEALTH_TOOL_NAME,
   label: CODE_HEALTH_TOOL_LABEL,
+  annotations: {
+    readOnlyHint: true,
+    destructiveHint: false,
+    idempotentHint: true,
+    openWorldHint: false,
+  },
   parameters: Type.Object(
     {
       scope: Type.Optional(ScopeParam),

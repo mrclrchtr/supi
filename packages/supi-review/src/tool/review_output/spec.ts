@@ -25,6 +25,12 @@ const reviewOutputParameters = Type.Object(
 export const reviewOutputSpec = {
   name: REVIEW_OUTPUT_TOOL_NAME,
   label: REVIEW_OUTPUT_TOOL_LABEL,
+  annotations: {
+    readOnlyHint: true,
+    destructiveHint: false,
+    idempotentHint: true,
+    openWorldHint: false,
+  },
   parameters: reviewOutputParameters,
   outputSchema: Type.Object(
     {

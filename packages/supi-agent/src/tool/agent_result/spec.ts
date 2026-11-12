@@ -7,6 +7,13 @@ export { makeAgentResultExecute } from "./execute.ts";
 export const agentResultSpec = {
   name: AGENT_RESULT_TOOL_NAME,
   label: "Agent Result",
+  // Records collected results, checkpoints, and Usage in the session once.
+  annotations: {
+    readOnlyHint: false,
+    destructiveHint: false,
+    idempotentHint: true,
+    openWorldHint: false,
+  },
   exposure: "model-only",
   executionMode: "sequential",
   parameters: Type.Object(

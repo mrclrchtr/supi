@@ -1,5 +1,9 @@
 # Changelog
 
+## [11.5.0]
+
+- The `agent_*` tools now declare audited `readOnlyHint`, `destructiveHint`, `idempotentHint`, and `openWorldHint` annotations for permission extensions. `agent_run` is marked destructive and open-world because child sessions may get shell, edit, and Web tools ([#582](https://github.com/mrclrchtr/supi/issues/582)).
+
 ## [11.4.0]
 
 - Agent Run retrospectives (opt-in via `debug.agentRunRetrospectivesEnabled`) now also ask about Code Intelligence (`code_*`) results that were incomplete, oversized, ambiguous, or failed, and record a `promptRevision` so older and newer reports can be told apart.

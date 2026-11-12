@@ -17,6 +17,18 @@ const declineReviewRecoverySchema = Type.Object(
   { additionalProperties: false },
 );
 
+/**
+ * Hints shared by the child-only tools: each records one in-memory result and ends its child
+ * session without touching files or the network. A repeated call overwrites or conflicts with
+ * the first, so none is idempotent.
+ */
+const CHILD_TOOL_ANNOTATIONS = {
+  readOnlyHint: false,
+  destructiveHint: false,
+  idempotentHint: false,
+  openWorldHint: false,
+} as const;
+
 /** Canonical metadata for the child-session tools owned by the review_run workflow. */
 export const REVIEW_CHILD_TOOL_SPECS = {
   submitReview: {
@@ -25,6 +37,7 @@ export const REVIEW_CHILD_TOOL_SPECS = {
     description:
       "Submit the one final structured result for this review task. A successful call ends the Reviewer Session.",
     exposure: "model-only",
+    annotations: CHILD_TOOL_ANNOTATIONS,
     parameters: reviewSubmissionSchema,
   },
   declineReviewRecovery: {
@@ -33,6 +46,7 @@ export const REVIEW_CHILD_TOOL_SPECS = {
     description:
       "End Submission Recovery without a Task Verdict when retained history cannot support a valid review submission.",
     exposure: "model-only",
+    annotations: CHILD_TOOL_ANNOTATIONS,
     parameters: declineReviewRecoverySchema,
   },
   submitPlannerDraft: {
@@ -40,6 +54,7 @@ export const REVIEW_CHILD_TOOL_SPECS = {
     label: "Submit Planner Draft",
     description:
       "Submit the one advisory Planner Draft. A successful call ends the Planner Session.",
+    annotations: CHILD_TOOL_ANNOTATIONS,
     parameters: plannerDraftSchema,
   },
 } as const;

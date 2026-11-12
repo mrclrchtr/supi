@@ -12,6 +12,12 @@ export const CODE_GRAPH_TOOL_LABEL = "Code Graph";
 export const codeGraphSpec = {
   name: CODE_GRAPH_TOOL_NAME,
   label: CODE_GRAPH_TOOL_LABEL,
+  annotations: {
+    readOnlyHint: true,
+    destructiveHint: false,
+    idempotentHint: true,
+    openWorldHint: false,
+  },
   outputSchema: GraphOutputSchema,
   parameters: Type.Object(
     {

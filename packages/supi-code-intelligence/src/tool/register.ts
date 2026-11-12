@@ -12,6 +12,7 @@ import {
   type CodeIntelligenceToolPromptSurfaceMap,
 } from "./guidance.ts";
 import { boundCodeToolResult } from "./infra/truncate.ts";
+import { CODE_TOOL_NAMESPACE } from "./namespace.ts";
 import { CODE_INTELLIGENCE_TOOL_SPECS, type CodeIntelligenceToolDefinitionSpec } from "./specs.ts";
 
 /**
@@ -101,6 +102,8 @@ export function registerCodeIntelligenceTools(
     pi.registerTool({
       name: spec.name,
       label: spec.label,
+      namespace: CODE_TOOL_NAMESPACE,
+      annotations: spec.annotations,
       description: surface.description,
       promptSnippet: surface.promptSnippet,
       promptGuidelines: surface.promptGuidelines,

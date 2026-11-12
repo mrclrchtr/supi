@@ -7,6 +7,12 @@ export const ASK_USER_TOOL_LABEL = "Ask User";
 export const askUserSpec = {
   name: ASK_USER_TOOL_NAME,
   label: ASK_USER_TOOL_LABEL,
+  annotations: {
+    readOnlyHint: true,
+    destructiveHint: false,
+    idempotentHint: true,
+    openWorldHint: false,
+  },
   parameters: AskUserParamsSchema,
   // Keep user forms out of nested tool calls.
   exposure: "model-only",

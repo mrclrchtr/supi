@@ -12,6 +12,7 @@ A tool's `spec.ts` owns:
 - parameter schemas and native result `outputSchema` (declared locally or in a paired `structured.ts` / `structured-schema.ts`)
 - execution bindings — `execute` lives on the spec object when it needs no runtime dependencies; when a tool's schema or execute is dynamic (depends on catalog or session state), `spec.ts` exports the factory (e.g. a parameter builder or execute factory) and `register.ts` evaluates it at registration time
 - concise purpose and substrate metadata
+- `annotations` — audited behavior hints (§ Namespaces and annotations)
 
 The paired `guidance.ts` owns verbose descriptions, snippets, and guidelines. Registration imports each tool's spec and guidance; alignment tests assert that registration matches the spec modules.
 
@@ -155,6 +156,52 @@ Current examples:
 - `supi-code-runtime` brokers canonical semantic and structural capability state. `WorkspaceRuntime` is the only process-shared provider seam.
 
 Reuse the core session-registry helper for normalized workspace-keyed state. Keep package-specific state unions and wait policy local.
+
+## Namespaces and annotations
+
+Pi passes both fields through `pi.getAllTools()` and does not enforce them ([Tool Exposure](https://github.com/earendil-works/pi/blob/main/docs/extensions.md#tool-exposure) in the installed Pi docs).
+
+**Namespaces** group codemode-callable tools under one heading in the codemode description. They also scope `searchTools(q, { namespace })` and `describeNamespace(name)`.
+
+- Each package keeps one `ToolNamespace` constant in `src/tool/namespace.ts`, and its `register.ts` files attach it. Every tool of the package shares that object.
+- `description` is one sentence and appears in the listing. `instructions` load only through `describeNamespace()`, so they hold ordering hints (resolve → graph/inspect, plan → apply) and never safety-critical rules. Those rules stay in each tool's own description.
+- Model-only tools (`agent_*`, `ask_user`, `review_run`, `consulting_run`) have no namespace. Codemode never lists them, so a namespace would only group them in `getAllTools()`.
+
+| Namespace | Package | Tools |
+| --- | --- | --- |
+| `code` | `supi-code-intelligence` | `code_*` |
+| `web` | `supi-web` | `web_*` |
+| `review` | `supi-review` | `review_output`, `review_audit` |
+| `debug` | `supi-debug` | `debug` |
+| `context` | `supi-context` | `context_report` |
+| `cache` | `supi-cache` | `cache_forensics` |
+
+**Annotations** carry MCP semantics. A missing hint falls back to the pessimistic MCP default (not read-only, may be destructive, open world). Therefore every owned tool declares all four hints in its `spec.ts`, including the Review child-only tools. `scripts/__tests__/tool-schema-integrity.test.mjs` checks the specs for completeness and coherence; `scripts/__tests__/tool-registration-metadata.test.mjs` checks what registration forwards.
+
+Audit the effects, not the name:
+
+- **read-only** means no change to the workspace, user config, or session history the model relies on. SuPi-owned spill files under the OS temp directory, pruning of expired SuPi-owned replays, and append-only session metadata outside the model context do not count.
+- **destructive** means the tool may overwrite or delete user data, or it starts work that can do so.
+- **open world** means the tool reaches external services or runs code that can reach them.
+
+| Tool | RO | Destr. | Idem. | Open | Rationale |
+| --- | --- | --- | --- | --- | --- |
+| `code_resolve`, `code_inspect`, `code_graph`, `code_find`, `code_health` | ✓ | – | ✓ | – | Language-server and syntax-tree queries over the workspace. `code_health refresh:true` only retries failed server routes. |
+| `code_orientation` | ✓ | – | ✓ | ✓ | Read-only by default. Exemption: Gradle observation runs project build logic, which may write caches or download dependencies, but only after an explicit per-project allow. That consent covers its effects. The open-world hint stays because the run can reach the network. |
+| `code_refactor_plan` | ✓ | – | ✓ | – | Stores a preview in memory. Edits that a server pushes are captured and refused, so no file changes. |
+| `code_refactor_apply` | – | ✓ | ✓ | – | Overwrites workspace files. Apply consumes the plan, so a repeated `planId` is rejected without further effect. |
+| `web_fetch_md`, `web_search`, `web_docs_search`, `web_docs_fetch` | ✓ | – | ✓ | ✓ | Public web, Firecrawl, bx search, and Context7. Large results spill to temp files. |
+| `debug`, `cache_forensics`, `context_report` | ✓ | – | ✓ | – | Read live state or past session logs. Large results spill to temp files. |
+| `review_output` | ✓ | – | ✓ | – | Reads an in-memory artifact. |
+| `review_audit` | ✓ | – | ✓ | – | Reads replays. A read prunes only expired SuPi-owned replay files. |
+| `review_run` | – | ✓ | – | ✓ | Starts model-backed Reviewer Sessions, optionally with Web tools, and may store replays. Reviewers get `bash`; inspection-only is a protocol, not access control. |
+| `submit_review`, `decline_review_recovery`, `submit_planner_draft` | – | – | – | – | Child-only. Each records one in-memory result and ends its child session; a second call conflicts or overwrites. |
+| `agent_run` | – | ✓ | – | ✓ | Starts child sessions. Depending on the profile, they get shell, edit, and Web tools. |
+| `agent_list` | ✓ | – | ✓ | – | Lists saved conversations. |
+| `agent_result` | – | – | ✓ | – | Stores collected results, checkpoints, and Usage in the session once; repeated collection adds nothing. |
+| `agent_cancel` | – | – | ✓ | – | Stops background child work; repeated requests are harmless. |
+| `ask_user` | ✓ | – | ✓ | – | Shows a form to the user. It records only form metadata outside the model context. |
+| `consulting_run` | – | – | – | ✓ | Sends the prompt, and optionally workspace evidence, to an external agent with web access. Saves a continuation handle in the session. |
 
 ## Current code-intelligence example
 

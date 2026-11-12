@@ -297,6 +297,24 @@ it("delivers actual web tool data through PI's default codemode and rejects thro
       }
     }
 
+    // Namespace-scoped search finds only the web tools.
+    const scoped = await runScript(
+      [
+        // biome-ignore lint/security/noSecrets: codemode script source, not a secret
+        'const found = await searchTools("documentation", { namespace: "web" });',
+        "const names = found.map((tool) => tool.name);",
+        'const onlyWeb = names.length > 0 && names.every((name) => name.startsWith("web_"));',
+        'return { docs: names.includes("web_docs_fetch"), onlyWeb };',
+      ].join("\n"),
+    );
+    expect(scoped.isError).toBe(false);
+    expect(
+      scoped.content
+        .filter((block) => block.type === "text")
+        .map((block) => block.text)
+        .join("\n"),
+    ).toContain('{"docs":true,"onlyWeb":true}');
+
     const providerFailure = await runScript(
       'return await tools.web_fetch_md({ url: "https://example.com/provider-failure", fetch_mode: "firecrawl_fallback" });',
     );

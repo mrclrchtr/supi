@@ -1,3 +1,4 @@
+import type { ToolAnnotations } from "@earendil-works/pi-coding-agent";
 import type { Component } from "@earendil-works/pi-tui";
 import type { TSchema } from "typebox";
 import type {
@@ -27,6 +28,8 @@ export type CodeToolRendererFn = (...args: any[]) => Component;
 export interface CodeIntelligenceToolDefinitionSpec {
   name: CodeIntelligenceToolName;
   label: string;
+  /** Audited behavior hints for permission extensions (MCP tool-annotation semantics). */
+  annotations: ToolAnnotations;
   parameters: TSchema;
   /** Machine-readable success and recoverable-input outcomes for programmatic callers. */
   outputSchema?: TSchema;

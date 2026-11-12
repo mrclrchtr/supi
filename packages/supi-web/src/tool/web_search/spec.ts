@@ -14,6 +14,12 @@ export const WEB_SEARCH_TOOL_LABEL = "Web Search";
 export const webSearchSpec = {
   name: WEB_SEARCH_TOOL_NAME,
   label: WEB_SEARCH_TOOL_LABEL,
+  annotations: {
+    readOnlyHint: true,
+    destructiveHint: false,
+    idempotentHint: true,
+    openWorldHint: true,
+  },
   parameters: webSearchParameters,
   outputSchema: webSearchOutputSchema,
   execute: runWebSearch,

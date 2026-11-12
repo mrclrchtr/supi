@@ -5,6 +5,13 @@ import { AGENT_CANCEL_TOOL_NAME } from "../names.ts";
 export const agentCancelSpec = {
   name: AGENT_CANCEL_TOOL_NAME,
   label: "Agent Cancel",
+  // Stops running child work; repeated requests are harmless.
+  annotations: {
+    readOnlyHint: false,
+    destructiveHint: false,
+    idempotentHint: true,
+    openWorldHint: false,
+  },
   exposure: "model-only",
   executionMode: "sequential",
   parameters: Type.Object(

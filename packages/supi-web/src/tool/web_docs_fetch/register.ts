@@ -1,4 +1,5 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { WEB_TOOL_NAMESPACE } from "../namespace.ts";
 import { promptGuidelines, promptSnippet, toolDescription } from "./guidance.ts";
 import { renderFetchCall, renderFetchResult } from "./render.ts";
 import { webDocsFetchSpec } from "./spec.ts";
@@ -7,6 +8,7 @@ import { webDocsFetchSpec } from "./spec.ts";
 export function registerWebDocsFetchTool(pi: ExtensionAPI): void {
   pi.registerTool({
     ...webDocsFetchSpec,
+    namespace: WEB_TOOL_NAMESPACE,
     description: toolDescription,
     promptSnippet,
     promptGuidelines: [...promptGuidelines],
