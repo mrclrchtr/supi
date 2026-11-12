@@ -118,5 +118,10 @@ function formatOperationSupportDetail(value: OperationSupport): string | null {
   }
   if (value.supi === "unsupported") details.push("SuPi unsupported");
   if (value.kinds?.length) details.push(`kinds ${value.kinds.join(", ")}`);
+  if (value.anyKind) {
+    details.push(
+      value.kinds?.length ? "may return unlisted kinds" : "no kinds listed; may return any kind",
+    );
+  }
   return details.length > 0 ? details.join("; ") : null;
 }

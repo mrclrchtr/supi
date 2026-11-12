@@ -19,6 +19,11 @@ export interface ServerOperationSupport {
   readonly reason?: string;
   /** Advertised CodeActionKinds in this operation's family (`refactor*` or `source*`). */
   readonly kinds?: readonly string[];
+  /**
+   * The server may return kinds beyond `kinds`: it advertises CodeActionKind.Empty
+   * (`""`) or does not narrow `codeActionKinds` at all.
+   */
+  readonly anyKind?: boolean;
 }
 
 /** Operation support projected onto a project-server health entry. */
@@ -129,12 +134,18 @@ function codeActionFamilySupport(
   if (capabilities === null) return supportedOperation("unknown");
   const options = codeActionOptions(capabilities);
   if (!options) return supportedOperation("not-advertised");
-  // An unnarrowed provider or the empty kind may serve any family.
-  if (!options.kinds || options.kinds.includes("")) return supportedOperation("unknown");
-  const kinds = options.kinds.filter((kind) => isCodeActionKindWithin(kind, family));
-  return kinds.length > 0
-    ? { server: "advertised", supi: "supported", kinds }
-    : supportedOperation("not-advertised");
+  // An unnarrowed provider or the empty kind may return kinds it does not list.
+  const anyKind = !options.kinds || options.kinds.includes("");
+  const kinds = (options.kinds ?? []).filter(
+    (kind) => kind !== "" && isCodeActionKindWithin(kind, family),
+  );
+  if (kinds.length === 0 && !anyKind) return supportedOperation("not-advertised");
+  return {
+    server: "advertised",
+    supi: "supported",
+    ...(kinds.length > 0 ? { kinds } : {}),
+    ...(anyKind ? { anyKind } : {}),
+  };
 }
 
 /** Build the honest operation-support projection for one negotiated server. */

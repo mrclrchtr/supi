@@ -1,4 +1,4 @@
-import type { DiagnosticEvidenceSummary } from "@mrclrchtr/supi-lsp/api";
+import type { DiagnosticEvidenceSummary, ServerOperationSupport } from "@mrclrchtr/supi-lsp/api";
 import type { Static } from "typebox";
 import type {
   HealthData,
@@ -195,19 +195,7 @@ export function structuredHealthResult(data: HealthData): Output {
             operationSupport: Object.fromEntries(
               operations.flatMap((key) => {
                 const item = operationSupport[key];
-                return item
-                  ? [
-                      [
-                        key,
-                        {
-                          server: item.server,
-                          supi: item.supi,
-                          ...(item.reason === undefined ? {} : { reason: item.reason }),
-                          ...(item.kinds === undefined ? {} : { kinds: [...item.kinds] }),
-                        },
-                      ],
-                    ]
-                  : [];
+                return item ? [[key, structuredOperationSupport(item)]] : [];
               }),
             ),
           }
@@ -252,4 +240,15 @@ export function structuredHealthResult(data: HealthData): Output {
         }
       : {}),
   } as Output;
+}
+
+/** Copy one operation-support entry, omitting absent optional fields. */
+function structuredOperationSupport(item: ServerOperationSupport) {
+  return {
+    server: item.server,
+    supi: item.supi,
+    ...(item.reason === undefined ? {} : { reason: item.reason }),
+    ...(item.kinds === undefined ? {} : { kinds: [...item.kinds] }),
+    ...(item.anyKind ? { anyKind: true } : {}),
+  };
 }

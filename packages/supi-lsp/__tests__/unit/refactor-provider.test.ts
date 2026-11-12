@@ -641,6 +641,27 @@ describe("LspRefactorProvider", () => {
       expect(result).not.toMatchObject({ reason: expect.stringContaining("quickfix") });
     });
 
+    it("explains an empty result from a server that may return any kind, without retrying", async () => {
+      // rust-analyzer advertises CodeActionKind.Empty and no source kinds.
+      const codeActions = vi.fn().mockResolvedValue({
+        ...inDir([]),
+        advertisedKinds: ["", "quickfix", "refactor", "refactor.extract"],
+      });
+      const provider = createLspSemanticProvider(createMockLsp({ codeActions }));
+
+      const result = await provider.refactor?.({
+        operation: "source_action",
+        file,
+        kind: "source.organizeImports",
+      });
+
+      expect(codeActions).toHaveBeenCalledTimes(1);
+      expect(result).toMatchObject({ kind: "unavailable" });
+      const reason = result?.kind === "unavailable" ? result.reason : "";
+      expect(reason).toContain("may return any code-action kind");
+      expect(reason).not.toContain("advertises no kinds");
+    });
+
     it("keeps the routed failure reason", async () => {
       const provider = createLspSemanticProvider(
         createMockLsp({

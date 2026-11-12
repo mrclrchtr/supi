@@ -171,7 +171,7 @@ async function attemptCodeActionRefactor(
     const advertised = advertisedFamilyKinds(response.advertisedKinds, kind);
     return unavailable(
       noKindMatchReason(kind, advertised),
-      advertised?.some((candidate) => isCodeActionKindInRange(candidate, kind)) ?? true,
+      advertised.kinds.some((candidate) => isCodeActionKindInRange(candidate, kind)),
     );
   }
   const matching = title === undefined ? ofKind : ofKind.filter((action) => action.title === title);
@@ -237,22 +237,38 @@ function isTitledCodeAction(value: unknown): value is CodeAction {
   );
 }
 
-/** The negotiated kinds in the requested kind's top-level family, such as `source*`. */
+/** Advertised kinds in one CodeActionKind family, such as `source*`. */
+interface AdvertisedFamilyKinds {
+  /** Listed non-empty kinds in the requested kind's top-level family. */
+  readonly kinds: readonly string[];
+  /** The server lists CodeActionKind.Empty or no kinds, so it may return any kind. */
+  readonly anyKind: boolean;
+}
+
 function advertisedFamilyKinds(
   advertised: readonly string[] | undefined,
   kind: string,
-): readonly string[] | undefined {
-  if (!advertised) return undefined;
+): AdvertisedFamilyKinds {
   const family = kind.split(".")[0] ?? kind;
-  return advertised.filter((candidate) => isCodeActionKindWithin(candidate, family));
+  return {
+    kinds: (advertised ?? []).filter(
+      (candidate) => candidate !== "" && isCodeActionKindWithin(candidate, family),
+    ),
+    anyKind: !advertised || advertised.includes(""),
+  };
 }
 
-function noKindMatchReason(kind: string, advertised: readonly string[] | undefined): string {
-  const prefix = `No code action matches kind "${kind}".`;
-  if (!advertised) return `${prefix} The server does not list the kinds it supports.`;
-  return advertised.length > 0
-    ? `${prefix} Server-advertised kinds: ${advertised.join(", ")}.`
-    : `${prefix} The server advertises no kinds in this family.`;
+function noKindMatchReason(kind: string, advertised: AdvertisedFamilyKinds): string {
+  const parts = [`No code action matches kind "${kind}" here.`];
+  if (advertised.kinds.length > 0) {
+    parts.push(`Server-advertised kinds: ${advertised.kinds.join(", ")}.`);
+  }
+  if (advertised.anyKind) {
+    parts.push("The server may return any code-action kind but returned none of this kind.");
+  } else if (advertised.kinds.length === 0) {
+    parts.push("The server advertises no kinds in this family.");
+  }
+  return parts.join(" ");
 }
 
 function actionIdentity(action: CodeAction): RefactorActionIdentity {

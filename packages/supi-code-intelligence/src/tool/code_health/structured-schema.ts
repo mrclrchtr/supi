@@ -78,6 +78,7 @@ const operation = object({
   supi: Type.Enum(["supported", "limited", "unsupported"], { type: "string" }),
   reason: Type.Optional(Type.String()),
   kinds: Type.Optional(Type.Array(Type.String())),
+  anyKind: Type.Optional(Type.Boolean()),
 });
 const support = object({
   rename_symbol: Type.Optional(operation),

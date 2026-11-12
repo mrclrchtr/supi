@@ -69,6 +69,22 @@ describe("LSP route status presentation", () => {
     );
   });
 
+  it("marks servers that may return kinds they do not list", () => {
+    expect(
+      formatProjectServerOperationSupport({
+        code_action: {
+          server: "advertised",
+          supi: "supported",
+          kinds: ["refactor", "refactor.extract"],
+          anyKind: true,
+        },
+        source_action: { server: "advertised", supi: "supported", anyKind: true },
+      }),
+    ).toBe(
+      "operation support: code_action: kinds refactor, refactor.extract; may return unlisted kinds | source_action: no kinds listed; may return any kind",
+    );
+  });
+
   it("groups operations with identical details", () => {
     expect(
       formatProjectServerOperationSupport({

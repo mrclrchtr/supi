@@ -58,11 +58,34 @@ describe("code-action operation support", () => {
     });
   });
 
-  it("reports an unnarrowed code-action provider as unknown kinds", () => {
+  it("reports an unnarrowed code-action provider as offering any kind", () => {
     const support = getServerOperationSupport({ codeActionProvider: true });
 
-    expect(support.code_action).toEqual({ server: "unknown", supi: "supported" });
-    expect(support.source_action).toEqual({ server: "unknown", supi: "supported" });
+    expect(support.code_action).toEqual({ server: "advertised", supi: "supported", anyKind: true });
+    expect(support.source_action).toEqual({
+      server: "advertised",
+      supi: "supported",
+      anyKind: true,
+    });
+  });
+
+  it("keeps listed kinds alongside CodeActionKind.Empty", () => {
+    // rust-analyzer advertisement.
+    const support = getServerOperationSupport(
+      capabilities(["", "quickfix", "refactor", "refactor.extract", "refactor.rewrite"]),
+    );
+
+    expect(support.code_action).toEqual({
+      server: "advertised",
+      supi: "supported",
+      kinds: ["refactor", "refactor.extract", "refactor.rewrite"],
+      anyKind: true,
+    });
+    expect(support.source_action).toEqual({
+      server: "advertised",
+      supi: "supported",
+      anyKind: true,
+    });
   });
 
   it("reports missing families as not advertised", () => {
