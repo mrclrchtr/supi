@@ -79,20 +79,43 @@ export function formatProjectServerCompiler(
   return `${selection.backend}: TypeScript ${selection.compilerVersion ?? "(unknown version)"} via ${selection.packageName}${selection.wrapperVersion ? ` (wrapper ${selection.wrapperVersion})` : ""}`;
 }
 
-/** Render operation support without hiding server limits or SuPi limits. */
+/**
+ * Render operation support without hiding server limits or SuPi limits.
+ *
+ * A server that does not advertise an operation already rules it out, so its
+ * SuPi limitation is omitted. Operations with identical details share one
+ * entry, so a shared limitation reason appears once.
+ */
 export function formatProjectServerOperationSupport(
   support: ServerOperationSupportMap | undefined,
 ): string | null {
   if (!support) return null;
-  const entries = Object.entries(support).flatMap(([operation, value]) => {
-    const details: string[] = [];
-    if (value.server === "not-advertised") details.push("server unsupported");
-    if (value.server === "unknown") details.push("not negotiated");
-    if (value.supi === "limited") {
-      details.push(`SuPi limitation${value.reason ? `: ${value.reason}` : ""}`);
-    }
-    if (value.supi === "unsupported") details.push("SuPi unsupported");
-    return details.length > 0 ? [`${operation}: ${details.join("; ")}`] : [];
-  });
-  return entries.length > 0 ? `operation support: ${entries.join(", ")}` : null;
+  const operationsByDetail = new Map<string, string[]>();
+  for (const [operation, value] of Object.entries(support)) {
+    const detail = formatOperationSupportDetail(value);
+    if (!detail) continue;
+    const operations = operationsByDetail.get(detail);
+    if (operations) operations.push(operation);
+    else operationsByDetail.set(detail, [operation]);
+  }
+  const entries = Array.from(
+    operationsByDetail,
+    ([detail, operations]) => `${operations.join(", ")}: ${detail}`,
+  );
+  // Details already use ";" and grouped operations use ",", so entries need a third separator.
+  return entries.length > 0 ? `operation support: ${entries.join(" | ")}` : null;
+}
+
+type OperationSupport = NonNullable<ServerOperationSupportMap[keyof ServerOperationSupportMap]>;
+
+/** Describe one operation's limits, or return null when nothing limits it. */
+function formatOperationSupportDetail(value: OperationSupport): string | null {
+  if (value.server === "not-advertised") return "server unsupported";
+  const details: string[] = [];
+  if (value.server === "unknown") details.push("not negotiated");
+  if (value.supi === "limited") {
+    details.push(`SuPi limitation${value.reason ? `: ${value.reason}` : ""}`);
+  }
+  if (value.supi === "unsupported") details.push("SuPi unsupported");
+  return details.length > 0 ? details.join("; ") : null;
 }
