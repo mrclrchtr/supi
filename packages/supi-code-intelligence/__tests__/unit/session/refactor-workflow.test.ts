@@ -186,6 +186,28 @@ describe("runRefactorPlanWorkflow", () => {
       "operation.code_action.range.end must not be before operation.code_action.range.start.",
     ],
     [
+      "a range that ends past the last line",
+      {
+        code_action: {
+          file: "src/index.ts",
+          range: { start: { line: 1, character: 1 }, end: { line: 30, character: 1 } },
+          kind: "refactor",
+        },
+      },
+      "operation.code_action.range.end line 30 is beyond the end of `src/index.ts` (2 lines).",
+    ],
+    [
+      "a range that starts past the end of its line",
+      {
+        code_action: {
+          file: "src/index.ts",
+          range: { start: { line: 1, character: 12 }, end: { line: 2, character: 1 } },
+          kind: "refactor",
+        },
+      },
+      "operation.code_action.range.start character 12 is beyond line 1 of `src/index.ts` (maximum 11, 1-based UTF-16).",
+    ],
+    [
       "a refactor kind as a source action",
       { source_action: { file: "src/index.ts", kind: "refactor.extract" } },
       'operation.source_action.kind must be "source" or start with "source.".',
