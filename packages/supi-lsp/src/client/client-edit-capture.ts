@@ -194,7 +194,7 @@ export async function runCommandEditCapture(
       kind: "unavailable",
       reason:
         serverError === undefined
-          ? "The server command produced no edit."
+          ? "The server command produced no edit; there may be nothing to change."
           : `The server command failed: ${serverError}`,
     };
   }

@@ -101,7 +101,10 @@ describe("LspClient command edit capture", () => {
   it("reports no edit when the command pushes none", async () => {
     await expect(
       client.captureCommandEdits(command("capture.none"), { timeoutMs: 2000 }),
-    ).resolves.toEqual({ kind: "unavailable", reason: "The server command produced no edit." });
+    ).resolves.toEqual({
+      kind: "unavailable",
+      reason: "The server command produced no edit; there may be nothing to change.",
+    });
   });
 
   it("refuses every edit and reports unavailable when the command pushes several", async () => {
@@ -187,7 +190,10 @@ describe("LspClient command edit capture", () => {
     );
     await expect(
       client.captureCommandEdits(command("capture.none"), { timeoutMs: 2000 }),
-    ).resolves.toEqual({ kind: "unavailable", reason: "The server command produced no edit." });
+    ).resolves.toEqual({
+      kind: "unavailable",
+      reason: "The server command produced no edit; there may be nothing to change.",
+    });
   });
 
   it("resyncs the full document under incremental sync", async () => {

@@ -769,7 +769,10 @@ describe("LspRefactorProvider", () => {
       it("keeps the capture failure reason", async () => {
         const { provider } = capturing(
           [commandAction("Extract variable", "refactor.extract.variable")],
-          { kind: "unavailable", reason: "The server command produced no edit." },
+          {
+            kind: "unavailable",
+            reason: "The server command produced no edit; there may be nothing to change.",
+          },
         );
 
         const result = await provider.refactor?.({
@@ -781,7 +784,9 @@ describe("LspRefactorProvider", () => {
 
         expect(result).toMatchObject({
           kind: "unavailable",
-          reason: expect.stringContaining("The server command produced no edit."),
+          reason: expect.stringContaining(
+            "The server command produced no edit; there may be nothing to change.",
+          ),
         });
       });
 
