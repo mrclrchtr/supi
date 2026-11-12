@@ -202,6 +202,16 @@ describe("LspClient command edit capture", () => {
     expect(change?.params).not.toMatchObject({ contentChanges: [{ range: expect.anything() }] });
   });
 
+  it("keeps the one captured edit when the command then fails because it was refused", async () => {
+    await expect(
+      client.captureCommandEdits(command("capture.rejected"), { timeoutMs: 2000 }),
+    ).resolves.toMatchObject({
+      kind: "captured",
+      edit: { documentChanges: [{ edits: [{ newText: "// one\n" }] }] },
+    });
+    expect(fs.readFileSync(file, "utf8")).toBe("value\n");
+  });
+
   it("reports a server error from the command as unavailable", async () => {
     await expect(
       client.captureCommandEdits(command("capture.fail"), { timeoutMs: 2000 }),

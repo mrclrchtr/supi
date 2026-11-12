@@ -5,14 +5,12 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { createPiMock, getTool, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { registerCodeIntelligenceTools } from "../../src/tool/register.ts";
-import { waitFor } from "../helpers/integration-utils.ts";
 import {
   createRealLanguageWorkspace,
   type RealLanguageWorkspace,
 } from "../helpers/real-substrate-workspace.ts";
+import { capturePlanTools } from "./command-capture-tools.ts";
 
 function hasCommand(command: string): boolean {
   try {
@@ -26,43 +24,12 @@ function hasCommand(command: string): boolean {
 const HAS_KOTLIN = hasCommand("kotlin-lsp") && hasCommand("gradle");
 const FILE = "src/main/kotlin/Main.kt";
 
-interface ToolResult {
-  readonly content: readonly { readonly text?: string }[];
-  readonly structuredContent?: unknown;
-  readonly details: { readonly status?: string; readonly data: unknown };
-}
-
 describe.skipIf(!HAS_KOTLIN)("Kotlin command-capture acceptance", () => {
   let workspace: RealLanguageWorkspace;
-  let pi: ReturnType<typeof createPiMock>;
-
-  async function run(name: string, input: unknown): Promise<ToolResult> {
-    return (await getTool(pi, name).execute(
-      `kotlin-${name}`,
-      input,
-      undefined,
-      undefined,
-      makeCtx({ cwd: workspace.cwd }),
-    )) as ToolResult;
-  }
+  let tools: ReturnType<typeof capturePlanTools>;
 
   function source(): string {
     return readFileSync(`${workspace.cwd}/${FILE}`, "utf8");
-  }
-
-  function planId(result: ToolResult): string {
-    const match = /planId: "([^"]+)"/u.exec(result.content.map((item) => item.text).join("\n"));
-    if (!match?.[1]) throw new Error(`No plan ID: ${JSON.stringify(result.structuredContent)}`);
-    return match[1];
-  }
-
-  /** kotlin-lsp offers actions only after its Gradle import finishes. */
-  async function planUntilOffered(input: unknown): Promise<ToolResult> {
-    return waitFor(
-      () => run("code_refactor_plan", input),
-      (result) => result.details.status === "completed",
-      { timeoutMs: 240_000, retryDelayMs: 3_000, label: "kotlin-lsp code action" },
-    );
   }
 
   beforeAll(async () => {
@@ -71,8 +38,7 @@ describe.skipIf(!HAS_KOTLIN)("Kotlin command-capture acceptance", () => {
       fixturePath: fileURLToPath(new URL("../fixtures/language-baseline/kotlin/", import.meta.url)),
       sourceFile: FILE,
     });
-    pi = createPiMock();
-    registerCodeIntelligenceTools(pi as never, () => workspace.session);
+    tools = capturePlanTools(workspace);
   }, 300_000);
 
   afterAll(async () => {
@@ -82,7 +48,7 @@ describe.skipIf(!HAS_KOTLIN)("Kotlin command-capture acceptance", () => {
   it("plans organize imports from a captured command edit without writing", async () => {
     const before = source();
 
-    const plan = await planUntilOffered({
+    const plan = await tools.planUntilCompleted({
       operation: { source_action: { file: FILE, kind: "source.organizeImports" } },
     });
 
@@ -99,7 +65,7 @@ describe.skipIf(!HAS_KOTLIN)("Kotlin command-capture acceptance", () => {
     const line = before.split("\n").findIndex((text) => text.includes("price * 2")) + 1;
     const character = (before.split("\n")[line - 1]?.indexOf("price * 2") ?? 0) + 1;
 
-    const plan = await planUntilOffered({
+    const plan = await tools.planUntilCompleted({
       operation: {
         code_action: {
           file: FILE,
@@ -110,12 +76,8 @@ describe.skipIf(!HAS_KOTLIN)("Kotlin command-capture acceptance", () => {
     });
 
     expect(source()).toBe(before);
-    expect(plan.structuredContent).toMatchObject({
-      action: { provenance: "captured-command" },
-    });
-    const applied = await run("code_refactor_apply", { planId: planId(plan) });
-    expect(applied.details.status).toBe("completed");
-    expect(source()).not.toBe(before);
+    expect(plan.structuredContent).toMatchObject({ action: { provenance: "captured-command" } });
+    await tools.apply(plan);
     expect(source()).toMatch(/val \w+ = price \* 2/u);
   }, 300_000);
 });

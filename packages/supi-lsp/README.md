@@ -331,7 +331,8 @@ planning. One eligible command-only action (`refactor*`, `source.organizeImports
 `source.fixAll*`; a command the server lists when it lists any) runs once: SuPi
 advertises `workspace.applyEdit`, refuses every pushed edit with `applied: false`,
 and plans the single edit captured while the command runs or shortly after it
-answers. A timed-out or cancelled command keeps refusing late edits until it
+answers, even when the server then reports the command as failed because the
+edit was refused (clangd does). A timed-out or cancelled command keeps refusing late edits until it
 settles. Touched open documents are re-sent as full text under a new version.
 Running a command may still change server-side state. Resource operations,
 snippets, annotations, malformed actions, and stale responses stay unavailable. Distinct matching plans return an

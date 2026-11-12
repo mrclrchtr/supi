@@ -13,6 +13,7 @@ import {
 import { uriToFile } from "@mrclrchtr/supi-core/path";
 import type { Command, WorkspaceEdit } from "../config/types.ts";
 import { LSP_REQUEST_TIMEOUT_ERROR_CODE } from "../debug-telemetry.ts";
+import { JsonRpcRequestError } from "./transport.ts";
 
 /** Reply for an edit recorded for preview. */
 export const CAPTURED_EDIT_REPLY = {
@@ -174,16 +175,28 @@ export async function runCommandEditCapture(
     { command: command.command, ...(command.arguments ? { arguments: command.arguments } : {}) },
     { ...control, timeoutMs },
   );
+  let serverError: string | undefined;
   try {
     await request.result;
   } catch (error) {
-    return abandonCapture(options, request.settled, error);
+    if (!(error instanceof JsonRpcRequestError) || isCodeRequestInterruption(error, control)) {
+      return abandonCapture(options, request.settled, error);
+    }
+    // The server answered with an error, so the command is over. clangd
+    // reports that the refused edit "was not applied"; the edit still counts.
+    serverError = error.message;
   }
-  await window.waitForEdit(options.graceMs ?? DEFAULT_GRACE_MS);
+  if (serverError === undefined) await window.waitForEdit(options.graceMs ?? DEFAULT_GRACE_MS);
   const edits = window.close();
   const resynced = resynchronizeEdits(edits, options.resynchronize);
   if (edits.length === 0) {
-    return { kind: "unavailable", reason: "The server command produced no edit." };
+    return {
+      kind: "unavailable",
+      reason:
+        serverError === undefined
+          ? "The server command produced no edit."
+          : `The server command failed: ${serverError}`,
+    };
   }
   if (edits.length > 1) {
     return {
@@ -194,7 +207,7 @@ export async function runCommandEditCapture(
   return { kind: "captured", edit: edits[0] as WorkspaceEdit, resynced };
 }
 
-/** Close or drain the window after the command failed, then report or rethrow. */
+/** Close or drain the window after SuPi stopped waiting for the command, then report or rethrow. */
 function abandonCapture(
   options: CommandEditCaptureOptions,
   settled: Promise<void>,
@@ -209,7 +222,7 @@ function abandonCapture(
     kind: "unavailable",
     reason: isTimeout(error)
       ? `The server command did not finish within ${timeoutMs} ms.`
-      : `The server command failed: ${error instanceof Error ? error.message : String(error)}`,
+      : `The server command could not run: ${error instanceof Error ? error.message : String(error)}`,
   };
 }
 

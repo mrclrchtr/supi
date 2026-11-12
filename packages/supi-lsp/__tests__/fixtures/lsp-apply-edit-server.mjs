@@ -5,6 +5,7 @@
 //   capture.none      no applyEdit
 //   capture.multiple  two applyEdits
 //   capture.hang      never answers executeCommand
+//   capture.rejected  one applyEdit, then an error because it was not applied (clangd)
 //   capture.fail      answers with a JSON-RPC error
 //   capture.late      pushes one applyEdit after answering (within the grace period)
 //   capture.slow      pushes one applyEdit after 300 ms, then answers
@@ -67,6 +68,19 @@ async function executeCommand(message) {
       break;
     case "capture.hang":
       return;
+    case "capture.rejected":
+      // clangd: wait for the applyEdit reply, then fail the command because
+      // the edit was not applied.
+      await pushEdit(uri, "// one\n");
+      send({
+        jsonrpc: "2.0",
+        id: message.id,
+        error: {
+          code: -32001,
+          message: "edits were not applied: SuPi captured this edit for preview.",
+        },
+      });
+      return;
     case "capture.fail":
       send({ jsonrpc: "2.0", id: message.id, error: { code: -32603, message: "boom" } });
       return;
@@ -106,6 +120,7 @@ function handle(message) {
             codeActionProvider: { codeActionKinds: ["refactor", "source"] },
             executeCommandProvider: {
               commands: [
+                "capture.rejected",
                 "capture.fail",
                 "capture.late",
                 "capture.slow",
