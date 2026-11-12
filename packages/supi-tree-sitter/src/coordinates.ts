@@ -103,6 +103,7 @@ export function validatePublicPositionBounds(
 /**
  * Split source into Tree-sitter rows, dropping the `\r` of CRLF endings.
  * Tree-sitter rows break only on `\n`, so a lone `\r` is not a line break here.
+ * LSP treats a lone `\r` as a line break, so structural lines after one differ from LSP lines.
  */
 export function splitSourceLines(source: string): string[] {
   if (lastSplit?.source === source) return lastSplit.lines;
