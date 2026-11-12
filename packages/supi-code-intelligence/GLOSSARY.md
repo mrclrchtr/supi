@@ -255,7 +255,7 @@ A syntax-derived outgoing-call evidence atom from the enclosing executable scope
 _Avoid_: semantic callee, caller, reference, treating nested callback calls as direct parent calls
 
 **Refactor plan**:
-A stored, fingerprinted description of a proposed code refactor — its target, operation (such as rename, extract, import cleanup, or dead-code deletion), and exact text edits — produced for inspection and applied later, never silently. Non-mutating by construction.
+A stored, fingerprinted description of a proposed code refactor — its operation (a symbol rename, or one server code or source action selected by kind and title), the file and target or range it was requested for, and exact text edits — produced for inspection and applied later, never silently. Non-mutating by construction.
 _Avoid_: "refactor action", "code action result" (those are advisory, not stored plans)
 
 **Plan-then-apply (planner/applier split)**:

@@ -78,8 +78,9 @@ function setup(edits: (files: { index: string; other: string }) => FileEdit[]) {
 }
 
 const plan = (newName: string) => ({
-  target: { anchor: { file: "src/index.ts", line: 1, character: 1 } },
-  operation: { rename_symbol: { newName } },
+  operation: {
+    rename_symbol: { target: { anchor: { file: "src/index.ts", line: 1, character: 1 } }, newName },
+  },
 });
 
 const range = (line: number, start: number, end: number) => ({

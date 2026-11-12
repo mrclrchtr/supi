@@ -116,8 +116,12 @@ describe("semantic refactor mutation authority", () => {
       tool.execute(
         "workflow-refactor-outside-root",
         {
-          target: { anchor: { file: "src/index.ts", line: 1, character: 1 } },
-          operation: { rename_symbol: { newName: "newName" } },
+          operation: {
+            rename_symbol: {
+              target: { anchor: { file: "src/index.ts", line: 1, character: 1 } },
+              newName: "newName",
+            },
+          },
         },
         undefined,
         undefined,
@@ -154,8 +158,12 @@ describe("semantic refactor mutation authority", () => {
     codeIntelligenceExtension(pi as never, sessionCache.getOrCreate);
     const session = sessionCache.getOrCreate(sessionRoot);
     const planOutcome = await session.planRefactor({
-      target: { anchor: { file: target, line: 1, character: 1 } },
-      operation: { rename_symbol: { newName: "newName" } },
+      operation: {
+        rename_symbol: {
+          target: { anchor: { file: target, line: 1, character: 1 } },
+          newName: "newName",
+        },
+      },
     });
     expect(planOutcome.kind).toBe("completed");
     if (planOutcome.kind !== "completed") throw new Error("Expected a completed plan.");
@@ -205,8 +213,12 @@ describe("semantic refactor mutation authority", () => {
     const planResult = (await refactorTool.execute(
       "workflow-refactor-version-plan",
       {
-        target: { anchor: { file: "src/index.ts", line: 1, character: 1 } },
-        operation: { rename_symbol: { newName: "newName" } },
+        operation: {
+          rename_symbol: {
+            target: { anchor: { file: "src/index.ts", line: 1, character: 1 } },
+            newName: "newName",
+          },
+        },
       },
       undefined,
       undefined,

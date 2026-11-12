@@ -14,10 +14,12 @@ import { clearMockRuntime, registerMockProvider } from "../../../helpers/registe
 
 let cwd: string;
 const original = `export function widget() {}\n${"widget();\n".repeat(6)}`;
-const input = {
-  target: { anchor: { file: "index.ts", line: 1, character: 17 } },
-  operation: { rename_symbol: { newName: "gadget" } },
-};
+const renameAt = (file: string) => ({
+  operation: {
+    rename_symbol: { target: { anchor: { file, line: 1, character: 17 } }, newName: "gadget" },
+  },
+});
+const input = renameAt("index.ts");
 interface Tool {
   outputSchema: TSchema;
   execute: (...args: unknown[]) => Promise<{
@@ -74,10 +76,7 @@ describe("registered refactor structured results", () => {
       }),
     });
     const { plan, apply } = tools();
-    const planned = await call(plan, {
-      ...input,
-      target: { anchor: { file, line: 1, character: 17 } },
-    });
+    const planned = await call(plan, renameAt(file));
     const applied = await call(apply, { planId: planned.structuredContent.planId });
     expect(applied.structuredContent).toMatchObject({
       kind: "applied",
@@ -125,7 +124,8 @@ describe("registered refactor structured results", () => {
     expect(planned.structuredContent).toMatchObject({
       kind: "completed",
       operation: "rename_symbol",
-      target: { file: "index.ts", line: 1, character: 17 },
+      file: "index.ts",
+      target: { line: 1, character: 17 },
       editCount: 7,
       fileCount: 2,
       provenance: "semantic",

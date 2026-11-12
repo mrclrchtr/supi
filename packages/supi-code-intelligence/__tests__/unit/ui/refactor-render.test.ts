@@ -25,9 +25,8 @@ function makePlan(): RefactorPlan {
     id: "plan-1",
     operation: "rename_symbol",
     newName: "newName",
-    targetFile: "/repo/src/index.ts",
-    targetLine: 1,
-    targetCharacter: 1,
+    file: "/repo/src/index.ts",
+    target: { line: 1, character: 1 },
     authorizedMutationRoots: ["/repo"],
     edits: {
       edits: Array.from({ length: 3 }, (_, index) => ({

@@ -449,9 +449,8 @@ describe("canonical Tool result assembly", () => {
       {
         id: "plan-1",
         operation: "rename_symbol",
-        targetFile: "/repo/src/a.ts",
-        targetLine: 1,
-        targetCharacter: 1,
+        file: "/repo/src/a.ts",
+        target: { line: 1, character: 1 },
         authorizedMutationRoots: ["/repo"],
         edits: {
           edits: [

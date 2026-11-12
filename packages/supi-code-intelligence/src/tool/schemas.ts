@@ -112,7 +112,7 @@ export const OrientationFocusParam = exactOneSelector(
   "Exactly one Orientation focus.",
 );
 
-export const RefactorTargetParam = exactOneSelector(
+const RefactorTargetParam = exactOneSelector(
   {
     handle: Type.String({ description: "Target handle from a previous code tool result." }),
     anchor: SourcePointParam,
@@ -131,28 +131,49 @@ const RangeParam = Type.Object(
       { additionalProperties: false },
     ),
   },
-  { additionalProperties: false },
+  { additionalProperties: false, description: "Source range; end is exclusive." },
 );
 
 const NewNameParam = Type.String({ description: "New symbol name.", minLength: 1 });
+const ActionTitleParam = Type.String({
+  description:
+    "Exact action title from a previous ambiguous result; selects one of several matching actions.",
+  minLength: 1,
+});
 
 const RefactorOperationProperties = {
-  rename_symbol: Type.Object({ newName: NewNameParam }, { additionalProperties: false }),
-  extract_function: Type.Object(
-    { newName: NewNameParam, range: RangeParam },
-    { additionalProperties: false },
+  rename_symbol: Type.Object(
+    { target: RefactorTargetParam, newName: NewNameParam },
+    { additionalProperties: false, description: "Rename one symbol across the workspace." },
   ),
-  extract_variable: Type.Object(
-    { newName: NewNameParam, range: RangeParam },
-    { additionalProperties: false },
-  ),
-  update_imports: Type.Object({}, { additionalProperties: false }),
-  delete_dead_code: Type.Object(
-    {},
+  code_action: Type.Object(
+    {
+      file: FileParam,
+      range: RangeParam,
+      kind: Type.String({
+        description:
+          'CodeActionKind prefix under "refactor", such as "refactor.extract" or "refactor.inline". Sub-kinds match.',
+        pattern: "^refactor(\\..+)?$",
+      }),
+      title: Type.Optional(ActionTitleParam),
+    },
     {
       additionalProperties: false,
-      description: "Remove server-supported unused code; support may be limited to unused imports.",
+      description:
+        "Server refactor action for one range. Generated names (e.g. extracted variables) appear in the preview; rename them afterwards with rename_symbol.",
     },
+  ),
+  source_action: Type.Object(
+    {
+      file: FileParam,
+      kind: Type.String({
+        description:
+          'CodeActionKind prefix under "source", such as "source.organizeImports" or "source.fixAll". Sub-kinds match.',
+        pattern: "^source(\\..+)?$",
+      }),
+      title: Type.Optional(ActionTitleParam),
+    },
+    { additionalProperties: false, description: "Server source action for one whole file." },
   ),
 } satisfies Record<PublicRefactorOperationName, TSchema>;
 

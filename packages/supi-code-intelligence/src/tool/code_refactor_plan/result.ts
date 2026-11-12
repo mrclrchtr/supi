@@ -5,7 +5,7 @@ import type { CodeIntelResult, CodeIntelToolExecCtx } from "../../types/index.ts
 import { renderRefactorPlanResult } from "../refactor-markdown.ts";
 import { searchErrorResult } from "../result/errors.ts";
 import { assembleRefactorPlanDetails } from "../result/refactor.ts";
-import { structuredRefactorPlan } from "./structured.ts";
+import { AMBIGUOUS_NEXT_ACTION, structuredRefactorPlan } from "./structured.ts";
 
 type RefactorPlanOutcome = Awaited<ReturnType<CodeIntelToolExecCtx["session"]["planRefactor"]>>;
 
@@ -18,24 +18,33 @@ export function finishRefactorPlanResult(
   if (outcome.kind === "invalid-input") {
     return {
       ...searchErrorResult(`**Error:** ${outcome.message}`, {
-        nextQueries: ["Fix the target or operation and retry"],
+        nextQueries: ["Fix the operation input and retry"],
         message: outcome.message,
       }),
       structuredContent: structuredRefactorPlan(outcome, cwd),
     };
   }
   if (outcome.kind === "ambiguous") {
-    const candidates = outcome.candidates
-      .map(
-        (candidate, index) =>
-          `${index + 1}. ${candidate.description} (${candidate.file === undefined ? candidate.file : toDisplayPath(cwd, candidate.file)}:${candidate.line})`,
-      )
-      .join("\n");
+    const candidates = outcome.candidates.map((candidate, index) => {
+      const label =
+        candidate.title === undefined
+          ? candidate.description
+          : `${candidate.kind ? `\`${candidate.kind}\` — ` : ""}${JSON.stringify(candidate.title)}`;
+      const location =
+        candidate.file === undefined
+          ? ""
+          : ` — first edit ${toDisplayPath(cwd, candidate.file)}:${candidate.line}`;
+      return `${index + 1}. ${label}${location}`;
+    });
     return {
-      ...searchErrorResult(`**Refactor ambiguous:**\n${candidates}`, {
-        nextQueries: ["Use a precise target handle or anchor"],
-        message: "The refactor target is ambiguous.",
-      }),
+      ...searchErrorResult(
+        `**Refactor ambiguous:**\n${candidates.join("\n")}\n\n${AMBIGUOUS_NEXT_ACTION}.`,
+        {
+          status: "disambiguation",
+          nextQueries: [AMBIGUOUS_NEXT_ACTION],
+          message: "Several matching actions produce different edits.",
+        },
+      ),
       structuredContent: structuredRefactorPlan(outcome, cwd),
     };
   }

@@ -1,43 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  collectCodeActionResults,
-  isDeleteDeadCodeCodeAction,
-  isUpdateImportsCodeAction,
-} from "../../src/provider/refactor-planning.ts";
-
-function makeDeleteDeadCodeAction(
-  title: string,
-  kind?: string,
-): Parameters<typeof isDeleteDeadCodeCodeAction>[0] {
-  return { title, kind } as Parameters<typeof isDeleteDeadCodeCodeAction>[0];
-}
-
-function makeUpdateImportsAction(
-  title: string,
-  kind?: string,
-): Parameters<typeof isUpdateImportsCodeAction>[0] {
-  return { title, kind } as Parameters<typeof isUpdateImportsCodeAction>[0];
-}
-
-describe("isUpdateImportsCodeAction", () => {
-  it("requires the documented kind and never guesses from a title", () => {
-    expect(isUpdateImportsCodeAction(makeUpdateImportsAction("Organize Imports"))).toBe(false);
-    expect(isUpdateImportsCodeAction(makeUpdateImportsAction("Organize Imports", "quickfix"))).toBe(
-      false,
-    );
-  });
-
-  it("matches explicit organize-imports kinds", () => {
-    expect(
-      isUpdateImportsCodeAction(makeUpdateImportsAction("Sort imports", "source.organizeImports")),
-    ).toBe(true);
-    expect(
-      isUpdateImportsCodeAction(
-        makeUpdateImportsAction("Sort imports", "source.organizeImports.project"),
-      ),
-    ).toBe(true);
-  });
-});
+import { collectCodeActionResults } from "../../src/provider/refactor-planning.ts";
 
 describe("collectCodeActionResults", () => {
   it('keeps the "has no edit" vs "could not produce precise edits" distinction', () => {
@@ -65,55 +27,5 @@ describe("collectCodeActionResults", () => {
       reason:
         'Code action "Rewrite" could not produce precise edits: Workspace edit contains no file edits.',
     });
-  });
-});
-
-describe("isDeleteDeadCodeCodeAction", () => {
-  it.each([
-    "source.removeUnused",
-    "source.removeUnused.ts",
-    "source.removeUnusedImports",
-    "source.removeUnusedImports.ts",
-  ])("accepts the explicit kind %s", (kind) => {
-    expect(isDeleteDeadCodeCodeAction(makeDeleteDeadCodeAction("Remove unused", kind))).toBe(true);
-  });
-
-  it.each(["source", "source.removeUnusedExtra", "source.removeUnusedImportsExtra", "quickfix"])(
-    "rejects the nonmatching kind %s",
-    (kind) => {
-      expect(isDeleteDeadCodeCodeAction(makeDeleteDeadCodeAction("Remove unused", kind))).toBe(
-        false,
-      );
-    },
-  );
-
-  it("rejects title-only and unrelated kinds", () => {
-    expect(
-      isDeleteDeadCodeCodeAction(makeDeleteDeadCodeAction("Move declaration to new file")),
-    ).toBe(false);
-    expect(
-      isDeleteDeadCodeCodeAction(
-        makeDeleteDeadCodeAction("Remove unused declaration", "refactor.rewrite"),
-      ),
-    ).toBe(false);
-  });
-
-  it("rejects dead-code-looking titles when the kind is unsupported", () => {
-    expect(
-      isDeleteDeadCodeCodeAction(
-        makeDeleteDeadCodeAction("Remove unused declaration", "source.organizeImports"),
-      ),
-    ).toBe(false);
-  });
-
-  it("rejects source.fixAll actions even when the title looks like dead-code removal", () => {
-    expect(
-      isDeleteDeadCodeCodeAction(
-        makeDeleteDeadCodeAction("Remove unused declaration", "source.fixAll"),
-      ),
-    ).toBe(false);
-    expect(isDeleteDeadCodeCodeAction(makeDeleteDeadCodeAction("Fix all", "source.fixAll"))).toBe(
-      false,
-    );
   });
 });

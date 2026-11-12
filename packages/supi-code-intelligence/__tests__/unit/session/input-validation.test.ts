@@ -88,17 +88,16 @@ describe("session runtime input validation", () => {
     }
   });
 
-  it.each(["update_imports", "delete_dead_code"] as const)(
-    "accepts the safe %s refactor operation",
-    (operation) => {
-      expect(
-        parseRefactorPlanWorkflowInput({
-          target: { handle: "tg-1" },
-          operation: { [operation]: {} },
-        }),
-      ).toMatchObject({ kind: "valid", value: { operation: { [operation]: {} } } });
-    },
-  );
+  it("accepts a source action without a symbol target", () => {
+    expect(
+      parseRefactorPlanWorkflowInput({
+        operation: { source_action: { file: "src/a.ts", kind: "source.organizeImports" } },
+      }),
+    ).toEqual({
+      kind: "valid",
+      value: { operation: { source_action: { file: "src/a.ts", kind: "source.organizeImports" } } },
+    });
+  });
 
   it.each([
     [
@@ -118,8 +117,7 @@ describe("session runtime input validation", () => {
       "rejects the removed refactor rename alias",
       () =>
         parseRefactorPlanWorkflowInput({
-          target: { handle: "tg-1" },
-          operation: { rename: { newName: "next" } },
+          operation: { rename: { target: { handle: "tg-1" }, newName: "next" } },
         }),
     ],
     [

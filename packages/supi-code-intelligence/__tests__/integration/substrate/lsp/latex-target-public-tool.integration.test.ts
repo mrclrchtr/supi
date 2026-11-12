@@ -249,8 +249,9 @@ describe.skipIf(!HAS_TEXLAB)("LaTeX targets through real Texlab and Tree-sitter"
     const planResult = (await planTool.execute(
       "latex-heading-rename",
       {
-        target: { handle: headingTargetId },
-        operation: { rename_symbol: { newName: "NewHeading" } },
+        operation: {
+          rename_symbol: { target: { handle: headingTargetId }, newName: "NewHeading" },
+        },
       },
       undefined,
       undefined,
@@ -377,8 +378,9 @@ describe.skipIf(!HAS_TEXLAB)("LaTeX targets through real Texlab and Tree-sitter"
     const result = (await planTool.execute(
       "latex-label-rename",
       {
-        target: { handle: labelTargetId },
-        operation: { rename_symbol: { newName: "sec:overview" } },
+        operation: {
+          rename_symbol: { target: { handle: labelTargetId }, newName: "sec:overview" },
+        },
       },
       undefined,
       undefined,

@@ -6,38 +6,50 @@ import type { RefactorTargetInput, SourcePointInput } from "./target-input.ts";
 /** Public refactor operations exposed by code_refactor_plan. */
 export const PUBLIC_REFACTOR_OPERATION_NAMES = [
   "rename_symbol",
-  "extract_function",
-  "extract_variable",
-  "update_imports",
-  "delete_dead_code",
+  "code_action",
+  "source_action",
 ] as const;
 
 export type PublicRefactorOperationName = (typeof PUBLIC_REFACTOR_OPERATION_NAMES)[number];
 
+/** One-based public source range; the end is exclusive. */
 export interface PublicSourceRange {
   readonly start: Omit<SourcePointInput, "file">;
   readonly end: Omit<SourcePointInput, "file">;
 }
 
+/**
+ * One refactor operation with its own scope. Only `rename_symbol` needs a
+ * symbol target; code and source actions name a file directly.
+ */
 export type RefactorOperationInput =
-  | { readonly rename_symbol: { readonly newName: string } }
   | {
-      readonly extract_function: {
+      readonly rename_symbol: {
+        readonly target: RefactorTargetInput;
         readonly newName: string;
-        readonly range: PublicSourceRange;
       };
     }
   | {
-      readonly extract_variable: {
-        readonly newName: string;
+      readonly code_action: {
+        readonly file: string;
         readonly range: PublicSourceRange;
+        /** CodeActionKind prefix under `refactor`. */
+        readonly kind: string;
+        /** Exact action title that selects one matching action. */
+        readonly title?: string;
       };
     }
-  | { readonly update_imports: Record<string, never> }
-  | { readonly delete_dead_code: Record<string, never> };
+  | {
+      readonly source_action: {
+        readonly file: string;
+        /** CodeActionKind prefix under `source`. */
+        readonly kind: string;
+        /** Exact action title that selects one matching action. */
+        readonly title?: string;
+      };
+    };
 
 export interface RefactorPlanWorkflowInput {
-  readonly target: RefactorTargetInput;
   readonly operation: RefactorOperationInput;
 }
 

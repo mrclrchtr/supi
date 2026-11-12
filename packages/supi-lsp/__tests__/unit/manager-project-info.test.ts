@@ -68,9 +68,9 @@ describe("buildProjectServerInfo", () => {
     expect(result.operationSupport).toMatchObject({
       rename_symbol: { server: "advertised", supi: "supported" },
       prepare_rename: { server: "advertised" },
-      update_imports: { server: "advertised" },
+      source_action: { server: "advertised", kinds: ["source.organizeImports"] },
       code_action_resolve: { server: "advertised" },
-      extract_function: { server: "not-advertised", supi: "limited" },
+      code_action: { server: "not-advertised" },
     });
   });
 

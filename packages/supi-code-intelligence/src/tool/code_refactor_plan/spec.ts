@@ -1,6 +1,6 @@
 import { Type } from "typebox";
 import type { CodeIntelToolExecCtx } from "../../types/index.ts";
-import { RefactorOperationParam, RefactorTargetParam } from "../schemas.ts";
+import { RefactorOperationParam } from "../schemas.ts";
 import { executeRefactorPlanTool } from "./execute.ts";
 import { RefactorPlanOutputSchema } from "./structured.ts";
 import { renderRefactorPlanCall, renderRefactorPlanResult } from "./tui.ts";
@@ -14,7 +14,6 @@ export const codeRefactorPlanSpec = {
   label: CODE_REFACTOR_PLAN_TOOL_LABEL,
   parameters: Type.Object(
     {
-      target: RefactorTargetParam,
       operation: RefactorOperationParam,
     },
     { additionalProperties: false },

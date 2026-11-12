@@ -173,7 +173,7 @@ it("routes all five native tools through Pi default codemode, preserves recovery
       const inspect = await tools.code_inspect({ point: { file: "index.ts", line: 1, character: 17 } });
       const orientation = await tools.code_orientation({ maxResults: 5 });
       const health = await tools.code_health({ include: ["servers"] });
-      const plan = await tools.code_refactor_plan({ target: { anchor: inspect.point }, operation: { rename_symbol: { newName: "gadget" } } });
+      const plan = await tools.code_refactor_plan({ operation: { rename_symbol: { target: { anchor: inspect.point }, newName: "gadget" } } });
       store("planId", plan.planId);
       return { hover: inspect.sections.hover.data, file: orientation.workspace.directFiles[0].path,
         server: health.servers[0].name, edits: plan.edits.length, replacement: plan.edits[0].newText };
@@ -250,7 +250,7 @@ it("routes all five native tools through Pi default codemode, preserves recovery
       refactor: async () => ({ kind: "unavailable", reason: "Offline refactor capability" }),
     });
     const failure = await runScript(
-      'return await tools.code_refactor_plan({ target: { anchor: { file: "index.ts", line: 1, character: 17 } }, operation: { rename_symbol: { newName: "next" } } });',
+      'return await tools.code_refactor_plan({ operation: { rename_symbol: { target: { anchor: { file: "index.ts", line: 1, character: 17 } }, newName: "next" } } });',
     );
     expect(failure.isError).toBe(true);
     expect(failure.content).toEqual(

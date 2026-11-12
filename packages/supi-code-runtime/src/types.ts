@@ -193,31 +193,46 @@ export interface WorkspaceEdit {
 }
 
 /**
- * Supported refactor operation names for the current semantic planning path.
- */
-export type RefactorOperation =
-  | "rename_symbol"
-  | "extract_function"
-  | "extract_variable"
-  | "rename_file"
-  | "move_file"
-  | "update_imports"
-  | "delete_dead_code";
-
-/**
- * Operation-aware refactor planning request.
+ * Operation-aware refactor planning request. Each operation carries only the
+ * scope it needs:
  *
- * Consumers provide a target file/position plus operation-specific options.
- * File/resource operations remain requestable so providers can reject them
- * explicitly and honestly until shared workspace-edit resource ops exist.
+ * - `rename_symbol`: one symbol position and the new name.
+ * - `code_action`: one file range and a CodeActionKind prefix under `refactor`.
+ * - `source_action`: one whole file and a CodeActionKind prefix under `source`.
+ *
+ * `kind` matches the requested kind and its dotted sub-kinds. `title`, when
+ * present, selects one action by its exact title.
  */
-export interface RefactorRequest {
-  operation: RefactorOperation;
-  file: string;
-  position: CodePosition;
-  range?: SourceRange;
-  newName?: string;
-  destination?: string;
+export type RefactorRequest =
+  | {
+      operation: "rename_symbol";
+      file: string;
+      position: CodePosition;
+      newName: string;
+    }
+  | {
+      operation: "code_action";
+      file: string;
+      range: SourceRange;
+      kind: string;
+      title?: string;
+    }
+  | {
+      operation: "source_action";
+      file: string;
+      kind: string;
+      title?: string;
+    };
+
+/** Supported refactor operation names. */
+export type RefactorOperation = RefactorRequest["operation"];
+
+/** The code action selected for a precise code- or source-action plan. */
+export interface RefactorActionIdentity {
+  /** Server-reported CodeActionKind. */
+  kind: string;
+  /** Server-reported action title. */
+  title: string;
 }
 
 /**
@@ -228,6 +243,10 @@ export interface DisambiguationCandidate {
   file?: string;
   line?: number;
   character?: number;
+  /** Server-reported CodeActionKind, for code-action candidates. */
+  kind?: string;
+  /** Exact action title to pass back as `title`, for code-action candidates. */
+  title?: string;
 }
 
 /**
@@ -241,6 +260,8 @@ export type RefactorResult =
   | {
       kind: "precise";
       edits: WorkspaceEdit;
+      /** The selected code action, for code- and source-action plans. */
+      action?: RefactorActionIdentity;
       /** Provider roots authorized by the semantic route. Consumers canonicalize before storage. */
       authorizedMutationRoots: string[];
     }

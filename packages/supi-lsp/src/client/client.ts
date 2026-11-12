@@ -23,6 +23,7 @@ import { CodeActionTriggerKind } from "vscode-languageserver-types";
 import { CLIENT_CAPABILITIES } from "../config/capabilities.ts";
 import {
   getServerOperationSupport,
+  isCodeActionKindWithin,
   supportsCodeActionResolve,
   supportsCodeActions,
   supportsPrepareRename,
@@ -241,13 +242,6 @@ function isLazyCodeAction(value: unknown): value is CodeAction {
       "command",
       "data",
     ])
-  );
-}
-
-function codeActionKindMatchesFilter(kind: unknown, filter: string): boolean {
-  return (
-    filter === "" ||
-    (typeof kind === "string" && (kind === filter || kind.startsWith(`${filter}.`)))
   );
 }
 
@@ -1439,7 +1433,17 @@ export class LspClient {
     control: CodeRequestControl | undefined,
     only: readonly string[] | undefined,
   ): Promise<CodeAction[]> {
-    const candidates = raw.map((value) => {
+    // Servers may still return kinds that `only` excludes (typescript-language-server
+    // adds quickfixes). Drop those before validation so they cannot fail the request.
+    const requested = only
+      ? raw.filter(
+          (value) =>
+            !isRecord(value) ||
+            typeof value.kind !== "string" ||
+            only.some((filter) => isCodeActionKindWithin(value.kind, filter)),
+        )
+      : raw;
+    const candidates = requested.map((value) => {
       const candidate = normalizeCodeActionResponseEntry(value);
       if (!candidate)
         throw new Error("LSP server returned a malformed code action response entry.");
@@ -1452,7 +1456,7 @@ export class LspClient {
         !this.supportsCodeActionResolve ||
         !lazyAction ||
         (only !== undefined &&
-          !only.some((filter) => codeActionKindMatchesFilter(lazyAction.kind, filter)))
+          !only.some((filter) => isCodeActionKindWithin(lazyAction.kind, filter)))
       ) {
         actions.push(action);
         continue;

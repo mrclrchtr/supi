@@ -148,8 +148,7 @@ const cases = [
     name: "code_refactor_plan",
     kind: "completed",
     input: () => ({
-      target: { anchor: anchor() },
-      operation: { rename_symbol: { newName: "gadget" } },
+      operation: { rename_symbol: { target: { anchor: anchor() }, newName: "gadget" } },
     }),
   },
   {

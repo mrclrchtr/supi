@@ -166,10 +166,8 @@ export function structuredHealthResult(data: HealthData): Output {
   const operations = [
     "rename_symbol",
     "prepare_rename",
-    "extract_function",
-    "extract_variable",
-    "update_imports",
-    "delete_dead_code",
+    "code_action",
+    "source_action",
     "code_action_resolve",
   ] as const;
   const servers = data.servers.map(
@@ -205,6 +203,7 @@ export function structuredHealthResult(data: HealthData): Output {
                           server: item.server,
                           supi: item.supi,
                           ...(item.reason === undefined ? {} : { reason: item.reason }),
+                          ...(item.kinds === undefined ? {} : { kinds: [...item.kinds] }),
                         },
                       ],
                     ]

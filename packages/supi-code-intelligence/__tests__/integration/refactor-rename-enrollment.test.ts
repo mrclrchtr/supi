@@ -75,8 +75,7 @@ describe("rename planning across document enrollment", () => {
   async function beginRename(active: Awaited<ReturnType<typeof startWorkspace>>) {
     const plan = active.session.planRefactor(
       {
-        target: { handle: active.targetId },
-        operation: { rename_symbol: { newName: "newName" } },
+        operation: { rename_symbol: { target: { handle: active.targetId }, newName: "newName" } },
       },
       { deadline: Date.now() + 10_000 },
     );
@@ -143,7 +142,7 @@ describe("rename planning across document enrollment", () => {
     ]);
     const plan = getTool(pi, "code_refactor_plan").execute(
       "rename-enrollment",
-      { target: { handle: active.targetId }, operation: { rename_symbol: { newName: "newName" } } },
+      { operation: { rename_symbol: { target: { handle: active.targetId }, newName: "newName" } } },
       undefined,
       undefined,
       makeCtx({ cwd: dirname(active.source) }),

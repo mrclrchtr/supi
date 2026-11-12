@@ -4,6 +4,7 @@ import * as path from "node:path";
 import {
   completedCodeQuery,
   getDefaultWorkspaceRuntime,
+  type RefactorRequest,
   type RefactorResult,
   type SemanticProvider,
 } from "@mrclrchtr/supi-code-runtime/api";
@@ -49,24 +50,9 @@ function extractPlanId(content: string): string {
   return match[1];
 }
 
-type RefactorRequest = {
-  operation: string;
-  file: string;
-  position: { line: number; character: number };
-  range?: {
-    start: { line: number; character: number };
-    end: { line: number; character: number };
-  };
-  newName?: string;
-};
-
-type OperationAwareSemanticProvider = SemanticProvider & {
-  refactor?: (request: RefactorRequest) => Promise<RefactorResult>;
-};
-
 function createSemanticProvider(
   overrides: Partial<Pick<SemanticProvider, "rename">> & {
-    refactor?: OperationAwareSemanticProvider["refactor"];
+    refactor?: (request: RefactorRequest) => Promise<RefactorResult>;
   } = {},
 ): SemanticProvider {
   return {
@@ -130,8 +116,12 @@ describe("code_refactor_plan / code_refactor_apply workflow wrappers", () => {
     const result = (await tool.execute(
       "workflow-refactor-1",
       {
-        target: { anchor: { file: "src/index.ts", line: 1, character: 1 } },
-        operation: { rename_symbol: { newName: "newName" } },
+        operation: {
+          rename_symbol: {
+            target: { anchor: { file: "src/index.ts", line: 1, character: 1 } },
+            newName: "newName",
+          },
+        },
       },
       undefined,
       undefined,
@@ -144,18 +134,14 @@ describe("code_refactor_plan / code_refactor_apply workflow wrappers", () => {
     expect(result.content[0].text).not.toContain(projectDir);
   });
 
-  it("creates extract function plans when the semantic provider returns precise edits", async () => {
+  it("plans a code action and reports its scope, action, and generated name", async () => {
     const { projectDir, file } = createProjectFile("const value = 1 + 2;\n");
+    const requests: RefactorRequest[] = [];
     registerSemantic(
       projectDir,
       createSemanticProvider({
         refactor: async (request) => {
-          expect(request.operation).toBe("extract_function");
-          expect(request.newName).toBe("computeValue");
-          expect(request.range).toEqual({
-            start: { line: 0, character: 14 },
-            end: { line: 0, character: 19 },
-          });
+          requests.push(request);
           return {
             kind: "precise",
             edits: {
@@ -163,10 +149,11 @@ describe("code_refactor_plan / code_refactor_apply workflow wrappers", () => {
                 {
                   file,
                   range: { start: { line: 0, character: 14 }, end: { line: 0, character: 19 } },
-                  newText: "computeValue()",
+                  newText: "newFunction()",
                 },
               ],
             },
+            action: { kind: "refactor.extract.function", title: "Extract function" },
             authorizedMutationRoots: [projectDir],
           };
         },
@@ -178,23 +165,141 @@ describe("code_refactor_plan / code_refactor_apply workflow wrappers", () => {
     const tool = getTool(pi, "code_refactor_plan");
 
     const result = (await tool.execute(
-      "workflow-refactor-extract-function",
+      "workflow-refactor-code-action",
       {
-        target: { anchor: { file: "src/index.ts", line: 1, character: 1 } },
         operation: {
-          extract_function: {
+          code_action: {
+            file: "src/index.ts",
             range: { start: { line: 1, character: 15 }, end: { line: 1, character: 20 } },
-            newName: "computeValue",
+            kind: "refactor.extract",
           },
         },
       },
       undefined,
       undefined,
       makeCtx({ cwd: projectDir }),
+    )) as { content: Array<{ type: string; text: string }>; structuredContent?: unknown };
+
+    expect(requests).toEqual([
+      {
+        operation: "code_action",
+        file,
+        range: { start: { line: 0, character: 14 }, end: { line: 0, character: 19 } },
+        kind: "refactor.extract",
+      },
+    ]);
+    const text = result.content[0].text;
+    expect(text).toContain("**File:** `src/index.ts` L1:15 → L1:20");
+    expect(text).toContain("**Action:** Extract function (`refactor.extract.function`)");
+    expect(text).toContain("newFunction()");
+    expect(text).toContain("use rename_symbol to rename any server-generated names");
+    expect(result.structuredContent).toMatchObject({
+      kind: "completed",
+      operation: "code_action",
+      file: "src/index.ts",
+      range: { start: { line: 1, character: 15 }, end: { line: 1, character: 20 } },
+      action: { kind: "refactor.extract.function", title: "Extract function" },
+    });
+  });
+
+  it("returns ambiguous action candidates with titles to pass back", async () => {
+    const { projectDir, file } = createProjectFile("import a from 'a';\n");
+    registerSemantic(
+      projectDir,
+      createSemanticProvider({
+        refactor: async () => ({
+          kind: "ambiguous",
+          candidates: [
+            {
+              description: "Extract into variable",
+              kind: "refactor.extract",
+              title: "Extract into variable",
+              file,
+              line: 1,
+              character: 1,
+            },
+            {
+              description: "Extract into function",
+              kind: "refactor.extract",
+              title: "Extract into function",
+              file,
+              line: 1,
+              character: 1,
+            },
+          ],
+        }),
+      }),
+    );
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never, sessionCache.getOrCreate);
+    const tool = getTool(pi, "code_refactor_plan");
+
+    const result = (await tool.execute(
+      "workflow-refactor-ambiguous",
+      {
+        operation: {
+          code_action: {
+            file: "src/index.ts",
+            range: { start: { line: 1, character: 1 }, end: { line: 1, character: 7 } },
+            kind: "refactor.extract",
+          },
+        },
+      },
+      undefined,
+      undefined,
+      makeCtx({ cwd: projectDir }),
+    )) as { content: Array<{ type: string; text: string }>; structuredContent?: unknown };
+
+    const text = result.content[0].text;
+    expect(text).toContain('1. `refactor.extract` — "Extract into variable"');
+    expect(text).toContain('2. `refactor.extract` — "Extract into function"');
+    expect(text).toContain("exact `title`");
+    expect(result.structuredContent).toMatchObject({
+      kind: "ambiguous",
+      candidates: [
+        { kind: "refactor.extract", title: "Extract into variable", file: "src/index.ts" },
+        { kind: "refactor.extract", title: "Extract into function" },
+      ],
+    });
+  });
+
+  it("plans a whole-file source action", async () => {
+    const { projectDir, file } = createProjectFile("import a from 'a';\noldName();\n");
+    registerSemantic(
+      projectDir,
+      createSemanticProvider({
+        refactor: async () => ({
+          kind: "precise",
+          edits: {
+            edits: [
+              {
+                file,
+                range: { start: { line: 0, character: 0 }, end: { line: 1, character: 0 } },
+                newText: "",
+              },
+            ],
+          },
+          action: { kind: "source.organizeImports", title: "Organize imports" },
+          authorizedMutationRoots: [projectDir],
+        }),
+      }),
+    );
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never, sessionCache.getOrCreate);
+    const tool = getTool(pi, "code_refactor_plan");
+
+    const result = (await tool.execute(
+      "workflow-refactor-source-action",
+      { operation: { source_action: { file: "src/index.ts", kind: "source.organizeImports" } } },
+      undefined,
+      undefined,
+      makeCtx({ cwd: projectDir }),
     )) as { content: Array<{ type: string; text: string }> };
 
-    expect(result.content[0].text).toContain("Plan ID");
-    expect(result.content[0].text).toContain("extract_function");
+    expect(result.content[0].text).toContain("**File:** `src/index.ts` (whole file)");
+    expect(result.content[0].text).toContain("source_action");
   });
 
   it("discloses truncated refactor edit previews in markdown and details", async () => {
@@ -226,8 +331,12 @@ describe("code_refactor_plan / code_refactor_apply workflow wrappers", () => {
     const result = (await tool.execute(
       "workflow-refactor-truncated-preview",
       {
-        target: { anchor: { file: "src/index.ts", line: 1, character: 1 } },
-        operation: { rename_symbol: { newName: "newName" } },
+        operation: {
+          rename_symbol: {
+            target: { anchor: { file: "src/index.ts", line: 1, character: 1 } },
+            newName: "newName",
+          },
+        },
       },
       undefined,
       undefined,
@@ -289,8 +398,12 @@ describe("code_refactor_plan / code_refactor_apply workflow wrappers", () => {
     const result = (await tool.execute(
       "workflow-refactor-rename-symbol",
       {
-        target: { anchor: { file: "src/index.ts", line: 1, character: 1 } },
-        operation: { rename_symbol: { newName: "newName" } },
+        operation: {
+          rename_symbol: {
+            target: { anchor: { file: "src/index.ts", line: 1, character: 1 } },
+            newName: "newName",
+          },
+        },
       },
       undefined,
       undefined,
@@ -330,8 +443,12 @@ describe("code_refactor_plan / code_refactor_apply workflow wrappers", () => {
     const planResult = (await refactorTool.execute(
       "workflow-refactor-2",
       {
-        target: { anchor: { file: "src/index.ts", line: 1, character: 1 } },
-        operation: { rename_symbol: { newName: "newName" } },
+        operation: {
+          rename_symbol: {
+            target: { anchor: { file: "src/index.ts", line: 1, character: 1 } },
+            newName: "newName",
+          },
+        },
       },
       undefined,
       undefined,
@@ -381,8 +498,12 @@ describe("code_refactor_plan / code_refactor_apply workflow wrappers", () => {
 
     const planResult = await executeRefactorPlanTool(
       {
-        target: { anchor: { file: "src/index.ts", line: 1, character: 1 } },
-        operation: { rename_symbol: { newName: "newName" } },
+        operation: {
+          rename_symbol: {
+            target: { anchor: { file: "src/index.ts", line: 1, character: 1 } },
+            newName: "newName",
+          },
+        },
       },
       { cwd: projectDir, session: sessionCache.getOrCreate(projectDir) },
     );
@@ -428,8 +549,12 @@ describe("code_refactor_plan / code_refactor_apply workflow wrappers", () => {
     const planResult = (await refactorTool.execute(
       "workflow-cross-compat-3",
       {
-        target: { anchor: { file: "src/index.ts", line: 1, character: 1 } },
-        operation: { rename_symbol: { newName: "newName" } },
+        operation: {
+          rename_symbol: {
+            target: { anchor: { file: "src/index.ts", line: 1, character: 1 } },
+            newName: "newName",
+          },
+        },
       },
       undefined,
       undefined,

@@ -18,8 +18,8 @@ import {
 import { resolveToolPath as resolveSessionPath } from "@mrclrchtr/supi-core/path";
 import { createSessionStateRegistry } from "@mrclrchtr/supi-core/session";
 import { CodeActionTriggerKind } from "vscode-languageserver-types";
+import { advertisedCodeActionKinds } from "../config/operation-support.ts";
 import type {
-  CodeAction,
   Diagnostic,
   DocumentSymbol,
   FileEvent,
@@ -49,6 +49,7 @@ import type {
 import { runRoutedRename } from "./runtime-rename.ts";
 import type {
   BulkTrackFilesResult,
+  RoutedCodeActionResponse,
   RoutedMutationResponse,
   SemanticReadinessResult,
   WorkspaceCodeActionRequestOptions,
@@ -84,6 +85,7 @@ export {
 export type {
   BulkTrackFileOutcome,
   BulkTrackFilesResult,
+  RoutedCodeActionResponse,
   RoutedMutationDocumentSnapshot,
   RoutedMutationResponse,
   SemanticReadinessResult,
@@ -293,7 +295,7 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
     positionOrRange: Position | Range,
     control?: CodeRequestControl,
     options?: WorkspaceCodeActionRequestOptions,
-  ): Promise<RoutedMutationResponse<CodeAction[] | null> | null> {
+  ): Promise<RoutedCodeActionResponse | null> {
     const resolvedPath = this.resolveFilePath(filePath);
     const client = await this.manager.ensureFileOpen(resolvedPath, {
       recoverProcessCrash: true,
@@ -315,21 +317,21 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
       triggerKind: options?.triggerKind ?? CodeActionTriggerKind.Invoked,
       ...(options?.only ? { only: [...options.only] } : {}),
     };
+    const advertisedKinds = advertisedCodeActionKinds(client.serverCapabilities ?? null);
+    const routed = {
+      authorizedMutationRoots: [client.root],
+      ...(advertisedKinds ? { advertisedKinds } : {}),
+    };
     if (typeof client.codeActionsDetailed === "function") {
       const result = await client.codeActionsDetailed(resolvedPath, range, context, control);
-      return {
-        value: result.kind === "completed" ? result.data : null,
-        authorizedMutationRoots: [client.root],
-        ...(result.kind === "unavailable"
-          ? { reason: result.reason }
-          : result.data === null
-            ? { reason: "LSP server returned no code actions." }
-            : {}),
-      };
+      // A completed `null` result means the server has no actions here (LSP spec).
+      return result.kind === "completed"
+        ? { ...routed, value: result.data ?? [] }
+        : { ...routed, value: null, reason: result.reason };
     }
     return {
-      value: await client.codeActions(resolvedPath, range, context, control),
-      authorizedMutationRoots: [client.root],
+      ...routed,
+      value: (await client.codeActions(resolvedPath, range, context, control)) ?? [],
     };
   }
 

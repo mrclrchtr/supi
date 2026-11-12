@@ -4,10 +4,8 @@ import type { ServerCapabilities } from "vscode-languageserver-protocol";
 export type ServerOperationName =
   | "rename_symbol"
   | "prepare_rename"
-  | "extract_function"
-  | "extract_variable"
-  | "update_imports"
-  | "delete_dead_code"
+  | "code_action"
+  | "source_action"
   | "code_action_resolve";
 
 /** Whether a server advertises one operation in its negotiated capabilities. */
@@ -19,34 +17,14 @@ export interface ServerOperationSupport {
   readonly supi: "supported" | "limited" | "unsupported";
   /** A stable explanation for a SuPi planning limitation or deferral. */
   readonly reason?: string;
+  /** Advertised CodeActionKinds in this operation's family (`refactor*` or `source*`). */
+  readonly kinds?: readonly string[];
 }
 
 /** Operation support projected onto a project-server health entry. */
 export type ServerOperationSupportMap = Partial<
   Record<ServerOperationName, ServerOperationSupport>
 >;
-
-const REMOVE_UNUSED_KIND = "source.removeUnused";
-const REMOVE_UNUSED_IMPORTS_KIND = "source.removeUnusedImports";
-
-/** Code-action kinds requested by each operation-specific planner. */
-export const REFACTOR_CODE_ACTION_KINDS = {
-  extract_function: ["refactor.extract.function"],
-  extract_variable: ["refactor.extract.constant", "refactor.extract.variable"],
-  update_imports: ["source.organizeImports"],
-  delete_dead_code: [REMOVE_UNUSED_KIND, REMOVE_UNUSED_IMPORTS_KIND],
-} as const satisfies Record<
-  "extract_function" | "extract_variable" | "update_imports" | "delete_dead_code",
-  readonly string[]
->;
-
-/**
- * Why extraction stays unavailable. LSP extraction actions pick a generated name;
- * typescript-language-server applies extraction edits inside a command and then
- * asks the client for an interactive rename, so no previewable exact-name plan exists.
- */
-export const EXTRACTION_NAME_LIMITATION =
-  "LSP extraction code actions choose a generated name, and typescript-language-server applies extraction edits through a command before requesting an interactive rename, so SuPi cannot preview an exact requested name. Use the edit tool for extraction.";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -100,6 +78,22 @@ export function supportsCodeActionResolve(capabilities: ServerCapabilities | nul
   return codeActionOptions(capabilities)?.resolveProvider === true;
 }
 
+/**
+ * Test whether a returned CodeActionKind falls under a requested kind: the same
+ * kind or a dotted descendant. The empty kind requests every kind.
+ */
+export function isCodeActionKindWithin(kind: unknown, requested: string): boolean {
+  if (requested === "") return true;
+  return typeof kind === "string" && (kind === requested || kind.startsWith(`${requested}.`));
+}
+
+/** Return the negotiated `codeActionKinds`, or undefined when the server did not narrow them. */
+export function advertisedCodeActionKinds(
+  capabilities: ServerCapabilities | null,
+): readonly string[] | undefined {
+  return codeActionOptions(capabilities)?.kinds;
+}
+
 /** Test the documented hierarchical relationship between two code-action kinds. */
 export function isCodeActionKindInRange(kind: string, requested: string): boolean {
   if (kind === "" || requested === "") return true;
@@ -123,46 +117,24 @@ export function supportsRequestedCodeActionKinds(
   );
 }
 
-function codeActionAdvertisement(
+function supportedOperation(server: ServerAdvertisement): ServerOperationSupport {
+  return { server, supi: "supported" };
+}
+
+/** Project advertised kinds for one CodeActionKind family, such as `refactor` or `source`. */
+function codeActionFamilySupport(
   capabilities: ServerCapabilities | null,
-  requested: readonly string[],
-): ServerAdvertisement {
-  if (capabilities === null) return "unknown";
-  const options = codeActionOptions(capabilities);
-  if (!options) return "not-advertised";
-  if (requested.length === 0 || !options.kinds) return "unknown";
-  if (!supportsRequestedCodeActionKinds(capabilities, requested)) return "not-advertised";
-
-  // A generic parent or the empty kind proves eligibility, but it does not
-  // prove that this exact operation is implemented by the server.
-  const exactOrChild = requested.some((wanted) =>
-    options.kinds?.some(
-      (kind) => kind === wanted || (wanted !== "" && kind.startsWith(`${wanted}.`)),
-    ),
-  );
-  return exactOrChild ? "advertised" : "unknown";
-}
-
-function supportedOperation(
-  server: ServerAdvertisement,
-  supi: ServerOperationSupport["supi"] = "supported",
-  reason?: string,
+  family: "refactor" | "source",
 ): ServerOperationSupport {
-  return { server, supi, ...(reason ? { reason } : {}) };
-}
-
-function deleteDeadCodeSupport(capabilities: ServerCapabilities | null): ServerOperationSupport {
-  const server = codeActionAdvertisement(capabilities, REFACTOR_CODE_ACTION_KINDS.delete_dead_code);
-  const importsOnly =
-    codeActionAdvertisement(capabilities, [REMOVE_UNUSED_KIND]) !== "advertised" &&
-    codeActionAdvertisement(capabilities, [REMOVE_UNUSED_IMPORTS_KIND]) === "advertised";
-  return importsOnly
-    ? supportedOperation(
-        server,
-        "limited",
-        "Only unused-import removal is supported by this mapping, not arbitrary unused declarations.",
-      )
-    : supportedOperation(server);
+  if (capabilities === null) return supportedOperation("unknown");
+  const options = codeActionOptions(capabilities);
+  if (!options) return supportedOperation("not-advertised");
+  // An unnarrowed provider or the empty kind may serve any family.
+  if (!options.kinds || options.kinds.includes("")) return supportedOperation("unknown");
+  const kinds = options.kinds.filter((kind) => isCodeActionKindWithin(kind, family));
+  return kinds.length > 0
+    ? { server: "advertised", supi: "supported", kinds }
+    : supportedOperation("not-advertised");
 }
 
 /** Build the honest operation-support projection for one negotiated server. */
@@ -190,27 +162,8 @@ export function getServerOperationSupport(
   return {
     rename_symbol: supportedOperation(renameServer),
     prepare_rename: supportedOperation(prepareServer),
-    extract_function: supportedOperation(
-      codeActionAdvertisement(capabilities, REFACTOR_CODE_ACTION_KINDS.extract_function),
-      "limited",
-      EXTRACTION_NAME_LIMITATION,
-    ),
-    extract_variable: supportedOperation(
-      codeActionAdvertisement(capabilities, REFACTOR_CODE_ACTION_KINDS.extract_variable),
-      "limited",
-      EXTRACTION_NAME_LIMITATION,
-    ),
-    update_imports: supportedOperation(
-      codeActionAdvertisement(capabilities, REFACTOR_CODE_ACTION_KINDS.update_imports),
-    ),
-    delete_dead_code: deleteDeadCodeSupport(capabilities),
+    code_action: codeActionFamilySupport(capabilities, "refactor"),
+    source_action: codeActionFamilySupport(capabilities, "source"),
     code_action_resolve: supportedOperation(resolveServer),
   };
-}
-
-/** Get the exact operation-specific kinds used in a code-action request. */
-export function codeActionKindsForOperation(
-  operation: keyof typeof REFACTOR_CODE_ACTION_KINDS,
-): readonly string[] {
-  return REFACTOR_CODE_ACTION_KINDS[operation];
 }

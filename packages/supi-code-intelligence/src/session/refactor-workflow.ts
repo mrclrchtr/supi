@@ -1,56 +1,37 @@
 /** Session-owned refactor planning and apply workflows. */
 
-import type {
-  RefactorOperation,
-  RefactorResult,
-  SemanticProvider,
-  SourceRange,
-} from "@mrclrchtr/supi-code-runtime/api";
 import { toLspPosition } from "@mrclrchtr/supi-lsp/api";
-import { SEMANTIC_READINESS_TIMEOUT_REASON } from "../analysis/readiness.ts";
 import { applyWorkspaceEdit } from "../analysis/refactor/apply.ts";
 import {
   isLatexSectionTarget,
   refineLatexSectionRenameResult,
 } from "../analysis/refactor/latex-section-rename.ts";
-import {
-  establishMutationAuthority,
-  revalidateMutationAuthority,
-} from "../analysis/refactor/mutation-authority.ts";
+import { revalidateMutationAuthority } from "../analysis/refactor/mutation-authority.ts";
 import { validateEdit } from "../analysis/refactor/safety.ts";
 import { normalizePath } from "../analysis/search/paths.ts";
-import type { CapabilityAdapter } from "./capability-adapter.ts";
 import {
   parseRefactorApplyWorkflowInput,
   parseRefactorPlanWorkflowInput,
 } from "./input/health-refactor.ts";
-import { collectFileFingerprints, dropIdentityEdits } from "./refactor-identity.ts";
+import { planFileAction } from "./refactor-file-actions.ts";
 import {
-  computeFileFingerprint,
-  generatePlanId,
-  isPlanFresh,
-  type RefactorPlan,
-  validateSynchronizedContentFingerprints,
-} from "./refactor-plans.ts";
-import {
-  PUBLIC_REFACTOR_OPERATION_NAMES,
-  type PublicSourceRange,
-  type RefactorApplyWorkflowInput,
-  type RefactorApplyWorkflowOutcome,
-  type RefactorOperationInput,
-  type RefactorPlanWorkflowInput,
-  type RefactorPlanWorkflowOutcome,
+  ensureFileReadiness,
+  finishProviderPlan,
+  immutablePlan,
+  planWithProvider,
+  type RefactorWorkflowDeps,
+} from "./refactor-plan-pipeline.ts";
+import { computeFileFingerprint, isPlanFresh } from "./refactor-plans.ts";
+import type {
+  RefactorApplyWorkflowInput,
+  RefactorApplyWorkflowOutcome,
+  RefactorOperationInput,
+  RefactorPlanWorkflowInput,
+  RefactorPlanWorkflowOutcome,
 } from "./refactor-types.ts";
 import type { TargetStoreEntry } from "./target-store.ts";
-import { resolveTargetWorkflow, type TargetWorkflowDeps } from "./target-workflow.ts";
+import { resolveTargetWorkflow } from "./target-workflow.ts";
 import { reportProgress, throwIfAborted, type WorkflowControl } from "./workflow-control.ts";
-
-export interface RefactorWorkflowDeps extends TargetWorkflowDeps {
-  readonly capability: CapabilityAdapter;
-  readonly storePlan: (plan: RefactorPlan) => string;
-  readonly getPlan: (id: string) => RefactorPlan | undefined;
-  readonly removePlan: (id: string) => void;
-}
 
 /** Plan one precise refactor without mutating files. */
 export async function runRefactorPlanWorkflow(
@@ -60,24 +41,27 @@ export async function runRefactorPlanWorkflow(
 ): Promise<RefactorPlanWorkflowOutcome> {
   const validatedInput = parseRefactorPlanWorkflowInput(input);
   if (validatedInput.kind === "invalid-input") return validatedInput;
-  const request = validatedInput.value;
-  const parsed = parseOperation(request.operation);
-  if (parsed.kind === "invalid-input") return parsed;
-  const rangeError = parsed.range ? validateRange(parsed.range) : null;
-  if (rangeError) return { kind: "invalid-input", message: rangeError };
-
+  const { operation } = validatedInput.value;
   throwIfAborted(control);
+  if ("rename_symbol" in operation) {
+    return planRename(operation.rename_symbol, deps, control);
+  }
+  return planFileAction(operation, deps, control);
+}
+
+async function planRename(
+  input: Extract<RefactorOperationInput, { rename_symbol: unknown }>["rename_symbol"],
+  deps: RefactorWorkflowDeps,
+  control?: WorkflowControl,
+): Promise<RefactorPlanWorkflowOutcome> {
   reportProgress(control, {
     intent: "refactor-plan",
     phase: "target",
     message: "Resolving refactor target",
   });
   const target = await resolveTargetWorkflow(
-    request.target,
-    {
-      fileLevelAllowed: false,
-      nameAnchorRequired: parsed.operation === "rename_symbol",
-    },
+    input.target,
+    { fileLevelAllowed: false, nameAnchorRequired: true },
     deps,
     control,
   );
@@ -86,28 +70,48 @@ export async function runRefactorPlanWorkflow(
     return {
       kind: "invalid-input",
       message:
-        "Refactor planning requires one declaration, not a whole file. Pass one handle from the file outline as target.handle.",
+        "Rename requires one declaration, not a whole file. Pass one handle from the file outline as target.handle.",
     };
   }
   if (target.kind === "disambiguation" || target.kind === "kind-mismatch") {
     return {
       kind: "invalid-input",
-      message: "Refactor planning requires one precise target handle or anchor.",
+      message: "Rename requires one precise target handle or anchor.",
     };
   }
   if (target.kind !== "resolved") return target;
 
-  const readiness = await deps.capability.ensureSemanticReadiness(
-    deps.cwd,
-    { kind: "file", file: target.entry.file },
+  const file = normalizePath(target.entry.file, deps.cwd);
+  const readiness = await ensureFileReadiness(file, deps, control);
+  if (readiness) return readiness;
+  const sectionRename = await planWithLatexSafety({
+    newName: input.newName,
+    target: target.entry,
+    file,
+    deps,
     control,
-  );
-  if (readiness.kind === "timeout") {
-    return { kind: "unavailable", reason: SEMANTIC_READINESS_TIMEOUT_REASON };
+  });
+  if (
+    sectionRename.result.kind === "precise" &&
+    sectionRename.sourceFingerprint &&
+    computeFileFingerprint(file) !== sectionRename.sourceFingerprint
+  ) {
+    return {
+      kind: "unavailable",
+      reason: "The LaTeX source changed before the title rename plan was stored.",
+    };
   }
-  if (readiness.kind === "unavailable") return readiness;
-  throwIfAborted(control);
-  return planResolvedRefactor(parsed, target.entry, deps, control);
+  return finishProviderPlan(sectionRename.result, deps, {
+    operation: "rename_symbol",
+    file,
+    discriminator: `${target.entry.displayLine}:${target.entry.displayCharacter}:${input.newName}`,
+    fields: {
+      newName: input.newName,
+      target: { line: target.entry.displayLine, character: target.entry.displayCharacter },
+    },
+    evidenceSource: sectionRename.evidenceSource,
+    sourceFingerprint: sectionRename.sourceFingerprint,
+  });
 }
 
 /** Revalidate and apply one stored plan through the per-file mutation queue. */
@@ -157,94 +161,17 @@ export async function runRefactorApplyWorkflow(
   return { kind: "completed", plan: immutablePlan(plan), result };
 }
 
-type ParsedRefactorOperation = Extract<ReturnType<typeof parseOperation>, { kind: "ok" }>;
 type RefinedRefactorResult = Awaited<ReturnType<typeof refineLatexSectionRenameResult>>;
 
-async function planResolvedRefactor(
-  parsed: ParsedRefactorOperation,
-  target: Readonly<TargetStoreEntry>,
-  deps: RefactorWorkflowDeps,
-  control?: WorkflowControl,
-): Promise<RefactorPlanWorkflowOutcome> {
-  const file = normalizePath(target.file, deps.cwd);
-  const sectionRename = await planWithLatexSafety({ parsed, target, file, deps, control });
-  const result = sectionRename.result;
-  if (result.kind === "unavailable") return result;
-  if (result.kind === "ambiguous") {
-    return { kind: "ambiguous", candidates: result.candidates };
-  }
-  if (
-    sectionRename.sourceFingerprint &&
-    computeFileFingerprint(file) !== sectionRename.sourceFingerprint
-  ) {
-    return {
-      kind: "unavailable",
-      reason: "The LaTeX source changed before the title rename plan was stored.",
-    };
-  }
-
-  const validation = validateEdit(result.edits);
-  if (!validation.safe) {
-    return { kind: "invalid-input", message: `Refactor safety check failed: ${validation.reason}` };
-  }
-  const authority = establishMutationAuthority(
-    result.edits.edits.map((edit) => edit.file),
-    result.authorizedMutationRoots,
-  );
-  if (authority.kind === "unavailable") return authority;
-  const fileFingerprints = collectFileFingerprints(
-    result.edits.edits,
-    sectionRename.sourceFingerprint
-      ? { file, fingerprint: sectionRename.sourceFingerprint }
-      : undefined,
-  );
-  const snapshotError = validateSynchronizedContentFingerprints(
-    result.edits.documentPreconditions,
-    fileFingerprints,
-    deps.cwd,
-  );
-  if (snapshotError) return { kind: "unavailable", reason: snapshotError };
-  const changed = dropIdentityEdits(result.edits, fileFingerprints);
-  if (changed.kind === "unavailable") return changed;
-  if (changed.edits.edits.length === 0) {
-    return {
-      kind: "invalid-input",
-      message: `The ${parsed.operation} refactor produces no changes; every planned edit matches the current text.`,
-    };
-  }
-
-  const plan: RefactorPlan = {
-    id: generatePlanId(
-      parsed.operation,
-      file,
-      target.displayLine,
-      target.displayCharacter,
-      parsed.newName,
-    ),
-    operation: parsed.operation,
-    newName: parsed.newName,
-    targetFile: file,
-    targetLine: target.displayLine,
-    targetCharacter: target.displayCharacter,
-    edits: changed.edits,
-    evidenceSource: sectionRename.evidenceSource,
-    authorizedMutationRoots: authority.canonicalRoots,
-    fileFingerprints: changed.fileFingerprints,
-    createdAt: Date.now(),
-  };
-  deps.storePlan(plan);
-  return { kind: "completed", plan: immutablePlan(plan) };
-}
-
 async function planWithLatexSafety(input: {
-  readonly parsed: ParsedRefactorOperation;
+  readonly newName: string;
   readonly target: Readonly<TargetStoreEntry>;
   readonly file: string;
   readonly deps: RefactorWorkflowDeps;
   readonly control?: WorkflowControl;
 }): Promise<RefinedRefactorResult> {
-  const { parsed, target, file, deps, control } = input;
-  const isLatexRename = parsed.operation === "rename_symbol" && isLatexSectionTarget(target);
+  const { newName, target, file, deps, control } = input;
+  const isLatexRename = isLatexSectionTarget(target);
   if (isLatexRename && computeFileFingerprint(file) !== target.fileFingerprint) {
     return {
       result: {
@@ -258,11 +185,10 @@ async function planWithLatexSafety(input: {
   const result = await planWithProvider(
     deps.capability.getSemanticProvider(deps.cwd),
     {
-      operation: parsed.operation,
+      operation: "rename_symbol",
       file,
       position: toLspPosition(target.displayLine, target.displayCharacter),
-      range: parsed.range ? toLspRange(parsed.range) : undefined,
-      newName: parsed.newName,
+      newName,
     },
     control,
   );
@@ -276,11 +202,11 @@ async function planWithLatexSafety(input: {
     };
   }
   return refineLatexSectionRenameResult({
-    operation: parsed.operation,
+    operation: "rename_symbol",
     result,
     target,
     file,
-    newName: parsed.newName,
+    newName,
     structural: deps.capability.getStructuralProvider(deps.cwd),
     documentVersionReader: getDocumentVersionReader(deps),
     control,
@@ -294,105 +220,4 @@ function getDocumentVersionReader(
   if (state.kind !== "ready" && state.kind !== "inactive") return undefined;
   if (typeof state.runtime.getOpenDocumentVersion !== "function") return undefined;
   return (file) => state.runtime.getOpenDocumentVersion(file);
-}
-
-function parseOperation(input: RefactorOperationInput):
-  | {
-      kind: "ok";
-      operation: RefactorOperation;
-      newName?: string;
-      range?: PublicSourceRange;
-    }
-  | { kind: "invalid-input"; message: string } {
-  const keys = PUBLIC_REFACTOR_OPERATION_NAMES.filter((key) => key in input);
-  if (keys.length !== 1) {
-    return { kind: "invalid-input", message: "Select exactly one refactor operation." };
-  }
-  if ("rename_symbol" in input) {
-    return {
-      kind: "ok",
-      operation: "rename_symbol",
-      newName: input.rename_symbol.newName,
-    };
-  }
-  if ("extract_function" in input) {
-    return {
-      kind: "ok",
-      operation: "extract_function",
-      newName: input.extract_function.newName,
-      range: input.extract_function.range,
-    };
-  }
-  if ("extract_variable" in input) {
-    return {
-      kind: "ok",
-      operation: "extract_variable",
-      newName: input.extract_variable.newName,
-      range: input.extract_variable.range,
-    };
-  }
-  return {
-    kind: "ok",
-    operation: "update_imports" in input ? "update_imports" : "delete_dead_code",
-  };
-}
-
-function validateRange(range: PublicSourceRange): string | null {
-  if (
-    range.end.line < range.start.line ||
-    (range.end.line === range.start.line && range.end.character <= range.start.character)
-  ) {
-    return "range.end must be after range.start.";
-  }
-  return null;
-}
-
-function toLspRange(range: PublicSourceRange): SourceRange {
-  return {
-    start: toLspPosition(range.start.line, range.start.character),
-    end: toLspPosition(range.end.line, range.end.character),
-  };
-}
-
-async function planWithProvider(
-  provider: SemanticProvider | null,
-  request: {
-    operation: RefactorOperation;
-    file: string;
-    position: { line: number; character: number };
-    range?: SourceRange;
-    newName?: string;
-  },
-  control?: WorkflowControl,
-): Promise<RefactorResult> {
-  if (!provider) return { kind: "unavailable", reason: "No semantic provider is active." };
-  if (provider.refactor) return provider.refactor(request, control);
-  if (request.operation === "rename_symbol" && request.newName !== undefined && provider.rename) {
-    return provider.rename(request.file, request.position, request.newName, control);
-  }
-  return {
-    kind: "unavailable",
-    reason: `The semantic provider cannot plan ${request.operation}.`,
-  };
-}
-
-function immutablePlan(plan: RefactorPlan): Readonly<RefactorPlan> {
-  return Object.freeze({
-    ...plan,
-    edits: Object.freeze({
-      ...plan.edits,
-      edits: Object.freeze(plan.edits.edits.map((edit) => Object.freeze({ ...edit }))),
-      documentPreconditions: plan.edits.documentPreconditions
-        ? Object.freeze(
-            plan.edits.documentPreconditions.map((precondition) =>
-              Object.freeze({ ...precondition }),
-            ),
-          )
-        : undefined,
-    }),
-    authorizedMutationRoots: Object.freeze([...plan.authorizedMutationRoots]),
-    fileFingerprints: Object.freeze(
-      plan.fileFingerprints.map((fingerprint) => Object.freeze({ ...fingerprint })),
-    ),
-  }) as Readonly<RefactorPlan>;
 }

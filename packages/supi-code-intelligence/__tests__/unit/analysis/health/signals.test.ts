@@ -15,12 +15,8 @@ const reasons: ProjectServerStatusReason[] = [
 describe("collectServers", () => {
   it("preserves negotiated operation support", () => {
     const operationSupport: ServerOperationSupportMap = {
-      update_imports: { server: "advertised", supi: "supported" },
-      extract_function: {
-        server: "advertised",
-        supi: "limited",
-        reason: "Standard LSP does not preserve the requested extraction name.",
-      },
+      source_action: { server: "advertised", supi: "supported", kinds: ["source.organizeImports"] },
+      code_action: { server: "not-advertised", supi: "supported" },
     };
     const runtime = {
       getProjectServers: () => [

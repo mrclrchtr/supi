@@ -10,9 +10,9 @@ import type { WorkspaceLspRuntimeState } from "@mrclrchtr/supi-lsp/api";
 import { createTreeSitterSession } from "@mrclrchtr/supi-tree-sitter/api";
 import { createTreeSitterProvider } from "@mrclrchtr/supi-tree-sitter/provider/tree-sitter-provider";
 import { afterEach, describe, expect, it } from "vitest";
+import type { RefactorWorkflowDeps } from "../../../src/session/refactor-plan-pipeline.ts";
 import type { RefactorPlan } from "../../../src/session/refactor-plans.ts";
 import {
-  type RefactorWorkflowDeps,
   runRefactorApplyWorkflow,
   runRefactorPlanWorkflow,
 } from "../../../src/session/refactor-workflow.ts";
@@ -98,8 +98,7 @@ describe("LaTeX section rename workflow", () => {
 
     const outcome = await runRefactorPlanWorkflow(
       {
-        target: { handle: target.targetId },
-        operation: { rename_symbol: { newName: "Overview" } },
+        operation: { rename_symbol: { target: { handle: target.targetId }, newName: "Overview" } },
       },
       deps,
     );
@@ -127,8 +126,7 @@ describe("LaTeX section rename workflow", () => {
 
     const outcome = await runRefactorPlanWorkflow(
       {
-        target: { handle: target.targetId },
-        operation: { rename_symbol: { newName: "Overview" } },
+        operation: { rename_symbol: { target: { handle: target.targetId }, newName: "Overview" } },
       },
       deps,
     );
@@ -150,7 +148,7 @@ async function runRenameCycle(
   const sourceFingerprint = fingerprintOf(fixture.file);
   const target = registerSectionTarget(fixture, deps.targetStore, oldName);
   const planOutcome = await runRefactorPlanWorkflow(
-    { target: { handle: target.targetId }, operation: { rename_symbol: { newName } } },
+    { operation: { rename_symbol: { target: { handle: target.targetId }, newName } } },
     deps,
   );
   if (planOutcome.kind !== "completed") throw new Error(`Rename plan failed: ${planOutcome.kind}`);

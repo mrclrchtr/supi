@@ -42,8 +42,12 @@ describe("throw policy: whole-tool-unavailable throws, invalid usage returns tex
     await expect(
       executeRefactorPlanTool(
         {
-          target: { anchor: { file: "a.ts", line: 1, character: 1 } },
-          operation: { rename_symbol: { newName: "bar" } },
+          operation: {
+            rename_symbol: {
+              target: { anchor: { file: "a.ts", line: 1, character: 1 } },
+              newName: "bar",
+            },
+          },
         },
         makeTestCtx(tmpDir),
       ),

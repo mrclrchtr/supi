@@ -42,15 +42,20 @@ export const CLIENT_CAPABILITIES: ClientCapabilities = {
             "refactor.extract.constant",
             "refactor.extract.variable",
             "refactor.inline",
+            "refactor.move",
             "refactor.rewrite",
             "source",
             "source.organizeImports",
             "source.fixAll",
             "source.removeUnused",
+            "source.removeUnusedImports",
+            "source.sortImports",
           ],
         },
       },
       dataSupport: true,
+      // Never advertise `workspace.workspaceEdit.snippetEditSupport` (LSP 3.18):
+      // snippet edits cannot become exact previewable text plans.
       // SuPi resolves only the edit property. Commands and other fields
       // must remain server-owned and are never advertised as resolvable.
       resolveSupport: { properties: ["edit"] },

@@ -14,14 +14,12 @@ export function renderRefactorPlanResult(assembly: RefactorPlanResultAssembly): 
   lines.push("");
   lines.push(`**Plan ID:** \`${plan.id}\``);
   lines.push(`**Operation:** \`${plan.operation}\``);
-  lines.push(
-    `**Target:** \`${toDisplayPath(cwd, plan.targetFile)}\`:${plan.targetLine}:${plan.targetCharacter}`,
-  );
+  lines.push(`**${plan.target ? "Target" : "File"}:** ${formatPlanScope(plan, cwd)}`);
   if (plan.newName) {
     lines.push(`**New name:** \`${plan.newName}\``);
   }
-  if (plan.destination) {
-    lines.push(`**Destination:** \`${plan.destination}\``);
+  if (plan.action) {
+    lines.push(`**Action:** ${plan.action.title} (\`${plan.action.kind}\`)`);
   }
   lines.push(`**Confidence:** \`${assembly.assembled.confidence}\``);
   lines.push(`**Files to change:** ${fileCount} file${fileCount !== 1 ? "s" : ""}`);
@@ -73,12 +71,26 @@ export function renderRefactorApplyResult(assembly: RefactorApplyResultAssembly)
   if (plan.newName) {
     lines.push(`- New name: \`${plan.newName}\``);
   }
-  if (plan.destination) {
-    lines.push(`- Destination: \`${plan.destination}\``);
+  if (plan.action) {
+    lines.push(`- Action: ${plan.action.title} (\`${plan.action.kind}\`)`);
   }
   const followUps = assembledNextQueries(assembly.assembled);
   if (followUps.length > 0) lines.push("", ...followUps);
   return lines.join("\n");
+}
+
+/** Render the operation scope: a rename target point, a code-action range, or a whole file. */
+function formatPlanScope(
+  plan: RefactorPlanResultAssembly["assembled"]["data"]["plan"],
+  cwd: string,
+): string {
+  const file = `\`${toDisplayPath(cwd, plan.file)}\``;
+  if (plan.target) return `${file}:${plan.target.line}:${plan.target.character}`;
+  if (plan.range) {
+    const { start, end } = plan.range;
+    return `${file} L${start.line}:${start.character} → L${end.line}:${end.character}`;
+  }
+  return `${file} (whole file)`;
 }
 
 function collectChangedFiles(

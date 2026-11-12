@@ -79,17 +79,11 @@ export function parseRefactorPlanWorkflowInput(
 ): InputValidation<RefactorPlanWorkflowInput> {
   const record = requireRecord(value, "code_refactor_plan input");
   if (record.kind === "invalid-input") return record;
-  const keysError = requireOnlyKeys(
-    record.value,
-    ["target", "operation"],
-    "code_refactor_plan input",
-  );
+  const keysError = requireOnlyKeys(record.value, ["operation"], "code_refactor_plan input");
   if (keysError) return invalid(keysError);
-  const target = parseTargetInput(record.value.target, ["handle", "anchor"]);
-  if (target.kind === "invalid-input") return target;
   const operation = parseRefactorOperation(record.value.operation);
   if (operation.kind === "invalid-input") return operation;
-  return valid({ target: target.value as RefactorTargetInput, operation: operation.value });
+  return valid({ operation: operation.value });
 }
 
 function parseRefactorOperation(value: unknown): InputValidation<RefactorOperationInput> {
@@ -104,56 +98,75 @@ function parseRefactorOperation(value: unknown): InputValidation<RefactorOperati
   const payload = requireRecord(record.value[name], `operation.${name}`);
   if (payload.kind === "invalid-input") return payload;
   if (name === "rename_symbol") return parseRenameOperation(payload.value);
-  if (name === "extract_function" || name === "extract_variable") {
-    return parseExtractOperation(name, payload.value);
-  }
-  const payloadError = requireOnlyKeys(payload.value, [], `operation.${name}`);
-  if (payloadError) return invalid(payloadError);
-  return name === "update_imports"
-    ? valid({ update_imports: {} })
-    : valid({ delete_dead_code: {} });
+  return parseActionOperation(name, payload.value);
 }
 
 function parseRenameOperation(
   payload: Record<string, unknown>,
 ): InputValidation<RefactorOperationInput> {
-  const payloadError = requireOnlyKeys(payload, ["newName"], "operation.rename_symbol");
+  const payloadError = requireOnlyKeys(payload, ["target", "newName"], "operation.rename_symbol");
   if (payloadError) return invalid(payloadError);
+  const target = parseTargetInput(payload.target, ["handle", "anchor"]);
+  if (target.kind === "invalid-input") return target;
   const newName = requireString(payload.newName, "operation.rename_symbol.newName", {
     nonEmpty: true,
   });
-  return newName.kind === "valid" ? valid({ rename_symbol: { newName: newName.value } }) : newName;
+  if (newName.kind === "invalid-input") return newName;
+  return valid({
+    rename_symbol: { target: target.value as RefactorTargetInput, newName: newName.value },
+  });
 }
 
-function parseExtractOperation(
-  name: "extract_function" | "extract_variable",
+/** Kind family each action operation accepts; `quickfix` and `notebook` kinds are never valid. */
+const ACTION_KIND_FAMILY = { code_action: "refactor", source_action: "source" } as const;
+
+function parseActionOperation(
+  name: "code_action" | "source_action",
   payload: Record<string, unknown>,
 ): InputValidation<RefactorOperationInput> {
-  const payloadError = requireOnlyKeys(payload, ["newName", "range"], `operation.${name}`);
+  const label = `operation.${name}`;
+  const allowed =
+    name === "code_action" ? ["file", "range", "kind", "title"] : ["file", "kind", "title"];
+  const payloadError = requireOnlyKeys(payload, allowed, label);
   if (payloadError) return invalid(payloadError);
-  const newName = requireString(payload.newName, `operation.${name}.newName`, { nonEmpty: true });
-  if (newName.kind === "invalid-input") return newName;
-  const range = parsePublicRange(payload.range);
+  const file = requireString(payload.file, `${label}.file`, { nonEmpty: true });
+  if (file.kind === "invalid-input") return file;
+  const kind = requireString(payload.kind, `${label}.kind`, { nonEmpty: true });
+  if (kind.kind === "invalid-input") return kind;
+  const family = ACTION_KIND_FAMILY[name];
+  if (kind.value !== family && !kind.value.startsWith(`${family}.`)) {
+    return invalid(`${label}.kind must be "${family}" or start with "${family}.".`);
+  }
+  const title =
+    payload.title === undefined
+      ? valid(undefined)
+      : requireString(payload.title, `${label}.title`, { nonEmpty: true });
+  if (title.kind === "invalid-input") return title;
+  const selection = {
+    file: file.value,
+    kind: kind.value,
+    ...(title.value === undefined ? {} : { title: title.value }),
+  };
+  if (name === "source_action") return valid({ source_action: selection });
+  const range = parsePublicRange(payload.range, `${label}.range`);
   if (range.kind === "invalid-input") return range;
-  return name === "extract_function"
-    ? valid({ extract_function: { newName: newName.value, range: range.value } })
-    : valid({ extract_variable: { newName: newName.value, range: range.value } });
+  return valid({ code_action: { ...selection, range: range.value } });
 }
 
-function parsePublicRange(value: unknown): InputValidation<PublicSourceRange> {
-  const record = requireRecord(value, "range");
+function parsePublicRange(value: unknown, label: string): InputValidation<PublicSourceRange> {
+  const record = requireRecord(value, label);
   if (record.kind === "invalid-input") return record;
-  const keysError = requireOnlyKeys(record.value, ["start", "end"], "range");
+  const keysError = requireOnlyKeys(record.value, ["start", "end"], label);
   if (keysError) return invalid(keysError);
-  const start = parsePosition(record.value.start, "range.start");
+  const start = parsePosition(record.value.start, `${label}.start`);
   if (start.kind === "invalid-input") return start;
-  const end = parsePosition(record.value.end, "range.end");
+  const end = parsePosition(record.value.end, `${label}.end`);
   if (end.kind === "invalid-input") return end;
   if (
     end.value.line < start.value.line ||
     (end.value.line === start.value.line && end.value.character <= start.value.character)
   ) {
-    return invalid("range.end must be after range.start.");
+    return invalid(`${label}.end must be after ${label}.start.`);
   }
   return valid({ start: start.value, end: end.value });
 }

@@ -77,14 +77,13 @@ const operation = object({
   server: Type.Enum(["advertised", "not-advertised", "unknown"], { type: "string" }),
   supi: Type.Enum(["supported", "limited", "unsupported"], { type: "string" }),
   reason: Type.Optional(Type.String()),
+  kinds: Type.Optional(Type.Array(Type.String())),
 });
 const support = object({
   rename_symbol: Type.Optional(operation),
   prepare_rename: Type.Optional(operation),
-  extract_function: Type.Optional(operation),
-  extract_variable: Type.Optional(operation),
-  update_imports: Type.Optional(operation),
-  delete_dead_code: Type.Optional(operation),
+  code_action: Type.Optional(operation),
+  source_action: Type.Optional(operation),
   code_action_resolve: Type.Optional(operation),
 });
 const server = object({

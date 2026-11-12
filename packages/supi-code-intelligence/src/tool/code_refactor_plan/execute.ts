@@ -4,13 +4,11 @@ import type {
   RefactorOperationInput,
   RefactorPlanWorkflowInput,
 } from "../../session/refactor-types.ts";
-import type { RefactorTargetInput } from "../../session/target-input.ts";
 import type { CodeIntelResult, CodeIntelToolExecCtx } from "../../types/index.ts";
 import { toWorkflowControl } from "../infra/workflow-control.ts";
 import { finishRefactorPlanResult } from "./result.ts";
 
 export interface CodeRefactorPlanToolParams {
-  target: RefactorTargetInput;
   operation: RefactorOperationInput;
 }
 

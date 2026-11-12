@@ -317,6 +317,31 @@ describe("LSP code-action requests", () => {
     expect(rpc.sendRequest).toHaveBeenCalledTimes(1);
   });
 
+  it("ignores entries outside the requested kinds before validating them", async () => {
+    // typescript-language-server adds quickfixes with an empty nested command title
+    // for whole-document ranges, even when `only` asks for source actions.
+    const { client, rpc } = createRunningTestClient({
+      capabilities: { codeActionProvider: true },
+    });
+    const sourceAction = { title: "Remove unused", kind: "source.removeUnused.ts", edit: {} };
+    rpc.sendRequest.mockResolvedValueOnce([
+      {
+        title: "Remove import",
+        kind: "quickfix",
+        command: { title: "", command: "_typescript.applyCodeActionCommand" },
+      },
+      sourceAction,
+    ]);
+
+    const result = await client.codeActionsDetailed(
+      "/project/index.ts",
+      { start: { line: 0, character: 0 }, end: { line: 2, character: 0 } },
+      { diagnostics: [], only: ["source.removeUnused"] },
+    );
+
+    expect(result).toEqual({ kind: "completed", data: [sourceAction] });
+  });
+
   it("keeps a valid standard Command response editless and unsupported", async () => {
     const command = {
       title: "Run fix",

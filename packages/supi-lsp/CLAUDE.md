@@ -24,11 +24,10 @@ The provider maps semantic requests to `WorkspaceLspRuntime`. Read-only semantic
 Public code-intelligence refactors currently use:
 
 - `rename_symbol` → `textDocument/prepareRename` when advertised, then `textDocument/rename`
-- `extract_function` / `extract_variable` → unavailable: LSP actions pick a generated name; typescript-language-server applies edits via `_typescript.applyRefactoring` then requests interactive rename, so no exact-name preview exists (#467)
-- `update_imports` → `source.organizeImports` code actions
-- `delete_dead_code` → `source.removeUnused` code actions
+- `code_action` → code actions for a range with `only: [kind]` (kind under `refactor`)
+- `source_action` → code actions for the whole document with `only: [kind]` (kind under `source`); retried twice (500 ms, 1 s) while no action of the kind returns, because typescript-language-server omits fix-all/unused source actions while diagnostics are pending
 
-Operation-specific code actions use `context.only` and `Invoked`, resolve lazy edit-only actions when advertised, match `CodeAction.kind`, and return ambiguity for distinct normalized edits. Only precise text edits cross into refactor plans. Resource/file operations remain unavailable.
+Code-action planning uses `context.only` and `Invoked`, drops returned entries outside `only` before validation (typescript-language-server adds quickfixes with empty nested command titles), resolves lazy edit-only actions when advertised, matches `CodeAction.kind` by prefix (never title), excludes disabled actions, narrows by exact title when given, and returns ambiguity with candidate kind/title for distinct normalized edits. Command-only actions, resource/file operations, and snippet edits remain unavailable; never advertise `snippetEditSupport`.
 
 Diagnostic severity: Error (`1`), Warning (`2`), Information (`3`), Hint (`4`). The default threshold is `1`.
 

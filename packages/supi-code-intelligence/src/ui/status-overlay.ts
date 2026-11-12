@@ -618,7 +618,7 @@ export class CiStatusDialog {
       text(
         t.fg(
           "dim",
-          `    ${operation}: server ${support.server}; SuPi ${support.supi}${support.reason ? ` — ${support.reason}` : ""}`,
+          `    ${operation}: server ${support.server}; SuPi ${support.supi}${support.kinds?.length ? `; kinds ${support.kinds.join(", ")}` : ""}${support.reason ? ` — ${support.reason}` : ""}`,
         ),
       );
     }

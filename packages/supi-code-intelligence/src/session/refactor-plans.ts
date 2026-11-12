@@ -8,17 +8,27 @@
 
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
-import type { RefactorOperation, WorkspaceEdit } from "@mrclrchtr/supi-code-runtime/api";
+import type {
+  RefactorActionIdentity,
+  RefactorOperation,
+  WorkspaceEdit,
+} from "@mrclrchtr/supi-code-runtime/api";
 import { toDisplayPath } from "../analysis/search/paths.ts";
+import type { PublicSourceRange } from "./refactor-types.ts";
 
 export interface RefactorPlan {
   id: string;
   operation: RefactorOperation;
+  /** Absolute file the operation was requested for. */
+  file: string;
+  /** `rename_symbol`: the requested name. */
   newName?: string;
-  destination?: string;
-  targetFile: string;
-  targetLine: number;
-  targetCharacter: number;
+  /** `rename_symbol`: one-based target position in `file`. */
+  target?: { line: number; character: number };
+  /** `code_action`: the one-based requested range in `file`. */
+  range?: PublicSourceRange;
+  /** `code_action` / `source_action`: the selected server action. */
+  action?: RefactorActionIdentity;
   edits: WorkspaceEdit;
   /** Evidence source used to compose this plan. */
   evidenceSource?: "semantic" | "structural";
@@ -56,17 +66,10 @@ export function validateSynchronizedContentFingerprints(
   return null;
 }
 
-/** Generate a stable plan id from operation details. */
-// biome-ignore lint/complexity/useMaxParams: plan id construction needs all positional args
-export function generatePlanId(
-  operation: string,
-  file: string,
-  line: number,
-  character: number,
-  discriminator: string = "",
-): string {
+/** Generate a plan id from operation details and a time discriminator. */
+export function generatePlanId(operation: string, file: string, discriminator: string): string {
   const hash = createHash("sha256")
-    .update(`${operation}:${file}:${line}:${character}:${discriminator}:${Date.now()}`)
+    .update(`${operation}:${file}:${discriminator}:${Date.now()}`)
     .digest("hex")
     .slice(0, 12);
   return `plan-${hash}`;

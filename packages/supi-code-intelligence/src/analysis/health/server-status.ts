@@ -117,5 +117,6 @@ function formatOperationSupportDetail(value: OperationSupport): string | null {
     details.push(`SuPi limitation${value.reason ? `: ${value.reason}` : ""}`);
   }
   if (value.supi === "unsupported") details.push("SuPi unsupported");
+  if (value.kinds?.length) details.push(`kinds ${value.kinds.join(", ")}`);
   return details.length > 0 ? details.join("; ") : null;
 }

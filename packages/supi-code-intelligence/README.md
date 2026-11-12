@@ -95,7 +95,7 @@ All eight tools declare native output schemas and return JSON-serializable `stru
 | Graph | Per-relation `sections` with bounded `items` and evidence |
 | Find | Bounded `matches`; AST scan policy, exclusions, limitations, and failures |
 | Health | Requested `includedSections` and `level`, actual `diagnostics` with scope and confirmation evidence, all collected `servers`, workspace inventory scope, capability state, warnings, and separate `refresh` outcomes |
-| Refactor Plan | `planId`, operation, safe target facts, every exact edit in `edits`, file/edit counts, provenance, and `nextAction` |
+| Refactor Plan | `planId`, operation, `file`, rename `target` or action `range`, the selected `action` kind and title, every exact edit in `edits`, file/edit counts, provenance, and `nextAction`; ambiguous results list candidate kinds and titles |
 | Refactor Apply | Explicit `kind: "applied"`, changed `files` with per-file counts, and total file/edit counts |
 
 Check `kind` before consuming evidence. Invalid input and candidate selection remain corrective returned outcomes; real execution/capability failures and cancellation throw. Internal providers, target records, fingerprints, mutation authority, and session state are not exposed. Apply recovery consumes original document identities in `details.data.recoveryFiles`, independently of display paths and script data.
@@ -110,7 +110,7 @@ Semantic exclusion examples distinguish the original `observedPath` rejected by 
 
 Orientation groups equivalent syntax-recovery warnings by source, reason, and error ranges, listing all affected operations once. Native recovery facts retain every per-operation observation; distinct warnings remain separate.
 
-Source points, target positions, Inspect source coordinates, and Orientation source-item coordinates use one-based lines and UTF-16 columns. Refactor edit ranges and Orientation provider ranges (hover, definitions, diagnostics), like syntax-recovery ranges, use zero-based lines and UTF-16 columns; range ends are exclusive. Health messages use one-based lines.
+Source points, target positions, `code_action` ranges, Inspect source coordinates, and Orientation source-item coordinates use one-based lines and UTF-16 columns. Refactor edit ranges and Orientation provider ranges (hover, definitions, diagnostics), like syntax-recovery ranges, use zero-based lines and UTF-16 columns; range ends are exclusive. Health messages use one-based lines.
 
 Registered-tool tests validate results against the registered output schemas and JSON round-tripping; Pi does not validate output schemas at runtime. Separate deterministic integration tests execute all five migrated tools through Pi's real default codemode route, including fixture mutation by Apply. These tests use controlled providers, not live language-server qualification.
 
@@ -166,9 +166,15 @@ Candidate selection for Graph, Resolve, and Orientation uses one structured tran
 
 ### Refactor checks
 
-The planner accepts one target handle or anchor and one operation: `rename_symbol`, `extract_function`, `extract_variable`, `update_imports`, or `delete_dead_code`. Rename, import updates, and dead-code removal depend on the language server and validated edits. Function and variable extraction are currently unavailable for all languages: LSP extraction actions choose a generated name, and typescript-language-server applies extraction edits before an interactive rename, so no exact-name preview exists; use the edit tool instead. Unsupported operations do not fall back to text edits.
+The planner accepts exactly one operation, each with its own scope:
 
-`delete_dead_code` accepts precise `source.removeUnused` or `source.removeUnusedImports` actions (including dotted descendants), not title-based guesses or `source.fixAll`. Native TypeScript 7 is qualified for unused-import removal only; it does not imply removal of arbitrary unused declarations or TLS/native parity. An imports-only advertisement appears as limited SuPi support with the reason in `code_health`. Different matching edit plans remain ambiguous rather than selecting an action automatically.
+| Operation | Input | Server request |
+|---|---|---|
+| `rename_symbol` | `target` (handle or name anchor) and `newName` | `textDocument/rename` |
+| `code_action` | `file`, one-based `range`, `kind` under `refactor` (for example `refactor.extract`), optional `title` | Code actions for the range |
+| `source_action` | `file`, `kind` under `source` (for example `source.organizeImports`), optional `title` | Code actions for the whole file |
+
+`kind` matches the action kind and its dotted sub-kinds, never the title; `quickfix` and other kinds are rejected. Disabled actions never match. When matching actions produce different edits, the result is ambiguous and lists each candidate's kind and exact title; repeat the call with `title`. Actions that only run a server command cannot be previewed and stay unavailable. Code actions choose their own names (such as `newVar` or `var_name`); the preview shows them, and `rename_symbol` can rename them after apply. Which kinds work depends on the server: `code_health` lists the advertised `refactor*` and `source*` kinds per server. Unsupported operations do not fall back to text edits.
 
 Rename can discover affected files and repeat the request once after validated same-route enrollment, with a limit of 64 files. A null server document version for an open file is accepted only with a verified request snapshot of synchronized content. Plans retain its content fingerprint and client version; unknown or mismatched state remains unavailable.
 

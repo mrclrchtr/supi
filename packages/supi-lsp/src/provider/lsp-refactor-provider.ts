@@ -4,14 +4,13 @@ import type {
   RefactorResult,
   SemanticProvider,
 } from "@mrclrchtr/supi-code-runtime/api";
-import { EXTRACTION_NAME_LIMITATION } from "../config/operation-support.ts";
 import type { WorkspaceLspRuntime } from "../session/runtime-registry.ts";
 import {
   collectCodeActionResults,
-  isDeleteDeadCodeCodeAction,
-  isUpdateImportsCodeAction,
-  runFilteredCodeActionRefactor,
+  runCodeActionRefactor,
   runRenameRefactor,
+  runSourceActionRefactor,
+  wholeDocumentRange,
 } from "./refactor-planning.ts";
 
 /** Build optional refactor methods for the semantic provider adapter. */
@@ -46,12 +45,6 @@ async function planRefactor(
 ): Promise<RefactorResult> {
   switch (request.operation) {
     case "rename_symbol":
-      if (!request.newName) {
-        return {
-          kind: "unavailable",
-          reason: 'Refactor operation "rename_symbol" requires `newName`.',
-        };
-      }
       return runRenameRefactor({
         lsp,
         file: request.file,
@@ -59,39 +52,31 @@ async function planRefactor(
         newName: request.newName,
         control,
       });
-    case "extract_function":
-    case "extract_variable":
-      return {
-        kind: "unavailable",
-        reason: `Refactor operation "${request.operation}" is unavailable. ${EXTRACTION_NAME_LIMITATION}`,
-      };
-    case "update_imports":
-      return runFilteredCodeActionRefactor({
+    case "code_action":
+      return runCodeActionRefactor({
         lsp,
         file: request.file,
-        position: request.position,
-        operation: "update_imports",
-        matches: isUpdateImportsCodeAction,
+        range: request.range,
+        kind: request.kind,
+        title: request.title,
+        label: "Code action",
         control,
       });
-    case "delete_dead_code":
-      return runFilteredCodeActionRefactor({
+    case "source_action": {
+      // LSP source actions apply to the entire file, so request the whole document.
+      const range = wholeDocumentRange(request.file);
+      if (!range) {
+        return { kind: "unavailable", reason: `File ${request.file} could not be read.` };
+      }
+      return runSourceActionRefactor({
         lsp,
         file: request.file,
-        position: request.position,
-        operation: "delete_dead_code",
-        matches: isDeleteDeadCodeCodeAction,
+        range,
+        kind: request.kind,
+        title: request.title,
+        label: "Source action",
         control,
       });
-    case "rename_file":
-    case "move_file":
-      return {
-        kind: "unavailable",
-        reason: `Refactor operation "${request.operation}" is not supported yet. File/resource operations are deferred.`,
-      };
+    }
   }
-  return {
-    kind: "unavailable",
-    reason: `Refactor operation "${request.operation}" is not supported by the active semantic provider.`,
-  };
 }

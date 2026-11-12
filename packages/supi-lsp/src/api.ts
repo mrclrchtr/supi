@@ -7,10 +7,8 @@ export {
   loadConfig,
 } from "./config/config.ts";
 export {
-  codeActionKindsForOperation,
   getServerOperationSupport,
   isCodeActionKindInRange,
-  REFACTOR_CODE_ACTION_KINDS,
   supportsCodeActionResolve,
   supportsCodeActions,
   supportsPrepareRename,
@@ -91,6 +89,7 @@ export type {
   ProcessCrashRecoveryOutcome,
   ProcessCrashRecoveryReport,
   RecoverDiagnosticsResult,
+  RoutedCodeActionResponse,
   RoutedMutationDocumentSnapshot,
   RoutedMutationResponse,
   SemanticReadinessResult,

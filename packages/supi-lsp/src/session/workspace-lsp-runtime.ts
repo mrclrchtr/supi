@@ -80,6 +80,12 @@ export interface RoutedMutationResponse<T> {
   readonly reason?: string;
 }
 
+/** One code-action response with the routed server's negotiated kinds. */
+export interface RoutedCodeActionResponse extends RoutedMutationResponse<CodeAction[] | null> {
+  /** Negotiated `codeActionProvider.codeActionKinds`; undefined when the server did not narrow them. */
+  readonly advertisedKinds?: readonly string[];
+}
+
 /** Extra protocol context for one explicit code-action request. */
 export interface WorkspaceCodeActionRequestOptions {
   /** Operation-specific CodeActionKind filters. */
@@ -164,7 +170,7 @@ export interface WorkspaceLspRuntime extends WorkspaceLspDiagnosticSurface {
     positionOrRange: Position | Range,
     control?: CodeRequestControl,
     options?: WorkspaceCodeActionRequestOptions,
-  ): Promise<RoutedMutationResponse<CodeAction[] | null> | null>;
+  ): Promise<RoutedCodeActionResponse | null>;
   getOpenDocumentVersion(filePath: string): number | null;
   /**
    * Wait for file readiness; an explicit refresh may make one shared route

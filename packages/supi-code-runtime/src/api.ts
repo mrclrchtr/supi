@@ -60,6 +60,7 @@ export type {
   ImportData,
   NodeAtData,
   OutlineData,
+  RefactorActionIdentity,
   RefactorOperation,
   RefactorRequest,
   RefactorResult,

@@ -45,8 +45,14 @@ describe("focused code intelligence tool registration", () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
 
-    for (const name of ["code_resolve", "code_graph", "code_refactor_plan"] as const) {
-      const properties = propertiesOf(getTool(pi, name));
+    const renameOperation = propertiesOf(getTool(pi, "code_refactor_plan")).operation as {
+      properties: { rename_symbol: { properties: Record<string, unknown> } };
+    };
+    for (const properties of [
+      propertiesOf(getTool(pi, "code_resolve")),
+      propertiesOf(getTool(pi, "code_graph")),
+      renameOperation.properties.rename_symbol.properties,
+    ]) {
       expect(properties).toHaveProperty("target");
       expect(properties).not.toHaveProperty("targetId");
       expect(properties).not.toHaveProperty("file");
@@ -195,11 +201,13 @@ describe("focused code intelligence tool registration", () => {
     codeIntelligenceExtension(pi as never);
 
     const planner = propertiesOf(getTool(pi, "code_refactor_plan"));
-    expect(planner).toHaveProperty("operation");
+    expect(Object.keys(planner)).toEqual(["operation"]);
     const operations = JSON.stringify(planner.operation);
     expect(operations).toContain("rename_symbol");
-    expect(operations).toContain("update_imports");
-    expect(operations).toContain("delete_dead_code");
+    expect(operations).toContain("code_action");
+    expect(operations).toContain("source_action");
+    expect(operations).not.toContain("update_imports");
+    expect(operations).not.toContain("extract_function");
     expect(operations).not.toContain('"rename"');
     expect(operations).not.toContain("rename_file");
     expect(operations).not.toContain("move_file");

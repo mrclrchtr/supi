@@ -30,10 +30,7 @@ describe("TypeScript organize-imports planning and application", () => {
     writeFileSync(file, original);
 
     const plan = await workspace.session.planRefactor(
-      {
-        target: { anchor: { file, line: 3, character: 14 } },
-        operation: { update_imports: {} },
-      },
+      { operation: { source_action: { file, kind: "source.organizeImports" } } },
       { deadline: Date.now() + 15_000 },
     );
     expect(plan.kind).toBe("completed");

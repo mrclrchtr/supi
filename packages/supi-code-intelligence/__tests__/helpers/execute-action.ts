@@ -25,11 +25,6 @@ export interface ActionParams {
   symbol?: string;
   maxResults?: number;
   relations?: string[];
-  operation?: string;
-  range?: {
-    start: { line: number; character: number };
-    end: { line: number; character: number };
-  };
   newName?: string;
   planId?: string;
 }
@@ -132,25 +127,10 @@ function toTarget(rest: Omit<ActionParams, "action">): TargetInput {
 }
 
 function toRefactorParams(rest: Omit<ActionParams, "action">) {
-  const target = toTarget(rest);
-  const operation = rest.operation ?? "rename_symbol";
-  if (operation === "extract_function" || operation === "extract_variable") {
-    return {
-      target,
-      operation: {
-        [operation]: {
-          newName: rest.newName ?? "extracted",
-          range: rest.range ?? {
-            start: { line: rest.line ?? 1, character: rest.character ?? 1 },
-            end: { line: rest.line ?? 1, character: (rest.character ?? 1) + 1 },
-          },
-        },
-      },
-    } as Parameters<typeof executeRefactorPlanTool>[0];
-  }
   return {
-    target,
-    operation: { rename_symbol: { newName: rest.newName ?? "renamed" } },
+    operation: {
+      rename_symbol: { target: toTarget(rest), newName: rest.newName ?? "renamed" },
+    },
   } as Parameters<typeof executeRefactorPlanTool>[0];
 }
 

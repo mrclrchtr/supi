@@ -67,7 +67,12 @@ export function assembleRefactorPlanDetails(
       },
     ],
     evidenceLists: [edits.metadata],
-    nextQueries: [`Use code_refactor_apply with planId: "${plan.id}" to apply this refactor`],
+    nextQueries: [
+      `Use code_refactor_apply with planId: "${plan.id}" to apply this refactor`,
+      ...(plan.operation === "code_action"
+        ? ["After applying, use rename_symbol to rename any server-generated names"]
+        : []),
+    ],
     candidateCount: edits.metadata.totalCount ?? edits.metadata.shownCount,
     confidence: evidenceSource,
     provenance,

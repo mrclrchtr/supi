@@ -77,8 +77,7 @@ export function registerLanguageBaselineCase(spec: LanguageCase): void {
         );
         writeFileSync(file, original);
         const plan = await runTool(setup, "code_refactor_plan", {
-          target: { anchor: { file, line: 3, character: 14 } },
-          operation: { update_imports: {} },
+          operation: { source_action: { file, kind: "source.organizeImports" } },
         });
         expect(plan.details.status, displayText(plan)).toBe("completed");
         expect(readFileSync(file, "utf8")).toBe(original);
@@ -102,12 +101,10 @@ export function registerLanguageBaselineCase(spec: LanguageCase): void {
           "",
         ].join("\n");
         const original = `import { renameMe } from "./model";\n${preserved}`;
-        const params = {
-          target: { anchor: { file, line: importsOnly ? 4 : 3, character: 14 } },
-          operation: { delete_dead_code: {} },
-        };
+        const kind = importsOnly ? "source.removeUnusedImports" : "source.removeUnused";
+        const params = { operation: { source_action: { file, kind } } };
         writeFileSync(file, original);
-        await assertUnusedImportSupport(setup, file, importsOnly);
+        await assertUnusedImportSupport(setup, file, kind);
         const stale = await runTool(setup, "code_refactor_plan", params);
         expect(stale.details.status, displayText(stale)).toBe("completed");
         expect(readFileSync(file, "utf8")).toBe(original);
@@ -139,25 +136,24 @@ export function registerLanguageBaselineCase(spec: LanguageCase): void {
 async function assertUnusedImportSupport(
   setup: ToolContext,
   file: string,
-  importsOnly: boolean,
+  kind: string,
 ): Promise<void> {
   const health = await runTool(setup, "code_health", { scope: file, include: ["servers"] });
-  const support = importsOnly
-    ? {
-        server: "advertised",
-        supi: "limited",
-        reason: expect.stringContaining("not arbitrary unused declarations"),
-      }
-    : { server: "advertised", supi: "supported" };
-  const compiler = importsOnly
-    ? { backend: "native", compilerVersion: "7.0.2" }
-    : { backend: "tsserver" };
+  const compiler =
+    kind === "source.removeUnusedImports"
+      ? { backend: "native", compilerVersion: "7.0.2" }
+      : { backend: "tsserver" };
   expect(health.structuredContent).toMatchObject({
     kind: "completed",
     servers: expect.arrayContaining([
       expect.objectContaining({
         typescript: expect.objectContaining(compiler),
-        operationSupport: expect.objectContaining({ delete_dead_code: support }),
+        operationSupport: expect.objectContaining({
+          source_action: expect.objectContaining({
+            server: "advertised",
+            kinds: expect.arrayContaining([expect.stringMatching(new RegExp(`^${kind}`))]),
+          }),
+        }),
       }),
     ]),
   });
@@ -630,8 +626,7 @@ async function planRename(
   newName: string,
 ): Promise<PublicToolResult> {
   return runTool(setup, "code_refactor_plan", {
-    target: { handle: targetId },
-    operation: { rename_symbol: { newName } },
+    operation: { rename_symbol: { target: { handle: targetId }, newName } },
   });
 }
 
