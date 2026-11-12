@@ -131,7 +131,10 @@ const RangeParam = Type.Object(
       { additionalProperties: false },
     ),
   },
-  { additionalProperties: false, description: "Source range; end is exclusive." },
+  {
+    additionalProperties: false,
+    description: "Source range; end is exclusive. Equal start and end mark a cursor position.",
+  },
 );
 
 const NewNameParam = Type.String({ description: "New symbol name.", minLength: 1 });

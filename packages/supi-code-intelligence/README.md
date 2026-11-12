@@ -171,7 +171,7 @@ The planner accepts exactly one operation, each with its own scope:
 | Operation | Input | Server request |
 |---|---|---|
 | `rename_symbol` | `target` (handle or name anchor) and `newName` | `textDocument/rename` |
-| `code_action` | `file`, one-based `range`, `kind` under `refactor` (for example `refactor.extract`), optional `title` | Code actions for the range |
+| `code_action` | `file`, one-based `range` (equal `start` and `end` mark a cursor position), `kind` under `refactor` (for example `refactor.extract`), optional `title` | Code actions for the range |
 | `source_action` | `file`, `kind` under `source` (for example `source.organizeImports`), optional `title` | Code actions for the whole file |
 
 `kind` matches the action kind and its dotted sub-kinds, never the title; `quickfix` and other kinds are rejected. Disabled actions never match. When matching actions produce different edits, the result is ambiguous and lists each candidate's kind and exact title; repeat the call with `title`. Actions that only run a server command cannot be previewed and stay unavailable. Code actions choose their own names (such as `newVar` or `var_name`); the preview shows them, and `rename_symbol` can rename them after apply. Which kinds work depends on the server: `code_health` lists the advertised `refactor*` and `source*` kinds per server and marks servers, such as rust-analyzer, that may also return kinds they do not list. Unsupported operations do not fall back to text edits.

@@ -125,6 +125,26 @@ describe("runRefactorPlanWorkflow", () => {
     });
   });
 
+  it("sends an empty cursor range to the provider", async () => {
+    const requests: RefactorRequest[] = [];
+    await runRefactorPlanWorkflow(
+      {
+        operation: {
+          code_action: {
+            file: "src/index.ts",
+            range: { start: { line: 1, character: 3 }, end: { line: 1, character: 3 } },
+            kind: "refactor.inline",
+          },
+        },
+      },
+      depsWith(new TestCapabilityAdapter({ semantic: deleteFirstLineProvider(requests) })),
+    );
+
+    expect(requests).toMatchObject([
+      { range: { start: { line: 0, character: 2 }, end: { line: 0, character: 2 } } },
+    ]);
+  });
+
   it("reports semantic readiness timeouts for file operations", async () => {
     const outcome = await runRefactorPlanWorkflow(
       { operation: { source_action: { file: "src/index.ts", kind: "source" } } },
@@ -153,6 +173,17 @@ describe("runRefactorPlanWorkflow", () => {
         },
       },
       'operation.code_action.kind must be "refactor" or start with "refactor.".',
+    ],
+    [
+      "a range that ends before it starts",
+      {
+        code_action: {
+          file: "src/index.ts",
+          range: { start: { line: 1, character: 3 }, end: { line: 1, character: 2 } },
+          kind: "refactor",
+        },
+      },
+      "operation.code_action.range.end must not be before operation.code_action.range.start.",
     ],
     [
       "a refactor kind as a source action",

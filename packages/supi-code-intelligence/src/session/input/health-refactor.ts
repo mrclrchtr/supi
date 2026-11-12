@@ -153,6 +153,7 @@ function parseActionOperation(
   return valid({ code_action: { ...selection, range: range.value } });
 }
 
+/** Parse a one-based range; an empty range (`start` equal to `end`) marks a cursor position. */
 function parsePublicRange(value: unknown, label: string): InputValidation<PublicSourceRange> {
   const record = requireRecord(value, label);
   if (record.kind === "invalid-input") return record;
@@ -164,9 +165,9 @@ function parsePublicRange(value: unknown, label: string): InputValidation<Public
   if (end.kind === "invalid-input") return end;
   if (
     end.value.line < start.value.line ||
-    (end.value.line === start.value.line && end.value.character <= start.value.character)
+    (end.value.line === start.value.line && end.value.character < start.value.character)
   ) {
-    return invalid(`${label}.end must be after ${label}.start.`);
+    return invalid(`${label}.end must not be before ${label}.start.`);
   }
   return valid({ start: start.value, end: end.value });
 }
