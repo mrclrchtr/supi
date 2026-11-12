@@ -67,7 +67,16 @@ export interface RealSubstrateWorkspace {
 export interface RealLanguageWorkspaceOptions {
   readonly fixturePath: string;
   readonly sourceFile: string;
-  readonly language: "typescript" | "javascript" | "python" | "java" | "go" | "rust" | "c" | "cpp";
+  readonly language:
+    | "typescript"
+    | "javascript"
+    | "python"
+    | "java"
+    | "kotlin"
+    | "go"
+    | "rust"
+    | "c"
+    | "cpp";
   readonly command?: string;
   readonly args?: readonly string[];
   /** Test installation to expose as canonical typescript; launch remains automatic. */
@@ -242,6 +251,7 @@ function serverCommandEnvironment(language: RealLanguageWorkspaceOptions["langua
     return "CODE_BASELINE_TYPESCRIPT_SERVER";
   if (language === "python") return "CODE_BASELINE_PYTHON_SERVER";
   if (language === "java") return "CODE_BASELINE_JDTLS_SERVER";
+  if (language === "kotlin") return "CODE_BASELINE_KOTLIN_SERVER";
   if (language === "go") return "CODE_BASELINE_GOPLS_SERVER";
   if (language === "rust") return "CODE_BASELINE_RUST_ANALYZER_SERVER";
   return "CODE_BASELINE_CLANGD_SERVER";
@@ -252,6 +262,10 @@ function defaultArgs(
   options: RealLanguageWorkspaceOptions,
   selected: readonly string[],
 ): string[] {
+  if (options.language === "kotlin") {
+    // Keep IntelliJ indexes inside the disposable home directory.
+    return [...selected, "--system-path", join(homeDir, "kotlin-lsp-system")];
+  }
   if (options.language !== "java") return [...selected];
   const data = join(homeDir, "jdtls-data");
   const configuration = join(homeDir, "jdtls-configuration");

@@ -571,23 +571,177 @@ describe("LspRefactorProvider", () => {
       });
     });
 
-    it("rejects command-only actions as not previewable", async () => {
-      const { provider } = providerWith([
-        {
-          title: "Extract to local variable",
-          kind: "refactor.extract.variable",
-          command: { title: "Extract", command: "refactor.extract.variable" },
-        },
-      ]);
+    describe("command-only actions", () => {
+      function commandAction(title: string, kind: string, command = kind) {
+        return { title, kind, command: { title, command, arguments: [uri] } };
+      }
 
-      const result = await provider.refactor?.({
-        operation: "code_action",
-        file,
-        range: extractRange,
-        kind: "refactor.extract",
+      function versionedEdit(version: number, newText: string) {
+        return {
+          documentChanges: [
+            {
+              textDocument: { uri, version },
+              edits: [
+                {
+                  range: { start: { line: 0, character: 0 }, end: { line: 0, character: 1 } },
+                  newText,
+                },
+              ],
+            },
+          ],
+        };
+      }
+
+      function capturing(
+        actions: unknown[],
+        value: unknown,
+        overrides: Partial<WorkspaceLspRuntime> = {},
+      ) {
+        const captureCommandEdits = vi.fn().mockResolvedValue(inDir(value));
+        const { provider } = providerWith(actions, { captureCommandEdits, ...overrides });
+        return { provider, captureCommandEdits };
+      }
+
+      it("captures the edit of one eligible action and rebases it to the resynced version", async () => {
+        const { provider, captureCommandEdits } = capturing(
+          [commandAction("Extract variable", "refactor.extract.variable")],
+          {
+            kind: "captured",
+            edit: versionedEdit(3, "val total = i"),
+            resynced: [{ file, from: 3, to: 4 }],
+          },
+          { getOpenDocumentVersion: vi.fn().mockReturnValue(4) },
+        );
+
+        const result = await provider.refactor?.({
+          operation: "code_action",
+          file,
+          range: extractRange,
+          kind: "refactor.extract",
+        });
+
+        expect(captureCommandEdits).toHaveBeenCalledWith(
+          file,
+          { title: "Extract variable", command: "refactor.extract.variable", arguments: [uri] },
+          undefined,
+        );
+        expect(result).toMatchObject({
+          kind: "precise",
+          action: {
+            kind: "refactor.extract.variable",
+            title: "Extract variable",
+            provenance: "captured-command",
+          },
+          edits: {
+            edits: [{ file, newText: "val total = i" }],
+            documentPreconditions: [{ file, kind: "open-document-version", version: 4 }],
+          },
+        });
       });
 
-      expect(result).toMatchObject({ kind: "unavailable", reason: COMMAND_ONLY_ACTION_REASON });
+      it("captures an organize-imports source action", async () => {
+        const { provider, captureCommandEdits } = capturing(
+          [commandAction("Organize imports", "source.organizeImports", "kotlin.organize.imports")],
+          {
+            kind: "captured",
+            edit: { changes: { [uri]: [{ range: extractRange, newText: "" }] } },
+            resynced: [],
+          },
+        );
+
+        const result = await provider.refactor?.({
+          operation: "source_action",
+          file,
+          kind: "source.organizeImports",
+        });
+
+        expect(captureCommandEdits).toHaveBeenCalledTimes(1);
+        expect(result).toMatchObject({
+          kind: "precise",
+          action: { provenance: "captured-command" },
+        });
+      });
+
+      it("never runs commands of ineligible source kinds", async () => {
+        const { provider, captureCommandEdits } = capturing(
+          [commandAction("Browse documentation", "source.doc", "gopls.doc")],
+          { kind: "captured", edit: versionedEdit(1, "x"), resynced: [] },
+        );
+
+        const result = await provider.refactor?.({
+          operation: "source_action",
+          file,
+          kind: "source.doc",
+        });
+
+        expect(captureCommandEdits).not.toHaveBeenCalled();
+        expect(result).toMatchObject({ kind: "unavailable", reason: COMMAND_ONLY_ACTION_REASON });
+      });
+
+      it("reports several matching actions as ambiguous without running a command", async () => {
+        const { provider, captureCommandEdits } = capturing(
+          [
+            commandAction("Extract variable", "refactor.extract.variable"),
+            commandAction("Extract constant", "refactor.extract.constant"),
+          ],
+          { kind: "captured", edit: versionedEdit(1, "x"), resynced: [] },
+        );
+
+        const result = await provider.refactor?.({
+          operation: "code_action",
+          file,
+          range: extractRange,
+          kind: "refactor.extract",
+        });
+
+        expect(captureCommandEdits).not.toHaveBeenCalled();
+        expect(result).toMatchObject({
+          kind: "ambiguous",
+          candidates: [
+            { kind: "refactor.extract.variable", title: "Extract variable" },
+            { kind: "refactor.extract.constant", title: "Extract constant" },
+          ],
+        });
+      });
+
+      it("keeps the capture failure reason", async () => {
+        const { provider } = capturing(
+          [commandAction("Extract variable", "refactor.extract.variable")],
+          { kind: "unavailable", reason: "The server command produced no edit." },
+        );
+
+        const result = await provider.refactor?.({
+          operation: "code_action",
+          file,
+          range: extractRange,
+          kind: "refactor.extract",
+        });
+
+        expect(result).toMatchObject({
+          kind: "unavailable",
+          reason: expect.stringContaining("The server command produced no edit."),
+        });
+      });
+
+      it("rejects a captured edit with a resource operation", async () => {
+        const { provider } = capturing([commandAction("Move to file", "refactor.move")], {
+          kind: "captured",
+          edit: { documentChanges: [{ kind: "create", uri: `${uri}.new` }] },
+          resynced: [],
+        });
+
+        const result = await provider.refactor?.({
+          operation: "code_action",
+          file,
+          range: extractRange,
+          kind: "refactor.move",
+        });
+
+        expect(result).toMatchObject({
+          kind: "unavailable",
+          reason: expect.stringContaining("resource operation"),
+        });
+      });
     });
 
     it("retries a source action while an advertising server returns no action of the kind", async () => {

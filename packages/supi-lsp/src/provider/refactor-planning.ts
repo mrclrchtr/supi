@@ -12,7 +12,13 @@ import { CodeActionTriggerKind } from "vscode-languageserver-types";
 import { isCodeActionKindInRange, isCodeActionKindWithin } from "../config/operation-support.ts";
 import type { CodeAction } from "../config/types.ts";
 import { raceRequestControl } from "../session/readiness.ts";
-import type { WorkspaceLspRuntime } from "../session/runtime-registry.ts";
+import type { RoutedCodeActionResponse, WorkspaceLspRuntime } from "../session/runtime-registry.ts";
+import {
+  captureCommandAction,
+  captureEligibleActions,
+  commandCandidates,
+  isCommandOnlyAction,
+} from "./refactor-command-capture.ts";
 import {
   normalizeSemanticEdit,
   type SemanticEditNormalizationContext,
@@ -86,17 +92,21 @@ export interface CodeActionRefactorOptions {
   control?: CodeRequestControl;
 }
 
-/** Stable reason for matching actions that only run a server command. */
+/**
+ * Stable reason for command-only actions SuPi will not run: an ineligible kind
+ * or a command the server does not list.
+ */
 export const COMMAND_ONLY_ACTION_REASON =
-  "Matching code actions only run a server command, so their edits cannot be previewed.";
+  "Matching code actions only run a server command that SuPi does not run for preview.";
 
 /**
  * Plan one code action of the requested kind over a file range.
  *
  * `kind` matches itself and its dotted sub-kinds, per the LSP CodeActionKind
  * hierarchy. Disabled actions never match. `title` narrows matches to one exact
- * title. Distinct precise plans stay ambiguous; command-only actions stay
- * unavailable because their edits cannot be previewed.
+ * title. Distinct precise plans stay ambiguous. One eligible command-only
+ * action runs once so its pushed edit can be captured; see
+ * `refactor-command-capture.ts`.
  */
 export async function runCodeActionRefactor(
   options: CodeActionRefactorOptions,
@@ -182,30 +192,47 @@ async function attemptCodeActionRefactor(
     );
   }
 
+  return { result: await planMatchingActions(options, matching, response), retryable: false };
+}
+
+/** Turn the matching actions into one plan, candidates, or an unavailable reason. */
+async function planMatchingActions(
+  options: CodeActionRefactorOptions,
+  matching: CodeAction[],
+  response: RoutedCodeActionResponse,
+): Promise<RefactorResult> {
+  const { lsp, file, kind } = options;
+  const roots = [...response.authorizedMutationRoots];
+  const unavailable = (reason: string): RefactorResult => ({
+    kind: "unavailable",
+    reason,
+    authorizedMutationRoots: roots,
+  });
   const plans = collectPrecisePlans(matching, {
     getOpenDocumentVersion: (candidate) => lsp.getOpenDocumentVersion(candidate),
     authorizedMutationRoots: response.authorizedMutationRoots,
   });
   const [single] = plans.precise;
   if (plans.precise.length === 1 && single) {
-    return {
-      result: { ...single.result, action: actionIdentity(single.action) },
-      retryable: false,
-    };
+    return { ...single.result, action: { ...actionIdentity(single.action), provenance: "edit" } };
   }
   if (plans.precise.length > 1) {
     return {
-      result: {
-        kind: "ambiguous",
-        candidates: plans.precise.map(({ action, result }, index) =>
-          refactorCandidate(action, result, index, plans.precise),
-        ),
-      },
-      retryable: false,
+      kind: "ambiguous",
+      candidates: plans.precise.map(({ action, result }, index) =>
+        refactorCandidate(action, result, index, plans.precise),
+      ),
     };
   }
-  if (matching.every((action) => Object.hasOwn(action, "command") && !action.edit)) {
-    return unavailable(COMMAND_ONLY_ACTION_REASON);
+  if (matching.every(isCommandOnlyAction)) {
+    const eligible = captureEligibleActions(matching, response.advertisedCommands);
+    const [only] = eligible;
+    if (eligible.length === 1 && only) {
+      return captureCommandAction({ lsp, file, action: only, control: options.control });
+    }
+    return eligible.length > 1
+      ? commandCandidates(eligible)
+      : unavailable(COMMAND_ONLY_ACTION_REASON);
   }
   return unavailable(
     plans.unavailableReason

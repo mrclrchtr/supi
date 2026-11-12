@@ -18,8 +18,10 @@ import {
 import { resolveToolPath as resolveSessionPath } from "@mrclrchtr/supi-core/path";
 import { createSessionStateRegistry } from "@mrclrchtr/supi-core/session";
 import { CodeActionTriggerKind } from "vscode-languageserver-types";
+import type { CommandEditCaptureResult } from "../client/client-edit-capture.ts";
 import { advertisedCodeActionKinds } from "../config/operation-support.ts";
 import type {
+  Command,
   Diagnostic,
   DocumentSymbol,
   FileEvent,
@@ -57,6 +59,9 @@ import type {
   WorkspaceLspRuntime,
   WorkspaceLspRuntimeState,
 } from "./workspace-lsp-runtime.ts";
+
+/** Upper bound for a server command run to capture its pushed edit. */
+const COMMAND_CAPTURE_TIMEOUT_MS = 10_000;
 
 export type {
   ProcessCrashDiagnosticDemand,
@@ -291,6 +296,28 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
     return this.manager.getOpenDocumentVersion(this.resolveFilePath(filePath));
   }
 
+  async captureCommandEdits(
+    filePath: string,
+    command: Command,
+    control?: CodeRequestControl,
+  ): Promise<RoutedMutationResponse<CommandEditCaptureResult | null> | null> {
+    const resolvedPath = this.resolveFilePath(filePath);
+    const client = await this.manager.ensureFileOpen(resolvedPath, {
+      recoverProcessCrash: true,
+      protectInputs: true,
+      control,
+    });
+    if (!client) return null;
+    const authorizedMutationRoots = [client.root];
+    const outside = outsideRouteRootReason(resolvedPath, client.root);
+    if (outside) return { value: null, authorizedMutationRoots, reason: outside };
+    const value = await client.captureCommandEdits(command, {
+      timeoutMs: COMMAND_CAPTURE_TIMEOUT_MS,
+      ...(control ? { control } : {}),
+    });
+    return { value, authorizedMutationRoots };
+  }
+
   async codeActions(
     filePath: string,
     positionOrRange: Position | Range,
@@ -323,9 +350,11 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
       ...(options?.only ? { only: [...options.only] } : {}),
     };
     const advertisedKinds = advertisedCodeActionKinds(client.serverCapabilities ?? null);
+    const advertisedCommands = client.serverCapabilities?.executeCommandProvider?.commands;
     const routed = {
       authorizedMutationRoots: [client.root],
       ...(advertisedKinds ? { advertisedKinds } : {}),
+      ...(Array.isArray(advertisedCommands) ? { advertisedCommands } : {}),
     };
     if (typeof client.codeActionsDetailed === "function") {
       const result = await client.codeActionsDetailed(resolvedPath, range, context, control);

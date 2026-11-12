@@ -397,6 +397,23 @@ export class ClientDiagnostics {
     this.#synchronizeTrackedDocument(uri, filePath, content, doc);
   }
 
+  /**
+   * Re-send an open document's current content under a new version, even when
+   * the content is unchanged. Used after a server ran a command whose pushed
+   * edit was refused, so the server's model matches the client again.
+   * Returns the versions before and after, or null when the document is not open.
+   */
+  resynchronizeOpenDocument(filePath: string): { from: number; to: number } | null {
+    if (!this.host.isOperational()) return null;
+    const uri = fileToUri(filePath);
+    const doc = this.#openDocs.get(uri);
+    if (!doc) return null;
+    const from = doc.version;
+    this.#advanceInputRevision();
+    this.#synchronizeTrackedDocument(uri, filePath, doc.content, doc);
+    return { from, to: doc.version };
+  }
+
   /** Send a save after a disk change that the input barrier observed. */
   #noteExternalDiskChange(filePath: string, content: string): void {
     this.#inputAdmission.invalidateRequests();

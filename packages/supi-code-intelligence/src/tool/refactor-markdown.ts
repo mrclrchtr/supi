@@ -20,6 +20,8 @@ export function renderRefactorPlanResult(assembly: RefactorPlanResultAssembly): 
   }
   if (plan.action) {
     lines.push(`**Action:** ${plan.action.title} (\`${plan.action.kind}\`)`);
+    const source = actionSource(plan.action.provenance);
+    if (source) lines.push(`**Source:** ${source}`);
   }
   lines.push(`**Confidence:** \`${assembly.assembled.confidence}\``);
   lines.push(`**Files to change:** ${fileCount} file${fileCount !== 1 ? "s" : ""}`);
@@ -101,4 +103,13 @@ function collectChangedFiles(
     counts.set(edit.file, (counts.get(edit.file) ?? 0) + 1);
   }
   return [...counts.entries()];
+}
+
+/** Describe how a code-action plan obtained its edits. */
+function actionSource(provenance: "edit" | "captured-command" | undefined): string | null {
+  if (provenance === "edit") return "code action edit";
+  if (provenance === "captured-command") {
+    return "edit captured from the server command; it was refused, not applied";
+  }
+  return null;
 }

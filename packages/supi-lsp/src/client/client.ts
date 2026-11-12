@@ -33,6 +33,7 @@ import {
 import type {
   CodeAction,
   CodeActionContext,
+  Command,
   Diagnostic,
   DidChangeWatchedFilesParams,
   DocumentDiagnosticReport,
@@ -72,6 +73,11 @@ import { createTypeScriptDiagnosticRequestAdapter } from "./client-diagnostic-ty
 import { ClientDiagnostics } from "./client-diagnostics.ts";
 import type { ClientDiagnosticSnapshot, DiagnosticEntry } from "./client-document-state.ts";
 import { type NormalizedDocumentSync, normalizeDocumentSync } from "./client-document-sync.ts";
+import {
+  type CommandEditCaptureResult,
+  EditCaptureWindow,
+  runCommandEditCapture,
+} from "./client-edit-capture.ts";
 import {
   SemanticInputRequestRetryGuard,
   type SemanticInputRequestRetryReason,
@@ -540,6 +546,7 @@ export class LspClient {
   private readonly settingsSnapshot: JsonObject | undefined;
   private readonly diagnosticRequestAdapter: DiagnosticRequestAdapter;
   private readonly diagnostics: ClientDiagnostics;
+  private readonly editCapture = new EditCaptureWindow();
   /** Dynamic capability registrations for this client instance only. */
   private readonly dynamicRegistrations = new ClientDynamicRegistrations();
   /** Workspace association snapshot shared by `didOpen` and selector matching. */
@@ -1242,6 +1249,31 @@ export class LspClient {
     return result.kind === "completed" ? readTypeScriptProjectMembership(result.data) : "unknown";
   }
 
+  /**
+   * Run one server command and capture the single edit it pushes through
+   * `workspace/applyEdit`. Every pushed edit is refused, so no file changes.
+   * Open documents the edit touches are re-sent afterwards under new versions.
+   */
+  async captureCommandEdits(
+    command: Command,
+    options: { timeoutMs: number; control?: CodeRequestControl },
+  ): Promise<CommandEditCaptureResult> {
+    return runCommandEditCapture({
+      command,
+      ...options,
+      window: this.editCapture,
+      sendRequest: (method, params, requestOptions) => {
+        if (!this.rpc || this._status !== "running") {
+          throw new Error(
+            `LSP request ${method} is unavailable because the client is not running.`,
+          );
+        }
+        return this.rpc.sendRequest(method, params, requestOptions);
+      },
+      resynchronize: (file) => this.diagnostics.resynchronizeOpenDocument(file),
+    });
+  }
+
   async workspaceSymbol(
     query: string,
     control?: CodeRequestControl,
@@ -1786,6 +1818,8 @@ export class LspClient {
 
   private handleServerRequest(method: string, params: unknown): unknown {
     switch (method) {
+      case "workspace/applyEdit":
+        return this.editCapture.handleApplyEdit(params);
       case "workspace/configuration":
         return this.buildWorkspaceConfigurationResult(params);
       case "workspace/workspaceFolders":

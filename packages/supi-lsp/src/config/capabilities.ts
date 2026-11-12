@@ -77,6 +77,9 @@ export const CLIENT_CAPABILITIES: ClientCapabilities = {
     workDoneProgress: true,
   },
   workspace: {
+    // Servers may push edits through workspace/applyEdit. SuPi records them
+    // only while previewing one command and always replies applied: false.
+    applyEdit: true,
     configuration: true,
     workspaceFolders: true,
     workspaceEdit: {

@@ -233,6 +233,13 @@ export interface RefactorActionIdentity {
   kind: string;
   /** Server-reported action title. */
   title: string;
+  /**
+   * How the edits were obtained: `edit` from the action itself (after
+   * `codeAction/resolve` when needed), or `captured-command` from the single
+   * `workspace/applyEdit` the server pushed while running the action's command.
+   * Captured edits were refused, never applied.
+   */
+  provenance?: "edit" | "captured-command";
 }
 
 /**

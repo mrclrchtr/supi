@@ -1,7 +1,9 @@
 import type { CodeQueryResult, CodeRequestControl } from "@mrclrchtr/supi-code-runtime/api";
+import type { CommandEditCaptureResult } from "../client/client-edit-capture.ts";
 import type {
   CodeAction,
   CodeActionContext,
+  Command,
   DocumentSymbol,
   FileEvent,
   Hover,
@@ -84,6 +86,8 @@ export interface RoutedMutationResponse<T> {
 export interface RoutedCodeActionResponse extends RoutedMutationResponse<CodeAction[] | null> {
   /** Negotiated `codeActionProvider.codeActionKinds`; undefined when the server did not narrow them. */
   readonly advertisedKinds?: readonly string[];
+  /** Negotiated `executeCommandProvider.commands`; undefined when the server lists none. */
+  readonly advertisedCommands?: readonly string[];
 }
 
 /** Extra protocol context for one explicit code-action request. */
@@ -171,6 +175,15 @@ export interface WorkspaceLspRuntime extends WorkspaceLspDiagnosticSurface {
     control?: CodeRequestControl,
     options?: WorkspaceCodeActionRequestOptions,
   ): Promise<RoutedCodeActionResponse | null>;
+  /**
+   * Run one code-action command on the client routed to `filePath` and
+   * capture the single edit the server pushes. No pushed edit is applied.
+   */
+  captureCommandEdits(
+    filePath: string,
+    command: Command,
+    control?: CodeRequestControl,
+  ): Promise<RoutedMutationResponse<CommandEditCaptureResult | null> | null>;
   getOpenDocumentVersion(filePath: string): number | null;
   /**
    * Wait for file readiness; an explicit refresh may make one shared route

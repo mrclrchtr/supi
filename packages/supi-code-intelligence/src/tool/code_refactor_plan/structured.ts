@@ -28,7 +28,16 @@ const OnePosition = Type.Object(
   { additionalProperties: false },
 );
 const Action = Type.Object(
-  { kind: Type.String(), title: Type.String() },
+  {
+    kind: Type.String(),
+    title: Type.String(),
+    provenance: Type.Optional(
+      Type.Union([Type.Literal("edit"), Type.Literal("captured-command")], {
+        description:
+          "edit: the action's own edit. captured-command: the edit the server pushed while running the action's command; SuPi refused it, so nothing was applied.",
+      }),
+    ),
+  },
   { additionalProperties: false, description: "Server-reported code action kind and title." },
 );
 const Candidate = Type.Object(

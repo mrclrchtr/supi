@@ -134,73 +134,83 @@ describe("code_refactor_plan / code_refactor_apply workflow wrappers", () => {
     expect(result.content[0].text).not.toContain(projectDir);
   });
 
-  it("plans a code action and reports its scope, action, and generated name", async () => {
-    const { projectDir, file } = createProjectFile("const value = 1 + 2;\n");
-    const requests: RefactorRequest[] = [];
-    registerSemantic(
-      projectDir,
-      createSemanticProvider({
-        refactor: async (request) => {
-          requests.push(request);
-          return {
-            kind: "precise",
-            edits: {
-              edits: [
-                {
-                  file,
-                  range: { start: { line: 0, character: 14 }, end: { line: 0, character: 19 } },
-                  newText: "newFunction()",
-                },
-              ],
+  it.each([
+    ["edit", "Source: code action edit"],
+    [
+      "captured-command",
+      "Source: edit captured from the server command; it was refused, not applied",
+    ],
+  ] as const)(
+    "plans a code action from a %s and reports its scope, action, source, and generated name",
+    async (provenance, sourceLine) => {
+      const { projectDir, file } = createProjectFile("const value = 1 + 2;\n");
+      const requests: RefactorRequest[] = [];
+      registerSemantic(
+        projectDir,
+        createSemanticProvider({
+          refactor: async (request) => {
+            requests.push(request);
+            return {
+              kind: "precise",
+              edits: {
+                edits: [
+                  {
+                    file,
+                    range: { start: { line: 0, character: 14 }, end: { line: 0, character: 19 } },
+                    newText: "newFunction()",
+                  },
+                ],
+              },
+              action: { kind: "refactor.extract.function", title: "Extract function", provenance },
+              authorizedMutationRoots: [projectDir],
+            };
+          },
+        }),
+      );
+
+      const pi = createPiMock();
+      codeIntelligenceExtension(pi as never, sessionCache.getOrCreate);
+      const tool = getTool(pi, "code_refactor_plan");
+
+      const result = (await tool.execute(
+        "workflow-refactor-code-action",
+        {
+          operation: {
+            code_action: {
+              file: "src/index.ts",
+              range: { start: { line: 1, character: 15 }, end: { line: 1, character: 20 } },
+              kind: "refactor.extract",
             },
-            action: { kind: "refactor.extract.function", title: "Extract function" },
-            authorizedMutationRoots: [projectDir],
-          };
-        },
-      }),
-    );
-
-    const pi = createPiMock();
-    codeIntelligenceExtension(pi as never, sessionCache.getOrCreate);
-    const tool = getTool(pi, "code_refactor_plan");
-
-    const result = (await tool.execute(
-      "workflow-refactor-code-action",
-      {
-        operation: {
-          code_action: {
-            file: "src/index.ts",
-            range: { start: { line: 1, character: 15 }, end: { line: 1, character: 20 } },
-            kind: "refactor.extract",
           },
         },
-      },
-      undefined,
-      undefined,
-      makeCtx({ cwd: projectDir }),
-    )) as { content: Array<{ type: string; text: string }>; structuredContent?: unknown };
+        undefined,
+        undefined,
+        makeCtx({ cwd: projectDir }),
+      )) as { content: Array<{ type: string; text: string }>; structuredContent?: unknown };
 
-    expect(requests).toEqual([
-      {
+      expect(requests).toEqual([
+        {
+          operation: "code_action",
+          file,
+          range: { start: { line: 0, character: 14 }, end: { line: 0, character: 19 } },
+          kind: "refactor.extract",
+        },
+      ]);
+      const text = result.content[0].text;
+      expect(text).toContain("**File:** `src/index.ts` L1:15 → L1:20");
+      expect(text).toContain("**Action:** Extract function (`refactor.extract.function`)");
+      expect(text).toContain(`**${sourceLine.replace(": ", ":** ")}`);
+      expect(text).toContain("newFunction()");
+      expect(text).toContain("use rename_symbol to rename any server-generated names");
+      expect(result.structuredContent).toMatchObject({
+        kind: "completed",
         operation: "code_action",
-        file,
-        range: { start: { line: 0, character: 14 }, end: { line: 0, character: 19 } },
-        kind: "refactor.extract",
-      },
-    ]);
-    const text = result.content[0].text;
-    expect(text).toContain("**File:** `src/index.ts` L1:15 → L1:20");
-    expect(text).toContain("**Action:** Extract function (`refactor.extract.function`)");
-    expect(text).toContain("newFunction()");
-    expect(text).toContain("use rename_symbol to rename any server-generated names");
-    expect(result.structuredContent).toMatchObject({
-      kind: "completed",
-      operation: "code_action",
-      file: "src/index.ts",
-      range: { start: { line: 1, character: 15 }, end: { line: 1, character: 20 } },
-      action: { kind: "refactor.extract.function", title: "Extract function" },
-    });
-  });
+        file: "src/index.ts",
+        range: { start: { line: 1, character: 15 }, end: { line: 1, character: 20 } },
+        action: { kind: "refactor.extract.function", title: "Extract function", provenance },
+      });
+    },
+  );
 
   it("returns ambiguous action candidates with titles to pass back", async () => {
     const { projectDir, file } = createProjectFile("import a from 'a';\n");
