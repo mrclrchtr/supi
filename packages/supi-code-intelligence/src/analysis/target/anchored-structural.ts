@@ -30,6 +30,9 @@ const DECLARATION_NODE_TYPES = new Set([
   "export_statement",
 ]);
 
+/** Tree-sitter name tokens; Kotlin names its identifiers `simple_identifier`. */
+const IDENTIFIER_NODE_TYPES = new Set(["identifier", "simple_identifier"]);
+
 /** Tree-sitter nodes that cannot identify a declaration name. */
 const NON_SYMBOL_NODE_TYPES = new Set([
   "comment",
@@ -94,7 +97,7 @@ export async function resolveFromStructural(
       ),
     };
   }
-  if (node.type !== "identifier") {
+  if (!IDENTIFIER_NODE_TYPES.has(node.type)) {
     return {
       kind: "error",
       message: coordinateNotOnSymbolMessage(file, requested, node.type),

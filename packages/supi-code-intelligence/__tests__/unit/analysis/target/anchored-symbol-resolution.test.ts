@@ -306,6 +306,57 @@ describe("resolveAnchoredSymbolTarget — structural fallback", () => {
     teardown();
   });
 
+  it("resolves a Kotlin local declared with a simple_identifier name", async () => {
+    const dir = setup();
+    const file = path.join(dir, "Main.kt");
+    writeFileSync(file, "fun total(price: Int): Int {\n    val i = price * 2\n    return i\n}\n");
+    const provider = {
+      documentSymbols: vi.fn(async () => docSymbols(file, [])),
+      nodeAt: vi.fn(async () => ({
+        kind: "success" as const,
+        data: {
+          type: "simple_identifier",
+          startLine: 2,
+          startCharacter: 9,
+          endLine: 2,
+          endCharacter: 10,
+          text: "i",
+          ancestry: [
+            {
+              type: "variable_declaration",
+              startLine: 2,
+              startCharacter: 9,
+              endLine: 2,
+              endCharacter: 10,
+            },
+            {
+              type: "property_declaration",
+              startLine: 2,
+              startCharacter: 5,
+              endLine: 2,
+              endCharacter: 22,
+            },
+            {
+              type: "function_declaration",
+              startLine: 1,
+              startCharacter: 1,
+              endLine: 4,
+              endCharacter: 2,
+            },
+          ],
+        },
+      })),
+    };
+
+    const result = await resolveAnchoredSymbolTarget(file, 2, 9, provider);
+
+    expect(result).toMatchObject({
+      kind: "resolved",
+      target: { name: "i", kind: "Variable", displayLine: 2, displayCharacter: 9 },
+    });
+    teardown();
+  });
+
   it("resolves a Rust function item when semantic symbols are empty", async () => {
     const dir = setup();
     const file = path.join(dir, "lib.rs");
