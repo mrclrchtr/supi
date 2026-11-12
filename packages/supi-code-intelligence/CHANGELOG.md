@@ -1,5 +1,9 @@
 # Changelog
 
+## [11.5.0]
+
+- An explicit `code_health` refresh that runs while a crashed language server is being replaced no longer makes the replacement fail. Previously, the request waiting on that replacement got no server and the recovery was recorded as cancelled, even though the new server was running.
+
 ## [11.4.0]
 
 - `code_orientation` with a directory focus no longer embeds an instruction file (such as `CLAUDE.md`) that the agent already read in full with `read` since the latest compaction. Reads with `offset` or `limit`, truncated reads, and failed reads do not count. In observed sessions, about a quarter of embedded instruction text repeated a file the agent had just read.

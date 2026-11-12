@@ -574,6 +574,40 @@ describe("workspace-symbol process-crash demand", () => {
     expect(outcomes.filter((outcome) => outcome === "success")).toHaveLength(2);
   });
 
+  it("keeps an in-flight automatic recovery when an explicit refresh observes its replacement", async () => {
+    const fixture = await createTwoCrashedRoutes({ crashA: false });
+    const workspace = path.dirname(fixture.rootA);
+    const restore = deferred<void>();
+    mocks.startBehaviors.push(() => {
+      const replacement = mocks.clients.at(-1) as InstanceType<typeof mocks.FakeClient>;
+      replacement.becomeReady();
+      const restoreDocument = replacement.restoreDocument.bind(replacement);
+      replacement.restoreDocument = async (...args) => {
+        await restore.promise;
+        return restoreDocument(...args);
+      };
+    });
+
+    // The automatic recovery stops while restoring documents on a ready replacement.
+    const automatic = fixture.manager.getClientForFile(fixture.fileB, {
+      recoverProcessCrash: true,
+    });
+    await vi.waitFor(() => expect(mocks.clients).toHaveLength(3));
+    const replacement = mocks.clients[2];
+
+    // An explicit refresh in that window observes the replacement as ready.
+    await fixture.manager.recoverWorkspaceDiagnostics({
+      restartIfStillStale: false,
+      processCrashDemand: { explicit: true, scopes: [workspace] },
+    });
+    restore.resolve();
+
+    await expect(automatic).resolves.toBe(replacement);
+    const outcomes = mocks.recordDebugEvent.mock.calls.map(([event]) => event.data?.outcome);
+    expect(outcomes).toContain("success");
+    expect(outcomes).not.toContain("cancelled");
+  });
+
   it("recovers a crashed route required by explicit diagnostic demand", async () => {
     const fixture = await createTwoCrashedRoutes({ crashA: false });
 

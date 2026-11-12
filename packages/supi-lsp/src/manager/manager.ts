@@ -1107,7 +1107,9 @@ export class LspManager {
     if (client.status !== "running" || !client.ready) return;
     const key = clientKey(client.name, client.root);
     const recovery = this.processCrashRecoveries.get(key);
-    if (recovery) {
+    // An in-flight recovery owns its record until it settles; removing it here
+    // would make that recovery report cancellation for a live replacement.
+    if (recovery && !recovery.pending) {
       recovery.attemptConsumed = false;
       recovery.statusReason = undefined;
       recovery.failureMessage = undefined;
