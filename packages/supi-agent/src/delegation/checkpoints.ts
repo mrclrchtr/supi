@@ -29,6 +29,8 @@ export interface DelegationCheckpoint {
   readonly leafId: string | null;
   readonly runStatus: "completed" | "failed" | "canceled" | "timeout";
   readonly failureCode?: string;
+  /** Requested task cwd; omitted when the conversation shares the parent's cwd. */
+  readonly cwd?: string;
 }
 
 /** One conversation discovered from valid records on the active parent branch. */
@@ -71,6 +73,7 @@ export function createDelegationCheckpoint(options: {
   readonly parentCheckpointId: string | null;
   readonly runStatus: DelegationCheckpoint["runStatus"];
   readonly failureCode?: string;
+  readonly cwd?: string;
 }): DelegationCheckpoint | undefined {
   if (!options.context) return undefined;
   try {
@@ -89,6 +92,7 @@ export function createDelegationCheckpoint(options: {
       leafId: captured.leafId,
       runStatus: options.runStatus,
       ...(options.failureCode ? { failureCode: options.failureCode } : {}),
+      ...(options.cwd ? { cwd: options.cwd } : {}),
     };
   } catch {
     return undefined;
@@ -201,9 +205,10 @@ function resolveParentContext(
   }
   if (
     parent.record.label !== checkpoint.label ||
-    parent.record.profileId !== checkpoint.profileId
+    parent.record.profileId !== checkpoint.profileId ||
+    parent.record.cwd !== checkpoint.cwd
   ) {
-    return { error: "Saved context changes its conversation label or profile." };
+    return { error: "Saved context changes its conversation label, profile, or cwd." };
   }
   return { context: parent.context };
 }
@@ -268,6 +273,12 @@ function validateCheckpointShape(
   if (
     raw.failureCode !== undefined &&
     (typeof raw.failureCode !== "string" || !SAFE_FAILURE_CODES.has(raw.failureCode))
+  ) {
+    return { error: "Saved context record is invalid." };
+  }
+  if (
+    raw.cwd !== undefined &&
+    (typeof raw.cwd !== "string" || raw.cwd.length === 0 || raw.cwd.length > 4096)
   ) {
     return { error: "Saved context record is invalid." };
   }

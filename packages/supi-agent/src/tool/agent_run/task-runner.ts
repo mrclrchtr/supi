@@ -187,7 +187,7 @@ export function startBatchTask(options: StartBatchTaskOptions): StartedBatchTask
     task,
     taskMetadata,
     modelId,
-    cwd: options.cwd,
+    cwd: task.inputs.cwd,
     runKey,
     ...(registry ? { registry } : {}),
     telemetry,
@@ -303,6 +303,7 @@ function finalizeTaskOutcome(
     parentCheckpointId: context.task.parentCheckpointId,
     runStatus: outcome.kind === "success" ? "completed" : outcome.kind,
     ...(failureCode ? { failureCode } : {}),
+    ...(context.task.requestedCwd === undefined ? {} : { cwd: context.task.requestedCwd }),
   });
   const modelText = capModelText(rawText);
   const humanText = capHumanText(rawText);

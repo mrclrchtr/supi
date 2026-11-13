@@ -53,7 +53,7 @@ In TUI and RPC, `agent_run` defaults to background execution for read-only profi
 - Parent abort stops active background batches and pauses automatic delivery until a later user-originated prompt. Normal parent completion leaves them running. Idle Escape keeps Pi's normal editor behavior; use `/agents` to stop selected runs.
 - Leaving the conversation branch that contains a batch's launch cancels active tasks. Compaction alone does not cancel them. Reload, session replacement, and shutdown stop owned runs and expire batch handles. Saved conversation checkpoints remain available; active work is not restored.
 - Child Usage enters Pi's parent totals when Pi first stores a collection's Usage. A result hook can mark delivery as failed while preserving that Usage; retrying the output does not charge it again. Repeated collection does not count it again. `/agents` marks uncollected Usage: parent totals remain incomplete if results are never collected.
-- Read-only runs share the parent's working directory. They do not read a frozen snapshot.
+- Runs share the parent's working directory. They do not read a frozen snapshot. Set `new: { profile, cwd }` to start a conversation in another worktree of the same Git repository, for example the worktree a task brief names. The child then loads that worktree's instruction files and inherits the parent's project trust; follow-ups keep the directory.
 
 See the [background delegation design](docs/background-delegation.md) for the full contract.
 

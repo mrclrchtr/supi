@@ -1,5 +1,9 @@
 # Changelog
 
+## [12.1.0]
+
+- `agent_run` accepts `new: { profile, cwd }` to start a conversation in another worktree of the same Git repository. The child session, its instruction files, and its system-prompt cwd use that directory; project trust is inherited from the parent. Follow-ups keep the directory. Relative paths, missing directories, and directories outside the parent's repository fail preflight before any task starts.
+
 ## [12.0.0]
 
 - While `agent_result` waits, its row now shows each task's live status and activity instead of a static "Waiting for Agent Run results…" line.

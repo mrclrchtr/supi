@@ -13,6 +13,7 @@ import { resolveProfileDefinition } from "../../profile-catalogue.ts";
 import { resolveAgentDirectory } from "../../resources.ts";
 import type { AgentModelContext, AgentProfile, ProfileCatalogue } from "../../types.ts";
 import type { AgentRunTaskInput, AgentRunToolParams } from "./schema.ts";
+import { resolveTaskCwd } from "./task-cwd.ts";
 
 interface PreflightError {
   taskId?: string;
@@ -26,6 +27,8 @@ interface CurrentProfileOptions {
   readonly modelContext: AgentModelContext;
   readonly agentDir: string;
   readonly webTools?: ChildWebToolProvision;
+  /** Task cwd; defaults to the parent's cwd. */
+  readonly cwd?: string;
 }
 
 /** One Delegation Task after profile, model, resource, and capability preflight. */
@@ -40,6 +43,8 @@ export interface ResolvedTask {
   baseContext?: AgentRunContext;
   previousRunStatus?: DelegationCheckpoint["runStatus"];
   previousFailureCode?: string;
+  /** Requested task cwd stored with checkpoints; undefined means the parent's cwd. */
+  requestedCwd?: string;
   timeoutMs?: number;
   model: AgentSessionInputs["model"];
   inputs: AgentSessionInputs;
@@ -110,7 +115,11 @@ function resolvePreflightTask(
   }
   targets.add(target.conversationId);
 
-  const policy = resolveCurrentProfile(target.profileId, profileOptions);
+  const taskCwd = resolveTaskCwd(profileOptions.ctx.cwd, target.cwd);
+  if ("error" in taskCwd) {
+    return { taskId: task.id, profileId: target.profileId, message: taskCwd.error };
+  }
+  const policy = resolveCurrentProfile(target.profileId, { ...profileOptions, cwd: taskCwd.cwd });
   if ("error" in policy) {
     return { taskId: task.id, profileId: target.profileId, message: policy.error };
   }
@@ -129,6 +138,7 @@ function resolvePreflightTask(
     ...(target.context ? { baseContext: target.context } : {}),
     ...(target.previousRunStatus ? { previousRunStatus: target.previousRunStatus } : {}),
     ...(target.previousFailureCode ? { previousFailureCode: target.previousFailureCode } : {}),
+    ...(target.cwd === undefined ? {} : { requestedCwd: target.cwd }),
     timeoutMs: policy.effective.timeoutMs,
     model: policy.effective.model,
     inputs,
@@ -153,7 +163,7 @@ function resolveCurrentProfile(
   const profile = resolveProfileDefinition(profileEntry, options.catalogue.sourceDirectories);
   if ("code" in profile) return { error: profile.message };
   const effective = resolveAgentProfile(profile, options.modelContext, {
-    cwd: options.ctx.cwd,
+    cwd: options.cwd ?? options.ctx.cwd,
     agentDir: options.agentDir,
     projectTrusted: options.ctx.isProjectTrusted(),
     providerAuthority: options.modelContext.providerAuthority,

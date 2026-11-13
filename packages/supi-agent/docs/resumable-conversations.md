@@ -130,7 +130,7 @@ agent_run({
 - Preserve current project trust, model authorization, resource exclusions, and capability checks.
 - A missing, disabled, invalid, or unauthorized profile blocks continuation. Do not replace it with another profile.
 - Saved messages are context, not authority to restore old tool access.
-- Continue to use the parent's working directory under the existing execution policy. Do not add workspace snapshots or permission isolation.
+- Continue in the working directory the conversation started with: the parent's, or the `new.cwd` worktree saved in its checkpoint, under the existing execution policy. Do not add workspace snapshots or permission isolation.
 - Retained findings are historical observations. The child must check current files before it relies on facts that can have changed.
 - Preserve native context compaction. Do not promise exact, unlimited recall or implement a separate memory-summary system.
 - Do not restore process resources, live tool handles, credentials, or arbitrary extension state merely because their descriptions appear in saved messages.

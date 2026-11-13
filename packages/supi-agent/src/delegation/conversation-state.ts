@@ -22,6 +22,8 @@ interface ConversationTarget {
   context?: AgentRunContext;
   previousRunStatus?: DelegationCheckpoint["runStatus"];
   previousFailureCode?: string;
+  /** Requested task cwd; undefined means the parent's cwd. */
+  cwd?: string;
 }
 
 /** A new or saved conversation target, or its preflight failure without Profile policy. */
@@ -58,6 +60,7 @@ export function createConversationTargetResolver(
         label: task.id,
         profileId: task.new.profile,
         parentCheckpointId: null,
+        ...(task.new.cwd === undefined ? {} : { cwd: task.new.cwd }),
       };
     }
     const conversationId = task.continue.conversationId;
@@ -88,6 +91,7 @@ export function createConversationTargetResolver(
       context: saved.context,
       previousRunStatus: saved.latest.runStatus,
       previousFailureCode: saved.latest.failureCode,
+      ...(saved.latest.cwd === undefined ? {} : { cwd: saved.latest.cwd }),
     };
   };
 }

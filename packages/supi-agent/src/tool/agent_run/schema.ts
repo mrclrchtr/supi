@@ -51,7 +51,22 @@ export function buildAgentRunSchema(catalogue: ProfileCatalogue): TSchema {
   const taskSchema = Type.Object(
     {
       ...commonTaskProperties,
-      new: Type.Optional(Type.Object({ profile: profileEnum }, { additionalProperties: false })),
+      new: Type.Optional(
+        Type.Object(
+          {
+            profile: profileEnum,
+            cwd: Type.Optional(
+              Type.String({
+                minLength: 1,
+                maxLength: 4096,
+                description:
+                  "Absolute working directory for this conversation, such as a sibling Git worktree of the same repository. Default: the parent's cwd. Follow-ups keep it.",
+              }),
+            ),
+          },
+          { additionalProperties: false },
+        ),
+      ),
       continue: Type.Optional(
         Type.Object(
           {
@@ -109,7 +124,7 @@ function summarizeCapabilities(tools: readonly AgentCapabilityId[]): string {
 }
 
 export type AgentRunTaskInput =
-  | { id: string; new: { profile: string }; instructions: string }
+  | { id: string; new: { profile: string; cwd?: string }; instructions: string }
   | { id: string; continue: { conversationId: string }; instructions: string };
 
 export type AgentRunToolParams = {

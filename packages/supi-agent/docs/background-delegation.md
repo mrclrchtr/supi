@@ -23,7 +23,7 @@ Status: Implemented. This document defines the approved behavior.
 - Validate all profiles, models, instructions, mode, and capacity before starting any task.
 - A background start returns a batch handle and task identifiers after admission and registration. It does not wait for child setup or results.
 - Report initial task status as starting, not ready or completed.
-- A background run shares the working directory with the parent. Read-only does not mean a frozen snapshot. Parent edits can change what a child observes.
+- A background run shares the parent's working directory unless `new.cwd` names a worktree of the same Git repository. Read-only does not mean a frozen snapshot. Parent edits can change what a child observes.
 
 ## Capacity
 
