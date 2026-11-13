@@ -1,5 +1,9 @@
 # Changelog
 
+## [12.1.0]
+
+- `web_search` requests about half as much source text per search (a 4,096-token budget instead of the Brave default of about 8,192), so one search uses less of the context window. Results hold fewer sources; search again with a narrower query when the first results are not enough.
+
 ## [12.0.0]
 
 - **Breaking:** Web tool parameters are camelCase, like every other SuPi tool. `web_fetch_md`: `output_mode` → `outputMode`, `fetch_mode` → `fetchMode`, `abs_links` → `absLinks`, `timeout_ms` → `timeoutMs`. `web_docs_search`: `library_name` → `libraryName`. `web_docs_fetch`: `library_id` → `libraryId`. Values such as `firecrawl_fallback` are unchanged. Update codemode scripts and saved prompts that pass the old names; they are now rejected as unknown fields.

@@ -55,9 +55,17 @@ describe("web_search input", () => {
   });
 
   it("places the query after the argument terminator", () => {
-    expect(buildBxContextArgs("-query", undefined)).toEqual(["context", "--", "-query"]);
+    expect(buildBxContextArgs("-query", undefined)).toEqual([
+      "context",
+      "--max-tokens",
+      "4096",
+      "--",
+      "-query",
+    ]);
     expect(buildBxContextArgs("query", "2024-01-01to2024-01-31")).toEqual([
       "context",
+      "--max-tokens",
+      "4096",
       "--extra",
       "freshness=2024-01-01to2024-01-31",
       "--",

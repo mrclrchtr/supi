@@ -14,7 +14,7 @@ Context7 using `web_docs_search` + `web_docs_fetch`.
 ## Web Search pipeline (web_search)
 
 1. Validate `query` and optional freshness.
-2. Run one direct `bx context` process with the query after `--`.
+2. Run one direct `bx context --max-tokens 4096` process with the query after `--`. The budget halves the service default; see `docs/ops/web-search-design.md` § Result size.
 3. Parse required `grounding.generic` source data and format all sources and excerpts.
 4. Apply the shared model-visible output limit.
 

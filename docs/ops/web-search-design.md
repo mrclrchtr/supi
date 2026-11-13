@@ -8,7 +8,7 @@ Status: implemented and verified against the user-confirmed design.
 - Return titles, source URLs, and Source Excerpts. Do not generate an answer.
 - Use the installed `bx` executable.
 - Do not add domain-filter fields.
-- Leave search size parameters unset. Use the defaults selected by `bx` and Brave.
+- Request a fixed total budget of 4,096 tokens (`--max-tokens`). Leave the other search size parameters unset. See [Result size](#result-size).
 - Do not switch to another search operation after failure.
 - Omit the tool when `bx` is missing. Warn the user when the setting enables the tool but `bx` is missing.
 - Keep skill visibility under separate user control. Do not delete or automatically suppress the `bx` skill.
@@ -70,7 +70,7 @@ web_search({
 - Accept only documented freshness codes or a valid ordered date range. Do not expose raw CLI flags, `extra`, endpoint overrides, or credentials as tool arguments.
 - Run explicit `bx context` with an argument array, not shell interpolation. Put the query after `--` so a leading hyphen cannot become an option.
 - Add `--extra freshness=<value>` only when the caller supplied the Freshness Filter.
-- Leave count, token, snippet, URL, and relevance settings unset.
+- Pass `--max-tokens 4096`. Leave count, per-URL token, snippet, URL, and relevance settings unset.
 - Use normal bx environment/configuration handling. Do not add a second credential store, auto-install the binary, or override its configured request timeout.
 - Propagate cancellation to the process. Do not add retries or switch search operations.
 
@@ -102,7 +102,7 @@ web_search({
 - Keep bx process handling and response parsing behind a small internal interface. Do not add a general provider framework.
 - Reuse the package's result handling and rendering patterns.
 - Add and bundle the shared settings dependency as required by the package conventions.
-- Test query/freshness arguments, absence of size overrides, leading-hyphen queries, successful and empty results, malformed data, additional fields, optional dates, cancellation, exit failures, missing bx, scoped settings, reload behavior, warnings, and file overflow.
+- Test query/freshness arguments, the fixed token budget, leading-hyphen queries, successful and empty results, malformed data, additional fields, optional dates, cancellation, exit failures, missing bx, scoped settings, reload behavior, warnings, and file overflow.
 - Use a fake executable for deterministic integration tests. A local HTTP capture can verify the installed bx request without Brave credentials or quota use.
 - Run `pnpm verify:ai` for implementation changes. Documentation-only interview updates do not require it.
 
@@ -120,6 +120,23 @@ The user confirmed this contract and requested implementation. The user later re
 - A live call after the final reload confirmed one introduction, short source dates, and separate quoted excerpts without repeated labels.
 - An unfiltered Node.js search returned an outdated release table. Fetching the same URL returned the current table. Search excerpts are not a guarantee of current page content.
 - The bx skill preference and personal configuration were not changed.
+
+## Result size
+
+The first version left every size parameter unset. Session logs later showed the cost of the service default:
+
+| Measure (96 calls, 14 days, all projects) | p10 | Median | p90 |
+| --- | --- | --- | --- |
+| Result characters | 20,476 | 32,117 | 36,119 |
+| Sources | 16 | 29 | 38 |
+
+- A source had a median of 837 characters; the first ten sources held 46% of a result. No result reached the 50 KB limit, so nothing was truncated.
+- `web_search` produced more result characters than every other SuPi tool, at about 30,000 per call.
+- One live query compared budgets: default 28 sources / 26,672 characters, `--max-tokens 4096` 17 / 12,962, `--max-tokens 2048` 11 / 5,855. The leading sources were largely the same in each run.
+
+Decision: pass `--max-tokens 4096` (`WEB_SEARCH_MAX_TOKENS`). There is no caller parameter for it; agents never set the optional `freshness` in those 96 calls.
+
+Limits: the comparison is one query and does not measure answer quality. Re-measure result size and the share of repeated `web_search` calls after the change.
 
 ## Evidence limits
 

@@ -62,6 +62,8 @@ describe("web_search process integration", () => {
 
     expect(readFakeBxArgs(fake)).toEqual([
       "context",
+      "--max-tokens",
+      "4096",
       "--extra",
       "freshness=pw",
       "--",
@@ -69,7 +71,7 @@ describe("web_search process integration", () => {
     ]);
   });
 
-  it("keeps freshness and all request budget fields unset when freshness is omitted", async () => {
+  it("requests only the fixed token budget when freshness is omitted", async () => {
     useFakeBx(fake, JSON.stringify({ grounding: { generic: [] } }));
     writeWebSearchSetting(fake.cwd, true);
 
@@ -86,7 +88,13 @@ describe("web_search process integration", () => {
       makeCtx({ cwd: fake.cwd }),
     );
 
-    expect(readFakeBxArgs(fake)).toEqual(["context", "--", "ordinary query"]);
+    expect(readFakeBxArgs(fake)).toEqual([
+      "context",
+      "--max-tokens",
+      "4096",
+      "--",
+      "ordinary query",
+    ]);
   });
 
   it("warns on load when enabled but bx is missing", async () => {

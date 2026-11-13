@@ -39,10 +39,19 @@ class BxProcessFailure extends Error {
   }
 }
 
+/**
+ * Total token budget requested from Brave for one search, half the service default of about
+ * 8,192. The default returned about 30 sources and 30,000 characters per call; see
+ * `docs/ops/web-search-design.md` § Result size.
+ */
+export const WEB_SEARCH_MAX_TOKENS = 4096;
+
 /** Build the direct argv used for one bx context request. */
 export function buildBxContextArgs(query: string, freshness?: string): string[] {
   return [
     "context",
+    "--max-tokens",
+    String(WEB_SEARCH_MAX_TOKENS),
     ...(freshness === undefined ? [] : ["--extra", `freshness=${freshness}`]),
     "--",
     query,
