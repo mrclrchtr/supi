@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { isAbsolute, relative } from "node:path";
 
 /** Count deduplicated reports, not independent experiments or all sessions scanned. */
@@ -83,6 +83,46 @@ function displayScope(filters) {
     ...(filters.sinceLast ? { sinceLast: true } : {}),
     previousGather: filters.previousGather ?? null,
     recordedGather: filters.recordedGather ?? null,
+    ...(filters.recordSkipReason ? { recordSkipReason: filters.recordSkipReason } : {}),
+  };
+}
+
+function displayRecord(record, filters) {
+  return {
+    ref: record.ref,
+    source: record.source,
+    date: new Date(record.timestamp).toISOString(),
+    status: record.status,
+    ...(record.promptRevision === undefined ? {} : { promptRevision: record.promptRevision }),
+    ...(record.provenance?.commit
+      ? { commit: record.provenance.commit.slice(0, 12), dirty: record.provenance.dirty === true }
+      : {}),
+    file: relative(filters.sessionsDir, record.sessionFile),
+    line: record.line,
+  };
+}
+
+/**
+ * Write the selected reports as complete JSONL, one whole assessment per line, for bulk analysis
+ * in scripts. Stdout carries only the export path, scope, coverage, and summary.
+ */
+export async function exportReports(evidence, evidenceFile, exportFile, refs) {
+  const records = selectRecords(evidence.records, { refs, offset: 0, textOffset: 0 });
+  const lines = records.map((record) =>
+    JSON.stringify({ ...displayRecord(record, evidence.filters), text: record.text ?? null }),
+  );
+  await writeFile(exportFile, lines.length ? `${lines.join("\n")}\n` : "", {
+    flag: "wx",
+    mode: 0o600,
+  });
+  const { failures: _failures, ...coverage } = evidence.coverage;
+  return {
+    evidenceFile,
+    exportFile,
+    exportedReports: records.length,
+    scope: displayScope(evidence.filters),
+    coverage,
+    summary: summarize(evidence.records),
   };
 }
 
@@ -156,19 +196,7 @@ export function displayPage(evidence, evidenceFile, options, scriptFile) {
   let display = render(items, offset, textOffset);
   while (offset < records.length && items.length < options.limit) {
     const record = records[offset];
-    const item = {
-      ref: record.ref,
-      source: record.source,
-      date: new Date(record.timestamp).toISOString(),
-      status: record.status,
-      ...(record.promptRevision === undefined ? {} : { promptRevision: record.promptRevision }),
-      ...(record.provenance?.commit
-        ? { commit: record.provenance.commit.slice(0, 12), dirty: record.provenance.dirty === true }
-        : {}),
-      file: relative(filters.sessionsDir, record.sessionFile),
-      line: record.line,
-      text: record.text?.slice(textOffset),
-    };
+    const item = { ...displayRecord(record, filters), text: record.text?.slice(textOffset) };
     if (textOffset)
       item.textRange = { start: textOffset, end: record.text.length, total: record.text.length };
     const candidate = render([...items, item], offset + 1);

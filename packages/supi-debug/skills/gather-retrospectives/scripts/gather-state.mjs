@@ -48,15 +48,17 @@ export async function sinceOptions(agentDir, scope, sinceLast, explicitSince) {
 }
 
 /**
- * Advance the marker only when recording is allowed (no `--no-record`) and the snapshot leaves no
- * gap after the previous gather: a complete scan without read failures, no commit filter, and a
- * start date absent or not later than it.
+ * Return why the marker must not advance, or null when it may. Recording requires no
+ * `--no-record` and a snapshot without a gap after the previous gather: a complete scan without
+ * read failures, no commit filter, and a start date absent or not later than that gather.
  */
-export function recordable(config, coverage) {
-  if (config.noRecord) return false;
-  if (coverage.sessionLimitReached || coverage.readFailures > 0 || config.sinceCommit) return false;
-  if (config.since === null) return true;
-  return config.previousGather !== null && config.since <= Date.parse(config.previousGather);
+export function recordSkipReason(config, coverage) {
+  if (config.noRecord) return "no-record";
+  if (coverage.sessionLimitReached || coverage.readFailures > 0) return "incomplete-scan";
+  if (config.sinceCommit) return "since-commit";
+  if (config.since === null) return null;
+  if (config.previousGather === null) return "since-without-previous-gather";
+  return config.since <= Date.parse(config.previousGather) ? null : "since-after-previous-gather";
 }
 
 /** Record `collectedAt` (collection start) for this scope; replaces the file atomically. */

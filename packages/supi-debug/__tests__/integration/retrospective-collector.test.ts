@@ -257,6 +257,39 @@ describe("retrospective collector CLI", () => {
     await expect(read()).rejects.toMatchObject({ code: 1 });
   });
 
+  it("exports complete assessments as JSONL without pagination or overwriting", async () => {
+    const longText = "🧭\n".repeat(20_000);
+    await session("a.jsonl", workspace, [
+      retrospective("large", longText, "supi-agent", 2000),
+      retrospective("small", "Short.", "supi-review"),
+    ]);
+    const { evidence } = await collect();
+    const exportFile = join(root, "reports.jsonl");
+    const run = (...args: string[]) =>
+      execute(process.execPath, [script.pathname, "--read", output, ...args]);
+    const result = JSON.parse((await run("--export", exportFile)).stdout);
+    expect(result).toMatchObject({ exportFile, exportedReports: 2, summary: { reports: 2 } });
+    const lines = (await readFile(exportFile, "utf8"))
+      .trimEnd()
+      .split("\n")
+      .map((line) => JSON.parse(line));
+    expect(lines.map((line) => line.ref)).toEqual(
+      evidence.records.map((r: { ref: string }) => r.ref),
+    );
+    expect(lines[0]).toMatchObject({
+      text: longText,
+      file: "a.jsonl",
+      line: 2,
+      source: "supi-agent",
+    });
+    await expect(run("--export", exportFile)).rejects.toMatchObject({ code: 1 });
+    await expect(run("--export", join(root, "x.jsonl"), "--offset", "1")).rejects.toMatchObject({
+      code: 1,
+    });
+    await rm(output);
+    await expect(collect(["--export", exportFile])).rejects.toMatchObject({ code: 1 });
+  });
+
   it("summarizes an empty snapshot without a continuation or invented dates", async () => {
     const { preview } = await collect();
     expect(preview.summary).toEqual({
@@ -322,7 +355,16 @@ describe("retrospective collector CLI", () => {
 
     await rm(output);
     const gap = await collect(["--since", new Date(now + 3_600_000).toISOString()]);
-    expect(gap.preview.scope.recordedGather).toBeNull();
+    expect(gap.preview.scope).toMatchObject({
+      recordedGather: null,
+      recordSkipReason: "since-after-previous-gather",
+    });
+    await rm(output);
+    const otherScope = await collect(["--since", "7d", "--source", "supi-agent"]);
+    expect(otherScope.preview.scope).toMatchObject({
+      recordedGather: null,
+      recordSkipReason: "since-without-previous-gather",
+    });
     await expect(collect(["--since", "30d", "--since-last"])).rejects.toMatchObject({ code: 1 });
   });
 

@@ -18,7 +18,7 @@ Dimensions:
 
 Map the answers to [CLI flags](#cli-flags). If the user defers, use the recommended defaults.
 
-Each successful collection records its start time for its scope, so the next `--since-last` gathers only newer reports. Output `scope.previousGather` and `scope.recordedGather` show the old and new markers. Pass `--no-record` when the user asks not to change local state or to keep outputs in a given directory. The marker is also not advanced when the scan is truncated or has read failures, when `--since-commit` is used, or when `--since` starts after the previous marker, because those snapshots could leave gaps.
+Each successful collection records its start time for its scope, so the next `--since-last` gathers only newer reports. Output `scope.previousGather` and `scope.recordedGather` show the old and new markers; `scope.recordSkipReason` names why a marker was not recorded. Pass `--no-record` when the user asks not to change local state or to keep outputs in a given directory. The marker is also not advanced when the scan is truncated or has read failures, when `--since-commit` is used, or when `--since` is used without an earlier marker or starts after it, because those snapshots could leave gaps.
 
 ## Collect once
 
@@ -34,7 +34,14 @@ Add the flags for the confirmed scope. See [CLI flags](#cli-flags) for storage, 
 
 ## Read to completion
 
-The temporary `evidenceFile` freezes all matching reports and scan coverage. Stdout supplies assessment text and citations within 16 KB. Use the displayed text directly, then execute `nextCommand` until `display.complete` is true. These follow-ups read the snapshot, not session storage, so new sessions cannot shift the results. Oversized assessments continue under the same `ref` with contiguous UTF-16 `textRange` offsets; interpret their fragments together.
+The temporary `evidenceFile` freezes all matching reports and scan coverage. With more than 20 reports (`summary.reports`), export the snapshot and read it inside a codemode script instead of paging:
+
+```bash
+node "<absolute-skill-directory>/scripts/collect.mjs" \
+  --read "$output_dir/evidence.json" --export "$output_dir/reports.jsonl"
+```
+
+Each line holds one whole report (`ref`, `source`, `date`, `promptRevision`, `file`, `line`, `text`). Read it with `tools.bash` (`cat`), not `tools.read`, which adds line numbers, and keep the parsed reports in script variables. Otherwise, page the display: stdout supplies assessment text and citations within 16 KB. Use the displayed text directly, then execute `nextCommand` until `display.complete` is true. These follow-ups read the snapshot, not session storage, so new sessions cannot shift the results. Oversized assessments continue under the same `ref` with contiguous UTF-16 `textRange` offsets; interpret their fragments together.
 
 - `coverage.complete` describes the scan independently of display completion. Disclose scan limits, malformed entries, skipped symlinks, or read failures when false.
 - `summary` counts the entire deduplicated snapshot: reports by producer/status, containing sessions, and earliest/latest report dates. Reports from one session remain correlated.
@@ -49,6 +56,15 @@ node "<absolute-skill-directory>/scripts/collect.mjs" \
 ```
 
 This selection has its own display completion; `summary` still describes the whole snapshot. Follow its `nextCommand` if needed. Per-report metadata remains in the evidence file.
+
+## Find themes
+
+With 10 or more reports, build themes in this order:
+
+1. Extract each report's bold headings in a script and read the list in full.
+2. Group the headings into candidate themes yourself. Write each theme as a concrete criterion, and name the producer it applies to when only one produces it (for example, reviewer submissions concern `supi-review` only).
+3. Count with the Jev classifier: one call per report, one bool question per theme, the report text as state.
+4. Count hits above 0.8 probability. Reread the 0.6–0.8 band yourself; a theme whose hits sit mostly there is cut badly, so rewrite or drop it.
 
 ## Summarize
 
@@ -95,4 +111,5 @@ Use `--read` instead of collection flags. Both collection and snapshot reading a
 | `--limit <1..100>` | Maximum reports displayed per response; defaults to `20`. This changes display, not collection scope. |
 | `--offset <n>` | Zero-based report offset within the current selection; defaults to `0`. |
 | `--text-offset <n>` | UTF-16 offset within an oversized report at the selected report offset. Requires `--read`; defaults to `0`. |
+| `--export <path>` | Write the selection (all reports, or `--refs`) to a new JSONL file, one complete report per line, instead of displaying it. Requires `--read`; excludes `--offset` and `--text-offset`. |
 | `--help` | Print usage, all flags, and storage discovery rules, then exit. |

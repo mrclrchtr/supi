@@ -1,5 +1,11 @@
 # Changelog
 
+## [12.1.0]
+
+- `gather-retrospectives` adds `--read <evidence> --export <file.jsonl>`, which writes every selected report in full, one per line, so large snapshots can be analyzed in a script instead of paged through 16 KB displays.
+- The skill adds a theme-finding step: extract headings, define themes, count them with the Jev classifier, and recheck low-confidence hits.
+- Collector output adds `scope.recordSkipReason`, which explains why no last-gather marker was recorded. `--since` without an earlier marker reports `since-without-previous-gather`.
+
 ## [12.0.0]
 
 - **Breaking:** `debug` rejects unknown parameters instead of ignoring them, and `limit` must be at least 1.

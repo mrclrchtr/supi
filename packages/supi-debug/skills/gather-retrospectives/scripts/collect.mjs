@@ -5,7 +5,7 @@ import { readdir, writeFile } from "node:fs/promises";
 import { isAbsolute, join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
-import { recordable, recordGather, sinceOptions } from "./gather-state.mjs";
+import { recordGather, recordSkipReason, sinceOptions } from "./gather-state.mjs";
 import { agentDirectory, canonicalPath, localPath, sessionDirectory } from "./paths.mjs";
 import {
   admitByCommit,
@@ -13,11 +13,12 @@ import {
   resolveCommit,
   SINCE_COMMIT_LIMITATION,
 } from "./provenance.mjs";
-import { displayPage, readEvidence, summarize } from "./snapshot.mjs";
+import { displayPage, exportReports, readEvidence, summarize } from "./snapshot.mjs";
 
 const help = `Collect stored Agent Run retrospectives without modifying sessions.
 Usage: node collect.mjs --output <new-file.json> [collection options]
        node collect.mjs --read <evidence.json> [display options]
+       node collect.mjs --read <evidence.json> --export <new-file.jsonl> [--refs]
   --workspace <path>     Include sessions in this directory tree (default: cwd)
   --all-workspaces       Explicitly include other projects; replaces --workspace
   --sessions-dir <path>  Override PI storage discovery
@@ -36,6 +37,8 @@ Usage: node collect.mjs --output <new-file.json> [collection options]
   --limit <1..100>       Maximum reports displayed per response (default: 20)
   --offset <number>      Report offset within the selection (default: 0)
   --text-offset <number> UTF-16 offset within an oversized report (--read only)
+  --export <path>        With --read: write selected reports as complete JSONL
+                         (one report per line) instead of paginated display
   --help                Show this help
 Only persisted supi-debug-event / agent-run-retrospective entries are collected.
 Interactive reports and quoted tool results are excluded. Stdout is bounded to
@@ -86,12 +89,22 @@ function readOptions(values, display) {
     throw new Error("--read cannot be combined with collection options.");
   if (display.refs?.some((ref) => !/^R-[a-f0-9]{16}$/.test(ref)))
     throw new Error("--refs must contain comma-separated report references.");
-  return { read: localPath(values.read), display };
+  if (values.export !== undefined && (values["text-offset"] || values.offset !== "0"))
+    throw new Error("--export writes the whole selection; omit --offset and --text-offset.");
+  return {
+    read: localPath(values.read),
+    display,
+    ...(values.export === undefined ? {} : { exportFile: localPath(values.export) }),
+  };
 }
 
 function validateCollection(values) {
-  if (values.refs !== undefined || values["text-offset"] !== undefined)
-    throw new Error("--refs and --text-offset require --read.");
+  if (
+    values.refs !== undefined ||
+    values["text-offset"] !== undefined ||
+    values.export !== undefined
+  )
+    throw new Error("--refs, --text-offset, and --export require --read.");
   if (!values.output) throw new Error("--output must name a new JSON evidence file.");
   if (values.workspace && values["all-workspaces"])
     throw new Error("Choose --workspace or --all-workspaces, not both.");
@@ -122,6 +135,7 @@ async function options() {
       read: { type: "string" },
       refs: { type: "string" },
       "text-offset": { type: "string" },
+      export: { type: "string" },
       help: { type: "boolean" },
     },
   });
@@ -392,18 +406,19 @@ try {
     const evidenceFile = config.read ?? config.output;
     if (!config.read) {
       evidence.summary = summarize(evidence.records);
-      evidence.filters.recordedGather = recordable(config, evidence.coverage)
-        ? new Date(startedAt).toISOString()
-        : null;
+      const skipReason = recordSkipReason(config, evidence.coverage);
+      evidence.filters.recordedGather = skipReason ? null : new Date(startedAt).toISOString();
+      evidence.filters.recordSkipReason = skipReason;
       await writeFile(evidenceFile, `${JSON.stringify(evidence, null, 2)}\n`, {
         flag: "wx",
         mode: 0o600,
       });
       if (evidence.filters.recordedGather) await recordGather(config.stateFile, config, startedAt);
     }
-    process.stdout.write(
-      `${JSON.stringify(displayPage(evidence, evidenceFile, config.display, fileURLToPath(import.meta.url)))}\n`,
-    );
+    const result = config.exportFile
+      ? await exportReports(evidence, evidenceFile, config.exportFile, config.display.refs)
+      : displayPage(evidence, evidenceFile, config.display, fileURLToPath(import.meta.url));
+    process.stdout.write(`${JSON.stringify(result)}\n`);
   }
 } catch (error) {
   process.stderr.write(`Retrospective collection failed: ${error.message}\n`);
