@@ -171,6 +171,7 @@ export async function runReviewer(invocation: ReviewerInvocation): Promise<Revie
     invocation.reviewerCodemodeEnabled,
     Boolean(retrospective),
     webTools,
+    invocation.cwd,
   );
   let session: AgentRunSessionView | undefined;
   const recovery = new ReviewRecoveryPolicy({

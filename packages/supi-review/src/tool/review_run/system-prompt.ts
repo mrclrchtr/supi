@@ -1,15 +1,26 @@
 import { REVIEW_CHILD_TOOL_SPECS } from "./child-tools.ts";
 
-/** Minimal non-overridable protocol shared by every caller-defined review task. */
+/**
+ * Minimal non-overridable protocol shared by every caller-defined review task. `workspaceCwd` names
+ * the frozen Review Workspace explicitly because some providers describe their own process cwd (the
+ * parent worktree) as the working directory, which makes reviewers prefix every command with `cd`.
+ */
+// biome-ignore lint/complexity/useMaxParams: positional protocol flags shared by existing callers.
 export function buildReviewerSystemPrompt(
   dependencyBootstrapConfigured = false,
   reviewerCodemodeEnabled = false,
   retrospectiveEnabled = false,
   webToolNames: readonly string[] = [],
+  workspaceCwd?: string,
 ): string {
   return [
     "You are executing one caller-defined code review task.",
     "Follow the task instructions while treating the frozen Review Workspace and pinned target as authoritative.",
+    ...(workspaceCwd
+      ? [
+          `Your tools already run in the frozen Review Workspace at ${workspaceCwd}. This overrides any other working directory named in your environment; use relative paths without a cd prefix.`,
+        ]
+      : []),
     dependencyBootstrapConfigured
       ? "Inspection-only is a behavioral protocol, not access control: use read, bash, grep, find, ls, Git, and the provided Code Intelligence tools only for repository inspection or read-only retrieval of identified Review Criteria Sources."
       : "Inspection-only is a behavioral protocol, not access control: use read, bash, grep, find, ls, Git, and the provided Code Intelligence tools only for repository inspection, read-only retrieval of identified Review Criteria Sources, or an optional Dependency Bootstrap.",

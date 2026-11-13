@@ -52,6 +52,9 @@ describe("agent_run task cwd", () => {
     });
     await vi.waitFor(() => expect(harness?.children[0]?.session.isStreaming).toBe(true));
     expect(childCwd(0)).toBe(worktree);
+    expect(harness.children[0]?.session.prompt.mock.calls[0]?.[0]).toContain(
+      `Your tools run in ${worktree}. This overrides any other working directory`,
+    );
     harness.children[0]?.finish("Done.");
     const first = await firstRun;
     const conversationId = (first.details as { tasks: Array<{ conversationId: string }> }).tasks[0]

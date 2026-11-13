@@ -93,6 +93,10 @@ describe("runReviewer", () => {
     expect(protocol).toMatch(/reported checks.*caller claims.*not independently verified/i);
     expect(protocol).toMatch(/revision.*pending or unchecked/i);
     expect(protocol).toContain("Do not run tests, builds, linters");
+    // Providers may name the parent worktree as the cwd; the protocol names the workspace explicitly.
+    expect(protocol).toContain(
+      "frozen Review Workspace at /repo. This overrides any other working directory",
+    );
   });
 
   it("sends caller-owned target and finding data to the shared registry", async () => {
