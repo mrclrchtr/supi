@@ -10,6 +10,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import type { AgentSessionInputs } from "@mrclrchtr/supi-agent-runtime/api";
 import headlessInspectionProfile from "@mrclrchtr/supi-code-intelligence/headless";
+import { registerShellHints } from "@mrclrchtr/supi-core/session";
 import {
   effectiveCapabilities,
   selectedWebCapabilities,
@@ -38,6 +39,7 @@ export function createAgentSessionInputs(options: AgentSessionInputOptions): Age
   );
   const tools = effectiveCapabilities(options.profile.manifest.tools, webTools);
   const extensionFactories = [
+    { name: "supi-shell-hints", factory: registerShellHints },
     ...(usesHeadlessInspection(options.profile.manifest.tools)
       ? [{ name: "supi-code-intelligence-headless", factory: headlessInspectionProfile }]
       : []),

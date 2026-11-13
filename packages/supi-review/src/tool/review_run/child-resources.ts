@@ -4,7 +4,7 @@ import {
   SettingsManager,
 } from "@earendil-works/pi-coding-agent";
 import headlessInspectionProfile from "@mrclrchtr/supi-code-intelligence/headless";
-import type { ChildWebToolProvision } from "@mrclrchtr/supi-core/session";
+import { type ChildWebToolProvision, registerShellHints } from "@mrclrchtr/supi-core/session";
 
 /** Loader and settings manager preconfigured for an isolated child session. */
 export interface IsolatedChildResources {
@@ -39,6 +39,7 @@ export function createIsolatedChildResources(
   });
   settingsManager.setProjectTrusted(options.projectTrusted ?? false);
   const extensionFactories = [
+    { name: "supi-shell-hints", factory: registerShellHints },
     ...(options.headlessInspection
       ? [{ name: "supi-code-intelligence-headless", factory: headlessInspectionProfile }]
       : []),

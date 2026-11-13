@@ -56,3 +56,4 @@ export {
   createSessionNameTracker,
   getActiveBranchEntries,
 } from "./session-utils.ts";
+export { BSD_SED_HINT, BSD_SED_HINT_MARKER, registerShellHints } from "./shell-hints.ts";

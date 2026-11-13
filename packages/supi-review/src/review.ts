@@ -1,6 +1,7 @@
 import { type ExtensionAPI, getAgentDir } from "@earendil-works/pi-coding-agent";
 import { Box } from "@earendil-works/pi-tui";
 import { registerAgentsCommand } from "@mrclrchtr/supi-agent-runtime/api";
+import { registerShellHints } from "@mrclrchtr/supi-core/session";
 import { LocalReviewAuditStore } from "./audit/local-review-audit-store.ts";
 import { registerReviewSettings, syncReviewAgentTools } from "./config.ts";
 import { ReviewArtifactStore } from "./session/review-artifact-store.ts";
@@ -19,6 +20,7 @@ export default function reviewExtension(pi: ExtensionAPI): void {
   });
   const registry = registerAgentsCommand(pi);
   registerReviewSettings(pi);
+  registerShellHints(pi);
   registerReviewOutputTool(pi, artifactStore);
   registerReviewRunTool(pi, artifactStore, auditStore, registry);
   registerReviewAuditTool(pi, auditStore);

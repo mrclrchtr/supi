@@ -1,5 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { clearAgentsProfilePages, registerAgentsCommand } from "@mrclrchtr/supi-agent-runtime/api";
+import { registerShellHints } from "@mrclrchtr/supi-core/session";
 import { registerAgentSettings, syncAgentRunTool } from "./config.ts";
 import { DelegationController } from "./delegation/controller.ts";
 import { agentProfilePages } from "./profile-pages.ts";
@@ -16,6 +17,7 @@ import { AGENT_COMPLETION_MESSAGE_TYPE } from "./tool/names.ts";
 export default function agentExtension(pi: ExtensionAPI): void {
   let disposeProfileSettings: (() => void) | undefined;
   let controller: DelegationController | undefined;
+  registerShellHints(pi);
 
   // Catalogue, settings sections, and tool schema refresh on every session start/reload.
   pi.on("session_start", async (_event, ctx) => {

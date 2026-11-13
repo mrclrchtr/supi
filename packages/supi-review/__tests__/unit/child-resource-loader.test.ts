@@ -60,7 +60,8 @@ describe("createIsolatedResourceLoader", () => {
     );
     const codemode = registeredTools.find((tool) => tool.name === "codemode");
 
-    expect(extensions).toHaveLength(2);
+    expect(extensions).toHaveLength(3);
+    expect(extensions.some((extension) => extension.path.includes("supi-shell-hints"))).toBe(true);
     expect(
       extensions.some((extension) => extension.path.includes("supi-code-intelligence-headless")),
     ).toBe(true);

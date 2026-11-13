@@ -143,7 +143,9 @@ describe("profile resource policy", () => {
     expect(registeredTools).toContain("codemode");
     expect(registeredTools).toContain("code_find");
     expect(registeredTools).toContain("code_resolve");
-    expect(extensions).toHaveLength(2);
+    // Headless Code Intelligence, codemode, and the tool-free shell hints.
+    expect(extensions).toHaveLength(3);
+    expect(extensions.some((extension) => extension.path.includes("supi-shell-hints"))).toBe(true);
   });
 
   it("receives only allowed Web Conditional Capabilities that the containing session provides", async () => {
@@ -247,8 +249,11 @@ describe("profile resource policy", () => {
 
     await inputs.resourceLoader.reload();
     const extensions = inputs.resourceLoader.getExtensions().extensions;
-    expect(extensions).toHaveLength(1);
-    expect([...extensions[0].tools.keys()].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))).toEqual([
+    const toolExtensions = extensions.filter((extension) => extension.tools.size > 0);
+    expect(toolExtensions).toHaveLength(1);
+    expect(
+      [...toolExtensions[0].tools.keys()].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)),
+    ).toEqual([
       "code_find",
       "code_graph",
       "code_health",
