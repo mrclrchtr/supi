@@ -1,5 +1,7 @@
+import { Check } from "typebox/value";
 import { describe, expect, it } from "vitest";
 import { AskUserValidationError, normalizeQuestionnaire } from "../../src/normalize.ts";
+import { AskUserParamsSchema } from "../../src/schema.ts";
 
 describe("normalizeQuestionnaire", () => {
   describe("deprecated field rejection", () => {
@@ -435,5 +437,29 @@ describe("normalizeQuestionnaire", () => {
         ],
       }),
     ).toThrowError(AskUserValidationError);
+  });
+});
+
+describe("ask_user parameter schema", () => {
+  const option = (extra = {}) => ({ value: "a", label: "A", ...extra });
+  const form = (question = {}, top = {}, firstOption = option()) => ({
+    questions: [
+      {
+        type: "choice",
+        id: "q",
+        header: "Q",
+        prompt: "Pick",
+        options: [firstOption, { value: "b", label: "B" }],
+        ...question,
+      },
+    ],
+    ...top,
+  });
+
+  it("rejects unknown fields at every level instead of ignoring them", () => {
+    expect(Check(AskUserParamsSchema, form())).toBe(true);
+    expect(Check(AskUserParamsSchema, form({}, { subtitle: "typo" }))).toBe(false);
+    expect(Check(AskUserParamsSchema, form({ recomendation: "a" }))).toBe(false);
+    expect(Check(AskUserParamsSchema, form({}, {}, option({ detail: "typo" })))).toBe(false);
   });
 });

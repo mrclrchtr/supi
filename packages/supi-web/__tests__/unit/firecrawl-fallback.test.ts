@@ -52,7 +52,7 @@ function registerTool() {
 function execute(input: Record<string, unknown> = {}, signal?: AbortSignal) {
   return registerTool().execute(
     "fallback",
-    { url: sourceUrl, fetch_mode: "firecrawl_fallback", ...input },
+    { url: sourceUrl, fetchMode: "firecrawl_fallback", ...input },
     signal,
     undefined,
     makeCtx({ cwd }) as never,
@@ -86,14 +86,14 @@ afterEach(() => {
 describe("agent-selected Firecrawl retrieval", () => {
   it.each(["firecrawl", "firecrawl_fallback"])(
     "blocks %s while disabled, then honors settings changes on the next call",
-    async (fetch_mode) => {
+    async (fetchMode) => {
       const requests = stubRequests(() => Response.json(providerPage()));
       writeSupiConfig({ section: "web", scope: "project", cwd }, { firecrawlEnabled: false });
-      await expect(execute({ fetch_mode })).rejects.toThrow(/disabled.*supi-settings/i);
+      await expect(execute({ fetchMode })).rejects.toThrow(/disabled.*supi-settings/i);
       expect(requests).not.toHaveBeenCalled();
       expect(lookup).not.toHaveBeenCalled();
       writeSupiConfig({ section: "web", scope: "project", cwd }, { firecrawlEnabled: true });
-      expect((await execute({ fetch_mode })).structuredContent).toMatchObject({ markdown });
+      expect((await execute({ fetchMode })).structuredContent).toMatchObject({ markdown });
     },
   );
 
@@ -113,7 +113,7 @@ describe("agent-selected Firecrawl retrieval", () => {
       await expect(
         tool.execute(
           "child",
-          { url: sourceUrl, fetch_mode: "firecrawl" },
+          { url: sourceUrl, fetchMode: "firecrawl" },
           undefined,
           undefined,
           makeCtx({ cwd: childCwd }) as never,
@@ -127,7 +127,7 @@ describe("agent-selected Firecrawl retrieval", () => {
 
   it("fetches with Firecrawl immediately without probing a JS-rendered source", async () => {
     const requests = stubRequests(() => Response.json(providerPage(["Article", "Site"])));
-    const result = await execute({ fetch_mode: "firecrawl" });
+    const result = await execute({ fetchMode: "firecrawl" });
     expect(result.structuredContent).toMatchObject({
       markdown,
       retrieval: { provider: "firecrawl" },
@@ -136,19 +136,19 @@ describe("agent-selected Firecrawl retrieval", () => {
   });
   it.each(["inline", "file"])(
     "preserves source, Markdown, and retrieval provenance in %s results",
-    async (output_mode) => {
+    async (outputMode) => {
       const requests = stubRequests(() => Response.json(providerPage()));
       const tool = registerTool();
       const result = await tool.execute(
         "fallback",
-        { url: sourceUrl, fetch_mode: "firecrawl_fallback", output_mode },
+        { url: sourceUrl, fetchMode: "firecrawl_fallback", outputMode },
         undefined,
         undefined,
         makeCtx({ cwd }) as never,
       );
       const data = expectStructuredContent<WebFetchMdOutput>(tool, result);
       expect(data).toMatchObject({
-        mode: output_mode,
+        mode: outputMode,
         url: sourceUrl,
         chars: markdown.length,
         retrieval: {
@@ -199,9 +199,9 @@ describe("agent-selected Firecrawl retrieval", () => {
   it.each([
     [500, 1_000],
     [300_001, 300_000],
-  ])("honors a %s ms local budget with a valid provider timeout", async (timeout_ms, timeout) => {
+  ])("honors a %s ms local budget with a valid provider timeout", async (timeoutMs, timeout) => {
     const requests = stubRequests(() => Response.json(providerPage()));
-    const result = await execute({ timeout_ms });
+    const result = await execute({ timeoutMs });
     expect(result.structuredContent).toMatchObject({ markdown });
     const call = requests.mock.calls.find(([url]) => String(url) === apiUrl);
     expect(call).toBeDefined();
@@ -214,7 +214,7 @@ describe("agent-selected Firecrawl retrieval", () => {
       const page = providerPage();
       page.data.metadata[field] = "x".repeat(60_000);
       stubRequests(() => Response.json(page));
-      await expect(execute({ output_mode: "file" })).rejects.toThrow(/Firecrawl.*invalid response/);
+      await expect(execute({ outputMode: "file" })).rejects.toThrow(/Firecrawl.*invalid response/);
     },
   );
 
@@ -224,7 +224,7 @@ describe("agent-selected Firecrawl retrieval", () => {
     const tool = registerTool();
     const result = await tool.execute(
       "long-url",
-      { url, fetch_mode: "firecrawl_fallback", output_mode: "file" },
+      { url, fetchMode: "firecrawl_fallback", outputMode: "file" },
       undefined,
       undefined,
       makeCtx({ cwd }) as never,
@@ -254,10 +254,10 @@ describe("agent-selected Firecrawl retrieval", () => {
       writeSupiConfig({ section: "web", scope: "project", cwd }, { firecrawlEnabled });
       vi.stubEnv("FIRECRAWL_API_KEY", undefined);
       const requests = stubRequests(() => Response.json(providerPage()));
-      const failure = execute({ fetch_mode: undefined });
+      const failure = execute({ fetchMode: undefined });
       await expect(failure).rejects.toMatchObject({
         status: 403,
-        message: expect.stringContaining('fetch_mode: "firecrawl_fallback"'),
+        message: expect.stringContaining('fetchMode: "firecrawl_fallback"'),
         cause: expect.objectContaining({ status: 403 }),
       });
       await expect(failure).rejects.toThrow(/shares the URL and may consume credits/);
@@ -302,7 +302,7 @@ describe("agent-selected Firecrawl retrieval", () => {
 
   it("rejects an unsupported fetch mode before making requests", async () => {
     const requests = stubRequests(() => Response.json(providerPage()));
-    await expect(execute({ fetch_mode: "unknown" })).rejects.toThrow("fetch_mode");
+    await expect(execute({ fetchMode: "unknown" })).rejects.toThrow("fetchMode");
     expect(requests).not.toHaveBeenCalled();
   });
 
@@ -448,6 +448,6 @@ describe("agent-selected Firecrawl retrieval", () => {
 
   it("bounds provider response-body reading by timeout", async () => {
     stubRequests(() => new Response(new ReadableStream()));
-    await expect(execute({ timeout_ms: 20 })).rejects.toThrow(/Firecrawl.*timed out/i);
+    await expect(execute({ timeoutMs: 20 })).rejects.toThrow(/Firecrawl.*timed out/i);
   });
 });

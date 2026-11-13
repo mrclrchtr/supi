@@ -78,7 +78,7 @@ export const InspectOutputSchema = Type.Union([
   Type.Object(
     {
       kind: Type.Literal("completed"),
-      point: Type.Object(
+      anchor: Type.Object(
         { file: Type.String(), line: Type.Integer(), character: Type.Integer() },
         { additionalProperties: false },
       ),
@@ -141,7 +141,7 @@ export function structuredInspectResult(
   const { data, assembled } = assembly;
   return {
     kind: "completed",
-    point: { file: data.relPath, line: data.line, character: data.character },
+    anchor: { file: data.relPath, line: data.line, character: data.character },
     confidence: data.confidence,
     diagnosticWindow: {
       startLine: data.diagnosticWindow.startLine,

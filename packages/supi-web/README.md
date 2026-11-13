@@ -63,12 +63,12 @@ Results describe the evidence returned by the provider, not exhaustive coverage 
 
 ```javascript
 const libraries = await tools.web_docs_search({
-  library_name: "react",
+  libraryName: "react",
   query: "effect cleanup",
 });
 if (libraries.results.length > 0) {
   const docs = await tools.web_docs_fetch({
-    library_id: libraries.results[0].id,
+    libraryId: libraries.results[0].id,
     query: "effect cleanup",
     raw: true,
   });
@@ -84,7 +84,7 @@ HTTP fetch failures include the requested URL and response status in the error m
 ```javascript
 for (const url of urls) {
   try {
-    const page = await tools.web_fetch_md({ url, output_mode: "file" });
+    const page = await tools.web_fetch_md({ url, outputMode: "file" });
     text({ url, filePath: page.filePath });
   } catch (error) {
     text({ url, error: String(error) });
@@ -117,7 +117,7 @@ Search results are provider-reported source material. A source date can be a pub
 
 It follows redirects and, for HTML, removes scripts and styles while preserving headings, links, lists, code blocks, and tables.
 
-Native Markdown is returned unchanged, including relative links and code examples. For HTML conversion, `abs_links` defaults to `true`; set it to `false` to preserve original link and image destinations. Unsafe URL schemes are removed in either HTML mode.
+Native Markdown is returned unchanged, including relative links and code examples. For HTML conversion, `absLinks` defaults to `true`; set it to `false` to preserve original link and image destinations. Unsafe URL schemes are removed in either HTML mode.
 
 ### Optional Firecrawl retrieval
 
@@ -125,7 +125,7 @@ Direct fetching remains the default and needs no API key. To allow Firecrawl, op
 
 Export `FIRECRAWL_API_KEY` before starting Pi. The key stays in the environment, not settings. Enabling without a key saves the preference and shows a warning; direct fetching remains available.
 
-The agent can select one `fetch_mode`:
+The agent can select one `fetchMode`:
 
 | Mode | Behavior |
 |---|---|
@@ -140,19 +140,19 @@ For a public page blocked with HTTP 403:
 ```javascript
 const page = await tools.web_fetch_md({
   url: "https://example.com/article",
-  fetch_mode: "firecrawl_fallback",
-  output_mode: "file",
+  fetchMode: "firecrawl_fallback",
+  outputMode: "file",
 });
 return page;
 ```
 
-For JS-rendered content, select `fetch_mode: "firecrawl"` instead. The key is read only when Firecrawl is actually needed and is not returned in results. Firecrawl receives the requested URL and may consume credits, including for cached results. The tool requests Markdown only, with no structured-extraction add-ons or client-side retries. Firecrawl manages its own retrieval pipeline.
+For JS-rendered content, select `fetchMode: "firecrawl"` instead. The key is read only when Firecrawl is actually needed and is not returned in results. Firecrawl receives the requested URL and may consume credits, including for cached results. The tool requests Markdown only, with no structured-extraction add-ons or client-side retries. Firecrawl manages its own retrieval pipeline.
 
 `firecrawl_fallback` runs only after the direct pipeline ends with HTTP 403—not for authentication errors (401), missing pages, rate limits, network failures, or cancellation. Neither mode retries Firecrawl failures through another provider. Both modes reject credential-bearing URLs, local/reserved hosts, and hosts resolving to non-public addresses before sharing them. Do not select Firecrawl for signed URLs or login-protected, private, or paywalled pages. These checks are not a sandbox or proof that a page is publicly accessible.
 
 Firecrawl results retain the requested source URL and include `retrieval.provider: "firecrawl"`, plus `cacheState` and `cachedAt` when supplied. Both inline/file responses disclose retrieval provenance. [Firecrawl caching](https://docs.firecrawl.dev/features/scrape#caching-and-freshness) allows cached content up to two days old by default; missing cache metadata does not establish freshness. Empty, unsuccessful, warning-bearing, and recognizable access-block responses are failures, not usable article content. A null or absent warning is accepted. Firecrawl can still return incomplete or noisy content, so inspect it before relying on it.
 
-`timeout_ms` applies to each direct HTTP request and to the complete Firecrawl attempt, including DNS validation and response reading; it is not a whole-tool deadline. The provider timeout is clamped to its supported 1–300 second range, while the local deadline still enforces shorter budgets. Cancellation is forwarded to Firecrawl. Native/Firecrawl Markdown remains unchanged, so `abs_links` applies only to local HTML conversion.
+`timeoutMs` applies to each direct HTTP request and to the complete Firecrawl attempt, including DNS validation and response reading; it is not a whole-tool deadline. The provider timeout is clamped to its supported 1–300 second range, while the local deadline still enforces shorter budgets. Cancellation is forwarded to Firecrawl. Native/Firecrawl Markdown remains unchanged, so `absLinks` applies only to local HTML conversion.
 
 ### Large pages
 

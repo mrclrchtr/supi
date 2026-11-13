@@ -111,7 +111,7 @@ describe("webExtension", () => {
     vi.unstubAllGlobals();
   });
 
-  it.each([true, false])("honors abs_links=%s for converted HTML", async (abs_links) => {
+  it.each([true, false])("honors absLinks=%s for converted HTML", async (absLinks) => {
     const pi = createPiMock();
     webExtension(pi as never);
     const html = `
@@ -133,7 +133,7 @@ describe("webExtension", () => {
     try {
       const result = await tool.execute(
         "links",
-        { url: "https://example.com/docs/page", abs_links },
+        { url: "https://example.com/docs/page", absLinks },
         undefined,
         undefined,
         makeCtx(),
@@ -142,12 +142,12 @@ describe("webExtension", () => {
       expect(data.mode).toBe("inline");
       if (data.mode !== "inline") throw new Error("Expected inline payload");
       expect(data.markdown).toContain(
-        abs_links ? "[reference](https://example.com/docs/reference)" : "[reference](./reference)",
+        absLinks ? "[reference](https://example.com/docs/reference)" : "[reference](./reference)",
       );
       // biome-ignore lint/security/noSecrets: expected Markdown image, not a credential
       const absoluteImage = "![diagram](https://example.com/images/diagram.png)";
       expect(data.markdown).toContain(
-        abs_links ? absoluteImage : "![diagram](../images/diagram.png)",
+        absLinks ? absoluteImage : "![diagram](../images/diagram.png)",
       );
     } finally {
       vi.unstubAllGlobals();
@@ -199,52 +199,49 @@ describe("webExtension", () => {
   it.each([
     ["file", "# Small"],
     ["auto", "x".repeat(15_001)],
-  ])(
-    "keeps %s file delivery usable without duplicating the body",
-    async (output_mode, markdown) => {
-      const pi = createPiMock();
-      webExtension(pi as never);
-      vi.stubGlobal(
-        "fetch",
-        vi.fn(
-          async (_url: unknown, init?: RequestInit) =>
-            new Response(init?.method === "HEAD" ? null : markdown, {
-              headers: { "content-type": "text/markdown" },
-            }),
-        ),
+  ])("keeps %s file delivery usable without duplicating the body", async (outputMode, markdown) => {
+    const pi = createPiMock();
+    webExtension(pi as never);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async (_url: unknown, init?: RequestInit) =>
+          new Response(init?.method === "HEAD" ? null : markdown, {
+            headers: { "content-type": "text/markdown" },
+          }),
+      ),
+    );
+    const tool = pi.tools[0] as RenderableTool;
+    try {
+      const result = await tool.execute(
+        "file",
+        {
+          url: "https://example.com/file",
+          outputMode,
+        },
+        undefined,
+        undefined,
+        makeCtx(),
       );
-      const tool = pi.tools[0] as RenderableTool;
+      const data = expectStructuredContent<WebFetchMdOutput>(tool, result);
+      expect(data.mode).toBe("file");
+      if (data.mode !== "file") throw new Error("Expected file payload");
       try {
-        const result = await tool.execute(
-          "file",
-          {
-            url: "https://example.com/file",
-            output_mode,
-          },
-          undefined,
-          undefined,
-          makeCtx(),
-        );
-        const data = expectStructuredContent<WebFetchMdOutput>(tool, result);
-        expect(data.mode).toBe("file");
-        if (data.mode !== "file") throw new Error("Expected file payload");
-        try {
-          expect(data.chars).toBe(markdown.length);
-          expect(await readFile(data.filePath, "utf8")).toBe(markdown);
-          expect(result).toMatchObject({
-            content: [{ text: expect.stringContaining(data.filePath) }],
-            details: { filePath: data.filePath },
-          });
-          expect(renderToolResult(tool, result, false)).toContain("Saved Markdown to");
-          expect(data).not.toHaveProperty("markdown");
-        } finally {
-          await rm(dirname(data.filePath), { recursive: true, force: true });
-        }
+        expect(data.chars).toBe(markdown.length);
+        expect(await readFile(data.filePath, "utf8")).toBe(markdown);
+        expect(result).toMatchObject({
+          content: [{ text: expect.stringContaining(data.filePath) }],
+          details: { filePath: data.filePath },
+        });
+        expect(renderToolResult(tool, result, false)).toContain("Saved Markdown to");
+        expect(data).not.toHaveProperty("markdown");
       } finally {
-        vi.unstubAllGlobals();
+        await rm(dirname(data.filePath), { recursive: true, force: true });
       }
-    },
-  );
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
 
   it("truncates model-visible inline output and saves full content", async () => {
     const pi = createPiMock();
@@ -267,7 +264,7 @@ describe("webExtension", () => {
     const tool = pi.tools[0] as RenderableTool;
     const result = (await tool.execute(
       "tc-1",
-      { url: "https://example.com/huge", output_mode: "inline" },
+      { url: "https://example.com/huge", outputMode: "inline" },
       undefined,
       undefined,
       makeCtx(),

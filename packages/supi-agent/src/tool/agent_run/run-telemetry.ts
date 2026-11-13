@@ -101,8 +101,10 @@ export class AgentRunTelemetry {
 
 function timingToolName(toolName: string, args: unknown): string {
   if (toolName !== "code_find" || !args || typeof args !== "object") return toolName;
-  const mode = (args as { mode?: unknown }).mode;
-  return mode === "ast" || mode === "semantic" ? `${toolName}:${mode}` : toolName;
+  const search = (args as { search?: unknown }).search;
+  if (!search || typeof search !== "object") return toolName;
+  const mode = "ast" in search ? "ast" : "semantic" in search ? "semantic" : undefined;
+  return mode ? `${toolName}:${mode}` : toolName;
 }
 
 /** Return the public status for one Agent Run outcome. */

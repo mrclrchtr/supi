@@ -286,7 +286,7 @@ describe("structured navigation results", () => {
 
   it.each([
     ["code_resolve", { target: { file: "missing.ts" } }],
-    ["code_find", { query: "", mode: "semantic" }],
+    ["code_find", { search: { semantic: { query: "" } } }],
     ["code_graph", { target: { handle: "tg-missing" } }],
   ])("returns schema-valid recovery data for %s invalid input", async (name, params) => {
     const pi = createPiMock();
@@ -371,7 +371,7 @@ describe("structured navigation results", () => {
     const tool = getTool(pi, "code_find") as unknown as StructuredTool;
     const result = await tool.execute(
       "ast",
-      { query: "widget", mode: "ast", kind: "definition" },
+      { search: { ast: { kind: "definition", query: "widget" } } },
       undefined,
       undefined,
       makeCtx({ cwd }),
@@ -413,7 +413,7 @@ describe("structured navigation results", () => {
     const tool = getTool(pi, "code_find") as unknown as StructuredTool;
     const result = await tool.execute(
       "partial",
-      { query: "widget", mode: "semantic" },
+      { search: { semantic: { query: "widget" } } },
       undefined,
       undefined,
       makeCtx({ cwd }),
@@ -455,7 +455,7 @@ describe("structured navigation results", () => {
     const tool = getTool(pi, "code_find") as unknown as StructuredTool;
     const result = await tool.execute(
       "exclusion-only",
-      { query: "widget", mode: "semantic" },
+      { search: { semantic: { query: "widget" } } },
       undefined,
       undefined,
       makeCtx({ cwd }),
@@ -491,7 +491,7 @@ describe("structured navigation results", () => {
     const tool = getTool(pi, "code_find") as unknown as StructuredTool;
     const result = await tool.execute(
       "large",
-      { query: "widget", mode: "semantic" },
+      { search: { semantic: { query: "widget" } } },
       undefined,
       undefined,
       makeCtx({ cwd }),
@@ -537,7 +537,7 @@ describe("structured navigation results", () => {
     const tool = getTool(pi, "code_find") as unknown as StructuredTool;
     const result = await tool.execute(
       "find",
-      { query: "widget", mode: "semantic", maxResults: 1 },
+      { search: { semantic: { query: "widget" } }, maxResults: 1 },
       undefined,
       undefined,
       makeCtx({ cwd }),

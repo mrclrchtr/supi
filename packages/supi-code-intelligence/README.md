@@ -59,7 +59,7 @@ The full extension registers all eight tools at startup; it does not load them o
 | `code_resolve` | Resolve a real symbol anchor or semantic query to target handles, or list a file's declarations |
 | `code_inspect` | Inspect syntax, the enclosing declaration, hover information, definitions, and nearby diagnostics at one point |
 | `code_graph` | Find semantic references and implementations, or structural calls from the enclosing scope |
-| `code_find` | Search with an explicit `ast` or `semantic` mode |
+| `code_find` | Search with exactly one `search` mode: `ast: { kind, query }` or `semantic: { query }` |
 | `code_health` | Report diagnostic observations and language-server health |
 | `code_refactor_plan` | Store a semantic refactor preview without changing files |
 | `code_refactor_apply` | Apply a fresh stored plan after file and edit checks |
@@ -70,7 +70,7 @@ Example tool calls:
 
 ```javascript
 code_orientation({ focus: { path: "packages/api" } })
-code_find({ query: "PaymentProvider", mode: "semantic", scope: ["packages/api"] })
+code_find({ search: { semantic: { query: "PaymentProvider" } }, scopes: ["packages/api"] })
 code_health({ scope: "packages/api/src/index.ts", refresh: true })
 ```
 
@@ -90,7 +90,7 @@ All eight tools declare native output schemas and return JSON-serializable `stru
 | Tool | Native data |
 |---|---|
 | Resolve | `targets` with reusable `handle` values, candidate selection, and evidence counts |
-| Inspect | `point`, independently completed/partial/unavailable `sections` with `data`, recovery, bounded definitions/diagnostics, provenance, and next queries |
+| Inspect | `anchor`, independently completed/partial/unavailable `sections` with `data`, recovery, bounded definitions/diagnostics, provenance, and next queries |
 | Orientation | `focusKind`, named section `facts`, selected `workspace` inventories/declarations/relationships and Gradle observations when applicable, instructions, limitations, and optional captured `snapshot` |
 | Graph | Per-relation `sections` with bounded `items` and evidence |
 | Find | Bounded `matches`; AST scan policy, exclusions, limitations, and failures |

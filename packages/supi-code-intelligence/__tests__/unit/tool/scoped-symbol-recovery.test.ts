@@ -55,7 +55,7 @@ describe("public scoped symbol recovery guidance", () => {
       const params =
         name === "code_resolve"
           ? { target: { symbol: { query: "Widget", scope } } }
-          : { query: "Widget", mode: "semantic", scope: [scope] };
+          : { search: { semantic: { query: "Widget" } }, scopes: [scope] };
       const call = getTool(pi, name).execute(
         "missing-route",
         params,
@@ -79,7 +79,7 @@ describe("public scoped symbol recovery guidance", () => {
       const params =
         name === "code_resolve"
           ? { target: { symbol: { query: "Widget" } } }
-          : { query: "Widget", mode: "semantic" };
+          : { search: { semantic: { query: "Widget" } } };
       const call = getTool(pi, name).execute(
         "unscoped-failure",
         params,
@@ -96,7 +96,7 @@ describe("public scoped symbol recovery guidance", () => {
   it("does not add LSP recovery guidance to AST failures", async () => {
     const call = getTool(pi, "code_find").execute(
       "ast-failure",
-      { query: "Widget", mode: "ast", kind: "definition", scope: [scope] },
+      { search: { ast: { kind: "definition", query: "Widget" } }, scopes: [scope] },
       undefined,
       undefined,
       makeCtx({ cwd }),

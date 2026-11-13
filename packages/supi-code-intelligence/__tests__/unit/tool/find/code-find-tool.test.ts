@@ -64,13 +64,8 @@ describe("code_find tool", () => {
 
     const props = tool.parameters?.properties;
     expect(props).toBeDefined();
-    expect(tool.parameters?.required).toEqual(expect.arrayContaining(["query", "mode"]));
-    expect(props).toHaveProperty("query");
-    expect(props).toHaveProperty("scope");
-    expect(props).toHaveProperty("mode");
-    expect(props).toHaveProperty("kind");
-    expect(props).not.toHaveProperty("contextLines");
-    expect(props).toHaveProperty("maxResults");
+    expect(tool.parameters?.required).toEqual(["search"]);
+    expect(Object.keys(props ?? {})).toEqual(["search", "scopes", "maxResults"]);
   });
 
   it("rejects empty query with an error result", async () => {
@@ -78,7 +73,7 @@ describe("code_find tool", () => {
 
     const result = (await tool.execute(
       "test-empty-query",
-      { query: "" },
+      { search: { semantic: { query: "" } } },
       undefined,
       undefined,
       makeCtx({ cwd: tmpDir }),
@@ -93,7 +88,7 @@ describe("code_find tool", () => {
 
     const result = (await tool.execute(
       "test-whitespace-query",
-      { query: " \t " },
+      { search: { semantic: { query: " \t " } } },
       undefined,
       undefined,
       makeCtx({ cwd: tmpDir }),
@@ -108,7 +103,7 @@ describe("code_find tool", () => {
 
     const result = (await tool.execute(
       "test-scope-missing",
-      { query: "something", mode: "semantic", scope: ["nonexistent/dir"] },
+      { search: { semantic: { query: "something" } }, scopes: ["nonexistent/dir"] },
       undefined,
       undefined,
       makeCtx({ cwd: tmpDir }),
@@ -124,13 +119,13 @@ describe("code_find tool", () => {
 
       const result = (await tool.execute(
         "test-mode-omitted",
-        { query: "foo", kind: "definition" },
+        { search: {} },
         undefined,
         undefined,
         makeCtx({ cwd: tmpDir }),
       )) as TextToolResult;
 
-      expect(result.content[0].text).toContain("mode is required");
+      expect(result.content[0].text).toContain("exactly one of `ast` or `semantic`");
     });
 
     it.each(["text", "regex"] as const)("rejects removed %s mode", async (mode) => {
@@ -138,14 +133,14 @@ describe("code_find tool", () => {
 
       const result = (await tool.execute(
         `test-removed-${mode}-mode`,
-        { query: "foo", mode },
+        { search: { [mode]: { query: "foo" } } },
         undefined,
         undefined,
         makeCtx({ cwd: tmpDir }),
       )) as TextToolResult;
 
-      expect(result.content[0].text).toContain("mode is required");
-      expect(result.content[0].text).toContain("ast or semantic");
+      expect(result.content[0].text).toContain("unsupported field");
+      expect(result.content[0].text).toContain(mode);
     });
 
     it("rejects the removed contextLines field", async () => {
@@ -153,7 +148,7 @@ describe("code_find tool", () => {
 
       const result = (await tool.execute(
         "test-removed-context-lines",
-        { query: "foo", mode: "semantic", contextLines: 1 },
+        { search: { semantic: { query: "foo" } }, contextLines: 1 },
         undefined,
         undefined,
         makeCtx({ cwd: tmpDir }),
@@ -169,14 +164,15 @@ describe("code_find tool", () => {
 
       const result = (await tool.execute(
         "test-kind-in-semantic-mode",
-        { query: "foo", mode: "semantic", kind: "definition" },
+        { search: { semantic: { query: "foo", kind: "definition" } } },
         undefined,
         undefined,
         makeCtx({ cwd: tmpDir }),
       )) as TextToolResult;
 
-      expect(result.content[0].text).toContain("kind is not valid");
-      expect(result.content[0].text).toContain('mode "semantic"');
+      expect(result.content[0].text).toContain(
+        "search.semantic contains unsupported field: `kind`",
+      );
     });
 
     it("returns error text when ast mode omits kind", async () => {
@@ -185,13 +181,13 @@ describe("code_find tool", () => {
 
       const result = (await tool.execute(
         "test-ast-without-kind",
-        { query: "foo", mode: "ast" },
+        { search: { ast: { query: "foo" } } },
         undefined,
         undefined,
         makeCtx({ cwd: tmpDir }),
       )) as TextToolResult;
 
-      expect(result.content[0].text).toContain('mode "ast" requires kind');
+      expect(result.content[0].text).toContain("search.ast.kind is required");
     });
 
     it.each(["namespace", "test"] as const)(
@@ -205,7 +201,7 @@ describe("code_find tool", () => {
 
         const result = (await tool.execute(
           `test-ast-unsupported-${kind}`,
-          { query: "foo", mode: "ast", kind },
+          { search: { ast: { kind, query: "foo" } } },
           undefined,
           undefined,
           makeCtx({ cwd: tmpDir }),
@@ -223,7 +219,7 @@ describe("code_find tool", () => {
       await expect(
         tool.execute(
           "test-ast-no-provider",
-          { query: "foo", mode: "ast", kind: "definition" },
+          { search: { ast: { kind: "definition", query: "foo" } } },
           undefined,
           undefined,
           makeCtx({ cwd: tmpDir }),
@@ -253,7 +249,7 @@ describe("code_find tool", () => {
 
       const result = (await tool.execute(
         "test-ast-definition",
-        { query: "foo", mode: "ast", kind: "definition" },
+        { search: { ast: { kind: "definition", query: "foo" } } },
         undefined,
         undefined,
         makeCtx({ cwd: tmpDir }),
@@ -293,7 +289,7 @@ describe("code_find tool", () => {
 
         const result = (await tool.execute(
           `test-ast-gitignore-${query}`,
-          { query, mode: "ast", kind: "definition" },
+          { search: { ast: { kind: "definition", query } } },
           undefined,
           undefined,
           makeCtx({ cwd: tmpDir }),
@@ -360,7 +356,7 @@ describe("code_find tool", () => {
 
         const result = (await tool.execute(
           "test-ast-overlapping-exclusions",
-          { query: "foo", mode: "ast", kind: "definition", scope },
+          { search: { ast: { kind: "definition", query: "foo" } }, scopes: scope },
           undefined,
           undefined,
           makeCtx({ cwd: tmpDir }),
@@ -429,7 +425,7 @@ describe("code_find tool", () => {
 
         const result = (await tool.execute(
           `test-ast-unreadable-ignore-${query}`,
-          { query, mode: "ast", kind: "definition" },
+          { search: { ast: { kind: "definition", query } } },
           undefined,
           undefined,
           makeCtx({ cwd: tmpDir }),
@@ -489,7 +485,7 @@ describe("code_find tool", () => {
 
       const result = (await tool.execute(
         "test-ast-oversized-policy-summary",
-        { query: "foo", mode: "ast", kind: "definition" },
+        { search: { ast: { kind: "definition", query: "foo" } } },
         undefined,
         undefined,
         makeCtx({ cwd: tmpDir }),
@@ -534,7 +530,7 @@ describe("code_find tool", () => {
 
       const result = (await tool.execute(
         "test-ast-export",
-        { query: "foo", mode: "ast", kind: "export" },
+        { search: { ast: { kind: "export", query: "foo" } } },
         undefined,
         undefined,
         makeCtx({ cwd: tmpDir }),
@@ -564,7 +560,7 @@ describe("code_find tool", () => {
 
       const result = (await tool.execute(
         "test-ast-import",
-        { query: "./foo.ts", mode: "ast", kind: "import" },
+        { search: { ast: { kind: "import", query: "./foo.ts" } } },
         undefined,
         undefined,
         makeCtx({ cwd: tmpDir }),
@@ -608,7 +604,7 @@ describe("code_find tool", () => {
 
       const result = (await tool.execute(
         "test-ast-type",
-        { query: "Foo", mode: "ast", kind: "type" },
+        { search: { ast: { kind: "type", query: "Foo" } } },
         undefined,
         undefined,
         makeCtx({ cwd: tmpDir }),
@@ -653,7 +649,7 @@ describe("code_find tool", () => {
 
       const result = (await tool.execute(
         "test-ast-interface",
-        { query: "Foo", mode: "ast", kind: "interface" },
+        { search: { ast: { kind: "interface", query: "Foo" } } },
         undefined,
         undefined,
         makeCtx({ cwd: tmpDir }),
@@ -690,7 +686,7 @@ describe("code_find tool", () => {
 
       const result = (await tool.execute(
         `test-ast-${astKind}`,
-        { query: name, mode: "ast", kind: astKind },
+        { search: { ast: { kind: astKind, query: name } } },
         undefined,
         undefined,
         makeCtx({ cwd: tmpDir }),
@@ -719,7 +715,7 @@ describe("code_find tool", () => {
 
       const result = (await tool.execute(
         "test-ast-call-mocked",
-        { query: "obj.method", mode: "ast", kind: "call" },
+        { search: { ast: { kind: "call", query: "obj.method" } } },
         undefined,
         undefined,
         makeCtx({ cwd: tmpDir }),
@@ -752,7 +748,7 @@ describe("code_find tool", () => {
 
       const result = (await tool.execute(
         "test-ast-call-nextqueries",
-        { query: "obj.method", mode: "ast", kind: "call" },
+        { search: { ast: { kind: "call", query: "obj.method" } } },
         undefined,
         undefined,
         makeCtx({ cwd: tmpDir }),
@@ -801,7 +797,7 @@ describe("code_find tool", () => {
 
       const result = (await tool.execute(
         "test-ast-truncation",
-        { query: "a", mode: "ast", kind: "definition", maxResults: 1 },
+        { search: { ast: { kind: "definition", query: "a" } }, maxResults: 1 },
         undefined,
         undefined,
         makeCtx({ cwd: tmpDir }),
@@ -860,7 +856,7 @@ describe("code_find tool", () => {
         try {
           const result = (await tool.execute(
             "test-ast-call-integration",
-            { query: "params.query.trim", mode: "ast", kind: "call", scope: ["src"] },
+            { search: { ast: { kind: "call", query: "params.query.trim" } }, scopes: ["src"] },
             undefined,
             undefined,
             makeCtx({ cwd: tmpDir }),
@@ -885,7 +881,7 @@ describe("code_find tool", () => {
         try {
           const result = (await tool.execute(
             "test-ast-same-line-calls",
-            { query: "invoke", mode: "ast", kind: "call", scope: ["src"] },
+            { search: { ast: { kind: "call", query: "invoke" } }, scopes: ["src"] },
             undefined,
             undefined,
             makeCtx({ cwd: tmpDir }),
@@ -924,7 +920,7 @@ describe("code_find tool", () => {
         try {
           const result = (await tool.execute(
             "test-ast-recovered-partial",
-            { query: "kept", mode: "ast", kind: "definition", scope: ["src"] },
+            { search: { ast: { kind: "definition", query: "kept" } }, scopes: ["src"] },
             undefined,
             undefined,
             makeCtx({ cwd: tmpDir }),
@@ -983,7 +979,7 @@ describe("code_find tool", () => {
         try {
           const result = (await tool.execute(
             "test-ast-rust-native-kind",
-            { query: "Speak", mode: "ast", kind: "interface", scope: ["src"] },
+            { search: { ast: { kind: "interface", query: "Speak" } }, scopes: ["src"] },
             undefined,
             undefined,
             makeCtx({ cwd: tmpDir }),
@@ -1015,7 +1011,7 @@ describe("code_find tool", () => {
         try {
           const result = (await tool.execute(
             "test-ast-python-import",
-            { query: "..pkg.sub", mode: "ast", kind: "import", scope: ["src"] },
+            { search: { ast: { kind: "import", query: "..pkg.sub" } }, scopes: ["src"] },
             undefined,
             undefined,
             makeCtx({ cwd: tmpDir }),
@@ -1063,10 +1059,8 @@ describe("code_find tool", () => {
           const result = (await tool.execute(
             "test-ast-call-argument-name",
             {
-              query: "canonicalDeclarationKind",
-              mode: "ast",
-              kind: "call",
-              scope: ["src"],
+              search: { ast: { kind: "call", query: "canonicalDeclarationKind" } },
+              scopes: ["src"],
             },
             undefined,
             undefined,
@@ -1092,7 +1086,7 @@ describe("code_find tool", () => {
       await expect(
         tool.execute(
           "test-semantic-no-provider",
-          { query: "foo", mode: "semantic" },
+          { search: { semantic: { query: "foo" } } },
           undefined,
           undefined,
           makeCtx({ cwd: tmpDir }),
@@ -1109,7 +1103,7 @@ describe("code_find tool", () => {
 
       const result = (await tool.execute(
         "test-semantic-no-results",
-        { query: "ghost", mode: "semantic" },
+        { search: { semantic: { query: "ghost" } } },
         undefined,
         undefined,
         makeCtx({ cwd: tmpDir }),
@@ -1142,7 +1136,7 @@ describe("code_find tool", () => {
 
       const result = (await tool.execute(
         "test-semantic-partial-empty",
-        { query: "ghost", mode: "semantic" },
+        { search: { semantic: { query: "ghost" } } },
         undefined,
         undefined,
         makeCtx({ cwd: tmpDir }),
@@ -1190,7 +1184,7 @@ describe("code_find tool", () => {
 
       const result = (await tool.execute(
         "test-semantic-symbols",
-        { query: "myFunc", mode: "semantic" },
+        { search: { semantic: { query: "myFunc" } } },
         undefined,
         undefined,
         makeCtx({ cwd: tmpDir }),
@@ -1228,7 +1222,7 @@ describe("code_find tool", () => {
 
       const result = (await tool.execute(
         "test-semantic-truncation",
-        { query: "o", mode: "semantic", maxResults: 1 },
+        { search: { semantic: { query: "o" } }, maxResults: 1 },
         undefined,
         undefined,
         makeCtx({ cwd: tmpDir }),
@@ -1286,7 +1280,7 @@ describe("code_find tool", () => {
 
       const result = (await tool.execute(
         "test-semantic-scope-filter",
-        { query: "scopedFunc", mode: "semantic", scope: ["@src"] },
+        { search: { semantic: { query: "scopedFunc" } }, scopes: ["@src"] },
         undefined,
         undefined,
         makeCtx({ cwd: tmpDir }),
@@ -1327,7 +1321,7 @@ describe("code_find tool", () => {
 
       const result = (await tool.execute(
         "test-semantic-multiple-scope-filter",
-        { query: "multiScoped", mode: "semantic", scope: ["src", "docs"] },
+        { search: { semantic: { query: "multiScoped" } }, scopes: ["src", "docs"] },
         undefined,
         undefined,
         makeCtx({ cwd: tmpDir }),
@@ -1369,7 +1363,7 @@ describe("code_find tool", () => {
 
       const defaultResult = (await tool.execute(
         "test-default-prunes-dependencies",
-        { query: "Target", mode: "ast", kind: "definition" },
+        { search: { ast: { kind: "definition", query: "Target" } } },
         undefined,
         undefined,
         makeCtx({ cwd: tmpDir }),
@@ -1388,10 +1382,8 @@ describe("code_find tool", () => {
       const explicitResult = (await tool.execute(
         "test-explicit-dependency-file",
         {
-          query: "dependencyTarget",
-          mode: "ast",
-          kind: "definition",
-          scope: ["node_modules/pkg/index.js"],
+          search: { ast: { kind: "definition", query: "dependencyTarget" } },
+          scopes: ["node_modules/pkg/index.js"],
         },
         undefined,
         undefined,

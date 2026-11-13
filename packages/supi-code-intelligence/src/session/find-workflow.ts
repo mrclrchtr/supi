@@ -6,7 +6,7 @@ import type { AutomaticLspPathPolicy } from "@mrclrchtr/supi-lsp/api";
 import { SEMANTIC_READINESS_TIMEOUT_REASON } from "../analysis/readiness.ts";
 import { resolveScopeSet } from "../analysis/search/paths.ts";
 import { getStructuredPatternMatches } from "../analysis/search/pattern.ts";
-import { isCodeFindAstKind } from "../tool/code_find/ast-kinds.ts";
+import type { CodeFindAstKind } from "../tool/code_find/ast-kinds.ts";
 import type { CapabilityAdapter } from "./capability-adapter.ts";
 import type { FindWorkflowInput, FindWorkflowOutcome } from "./find-types.ts";
 import { parseFindWorkflowInput } from "./input/workflows.ts";
@@ -29,10 +29,9 @@ export async function runFindWorkflow(
   const parsed = parseFindWorkflowInput(input);
   if (parsed.kind === "invalid-input") return parsed;
   const request = parsed.value;
-  const query = request.query;
-  const mode = request.mode;
+  const mode = "ast" in request.search ? "ast" : "semantic";
 
-  const scope = resolveScopeSet(request.scope ? [...request.scope] : undefined, deps.cwd);
+  const scope = resolveScopeSet(request.scopes ? [...request.scopes] : undefined, deps.cwd);
   if (scope.kind === "error") return { kind: "invalid-input", message: scope.reason };
 
   if (mode === "ast") control?.signal?.throwIfAborted();
@@ -45,9 +44,9 @@ export async function runFindWorkflow(
 
   const maxResults = request.maxResults ?? 8;
   const scopeLabel = scope.display ?? ".";
-  if (mode === "semantic") {
+  if ("semantic" in request.search) {
     return runSemanticSearch({
-      query,
+      query: request.search.semantic.query,
       scopePaths: scope.paths,
       scopeLabel,
       maxResults,
@@ -56,8 +55,7 @@ export async function runFindWorkflow(
     });
   }
   return runAstSearch({
-    query,
-    input: request,
+    search: request.search.ast,
     scopePaths: scope.paths,
     scopeLabel,
     maxResults,
@@ -108,25 +106,22 @@ async function runSemanticSearch(options: {
 }
 
 async function runAstSearch(options: {
-  query: string;
-  input: FindWorkflowInput;
+  search: { readonly kind: CodeFindAstKind; readonly query: string };
   scopePaths: readonly string[];
   scopeLabel: string;
   maxResults: number;
   deps: FindWorkflowDeps;
   control?: WorkflowControl;
 }): Promise<FindWorkflowOutcome> {
-  const { query, input, scopePaths, scopeLabel, maxResults, deps, control } = options;
-  if (!isCodeFindAstKind(input.kind)) {
-    return { kind: "invalid-input", message: "Unsupported AST kind." };
-  }
+  const { search, scopePaths, scopeLabel, maxResults, deps, control } = options;
+  const { kind, query } = search;
   const provider = deps.capability.getStructuralProvider(deps.cwd);
   if (!provider) {
     return { kind: "unavailable", reason: "No structural provider is active." };
   }
   control?.signal?.throwIfAborted();
   const outcome = await getStructuredPatternMatches({
-    params: { pattern: query, kind: input.kind },
+    params: { pattern: query, kind },
     roots: scopePaths,
     cwd: deps.cwd,
     structural: provider,
@@ -145,6 +140,6 @@ async function runAstSearch(options: {
     mode: "ast",
     scopeLabel,
     maxResults,
-    data: { kind: "ast", astKind: input.kind, result: outcome.result },
+    data: { kind: "ast", astKind: kind, result: outcome.result },
   };
 }

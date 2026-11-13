@@ -20,7 +20,7 @@ it.skipIf(process.env.SUPI_WEB_LIVE_TESTS !== "1")(
     const searchResult = await search.execute(
       "live-search",
       {
-        library_name: "react",
+        libraryName: "react",
         query,
       },
       undefined,
@@ -36,7 +36,7 @@ it.skipIf(process.env.SUPI_WEB_LIVE_TESTS !== "1")(
       const result = await fetch.execute(
         `live-docs-${raw}`,
         {
-          library_id: libraryId,
+          libraryId: libraryId,
           query,
           raw,
         },
@@ -62,7 +62,7 @@ it.skipIf(process.env.SUPI_WEB_LIVE_TESTS !== "1")(
     const emptyResult = await search.execute(
       "live-empty",
       {
-        library_name: unmatched,
+        libraryName: unmatched,
         query: unmatched,
       },
       undefined,

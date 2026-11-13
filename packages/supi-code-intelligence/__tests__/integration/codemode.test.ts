@@ -170,10 +170,10 @@ it("routes all five native tools through Pi default codemode, preserves recovery
       return result;
     };
     const planned = await runScript(`
-      const inspect = await tools.code_inspect({ point: { file: "index.ts", line: 1, character: 17 } });
+      const inspect = await tools.code_inspect({ anchor: { file: "index.ts", line: 1, character: 17 } });
       const orientation = await tools.code_orientation({ maxResults: 5 });
       const health = await tools.code_health({ include: ["servers"] });
-      const plan = await tools.code_refactor_plan({ operation: { rename_symbol: { target: { anchor: inspect.point }, newName: "gadget" } } });
+      const plan = await tools.code_refactor_plan({ operation: { rename_symbol: { target: { anchor: inspect.anchor }, newName: "gadget" } } });
       store("planId", plan.planId);
       return { hover: inspect.sections.hover.data, file: orientation.workspace.directFiles[0].path,
         server: health.servers[0].name, edits: plan.edits.length, replacement: plan.edits[0].newText };

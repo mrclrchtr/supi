@@ -58,7 +58,7 @@ renderCall(args, theme) {
     "web_fetch_md",
     args.url ?? "",
     theme,
-    args.output_mode,
+    args.outputMode,
   );
 }
 

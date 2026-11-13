@@ -26,8 +26,8 @@ const OutputModeEnum = Type.Enum(WEB_FETCH_OUTPUT_MODES, {
 export const webFetchMdParameters = Type.Object(
   {
     url: Type.String({ description: "Public http(s) URL" }),
-    output_mode: Type.Optional(OutputModeEnum),
-    fetch_mode: Type.Optional(
+    outputMode: Type.Optional(OutputModeEnum),
+    fetchMode: Type.Optional(
       Type.Enum(WEB_FETCH_MODES, {
         type: "string",
         default: "direct",
@@ -35,13 +35,13 @@ export const webFetchMdParameters = Type.Object(
           "direct fetches locally; firecrawl_fallback uses Firecrawl only after HTTP 403; firecrawl skips direct fetching for JS-heavy or poorly extracted pages. Firecrawl requires opt-in via /supi-settings and FIRECRAWL_API_KEY, shares the URL and may consume credits. Never use it for signed, login-protected, private, or paywalled URLs.",
       }),
     ),
-    abs_links: Type.Optional(
+    absLinks: Type.Optional(
       Type.Boolean({
         description: "Absolutize HTML links/images; false preserves original destinations.",
         default: true,
       }),
     ),
-    timeout_ms: Type.Optional(
+    timeoutMs: Type.Optional(
       Type.Integer({
         description: "Timeout per direct request and for the complete Firecrawl attempt (ms)",
         default: 30_000,

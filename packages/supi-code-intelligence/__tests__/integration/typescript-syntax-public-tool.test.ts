@@ -36,7 +36,7 @@ describe("public TypeScript AST completeness", () => {
     try {
       const result = (await getTool(pi, "code_find").execute(
         "typescript-syntax",
-        { query: "measure", mode: "ast", kind: "call", scope: ["."] },
+        { search: { ast: { kind: "call", query: "measure" } }, scopes: ["."] },
         undefined,
         undefined,
         makeCtx({ cwd }),
@@ -58,7 +58,7 @@ describe("public TypeScript AST completeness", () => {
       expect(text).not.toContain("total is unknown");
       const imports = (await getTool(pi, "code_find").execute(
         "typescript-runtime-imports",
-        { query: "import", mode: "ast", kind: "call", scope: ["."] },
+        { search: { ast: { kind: "call", query: "import" } }, scopes: ["."] },
         undefined,
         undefined,
         makeCtx({ cwd }),

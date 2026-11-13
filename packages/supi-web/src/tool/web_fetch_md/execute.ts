@@ -41,9 +41,9 @@ async function fetchAsMarkdown(
     throw new Error(`URL must be http(s): ${url}`);
   }
 
-  const outputMode = input.output_mode ?? "auto";
-  const absLinks = input.abs_links ?? true;
-  const timeoutMs = typeof input.timeout_ms === "number" ? input.timeout_ms : 30_000;
+  const outputMode = input.outputMode ?? "auto";
+  const absLinks = input.absLinks ?? true;
+  const timeoutMs = typeof input.timeoutMs === "number" ? input.timeoutMs : 30_000;
 
   onUpdate?.({
     content: [{ type: "text", text: `Fetching ${url}...` }],
@@ -53,7 +53,7 @@ async function fetchAsMarkdown(
   const result = await fetchPage(url, {
     timeoutMs,
     signal,
-    fetchMode: input.fetch_mode,
+    fetchMode: input.fetchMode,
     firecrawlEnabled: loadWebConfig(configCwd).firecrawlEnabled,
   });
   const markdown = await resolveMarkdown(result, absLinks);

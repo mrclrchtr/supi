@@ -19,7 +19,7 @@ describe("headless inspection profile", () => {
       const pi = createPiMock();
       headlessInspectionProfile(pi as unknown as ExtensionAPI);
       for (const [name, args] of [
-        ["code_inspect", { point: { file: "index.ts", line: 1, character: 14 } }],
+        ["code_inspect", { anchor: { file: "index.ts", line: 1, character: 14 } }],
         ["code_orientation", {}],
         ["code_health", { include: ["servers"] }],
       ] as const) {

@@ -18,10 +18,10 @@ export async function runSearch(
   _ctx: ExtensionContext,
 ): Promise<SearchResult> {
   const input = (params ?? {}) as WebDocsSearchInput;
-  const libraryName = input.library_name?.trim();
+  const libraryName = input.libraryName?.trim();
   const query = input.query?.trim();
 
-  if (!libraryName) throw new Error("'library_name' parameter is required");
+  if (!libraryName) throw new Error("'libraryName' parameter is required");
   if (!query) throw new Error("'query' parameter is required");
 
   onUpdate?.({

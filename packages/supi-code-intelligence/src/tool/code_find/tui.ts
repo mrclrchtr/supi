@@ -8,7 +8,7 @@ import {
   type ToolRendererContext,
   type ToolResult,
 } from "../../ui/tui/common.ts";
-import type { CodeFindToolParams } from "./execute.ts";
+import { CODE_FIND_MODES } from "./modes.ts";
 
 /** Render the compact code_find call header. */
 export function renderFindCall(
@@ -16,15 +16,21 @@ export function renderFindCall(
   theme: Theme,
   _context: ToolRendererContext | undefined,
 ): Text {
-  const params = (args ?? {}) as Partial<CodeFindToolParams>;
-  const mode = formatCallValue(params.mode, 20) ?? "mode?";
+  // Streaming calls arrive partial, so every level is read defensively.
+  const search = ((args ?? {}) as { search?: unknown }).search;
+  const branches = (search && typeof search === "object" ? search : {}) as Record<
+    string,
+    { query?: unknown; kind?: unknown } | undefined
+  >;
+  const mode = CODE_FIND_MODES.find((candidate) => branches[candidate] !== undefined);
+  const branch = (mode ? branches[mode] : undefined) ?? {};
 
   let content = theme.fg("toolTitle", "code_find");
-  const query = formatCallValue(params.query);
+  const query = formatCallValue(branch.query);
   if (query) content += ` ${theme.fg("accent", JSON.stringify(query))}`;
-  content += ` ${theme.fg("muted", mode)}`;
+  content += ` ${theme.fg("muted", mode ?? "mode?")}`;
 
-  const kind = formatCallValue(params.kind, 30);
+  const kind = formatCallValue(branch.kind, 30);
   if (kind) content += theme.fg("dim", ` [${kind}]`);
 
   return new Text(content, 0, 0);

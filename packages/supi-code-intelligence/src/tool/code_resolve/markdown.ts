@@ -158,7 +158,7 @@ function appendNotListed(lines: string[], details: ResolveDetails): void {
       : []),
     ...(notListed.exportListNames
       ? [
-          `- ${plural(notListed.exportListNames.count, "name")} in export lists (${span(notListed.exportListNames)}). Read those lines, or find them with code_find mode "ast", kind "export", a name fragment as query, and scope set to this file.`,
+          `- ${plural(notListed.exportListNames.count, "name")} in export lists (${span(notListed.exportListNames)}). Read those lines, or find them with code_find search.ast, kind "export", a name fragment as query, and scopes set to this file.`,
         ]
       : []),
     ...(notListed.localDeclarations > 0

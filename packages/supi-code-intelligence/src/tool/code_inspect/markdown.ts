@@ -32,19 +32,46 @@ function renderNode(
   appendSyntaxRecovery(lines, observation.recovery);
   const node = observation.data;
   if (!node) {
-    lines.push("_No syntax node at this point._", "");
+    lines.push("_No syntax node at this anchor._", "");
     return;
   }
   lines.push(
     `- \`${node.type}\` L${node.startLine}:${node.startCharacter}–L${node.endLine}:${node.endCharacter}`,
   );
-  if (node.text) lines.push("```text", node.text, "```");
+  if (node.text) appendNodeText(lines, node);
   if (node.ancestry.length > 0) {
     lines.push(
       `Ancestry: ${node.ancestry.map((ancestor) => `\`${ancestor.type} L${ancestor.startLine}:${ancestor.startCharacter}–L${ancestor.endLine}:${ancestor.endCharacter}\``).join(" > ")}`,
     );
   }
   lines.push("");
+}
+
+/** Preview bounds for syntax-node text; a whitespace anchor selects the whole file's root node. */
+const NODE_TEXT_MAX_LINES = 12;
+const NODE_TEXT_MAX_CHARACTERS = 1200;
+
+/** Print a bounded preview of the node text; the range above locates the rest. */
+function appendNodeText(
+  lines: string[],
+  node: { text: string; startLine: number; endLine: number },
+): void {
+  const textLines = node.text.split("\n");
+  let shown = textLines.slice(0, NODE_TEXT_MAX_LINES).join("\n");
+  // Array.from keeps surrogate pairs whole when a single long line is cut.
+  const characters = Array.from(shown);
+  if (characters.length > NODE_TEXT_MAX_CHARACTERS) {
+    shown = characters.slice(0, NODE_TEXT_MAX_CHARACTERS).join("");
+  }
+  lines.push("```text", shown, "```");
+  if (shown.length === node.text.length) return;
+  const preview =
+    textLines.length > NODE_TEXT_MAX_LINES
+      ? `first ${NODE_TEXT_MAX_LINES} of ${textLines.length} lines`
+      : `first ${NODE_TEXT_MAX_CHARACTERS} characters`;
+  lines.push(
+    `_Node text shortened to the ${preview}; read L${node.startLine}–L${node.endLine} for the rest._`,
+  );
 }
 
 function renderEnclosingSymbol(
@@ -60,7 +87,7 @@ function renderEnclosingSymbol(
   appendSyntaxRecovery(lines, observation.recovery);
   const symbol = observation.data;
   if (!symbol) {
-    lines.push("_No provider-reported declaration encloses this point._", "");
+    lines.push("_No provider-reported declaration encloses this anchor._", "");
     return;
   }
   lines.push(
@@ -79,7 +106,7 @@ function renderHover(
     return;
   }
   appendPartial(lines, observation);
-  lines.push(observation.data ?? "_No hover result at this point._", "");
+  lines.push(observation.data ?? "_No hover result at this anchor._", "");
 }
 
 function renderDefinitions(lines: string[], assembly: InspectResultAssembly): void {
@@ -88,7 +115,7 @@ function renderDefinitions(lines: string[], assembly: InspectResultAssembly): vo
   if (appendUnavailable(lines, observation)) return;
   appendPartial(lines, observation);
   if (assembly.displayedDefinitions.length === 0) {
-    lines.push("_No definition result at this point._");
+    lines.push("_No definition result at this anchor._");
   } else {
     for (const definition of assembly.displayedDefinitions) {
       lines.push(`- ${formatDefinition(definition, assembly.data)}`);
@@ -109,7 +136,7 @@ function formatDefinition(
     return `\`${definition.file}:${definition.line}:${definition.character}\``;
   }
   if (definition.line === focus.line && definition.character === focus.character)
-    return "Same point";
+    return "Same anchor";
   return `L${definition.line}:${definition.character}`;
 }
 

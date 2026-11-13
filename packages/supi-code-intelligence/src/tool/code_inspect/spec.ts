@@ -21,12 +21,14 @@ export const codeInspectSpec = {
   outputSchema: InspectOutputSchema,
   parameters: Type.Object(
     {
-      point: SourcePointParam,
-      maxResults: Type.Optional({
-        ...MaxResultsParam,
-        description:
-          "Maximum entries per definition or diagnostic list; does not limit syntax or hover text.",
-      }),
+      anchor: SourcePointParam,
+      maxResults: Type.Optional(
+        Type.Integer({
+          ...MaxResultsParam,
+          description:
+            "Maximum entries per definition or diagnostic list; does not limit syntax or hover text.",
+        }),
+      ),
     },
     { additionalProperties: false },
   ),

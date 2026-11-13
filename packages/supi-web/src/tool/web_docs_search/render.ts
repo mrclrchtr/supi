@@ -6,7 +6,7 @@ import { WEB_DOCS_SEARCH_TOOL_NAME, type WebDocsSearchInput } from "./spec.ts";
 /** Transcript renderer for web_docs_search tool calls. */
 export function renderSearchCall(args: unknown, theme: Theme) {
   const input = (args ?? {}) as WebDocsSearchInput;
-  const libraryName = typeof input.library_name === "string" ? input.library_name : "";
+  const libraryName = typeof input.libraryName === "string" ? input.libraryName : "";
   const query = typeof input.query === "string" ? truncatePreview(input.query) : undefined;
   return renderToolCall(WEB_DOCS_SEARCH_TOOL_NAME, libraryName, theme, query);
 }

@@ -141,7 +141,7 @@ const cases = [
     label: "semantic search",
     name: "code_find",
     kind: "completed",
-    input: () => ({ query: "widget", mode: "semantic", scope: [alias] }),
+    input: () => ({ search: { semantic: { query: "widget" } }, scopes: [alias] }),
   },
   {
     label: "refactor preview",
@@ -155,7 +155,7 @@ const cases = [
     label: "AST search",
     name: "code_find",
     kind: "completed",
-    input: () => ({ query: "work", mode: "ast", kind: "call", scope: [alias] }),
+    input: () => ({ search: { ast: { kind: "call", query: "work" } }, scopes: [alias] }),
   },
 ];
 
@@ -261,7 +261,7 @@ describe("registered code-tool external source paths", () => {
       const symbol = { query: "widget" };
       const input =
         name === "code_find"
-          ? { query: "widget", mode: "semantic", scope: [file] }
+          ? { search: { semantic: { query: "widget" } }, scopes: [file] }
           : name === "code_orientation"
             ? { focus: { target: { symbol } } }
             : { target: { symbol } };

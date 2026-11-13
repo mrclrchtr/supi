@@ -313,7 +313,7 @@ function emptySymbolOutcome(
     message: [
       `Symbol not found: \`${symbol}\`${scope ? ` in path \`${scope}\`` : ""}.`,
       "Workspace-symbol search covers only files in projects the language server has loaded; files outside them (e.g. excluded by tsconfig or in another toolchain's subtree) are not searched.",
-      'Next: `code_find` with `mode: "ast"` and `kind: "definition"` for a structural search, `code_resolve` with `target.file` if the file is known, or an anchor target (file/line/character) if the location is known.',
+      'Next: `code_find` with `search.ast` and `kind: "definition"` for a structural search, `code_resolve` with `target.file` if the file is known, or an anchor target (file/line/character) if the location is known.',
     ].join(" "),
   };
 }

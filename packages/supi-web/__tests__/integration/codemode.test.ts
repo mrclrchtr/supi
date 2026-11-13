@@ -256,13 +256,13 @@ it("delivers actual web tool data through PI's default codemode and rejects thro
 
     const result = await runScript(`
       const page = await tools.web_fetch_md({ url: "https://example.test/page" });
-      const recovered = await tools.web_fetch_md({ url: "https://example.com/blocked", fetch_mode: "firecrawl_fallback" });
-      const rendered = await tools.web_fetch_md({ url: "https://example.com/dynamic", fetch_mode: "firecrawl" });
+      const recovered = await tools.web_fetch_md({ url: "https://example.com/blocked", fetchMode: "firecrawl_fallback" });
+      const rendered = await tools.web_fetch_md({ url: "https://example.com/dynamic", fetchMode: "firecrawl" });
       const search = await tools.web_search({ query: "offline fixture" });
-      const libraries = await tools.web_docs_search({ library_name: "fixture", query: "example" });
-      const docs = await tools.web_docs_fetch({ library_id: libraries.results[0].id, query: "example", raw: true });
-      const textDocs = await tools.web_docs_fetch({ library_id: libraries.results[0].id, query: "example" });
-      const empty = await tools.web_docs_search({ library_name: "missing", query: "example" });
+      const libraries = await tools.web_docs_search({ libraryName: "fixture", query: "example" });
+      const docs = await tools.web_docs_fetch({ libraryId: libraries.results[0].id, query: "example", raw: true });
+      const textDocs = await tools.web_docs_fetch({ libraryId: libraries.results[0].id, query: "example" });
+      const empty = await tools.web_docs_search({ libraryName: "missing", query: "example" });
       return { page: page.markdown, source: search.sources[0].title,
         count: search.sourceCount, library: libraries.results[0].id, snippet: docs.snippets[0].content,
         guidance: docs.snippets[1].content, textDocs: textDocs.markdown, emptyCount: empty.count,
@@ -316,7 +316,7 @@ it("delivers actual web tool data through PI's default codemode and rejects thro
     ).toContain('{"docs":true,"onlyWeb":true}');
 
     const providerFailure = await runScript(
-      'return await tools.web_fetch_md({ url: "https://example.com/provider-failure", fetch_mode: "firecrawl_fallback" });',
+      'return await tools.web_fetch_md({ url: "https://example.com/provider-failure", fetchMode: "firecrawl_fallback" });',
     );
     expect(providerFailure.isError).toBe(true);
     expect(providerFailure.content).toEqual(
@@ -333,7 +333,7 @@ it("delivers actual web tool data through PI's default codemode and rejects thro
       { firecrawlEnabled: false },
     );
     const disabled = await runScript(
-      'return await tools.web_fetch_md({ url: "https://example.com/dynamic", fetch_mode: "firecrawl" });',
+      'return await tools.web_fetch_md({ url: "https://example.com/dynamic", fetchMode: "firecrawl" });',
     );
     expect(disabled.isError).toBe(true);
     expect(disabled.content).toEqual(
@@ -360,7 +360,7 @@ it("delivers actual web tool data through PI's default codemode and rejects thro
       'return await tools.web_fetch_md({ url: "ftp://example.test/page" });',
     );
     const context7Failure = await runScript(
-      'return await tools.web_docs_search({ library_name: "forbidden", query: "example" });',
+      'return await tools.web_docs_search({ libraryName: "forbidden", query: "example" });',
     );
     expect(context7Failure.isError).toBe(true);
     expect(context7Failure.content).toEqual(

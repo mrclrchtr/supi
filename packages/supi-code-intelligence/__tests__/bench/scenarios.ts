@@ -123,7 +123,7 @@ const inspectResolved = (outputs: readonly string[]): BenchCall | null => {
   return hit
     ? {
         tool: "code_inspect",
-        args: { point: { file: hit[1], line: Number(hit[2]), character: Number(hit[3]) } },
+        args: { anchor: { file: hit[1], line: Number(hit[2]), character: Number(hit[3]) } },
       }
     : null;
 };
@@ -376,10 +376,8 @@ export const scenarios: readonly BenchScenario[] = [
       {
         tool: "code_find",
         args: {
-          mode: "ast",
-          kind: "call",
-          query: "selectDirectoryNavigation",
-          scope: [`${CI}/src`],
+          search: { ast: { kind: "call", query: "selectDirectoryNavigation" } },
+          scopes: [`${CI}/src`],
         },
       },
     ],
@@ -397,10 +395,8 @@ export const scenarios: readonly BenchScenario[] = [
       {
         tool: "code_find",
         args: {
-          mode: "ast",
-          kind: "import",
-          query: "@mrclrchtr/supi-tree-sitter",
-          scope: [`${CI}/src`],
+          search: { ast: { kind: "import", query: "@mrclrchtr/supi-tree-sitter" } },
+          scopes: [`${CI}/src`],
         },
       },
     ],
@@ -541,7 +537,10 @@ export const scenarios: readonly BenchScenario[] = [
     code: [
       {
         tool: "code_find",
-        args: { mode: "ast", kind: "call", query: "registerSettings", scope: ["packages"] },
+        args: {
+          search: { ast: { kind: "call", query: "registerSettings" } },
+          scopes: ["packages"],
+        },
       },
     ],
     truth: REGISTER_SETTINGS_CALLS,
@@ -556,7 +555,10 @@ export const scenarios: readonly BenchScenario[] = [
     code: [
       {
         tool: "code_find",
-        args: { mode: "ast", kind: "definition", query: "runGraphWorkflow", scope: [`${CI}/src`] },
+        args: {
+          search: { ast: { kind: "definition", query: "runGraphWorkflow" } },
+          scopes: [`${CI}/src`],
+        },
       },
     ],
     truth: [`${CI}/src/session/graph-workflow.ts:29`],
@@ -573,10 +575,8 @@ export const scenarios: readonly BenchScenario[] = [
       {
         tool: "code_find",
         args: {
-          mode: "ast",
-          kind: "definition",
-          query: "WorkflowDeps",
-          scope: [`${CI}/src/session`],
+          search: { ast: { kind: "definition", query: "WorkflowDeps" } },
+          scopes: [`${CI}/src/session`],
         },
       },
     ],
@@ -607,10 +607,8 @@ export const scenarios: readonly BenchScenario[] = [
       {
         tool: "code_find",
         args: {
-          mode: "ast",
-          kind: "definition",
-          query: "emitDebug",
-          scope: ["packages/supi-core/src"],
+          search: { ast: { kind: "definition", query: "emitDebug" } },
+          scopes: ["packages/supi-core/src"],
         },
       },
     ],

@@ -3,21 +3,24 @@
 import { type Static, Type } from "typebox";
 import { ASK_USER_LIMITS } from "./types.ts";
 
-const OptionSchema = Type.Object({
-  value: Type.String({ description: "Unique returned id" }),
-  label: Type.String({ description: "Displayed label" }),
-  description: Type.Optional(
-    Type.String({
-      description: "Optional helper text",
-    }),
-  ),
-  details: Type.Optional(
-    Type.String({
-      description:
-        "Extended details shown when focused — trade-offs, code snippets, or consequences",
-    }),
-  ),
-});
+const OptionSchema = Type.Object(
+  {
+    value: Type.String({ description: "Unique returned id" }),
+    label: Type.String({ description: "Displayed label" }),
+    description: Type.Optional(
+      Type.String({
+        description: "Optional helper text",
+      }),
+    ),
+    details: Type.Optional(
+      Type.String({
+        description:
+          "Extended details shown when focused — trade-offs, code snippets, or consequences",
+      }),
+    ),
+  },
+  { additionalProperties: false },
+);
 
 const ChoiceOptionCount = {
   minItems: ASK_USER_LIMITS.minChoiceOptions,
@@ -28,51 +31,60 @@ const QuestionCount = {
   maxItems: ASK_USER_LIMITS.maxQuestions,
 } as const;
 
-const ChoiceQuestionSchema = Type.Object({
-  type: Type.Literal("choice"),
-  id: Type.String({ description: "Unique question id" }),
-  header: Type.String({ description: "Short label" }),
-  prompt: Type.String({ description: "Question text" }),
-  options: Type.Array(OptionSchema, {
-    description: "Each option requires `label` (shown text) and a unique `value` (returned id).",
-    ...ChoiceOptionCount,
-  }),
-  multi: Type.Optional(
-    Type.Boolean({
-      default: false,
-      description: "Allow multiple selections",
+const ChoiceQuestionSchema = Type.Object(
+  {
+    type: Type.Literal("choice"),
+    id: Type.String({ description: "Unique question id" }),
+    header: Type.String({ description: "Short label" }),
+    prompt: Type.String({ description: "Question text" }),
+    options: Type.Array(OptionSchema, {
+      description: "Each option requires `label` (shown text) and a unique `value` (returned id).",
+      ...ChoiceOptionCount,
     }),
-  ),
-  recommendation: Type.Optional(
-    Type.Union([Type.String(), Type.Array(Type.String())], {
-      description: "Recommended value(s): single string, multi array",
-    }),
-  ),
-});
+    multi: Type.Optional(
+      Type.Boolean({
+        default: false,
+        description: "Allow multiple selections",
+      }),
+    ),
+    recommendation: Type.Optional(
+      Type.Union([Type.String(), Type.Array(Type.String())], {
+        description: "Recommended value(s): single string, multi array",
+      }),
+    ),
+  },
+  { additionalProperties: false },
+);
 
-const TextQuestionSchema = Type.Object({
-  type: Type.Literal("text"),
-  id: Type.String({ description: "Unique question id" }),
-  header: Type.String({ description: "Short label" }),
-  prompt: Type.String({ description: "Question text" }),
-  recommendation: Type.Optional(Type.String({ description: "Suggested text" })),
-  placeholder: Type.Optional(Type.String({ description: "Editor placeholder" })),
-});
+const TextQuestionSchema = Type.Object(
+  {
+    type: Type.Literal("text"),
+    id: Type.String({ description: "Unique question id" }),
+    header: Type.String({ description: "Short label" }),
+    prompt: Type.String({ description: "Question text" }),
+    recommendation: Type.Optional(Type.String({ description: "Suggested text" })),
+    placeholder: Type.Optional(Type.String({ description: "Editor placeholder" })),
+  },
+  { additionalProperties: false },
+);
 
 const QuestionSchema = Type.Union([ChoiceQuestionSchema, TextQuestionSchema]);
 
-export const AskUserParamsSchema = Type.Object({
-  title: Type.Optional(Type.String({ description: "Optional title" })),
-  intro: Type.Optional(
-    Type.String({
-      description: "Optional context",
+export const AskUserParamsSchema = Type.Object(
+  {
+    title: Type.Optional(Type.String({ description: "Optional title" })),
+    intro: Type.Optional(
+      Type.String({
+        description: "Optional context",
+      }),
+    ),
+    questions: Type.Array(QuestionSchema, {
+      description: "1-10 related questions for one decision",
+      ...QuestionCount,
     }),
-  ),
-  questions: Type.Array(QuestionSchema, {
-    description: "1-10 related questions for one decision",
-    ...QuestionCount,
-  }),
-});
+  },
+  { additionalProperties: false },
+);
 
 export type AskUserParams = Static<typeof AskUserParamsSchema>;
 export type ExternalQuestion = Static<typeof QuestionSchema>;

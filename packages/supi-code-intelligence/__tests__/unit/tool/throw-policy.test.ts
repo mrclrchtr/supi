@@ -67,7 +67,10 @@ describe("throw policy: whole-tool-unavailable throws, invalid usage returns tex
   });
 
   it("code_find returns text (not throw) for an empty query", async () => {
-    const result = await executeFindTool({ query: "", mode: "semantic" }, makeTestCtx(tmpDir));
+    const result = await executeFindTool(
+      { search: { semantic: { query: "" } } },
+      makeTestCtx(tmpDir),
+    );
     expect(result.content).toContain("query must not be empty");
   });
 

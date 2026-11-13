@@ -135,27 +135,28 @@ describe("code intelligence tool specs", () => {
       properties?: Record<string, unknown>;
       required?: string[];
     };
-    const modeSchema = findSchema.properties?.mode;
-    const values = collectStringValues(modeSchema);
+    const searchSchema = findSchema.properties?.search as { properties?: Record<string, unknown> };
 
-    expect(values.sort((left, right) => left.localeCompare(right))).toEqual(["ast", "semantic"]);
-    expect(findSchema.required).toContain("mode");
-    expect(Check(CODE_INTELLIGENCE_TOOL_SCHEMAS.code_find, { query: "target" })).toBe(false);
-    expect(Check(CODE_INTELLIGENCE_TOOL_SCHEMAS.code_find, { query: "target", mode: "text" })).toBe(
-      false,
-    );
+    expect(Object.keys(searchSchema.properties ?? {})).toEqual(["ast", "semantic"]);
+    expect(findSchema.required).toContain("search");
+    const check = (search: unknown) => Check(CODE_INTELLIGENCE_TOOL_SCHEMAS.code_find, { search });
+    expect(check({})).toBe(false);
+    expect(check({ text: { query: "target" } })).toBe(false);
+    expect(check({ semantic: { query: "target", kind: "definition" } })).toBe(false);
+    expect(check({ ast: { query: "target" } })).toBe(false);
+    expect(
+      check({ ast: { kind: "definition", query: "target" }, semantic: { query: "target" } }),
+    ).toBe(false);
     expect(
       Check(CODE_INTELLIGENCE_TOOL_SCHEMAS.code_find, {
-        query: "target",
-        mode: "semantic",
+        search: { semantic: { query: "target" } },
         contextLines: 1,
       }),
     ).toBe(false);
     expect(
       Check(CODE_INTELLIGENCE_TOOL_SCHEMAS.code_find, {
-        query: "target",
-        mode: "semantic",
-        scope: ["src", "src"],
+        search: { semantic: { query: "target" } },
+        scopes: ["src", "src"],
       }),
     ).toBe(true);
   });
@@ -164,7 +165,10 @@ describe("code intelligence tool specs", () => {
     const findSchema = CODE_INTELLIGENCE_TOOL_SCHEMAS.code_find as {
       properties?: Record<string, unknown>;
     };
-    const kindSchema = findSchema.properties?.kind;
+    const searchSchema = findSchema.properties?.search as {
+      properties?: { ast?: { properties?: Record<string, unknown> } };
+    };
+    const kindSchema = searchSchema.properties?.ast?.properties?.kind;
     const schemaValues = collectStringValues(kindSchema).sort((left, right) =>
       left.localeCompare(right),
     );
@@ -175,14 +179,14 @@ describe("code intelligence tool specs", () => {
     );
     for (const kind of CODE_FIND_AST_KINDS) {
       expect(
-        Check(CODE_INTELLIGENCE_TOOL_SCHEMAS.code_find, { query: "target", mode: "ast", kind }),
+        Check(CODE_INTELLIGENCE_TOOL_SCHEMAS.code_find, {
+          search: { ast: { kind, query: "target" } },
+        }),
       ).toBe(true);
     }
     expect(
       Check(CODE_INTELLIGENCE_TOOL_SCHEMAS.code_find, {
-        query: "target",
-        mode: "ast",
-        kind: "test",
+        search: { ast: { kind: "test", query: "target" } },
       }),
     ).toBe(false);
   });

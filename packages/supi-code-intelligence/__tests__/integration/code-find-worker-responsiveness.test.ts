@@ -60,7 +60,7 @@ describe("public AST responsiveness", () => {
     try {
       const result = await tool.execute(
         "worker-heartbeat",
-        { query: "target", mode: "ast", kind: "definition", scope: ["target.ts"] },
+        { search: { ast: { kind: "definition", query: "target" } }, scopes: ["target.ts"] },
         undefined,
         undefined,
         makeCtx({ cwd }),

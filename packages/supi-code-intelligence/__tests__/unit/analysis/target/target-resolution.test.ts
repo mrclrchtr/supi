@@ -97,7 +97,7 @@ describe("resolveSymbolTarget", () => {
     const message = result.kind === "error" ? result.message : "";
     expect(message).toContain("Symbol not found: `handleHello` in path `supabase`.");
     expect(message).toContain("projects the language server has loaded");
-    expect(message).toContain('`code_find` with `mode: "ast"`');
+    expect(message).toContain("`code_find` with `search.ast`");
     expect(message).not.toContain("Try `code_resolve` to search");
   });
 

@@ -121,7 +121,7 @@ describe("structural workflow request control", () => {
 
     await expect(
       runInspectWorkflow(
-        { point: { file, line: 1, character: 17 } },
+        { anchor: { file, line: 1, character: 17 } },
         {
           cwd,
           capability: new TestCapabilityAdapter({ structural: structural({ nodeAt, outline }) }),
@@ -140,7 +140,7 @@ describe("structural workflow request control", () => {
 
     await expect(
       runInspectWorkflow(
-        { point: { file, line: 1, character: 17 } },
+        { anchor: { file, line: 1, character: 17 } },
         {
           cwd,
           capability: new TestCapabilityAdapter({
@@ -161,7 +161,7 @@ describe("structural workflow request control", () => {
     const requestControl = control();
 
     await runInspectWorkflow(
-      { point: { file, line: 1, character: 17 } },
+      { anchor: { file, line: 1, character: 17 } },
       {
         cwd,
         capability: new TestCapabilityAdapter({ structural: structural({ nodeAt, outline }) }),

@@ -336,7 +336,7 @@ type InspectOutcome = Awaited<ReturnType<CodeIntelToolExecCtx["session"]["inspec
 export function finishInspectResult(outcome: InspectOutcome): CodeIntelResult {
   if (outcome.kind === "unavailable") throw new Error(outcome.reason);
   if (outcome.kind === "invalid-input") {
-    const nextQueries = ["Provide an existing file and exact 1-based point"];
+    const nextQueries = ["Provide an existing file and exact 1-based anchor"];
     return {
       ...inspectErrorResult(`**Error:** ${outcome.message}`, {
         focusTarget: "invalid input",

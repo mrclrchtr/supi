@@ -71,7 +71,7 @@ export async function fetchPage(
   const mode = options.fetchMode ?? "direct";
   if (!WEB_FETCH_MODES.includes(mode)) {
     throw new FetchError(
-      'Unsupported fetch_mode; select "direct", "firecrawl_fallback", or "firecrawl"',
+      'Unsupported fetchMode; select "direct", "firecrawl_fallback", or "firecrawl"',
     );
   }
   if (mode !== "direct" && !options.firecrawlEnabled) {
@@ -89,7 +89,7 @@ export async function fetchPage(
         ? ""
         : "requires Firecrawl enabled in /supi-settings and FIRECRAWL_API_KEY; ";
       throw new FetchError(
-        `${error.message}. For a public page, retry with fetch_mode: "firecrawl_fallback" (${setupHint}shares the URL and may consume credits).`,
+        `${error.message}. For a public page, retry with fetchMode: "firecrawl_fallback" (${setupHint}shares the URL and may consume credits).`,
         { status: 403, cause: error },
       );
     }

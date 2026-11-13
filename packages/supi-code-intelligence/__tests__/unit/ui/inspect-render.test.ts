@@ -54,8 +54,8 @@ describe("renderInspectResult", () => {
     expect(result).toContain("## Syntax node");
     expect(result).toContain("variable_declarator L2:9–L2:12");
     expect(result).toContain("`widget` (function) L1:1–L4:2");
-    expect(result).toContain("No hover result at this point");
-    expect(result).toContain("No definition result at this point");
+    expect(result).toContain("No hover result at this anchor");
+    expect(result).toContain("No definition result at this anchor");
     expect(result).toContain("No diagnostics intersect the nearby window");
   });
 
@@ -83,7 +83,7 @@ describe("renderInspectResult", () => {
       [],
     );
     const result = renderInspectResult(assembly);
-    expect(result).toContain("- Same point");
+    expect(result).toContain("- Same anchor");
     expect(result).toContain("- L8:3");
     expect(result).toContain("src/other.ts:1:1");
     expect(result.match(/src\/widget\.ts/g)).toHaveLength(1);
@@ -160,5 +160,50 @@ describe("renderInspectResult", () => {
     expect(assembly.details.sections).toContainEqual(
       expect.objectContaining({ key: "definition", status: "partial" }),
     );
+  });
+
+  it("shortens a large syntax node and points to its range", () => {
+    const section = <T>(data: T) => completedCodeQuery(data);
+    const render = (text: string, endLine: number) =>
+      renderInspectResult(
+        assembleInspectResult(
+          {
+            relPath: "src/index.ts",
+            line: 3,
+            character: 1,
+            maxResults: 5,
+            confidence: "structural",
+            diagnosticWindow: { startLine: 1, endLine: 5 },
+            sections: {
+              node: section({
+                type: "program",
+                text,
+                startLine: 1,
+                startCharacter: 1,
+                endLine,
+                endCharacter: 1,
+                ancestry: [],
+              }),
+              enclosingSymbol: section(null),
+              hover: section(null),
+              definition: section([]),
+              diagnostics: section([]),
+            },
+          },
+          [],
+        ),
+      );
+
+    const file = Array.from({ length: 40 }, (_, index) => `line ${index + 1}`).join("\n");
+    const long = render(file, 40);
+    expect(long).toContain("line 12\n```");
+    expect(long).not.toContain("line 13");
+    expect(long).toContain("first 12 of 40 lines; read L1–L40 for the rest");
+
+    const minified = render("x".repeat(5000), 1);
+    expect(minified).toContain("first 1200 characters; read L1–L1 for the rest");
+    expect(minified.length).toBeLessThan(2000);
+
+    expect(render("const a = 1;\nconst b = 2;", 2)).not.toContain("shortened");
   });
 });

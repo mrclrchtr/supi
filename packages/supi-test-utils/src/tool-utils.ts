@@ -31,7 +31,7 @@ export function getTools(pi: PiMock): ToolDef[] {
  * @example
  * ```ts
  * const tool = getTool(pi, "web_docs_search");
- * const result = await tool.execute("tc-1", { library_name: "react" }, undefined, undefined, ctx);
+ * const result = await tool.execute("tc-1", { libraryName: "react" }, undefined, undefined, ctx);
  * ```
  */
 export function getTool(pi: PiMock, name: string): ToolDef {

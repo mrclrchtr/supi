@@ -8,7 +8,7 @@ export const WEB_DOCS_SEARCH_TOOL_LABEL = "Web Docs Search";
 
 export const webDocsSearchParameters = Type.Object(
   {
-    library_name: Type.String({
+    libraryName: Type.String({
       description: "Library name (e.g. react, next.js, fastapi)",
     }),
     query: Type.String({

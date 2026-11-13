@@ -207,10 +207,7 @@ async function assertDocumentSymbols(setup: ToolContext, spec: LanguageCase): Pr
 
 async function assertSemanticSearch(setup: ToolContext, spec: LanguageCase): Promise<void> {
   const query = spec.semanticQuery ?? spec.renameName;
-  const result = await runTool(setup, "code_find", {
-    query,
-    mode: "semantic",
-  });
+  const result = await runTool(setup, "code_find", { search: { semantic: { query } } });
   const data = resultData<{
     candidateCount: number;
     evidenceLists: Array<{ shownCount: number; totalCount: number | null }>;
@@ -252,7 +249,7 @@ async function assertInspection(setup: ToolContext, spec: LanguageCase): Promise
   const file = resolve(setup.workspace.cwd, spec.inspectFile);
   const point = findPoint(readFileSync(file, "utf8"), spec.renameName, spec.inspectOccurrence);
   const result = await runTool(setup, "code_inspect", {
-    point: { file, line: point.line, character: point.character },
+    anchor: { file, line: point.line, character: point.character },
   });
   const data = resultData<{
     sections: readonly {
@@ -326,18 +323,14 @@ async function assertImplementations(setup: ToolContext, spec: LanguageCase): Pr
 
 async function assertStructuralSearch(setup: ToolContext, spec: LanguageCase): Promise<void> {
   const imports = await runTool(setup, "code_find", {
-    query: spec.importQuery,
-    mode: "ast",
-    kind: "import",
+    search: { ast: { kind: "import", query: spec.importQuery } },
   });
   const importData = resultData<{ astMatches: readonly { name: string; kind: string }[] }>(imports);
   expect(importData.astMatches.some((match) => match.kind === "import")).toBe(true);
   expect(importData.astMatches.some((match) => match.name.includes(spec.importQuery))).toBe(true);
 
   const calls = await runTool(setup, "code_find", {
-    query: spec.renameName,
-    mode: "ast",
-    kind: "call",
+    search: { ast: { kind: "call", query: spec.renameName } },
   });
   const callData = resultData<{ astMatches: readonly { name: string; kind: string }[] }>(calls);
   expect(

@@ -265,10 +265,8 @@ describe("WorkspaceCodeIntelligenceSession real-substrate contract", () => {
       const { kind, resultKind, query, line } = expectation;
       const result = astResult(
         await getWorkspace().session.find({
-          query,
-          mode: "ast",
-          kind,
-          scope: [CONTRACT_FIXTURE.contracts],
+          search: { ast: { kind, query } },
+          scopes: [CONTRACT_FIXTURE.contracts],
         }),
       );
 
@@ -294,10 +292,8 @@ describe("WorkspaceCodeIntelligenceSession real-substrate contract", () => {
     "records the Python $kind support expectation",
     async (expectation) => {
       const outcome = await getWorkspace().session.find({
-        query: expectation.query,
-        mode: "ast",
-        kind: expectation.kind,
-        scope: [CONTRACT_FIXTURE.python],
+        search: { ast: { kind: expectation.kind, query: expectation.query } },
+        scopes: [CONTRACT_FIXTURE.python],
       });
 
       if (expectation.supported) {
@@ -334,7 +330,10 @@ describe("WorkspaceCodeIntelligenceSession real-substrate contract", () => {
     async (expectation) => {
       const { file, query, resultKind } = expectation;
       const result = astResult(
-        await getWorkspace().session.find({ query, mode: "ast", kind: "type", scope: [file] }),
+        await getWorkspace().session.find({
+          search: { ast: { kind: "type", query } },
+          scopes: [file],
+        }),
       );
 
       expectAstMatch(result, {
@@ -359,7 +358,7 @@ describe("WorkspaceCodeIntelligenceSession real-substrate contract", () => {
     async (expectation) => {
       const { file, kind, query, resultKind, line } = expectation;
       const result = astResult(
-        await getWorkspace().session.find({ query, mode: "ast", kind, scope: [file] }),
+        await getWorkspace().session.find({ search: { ast: { kind, query } }, scopes: [file] }),
       );
 
       expectAstMatch(result, {
@@ -431,10 +430,8 @@ describe("WorkspaceCodeIntelligenceSession real-substrate contract", () => {
     const session = getWorkspace().session;
     const empty = astResult(
       await session.find({
-        query: "AbsentContractClass",
-        mode: "ast",
-        kind: "class",
-        scope: [CONTRACT_FIXTURE.contracts],
+        search: { ast: { kind: "class", query: "AbsentContractClass" } },
+        scopes: [CONTRACT_FIXTURE.contracts],
       }),
     );
     expect(empty.matches).toEqual([]);
@@ -442,7 +439,7 @@ describe("WorkspaceCodeIntelligenceSession real-substrate contract", () => {
     expect(empty.scan.complete).toBe(true);
 
     const mixedWorkspace = astResult(
-      await session.find({ query: "AbsentContractClass", mode: "ast", kind: "definition" }),
+      await session.find({ search: { ast: { kind: "definition", query: "AbsentContractClass" } } }),
     );
     expect(mixedWorkspace.partialReason).toBeNull();
     expect(mixedWorkspace.scan).toMatchObject({ complete: true, limitations: [] });
@@ -451,10 +448,8 @@ describe("WorkspaceCodeIntelligenceSession real-substrate contract", () => {
     );
 
     const operationIneligible = await session.find({
-      query: "accounting",
-      mode: "ast",
-      kind: "import",
-      scope: [CONTRACT_FIXTURE.sql],
+      search: { ast: { kind: "import", query: "accounting" } },
+      scopes: [CONTRACT_FIXTURE.sql],
     });
     expect(operationIneligible).toMatchObject({
       kind: "invalid-input",
@@ -463,10 +458,8 @@ describe("WorkspaceCodeIntelligenceSession real-substrate contract", () => {
 
     await expect(
       session.find({
-        query: "accounting",
-        mode: "ast",
-        kind: "import",
-        scope: [CONTRACT_FIXTURE.sqlRoot],
+        search: { ast: { kind: "import", query: "accounting" } },
+        scopes: [CONTRACT_FIXTURE.sqlRoot],
       }),
     ).resolves.toEqual({
       kind: "unavailable",
@@ -474,10 +467,8 @@ describe("WorkspaceCodeIntelligenceSession real-substrate contract", () => {
     });
 
     const unsupported = await session.find({
-      query: "fixture",
-      mode: "ast",
-      kind: "definition",
-      scope: [CONTRACT_FIXTURE.unsupported],
+      search: { ast: { kind: "definition", query: "fixture" } },
+      scopes: [CONTRACT_FIXTURE.unsupported],
     });
     expect(unsupported).toMatchObject({
       kind: "invalid-input",
@@ -489,10 +480,8 @@ describe("WorkspaceCodeIntelligenceSession real-substrate contract", () => {
     try {
       await expect(
         session.find({
-          query: "ContractWidget",
-          mode: "ast",
-          kind: "class",
-          scope: [CONTRACT_FIXTURE.contracts],
+          search: { ast: { kind: "class", query: "ContractWidget" } },
+          scopes: [CONTRACT_FIXTURE.contracts],
         }),
       ).resolves.toMatchObject({
         kind: "unavailable",
@@ -505,7 +494,7 @@ describe("WorkspaceCodeIntelligenceSession real-substrate contract", () => {
 
   it("preserves real provider coordinates through inspection and graph evidence", async () => {
     const workspace = getWorkspace();
-    const inspection = await workspace.session.inspect({ point: CONTRACT_POINT.consumerHelper });
+    const inspection = await workspace.session.inspect({ anchor: CONTRACT_POINT.consumerHelper });
     expect(inspection.kind).toBe("completed");
     if (inspection.kind !== "completed") throw new Error("Expected completed point inspection.");
     expect(inspection.data.sections.node).toMatchObject({

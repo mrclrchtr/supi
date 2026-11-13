@@ -68,19 +68,19 @@ describe("docsExtension", () => {
   });
 
   describe("web_docs_search", () => {
-    it("rejects missing library_name", async () => {
+    it("rejects missing libraryName", async () => {
       const tool = getTool(pi, "web_docs_search");
 
       await expect(
         tool.execute("tc-1", { query: "how to do X" }, undefined, undefined, makeCtx()),
-      ).rejects.toThrow("library_name");
+      ).rejects.toThrow("libraryName");
     });
 
     it("rejects missing query", async () => {
       const tool = getTool(pi, "web_docs_search");
 
       await expect(
-        tool.execute("tc-1", { library_name: "react" }, undefined, undefined, makeCtx()),
+        tool.execute("tc-1", { libraryName: "react" }, undefined, undefined, makeCtx()),
       ).rejects.toThrow("query");
     });
 
@@ -100,7 +100,7 @@ describe("docsExtension", () => {
       const tool = getTool(pi, "web_docs_search") as unknown as RenderableTool;
       const result = (await tool.execute(
         "tc-1",
-        { library_name: "react", query: "how to use hooks" },
+        { libraryName: "react", query: "how to use hooks" },
         undefined,
         undefined,
         makeCtx(),
@@ -141,7 +141,7 @@ describe("docsExtension", () => {
       const tool = getTool(pi, "web_docs_search");
       const result = (await tool.execute(
         "tc-1",
-        { library_name: "lib", query: "docs" },
+        { libraryName: "lib", query: "docs" },
         undefined,
         undefined,
         makeCtx(),
@@ -169,7 +169,7 @@ describe("docsExtension", () => {
       const tool = getTool(pi, "web_docs_search");
       const result = (await tool.execute(
         "tc-1",
-        { library_name: "nonexistent-lib", query: "something" },
+        { libraryName: "nonexistent-lib", query: "something" },
         undefined,
         undefined,
         makeCtx(),
@@ -185,19 +185,19 @@ describe("docsExtension", () => {
   });
 
   describe("web_docs_fetch", () => {
-    it("rejects missing library_id", async () => {
+    it("rejects missing libraryId", async () => {
       const tool = getTool(pi, "web_docs_fetch");
 
       await expect(
         tool.execute("tc-1", { query: "how to do X" }, undefined, undefined, makeCtx()),
-      ).rejects.toThrow("library_id");
+      ).rejects.toThrow("libraryId");
     });
 
     it("rejects missing query", async () => {
       const tool = getTool(pi, "web_docs_fetch");
 
       await expect(
-        tool.execute("tc-1", { library_id: "/facebook/react" }, undefined, undefined, makeCtx()),
+        tool.execute("tc-1", { libraryId: "/facebook/react" }, undefined, undefined, makeCtx()),
       ).rejects.toThrow("query");
     });
 
@@ -207,7 +207,7 @@ describe("docsExtension", () => {
       const tool = getTool(pi, "web_docs_fetch") as unknown as RenderableTool;
       const result = (await tool.execute(
         "tc-1",
-        { library_id: "/facebook/react", query: "how to use hooks" },
+        { libraryId: "/facebook/react", query: "how to use hooks" },
         undefined,
         undefined,
         makeCtx(),
@@ -244,7 +244,7 @@ describe("docsExtension", () => {
       const result = (await tool.execute(
         "tc-1",
         {
-          library_id: "/facebook/react",
+          libraryId: "/facebook/react",
           query: "useState",
           raw: true,
         },
@@ -271,7 +271,7 @@ describe("docsExtension", () => {
       const tool = getTool(pi, "web_docs_fetch");
       const result = (await tool.execute(
         "tc-1",
-        { library_id: "/facebook/react", query: "hooks" },
+        { libraryId: "/facebook/react", query: "hooks" },
         undefined,
         undefined,
         makeCtx(),
@@ -295,7 +295,7 @@ describe("docsExtension", () => {
       const result = await tool.execute(
         "empty",
         {
-          library_id: "/facebook/react",
+          libraryId: "/facebook/react",
           query: "unknown",
           raw: true,
         },
@@ -318,7 +318,7 @@ describe("docsExtension", () => {
       await expect(
         tool.execute(
           "tc-1",
-          { library_id: "/invalid/lib", query: "test" },
+          { libraryId: "/invalid/lib", query: "test" },
           undefined,
           undefined,
           makeCtx(),

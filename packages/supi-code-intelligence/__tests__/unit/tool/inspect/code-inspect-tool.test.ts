@@ -144,7 +144,7 @@ async function executeInspect(point = { file: "src/index.ts", line: 3, character
   codeIntelligenceExtension(pi as never);
   return getTool(pi, "code_inspect").execute(
     "inspect",
-    { point },
+    { anchor: point },
     undefined,
     undefined,
     makeCtx({ cwd: tmpDir }),
@@ -158,7 +158,7 @@ describe("code_inspect tool", () => {
     const tool = getTool(pi, "code_inspect") as {
       parameters?: { properties?: Record<string, unknown> };
     };
-    expect(tool.parameters?.properties).toHaveProperty("point");
+    expect(tool.parameters?.properties).toHaveProperty("anchor");
     expect(tool.parameters?.properties).toHaveProperty("maxResults");
     expect(tool.parameters?.properties).not.toHaveProperty("file");
   });
@@ -372,7 +372,7 @@ describe("code_inspect tool", () => {
     };
     const text = result.content[0]?.text ?? "";
     expect(text).toContain("Hover lookup failed: hover transport failed");
-    expect(text).toContain("No definition result at this point");
+    expect(text).toContain("No definition result at this anchor");
     expect(text).toContain("diagnostic sync failed");
     expect(result.details?.data.sections).toEqual(
       expect.arrayContaining([
@@ -423,8 +423,8 @@ describe("code_inspect tool", () => {
 
     const result = (await executeInspect()) as { content: Array<{ text: string }> };
     const text = result.content[0]?.text ?? "";
-    expect(text).toContain("No hover result at this point");
-    expect(text).toContain("No definition result at this point");
+    expect(text).toContain("No hover result at this anchor");
+    expect(text).toContain("No definition result at this anchor");
     expect(text).toContain("No diagnostics intersect the nearby window");
   });
 

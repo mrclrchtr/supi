@@ -16,11 +16,11 @@ export function renderInspectCall(
   _context: ToolRendererContext | undefined,
 ): Text {
   const params = (args ?? {}) as {
-    point?: { file?: unknown; line?: unknown; character?: unknown };
+    anchor?: { file?: unknown; line?: unknown; character?: unknown };
   };
 
   let content = theme.fg("toolTitle", "code_inspect");
-  const point = params.point;
+  const point = params.anchor;
   if (point && typeof point === "object") {
     const file = formatCallPath(point.file);
     if (file) content += ` ${theme.fg("accent", file)}`;

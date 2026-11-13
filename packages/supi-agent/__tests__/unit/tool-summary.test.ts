@@ -36,10 +36,10 @@ describe("summarizeToolCall", () => {
 
   it("summarizes code_* tools with query/file info", () => {
     expect(
-      summarizeToolCall("code_inspect", { point: { file: "/src/app.ts", line: 1, character: 1 } })
+      summarizeToolCall("code_inspect", { anchor: { file: "/src/app.ts", line: 1, character: 1 } })
         .summary,
     ).toBe("code_inspect /src/app.ts");
-    expect(summarizeToolCall("code_find", { query: "myFunc", mode: "ast" }).summary).toBe(
+    expect(summarizeToolCall("code_find", { search: { ast: { query: "myFunc" } } }).summary).toBe(
       "code_find myFunc (ast)",
     );
     expect(summarizeToolCall("code_health", {}).summary).toBe("code_health");

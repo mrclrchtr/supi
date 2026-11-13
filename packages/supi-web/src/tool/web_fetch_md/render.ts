@@ -7,8 +7,8 @@ import { WEB_FETCH_MD_TOOL_NAME, type WebFetchMdInput } from "./spec.ts";
 export function renderWebFetchCall(args: unknown, theme: Theme) {
   const input = (args ?? {}) as WebFetchMdInput;
   const url = typeof input.url === "string" ? input.url : "";
-  const outputMode = typeof input.output_mode === "string" ? input.output_mode : undefined;
-  const annotation = [outputMode, input.fetch_mode].filter(Boolean).join(", ");
+  const outputMode = typeof input.outputMode === "string" ? input.outputMode : undefined;
+  const annotation = [outputMode, input.fetchMode].filter(Boolean).join(", ");
   return renderToolCall(WEB_FETCH_MD_TOOL_NAME, url, theme, annotation || undefined);
 }
 

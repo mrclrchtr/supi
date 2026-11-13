@@ -34,7 +34,7 @@ describe("code_find with the real LaTeX structural provider", () => {
     const ctx = { cwd, session };
     try {
       const imports = await executeFindTool(
-        { query: "chapters/method", mode: "ast", kind: "import", scope: ["paper.tex"] },
+        { search: { ast: { kind: "import", query: "chapters/method" } }, scopes: ["paper.tex"] },
         ctx,
       );
       expect(imports.content).toContain("`chapters/method` (import) L3");
@@ -44,7 +44,7 @@ describe("code_find with the real LaTeX structural provider", () => {
         ["call", "call-sites"],
       ] as const) {
         const unsupported = await executeFindTool(
-          { query: "custom", mode: "ast", kind, scope: ["paper.tex"] },
+          { search: { ast: { kind, query: "custom" } }, scopes: ["paper.tex"] },
           ctx,
         );
         expect(unsupported.content).toContain(`does not support the ${operation} operation`);

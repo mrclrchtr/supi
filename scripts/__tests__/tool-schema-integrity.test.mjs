@@ -73,6 +73,13 @@ describe("tool schema wire integrity", () => {
         expect(schema[combinator], `${pkg} :: ${name} top-level ${combinator}`).toBeUndefined();
       }
 
+      // TypeBox keeps "~kind"/"~optional" non-enumerable. Spreading a schema into a plain
+      // object and wrapping it in Type.Optional() makes the marker enumerable, so it would
+      // reach the provider as an unknown keyword.
+      expect(JSON.stringify(schema), `${pkg} :: ${name} leaks a TypeBox marker`).not.toContain(
+        '"~',
+      );
+
       const properties = schema.properties ?? {};
       for (const required of schema.required ?? []) {
         expect(

@@ -82,7 +82,7 @@ const handler = getHandlerOrThrow(pi, "message_end");
 await handler(event, ctx);
 
 const tool = getTool(pi, "web_docs_search");
-await tool.execute("tc-1", { library_name: "react" }, undefined, undefined, ctx);
+await tool.execute("tc-1", { libraryName: "react" }, undefined, undefined, ctx);
 ```
 
 ## Mocking guidance

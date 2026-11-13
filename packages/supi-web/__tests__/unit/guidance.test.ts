@@ -42,14 +42,14 @@ describe("web tool guidance", () => {
     expect(fetch?.surface.description).not.toMatch(/2,000 lines|50(?:\.0)?KB/i);
   });
 
-  it("keeps the Context7 order in the fetch description, not its library_id field", () => {
+  it("keeps the Context7 order in the fetch description, not its libraryId field", () => {
     const docsFetch = surfaces.find(({ spec }) => spec.name === "web_docs_fetch");
     expect(docsFetch?.surface.description).toMatch(/Search first if the ID is unknown/i);
 
     const schema = docsFetch?.spec.parameters as {
-      properties?: { library_id?: { description?: string } };
+      properties?: { libraryId?: { description?: string } };
     };
-    expect(schema.properties?.library_id?.description).not.toMatch(/search first/i);
+    expect(schema.properties?.libraryId?.description).not.toMatch(/search first/i);
   });
 
   it("routes library documentation toward Context7 without forbidding web_search", () => {
@@ -68,7 +68,7 @@ describe("web tool guidance", () => {
     const fetchSpec = WEB_TOOL_SPECS.find((spec) => spec.name === WEB_FETCH_MD_TOOL_NAME);
     if (!fetchSpec) throw new Error("The web fetch tool specification is missing.");
 
-    const input = (timeout_ms: number) => ({ url: "https://example.com", timeout_ms });
+    const input = (timeoutMs: number) => ({ url: "https://example.com", timeoutMs });
     expect(Value.Check(fetchSpec.parameters, input(0))).toBe(true);
     expect(Value.Check(fetchSpec.parameters, input(FETCH_TIMEOUT_MAX_MS))).toBe(true);
     expect(Value.Check(fetchSpec.parameters, input(-1))).toBe(false);

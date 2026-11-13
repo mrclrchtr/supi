@@ -132,6 +132,14 @@ For example, a target selector may admit one of `handle`, `anchor`, `symbol`, or
 
 Runtime validation still matters for direct tests and callers that bypass PI schema validation.
 
+Keep the input vocabulary uniform across tools:
+
+- Parameter names are camelCase (`maxResults`, `timeoutMs`), never snake_case. Exact-one branch keys that name an operation (`rename_symbol`) are the exception.
+- Every object in a parameter schema sets `additionalProperties: false`, so a misspelled field fails instead of being ignored.
+- Counts and limits are `Type.Integer` with a `minimum`, not `Type.Number`.
+- One concept keeps one name and shape: a `{ file, line, character }` source position is `anchor`; a single path filter is `scope` (string) and a set of search roots is `scopes` (array).
+- To add a description to a shared schema, wrap the spread in its constructor: `Type.Optional(Type.Integer({ ...Shared, description }))`. `Type.Optional({ ...Shared })` makes TypeBox's `~optional` marker enumerable and leaks it into the provider schema; `scripts/__tests__/tool-schema-integrity.test.mjs` rejects that.
+
 ## Capability and path semantics
 
 Runtime modules determine whether a capability exists; metadata defines its public label; presentation adapters render it. Avoid scattering strings such as `hover(file,line,char)` across runtime, guidance, status, and tests.

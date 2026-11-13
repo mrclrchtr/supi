@@ -112,11 +112,7 @@ describe("registered tools with scoped workspace-symbol completeness", () => {
     expect(JSON.stringify(broad)).toContain("dist/generated.test");
     const found = (await getTool(pi, "code_find").execute(
       "find-scope",
-      {
-        query: "work",
-        mode: "semantic",
-        scope: ["src"],
-      },
+      { search: { semantic: { query: "work" } }, scopes: ["src"] },
       undefined,
       undefined,
       makeCtx({ cwd }),

@@ -6,7 +6,7 @@ import { WEB_DOCS_FETCH_TOOL_NAME, type WebDocsFetchInput } from "./spec.ts";
 /** Transcript renderer for web_docs_fetch tool calls. */
 export function renderFetchCall(args: unknown, theme: Theme) {
   const input = (args ?? {}) as WebDocsFetchInput;
-  const libraryId = typeof input.library_id === "string" ? input.library_id : "";
+  const libraryId = typeof input.libraryId === "string" ? input.libraryId : "";
   const query = typeof input.query === "string" ? truncatePreview(input.query) : undefined;
   return renderToolCall(WEB_DOCS_FETCH_TOOL_NAME, libraryId, theme, query);
 }

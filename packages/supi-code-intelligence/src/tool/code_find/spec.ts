@@ -1,9 +1,7 @@
 import { Type } from "typebox";
 import type { CodeIntelToolExecCtx } from "../../types/index.ts";
-import { FindQueryParam, FindScopeParam, MaxResultsParam } from "../schemas.ts";
-import { CODE_FIND_AST_KINDS } from "./ast-kinds.ts";
+import { FindScopesParam, FindSearchParam, MaxResultsParam } from "../schemas.ts";
 import { executeFindTool } from "./execute.ts";
-import { CODE_FIND_MODES } from "./modes.ts";
 import { FindOutputSchema } from "./structured.ts";
 import { renderFindCall, renderFindResult } from "./tui.ts";
 
@@ -23,19 +21,8 @@ export const codeFindSpec = {
   outputSchema: FindOutputSchema,
   parameters: Type.Object(
     {
-      query: FindQueryParam,
-      scope: Type.Optional(FindScopeParam),
-      mode: Type.Enum(CODE_FIND_MODES, {
-        type: "string",
-        description:
-          "Required code-aware search mode. AST mode requires `kind`; semantic mode rejects `kind`.",
-      }),
-      kind: Type.Optional(
-        Type.Enum(CODE_FIND_AST_KINDS, {
-          type: "string",
-          description: 'AST structure kind; required only for mode:"ast".',
-        }),
-      ),
+      search: FindSearchParam,
+      scopes: Type.Optional(FindScopesParam),
       maxResults: Type.Optional(MaxResultsParam),
     },
     { additionalProperties: false },

@@ -13,11 +13,11 @@ export async function runFetch(
   _ctx: ExtensionContext,
 ): Promise<FetchResult> {
   const input = (params ?? {}) as WebDocsFetchInput;
-  const libraryId = input.library_id?.trim();
+  const libraryId = input.libraryId?.trim();
   const query = input.query?.trim();
   const raw = Boolean(input.raw);
 
-  if (!libraryId) throw new Error("'library_id' parameter is required");
+  if (!libraryId) throw new Error("'libraryId' parameter is required");
   if (!query) throw new Error("'query' parameter is required");
 
   onUpdate?.({

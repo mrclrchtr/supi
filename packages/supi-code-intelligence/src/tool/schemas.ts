@@ -4,11 +4,12 @@ import {
   type PublicRefactorOperationName,
 } from "../session/refactor-types.ts";
 import { TARGET_SYMBOL_KINDS } from "../session/target-input.ts";
+import { CODE_FIND_AST_KINDS } from "./code_find/ast-kinds.ts";
 
 export const ScopeParam = Type.String({
   description: "Workspace-relative file or directory scope.",
 });
-export const FindScopeParam = Type.Array(
+export const FindScopesParam = Type.Array(
   Type.String({ description: "Workspace-relative search scope." }),
   {
     description: "One or more workspace-relative search scopes.",
@@ -18,11 +19,6 @@ export const FindScopeParam = Type.Array(
 const FileParam = Type.String({ description: "File path." });
 export const QueryParam = Type.String({
   description: "Human or code reference to resolve or search for.",
-  minLength: 1,
-});
-export const FindQueryParam = Type.String({
-  description:
-    "AST mode: name or import module-specifier substring. Semantic mode: workspace-symbol query.",
   minLength: 1,
 });
 const LineParam = Type.Integer({ description: "1-based line.", minimum: 1 });
@@ -73,6 +69,29 @@ function exactOneSelector(properties: Record<string, TSchema>, description: stri
     additionalProperties: false,
   });
 }
+
+export const FindSearchParam = exactOneSelector(
+  {
+    ast: Type.Object(
+      {
+        kind: Type.Enum(CODE_FIND_AST_KINDS, {
+          type: "string",
+          description: "AST structure kind.",
+        }),
+        query: Type.String({
+          description: "Name or import module-specifier substring.",
+          minLength: 1,
+        }),
+      },
+      { additionalProperties: false, description: "Structural search over syntax trees." },
+    ),
+    semantic: Type.Object(
+      { query: Type.String({ description: "Workspace-symbol query.", minLength: 1 }) },
+      { additionalProperties: false, description: "Language-server workspace-symbol search." },
+    ),
+  },
+  "Exactly one search mode.",
+);
 
 export const ResolveTargetParam = exactOneSelector(
   {

@@ -52,7 +52,7 @@ describe("runFindWorkflow", () => {
     const semantic = { workspaceSymbols } as unknown as SemanticProvider;
 
     const outcome = await runFindWorkflow(
-      { query: "target", mode: "semantic" },
+      { search: { semantic: { query: "target" } } },
       {
         cwd: tmpDir,
         capability: new TestCapabilityAdapter({
@@ -82,7 +82,7 @@ describe("runFindWorkflow", () => {
       completedCodeQuery([]),
     );
     const outcome = await runFindWorkflow(
-      { query: "target", mode: "semantic" },
+      { search: { semantic: { query: "target" } } },
       {
         cwd: tmpDir,
         capability: new TestCapabilityAdapter({
@@ -102,7 +102,7 @@ describe("runFindWorkflow", () => {
 
   it("reports a readiness timeout when no semantic provider is registered", async () => {
     const outcome = await runFindWorkflow(
-      { query: "target", mode: "semantic" },
+      { search: { semantic: { query: "target" } } },
       {
         cwd: tmpDir,
         capability: new TestCapabilityAdapter({ readiness: { kind: "timeout" } }),
@@ -121,7 +121,7 @@ describe("runFindWorkflow", () => {
     } as unknown as SemanticProvider;
 
     const outcome = await runFindWorkflow(
-      { query: "missing", mode: "semantic" },
+      { search: { semantic: { query: "missing" } } },
       {
         cwd: tmpDir,
         capability: new TestCapabilityAdapter({ semantic }),
@@ -149,7 +149,7 @@ describe("runFindWorkflow", () => {
     );
 
     await runFindWorkflow(
-      { query: "target", mode: "semantic", scope: ["a", "b"] },
+      { search: { semantic: { query: "target" } }, scopes: ["a", "b"] },
       {
         cwd: tmpDir,
         capability: new TestCapabilityAdapter({
@@ -169,7 +169,7 @@ describe("runFindWorkflow", () => {
     }));
 
     const outcome = await runFindWorkflow(
-      { query: "target", mode: "ast", kind: "import" },
+      { search: { ast: { kind: "import", query: "target" } } },
       deps({ imports } as unknown as StructuralProvider),
       { deadline: Date.now() - 1 },
     );
@@ -196,7 +196,7 @@ describe("runFindWorkflow", () => {
     const signal = new AbortController().signal;
 
     await runFindWorkflow(
-      { query: "target", mode: "ast", kind: "import" },
+      { search: { ast: { kind: "import", query: "target" } } },
       deps({ imports } as unknown as StructuralProvider),
       { signal, deadline: Date.now() + 60_000 },
     );
@@ -214,7 +214,7 @@ describe("runFindWorkflow", () => {
     writeFileSync(path.join(tmpDir, "gamma.sql"), "select alpha;\n");
 
     const outcome = await runFindWorkflow(
-      { query: "a", mode: "ast", kind: "import", maxResults: 1 },
+      { search: { ast: { kind: "import", query: "a" } }, maxResults: 1 },
       deps(structuralProvider()),
     );
 
@@ -321,29 +321,26 @@ describe("runFindWorkflow", () => {
   });
 
   it("returns invalid-input instead of throwing for a non-string query", async () => {
-    const outcome = await runFindWorkflow({ query: 42, mode: "semantic" } as never, deps());
+    const outcome = await runFindWorkflow({ search: { semantic: { query: 42 } } } as never, deps());
 
-    expect(outcome).toEqual({ kind: "invalid-input", message: "query must be a string." });
+    expect(outcome).toEqual({
+      kind: "invalid-input",
+      message: "search.semantic.query must be a string.",
+    });
   });
 
-  it.each([undefined, "text", "regex", "not-a-mode"])(
-    "rejects removed or unknown mode %j",
-    async (mode) => {
-      const outcome = await runFindWorkflow(
-        { query: "needle", ...(mode === undefined ? {} : { mode }) } as never,
-        deps(),
-      );
+  it.each([undefined, "text", "regex"])("rejects removed or unknown mode %j", async (mode) => {
+    const outcome = await runFindWorkflow(
+      { search: mode === undefined ? {} : { [mode]: { query: "needle" } } } as never,
+      deps(),
+    );
 
-      expect(outcome).toEqual({
-        kind: "invalid-input",
-        message: "mode is required and must be one of ast or semantic.",
-      });
-    },
-  );
+    expect(outcome.kind).toBe("invalid-input");
+  });
 
   it("rejects the removed test AST kind before structural execution", async () => {
     const outcome = await runFindWorkflow(
-      { query: "registerCodeIntelligenceTools", mode: "ast", kind: "test" } as never,
+      { search: { ast: { kind: "test", query: "registerCodeIntelligenceTools" } } } as never,
       deps(),
     );
 

@@ -83,7 +83,7 @@ export function formatSearchResults(
   const noun = results.length === 1 ? "library" : "libraries";
   const hiddenNote =
     hiddenCount > 0
-      ? [`_${hiddenCount} more omitted; refine \`library_name\` or \`query\` if needed._`, ""]
+      ? [`_${hiddenCount} more omitted; refine \`libraryName\` or \`query\` if needed._`, ""]
       : [];
 
   return [

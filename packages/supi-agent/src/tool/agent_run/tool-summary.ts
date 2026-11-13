@@ -53,7 +53,7 @@ const summarizers: Record<string, ToolSummarizer> = {
   },
   code_inspect: {
     summarize: (args, name) => {
-      const file = typeof args?.point?.file === "string" ? args.point.file : "";
+      const file = typeof args?.anchor?.file === "string" ? args.anchor.file : "";
       return { toolName: name, summary: file ? `${name} ${file}` : name, bashPreview: undefined };
     },
   },
@@ -74,8 +74,9 @@ const summarizers: Record<string, ToolSummarizer> = {
   },
   code_find: {
     summarize: (args, name) => {
-      const query = typeof args.query === "string" ? args.query : "";
-      const mode = typeof args.mode === "string" ? args.mode : "";
+      const mode = args?.search?.ast ? "ast" : args?.search?.semantic ? "semantic" : "";
+      const branch = args?.search?.ast ?? args?.search?.semantic;
+      const query = typeof branch?.query === "string" ? branch.query : "";
       const label = mode ? `${query} (${mode})` : query;
       return { toolName: name, summary: label ? `${name} ${label}` : name, bashPreview: undefined };
     },

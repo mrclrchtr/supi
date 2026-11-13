@@ -42,7 +42,7 @@ export function validateInspectPoint(
   if (point.line > lines.length) {
     return {
       kind: "invalid-input",
-      message: `Point line ${point.line} is beyond the end of \`${point.file}\` (${lines.length} lines).`,
+      message: `Anchor line ${point.line} is beyond the end of \`${point.file}\` (${lines.length} lines).`,
     };
   }
 
@@ -51,7 +51,7 @@ export function validateInspectPoint(
   if (point.character > maximumCharacter) {
     return {
       kind: "invalid-input",
-      message: `Point character ${point.character} is beyond line ${point.line} of \`${point.file}\` (maximum ${maximumCharacter}, 1-based UTF-16).`,
+      message: `Anchor character ${point.character} is beyond line ${point.line} of \`${point.file}\` (maximum ${maximumCharacter}, 1-based UTF-16).`,
     };
   }
 

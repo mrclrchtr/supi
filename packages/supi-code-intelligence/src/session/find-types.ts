@@ -5,11 +5,15 @@ import type { CodeFindMode } from "../tool/code_find/modes.ts";
 
 export type FindMode = CodeFindMode;
 
+/** Exactly one search mode; each branch carries only the fields that mode honors. */
+export type FindSearchInput =
+  | { readonly ast: { readonly kind: CodeFindAstKind; readonly query: string } }
+  | { readonly semantic: { readonly query: string } };
+
+/** Canonical code_find workflow input. */
 export interface FindWorkflowInput {
-  readonly query: string;
-  readonly scope?: readonly string[];
-  readonly mode: FindMode;
-  readonly kind?: CodeFindAstKind;
+  readonly search: FindSearchInput;
+  readonly scopes?: readonly string[];
   readonly maxResults?: number;
 }
 

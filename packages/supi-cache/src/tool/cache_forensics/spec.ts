@@ -16,39 +16,43 @@ export const cacheForensicsSpec = {
     idempotentHint: true,
     openWorldHint: false,
   },
-  parameters: Type.Object({
-    pattern: Type.Enum(["hotspots", "breakdown", "correlate", "idle"], {
-      type: "string",
-      description:
-        "Analysis pattern: breakdown=cause totals; hotspots=largest drops; correlate=preceding tool shapes; idle=drops after long gaps.",
-    }),
-    since: Type.Optional(
-      Type.String({
-        description: 'Duration string like "7d", "24h", "30m". Default: "7d"',
-        default: "7d",
+  parameters: Type.Object(
+    {
+      pattern: Type.Enum(["hotspots", "breakdown", "correlate", "idle"], {
+        type: "string",
+        description:
+          "Analysis pattern: breakdown=cause totals; hotspots=largest drops; correlate=preceding tool shapes; idle=drops after long gaps.",
       }),
-    ),
-    minDrop: Type.Optional(
-      Type.Number({
-        description: "Minimum hit-rate drop in percentage points to include. Default: 0",
-        default: 0,
-      }),
-    ),
-    maxSessions: Type.Optional(
-      Type.Number({
-        description: "Maximum sessions to scan. Default: 100",
-        default: 100,
-      }),
-    ),
-    limit: Type.Optional(
-      Type.Integer({
-        minimum: 1,
-        maximum: MAX_FINDINGS_LIMIT,
-        description: `Maximum findings to return. Default: ${DEFAULT_FINDINGS_LIMIT}`,
-        default: DEFAULT_FINDINGS_LIMIT,
-      }),
-    ),
-  }),
+      since: Type.Optional(
+        Type.String({
+          description: 'Duration string like "7d", "24h", "30m". Default: "7d"',
+          default: "7d",
+        }),
+      ),
+      minDrop: Type.Optional(
+        Type.Number({
+          description: "Minimum hit-rate drop in percentage points to include. Default: 0",
+          default: 0,
+        }),
+      ),
+      maxSessions: Type.Optional(
+        Type.Integer({
+          minimum: 1,
+          description: "Maximum sessions to scan. Default: 100",
+          default: 100,
+        }),
+      ),
+      limit: Type.Optional(
+        Type.Integer({
+          minimum: 1,
+          maximum: MAX_FINDINGS_LIMIT,
+          description: `Maximum findings to return. Default: ${DEFAULT_FINDINGS_LIMIT}`,
+          default: DEFAULT_FINDINGS_LIMIT,
+        }),
+      ),
+    },
+    { additionalProperties: false },
+  ),
   outputSchema: cacheForensicsOutputSchema,
   execute: makeCacheForensicsExecute(),
 } as const;

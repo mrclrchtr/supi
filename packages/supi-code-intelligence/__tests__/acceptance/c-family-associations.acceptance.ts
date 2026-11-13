@@ -111,10 +111,8 @@ describe("trusted C-family associations with real clangd", () => {
 
   async function searchAst(file: string, name: string, kind: "type" | "class"): Promise<AstMatch> {
     const result = await runTool("code_find", {
-      query: name,
-      mode: "ast",
-      kind,
-      scope: [resolve(workspace.cwd, file)],
+      search: { ast: { kind, query: name } },
+      scopes: [resolve(workspace.cwd, file)],
     });
     const matches = resultData<{ astMatches: readonly AstMatch[] }>(result).astMatches;
     const match = matches.find((candidate) => candidate.name === name);
@@ -127,7 +125,7 @@ describe("trusted C-family associations with real clangd", () => {
     const absoluteFile = resolve(workspace.cwd, file);
     const point = findPoint(readFileSync(absoluteFile, "utf8"), name);
     const result = await runTool("code_inspect", {
-      point: { file: absoluteFile, ...point },
+      anchor: { file: absoluteFile, ...point },
     });
     const data = resultData<{
       readonly sections: readonly {

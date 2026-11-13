@@ -72,9 +72,9 @@ describe("registered inspect structured results", () => {
       definition: async () => completedCodeQuery([{ uri: pathToFileURL(alias).href, range }]),
     });
     try {
-      const result = await execute(tool(), { point: { file: alias, line: 1, character: 17 } });
+      const result = await execute(tool(), { anchor: { file: alias, line: 1, character: 17 } });
       expect(result.structuredContent).toMatchObject({
-        point: { file, line: 1, character: 17 },
+        anchor: { file, line: 1, character: 17 },
         sections: {
           node: { kind: "partial", recovery: { file } },
           definition: { data: [{ file, line: 1, character: 17 }] },
@@ -102,7 +102,7 @@ describe("registered inspect structured results", () => {
       hover: async () => completedCodeQuery(null),
       definition: async () => ({ kind: "partial", data: [], reason: "Index warming" }),
     });
-    const result = await execute(tool(), { point });
+    const result = await execute(tool(), { anchor: point });
     expect(result.structuredContent).toMatchObject({
       kind: "completed",
       sections: {
@@ -135,7 +135,7 @@ describe("registered inspect structured results", () => {
       } as never,
     });
     const registered = tool();
-    const selected = await execute(registered, { point, maxResults: 1 });
+    const selected = await execute(registered, { anchor: point, maxResults: 1 });
     expect(selected.structuredContent).toMatchObject({
       sections: {
         diagnostics: { kind: "completed", data: [{ message: "First", line: 1, character: 17 }] },
@@ -149,17 +149,19 @@ describe("registered inspect structured results", () => {
       { ...point, character: 999 },
       { ...point, line: 0 },
     ]) {
-      expect((await execute(registered, { point: invalidPoint })).structuredContent).toMatchObject({
-        kind: "invalid-input",
-        message: expect.any(String),
-      });
+      expect((await execute(registered, { anchor: invalidPoint })).structuredContent).toMatchObject(
+        {
+          kind: "invalid-input",
+          message: expect.any(String),
+        },
+      );
     }
     const controller = new AbortController();
     controller.abort();
-    await expect(execute(registered, { point }, controller.signal)).rejects.toThrow();
+    await expect(execute(registered, { anchor: point }, controller.signal)).rejects.toThrow();
     registerMockProvider(cwd, { hover: async () => unavailableCodeQuery("Not available") });
     setWorkspaceLspRuntimeState(cwd, { kind: "unavailable", reason: "Offline" });
-    await expect(execute(registered, { point })).rejects.toThrow(
+    await expect(execute(registered, { anchor: point })).rejects.toThrow(
       "No semantic, structural, or diagnostic provider",
     );
   });
@@ -205,10 +207,10 @@ describe("registered inspect structured results", () => {
         })),
       }),
     });
-    const result = await execute(tool(), { point, maxResults: 1 });
+    const result = await execute(tool(), { anchor: point, maxResults: 1 });
     expect(result.structuredContent).toMatchObject({
       kind: "completed",
-      point,
+      anchor: point,
       diagnosticWindow: { startLine: 1, endLine: 2 },
       sections: {
         node: {

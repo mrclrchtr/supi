@@ -45,7 +45,7 @@ describe("public Java AST search", () => {
 
     const result = await tool.execute(
       "java-anonymous-field",
-      { query: "hidden", mode: "ast", kind: "definition", scope: ["Host.java"] },
+      { search: { ast: { kind: "definition", query: "hidden" } }, scopes: ["Host.java"] },
       undefined,
       undefined,
       makeCtx({ cwd }),

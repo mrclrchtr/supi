@@ -299,7 +299,7 @@ describe.skipIf(!HAS_TEXLAB)("LaTeX targets through real Texlab and Tree-sitter"
   it("shows an underscore label as one syntax token in point inspection", async () => {
     const result = (await inspectTool.execute(
       "latex-underscore-inspect",
-      { point: { file: underscoreFile, line: 4, character: 14 } },
+      { anchor: { file: underscoreFile, line: 4, character: 14 } },
       undefined,
       undefined,
       context,

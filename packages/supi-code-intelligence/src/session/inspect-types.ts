@@ -7,7 +7,7 @@ import type { SourcePointInput } from "./target-input.ts";
 
 /** Canonical code_inspect workflow input. */
 export interface InspectWorkflowInput {
-  readonly point: SourcePointInput;
+  readonly anchor: SourcePointInput;
   readonly maxResults?: number;
 }
 

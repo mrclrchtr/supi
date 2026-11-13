@@ -1,8 +1,8 @@
 /** Runtime parsers for inspection, Orientation, graph, and find workflows. */
 
-import { type CodeFindAstKind, isCodeFindAstKind } from "../../tool/code_find/ast-kinds.ts";
+import { isCodeFindAstKind } from "../../tool/code_find/ast-kinds.ts";
 import { CODE_FIND_MODES } from "../../tool/code_find/modes.ts";
-import type { FindMode, FindWorkflowInput } from "../find-types.ts";
+import type { FindMode, FindSearchInput, FindWorkflowInput } from "../find-types.ts";
 import type { GraphWorkflowInput, RequestedGraphRelation } from "../graph-types.ts";
 import type { InspectWorkflowInput } from "../inspect-types.ts";
 import type { OrientationFocusInput, OrientationWorkflowInput } from "../orientation-types.ts";
@@ -19,7 +19,6 @@ import {
   valid,
 } from "./common.ts";
 
-const FIND_MODES = new Set<FindMode>(CODE_FIND_MODES);
 const GRAPH_RELATIONS = new Set<RequestedGraphRelation>([
   "all",
   "references",
@@ -30,14 +29,14 @@ const GRAPH_RELATIONS = new Set<RequestedGraphRelation>([
 export function parseInspectWorkflowInput(value: unknown): InputValidation<InspectWorkflowInput> {
   const record = requireRecord(value, "code_inspect input");
   if (record.kind === "invalid-input") return record;
-  const keysError = requireOnlyKeys(record.value, ["point", "maxResults"], "code_inspect input");
+  const keysError = requireOnlyKeys(record.value, ["anchor", "maxResults"], "code_inspect input");
   if (keysError) return invalid(keysError);
-  const point = parseSourcePoint(record.value.point);
-  if (point.kind === "invalid-input") return point;
+  const anchor = parseSourcePoint(record.value.anchor, "anchor");
+  if (anchor.kind === "invalid-input") return anchor;
   const maxResults = optionalPositiveInteger(record.value.maxResults, "maxResults");
   if (maxResults.kind === "invalid-input") return maxResults;
   return valid({
-    point: point.value,
+    anchor: anchor.value,
     ...(maxResults.value === undefined ? {} : { maxResults: maxResults.value }),
   });
 }
@@ -149,63 +148,63 @@ export function parseFindWorkflowInput(value: unknown): InputValidation<FindWork
   if (record.kind === "invalid-input") return record;
   const keysError = requireOnlyKeys(
     record.value,
-    ["query", "scope", "mode", "kind", "maxResults"],
+    ["search", "scopes", "maxResults"],
     "code_find input",
   );
   if (keysError) return invalid(keysError);
-  const query = requireString(record.value.query, "query", { nonEmpty: true });
-  if (query.kind === "invalid-input") return query;
-  const scope = parseFindScope(record.value.scope);
-  if (scope.kind === "invalid-input") return scope;
-  const mode = parseFindMode(record.value.mode);
-  if (mode.kind === "invalid-input") return mode;
-  const patternKind = parsePatternKind(record.value.kind);
-  if (patternKind.kind === "invalid-input") return patternKind;
-  const modeError = validateFindModeFields(mode.value, patternKind.value);
-  if (modeError) return invalid(modeError);
+  const search = parseFindSearch(record.value.search);
+  if (search.kind === "invalid-input") return search;
+  const scopes = parseFindScopes(record.value.scopes);
+  if (scopes.kind === "invalid-input") return scopes;
   const maxResults = optionalPositiveInteger(record.value.maxResults, "maxResults");
   if (maxResults.kind === "invalid-input") return maxResults;
   return valid({
-    query: query.value,
-    ...(scope.value === undefined ? {} : { scope: scope.value }),
-    mode: mode.value,
-    ...(patternKind.value === undefined ? {} : { kind: patternKind.value }),
+    search: search.value,
+    ...(scopes.value === undefined ? {} : { scopes: scopes.value }),
     ...(maxResults.value === undefined ? {} : { maxResults: maxResults.value }),
   });
 }
 
-function parseFindScope(value: unknown): InputValidation<readonly string[] | undefined> {
+function parseFindSearch(value: unknown): InputValidation<FindSearchInput> {
+  const record = requireRecord(value, "search");
+  if (record.kind === "invalid-input") return record;
+  const keysError = requireOnlyKeys(record.value, CODE_FIND_MODES, "search");
+  if (keysError) return invalid(keysError);
+  const selected = CODE_FIND_MODES.filter((mode) => record.value[mode] !== undefined);
+  if (selected.length !== 1) {
+    return invalid("search must contain exactly one of `ast` or `semantic`.");
+  }
+  const mode = selected[0] as FindMode;
+  const label = `search.${mode}`;
+  const branch = requireRecord(record.value[mode], label);
+  if (branch.kind === "invalid-input") return branch;
+  const branchKeysError = requireOnlyKeys(
+    branch.value,
+    mode === "ast" ? ["kind", "query"] : ["query"],
+    label,
+  );
+  if (branchKeysError) return invalid(branchKeysError);
+  const query = requireString(branch.value.query, `${label}.query`, { nonEmpty: true });
+  if (query.kind === "invalid-input") return query;
+  if (mode === "semantic") return valid({ semantic: { query: query.value } });
+  return isCodeFindAstKind(branch.value.kind)
+    ? valid({ ast: { kind: branch.value.kind, query: query.value } })
+    : invalid(
+        branch.value.kind === undefined ? "search.ast.kind is required." : "Unsupported AST kind.",
+      );
+}
+
+function parseFindScopes(value: unknown): InputValidation<readonly string[] | undefined> {
   if (value === undefined) return valid(undefined);
   if (
     !Array.isArray(value) ||
     value.length === 0 ||
     !value.every((item) => typeof item === "string")
   ) {
-    return invalid("scope must be a non-empty array of workspace-relative paths.");
+    return invalid("scopes must be a non-empty array of workspace-relative paths.");
   }
   if (value.some((item) => item.trim().length === 0)) {
-    return invalid("scope must not contain empty paths.");
+    return invalid("scopes must not contain empty paths.");
   }
   return valid(value);
-}
-
-function parseFindMode(value: unknown): InputValidation<FindMode> {
-  return typeof value === "string" && FIND_MODES.has(value as FindMode)
-    ? valid(value as FindMode)
-    : invalid("mode is required and must be one of ast or semantic.");
-}
-
-function parsePatternKind(value: unknown): InputValidation<CodeFindAstKind | undefined> {
-  if (value === undefined) return valid(undefined);
-  return isCodeFindAstKind(value) ? valid(value) : invalid("Unsupported AST kind.");
-}
-
-function validateFindModeFields(
-  mode: FindMode,
-  patternKind: CodeFindAstKind | undefined,
-): string | null {
-  if (mode === "ast" && patternKind === undefined) return 'mode "ast" requires kind.';
-  return mode !== "ast" && patternKind !== undefined
-    ? `kind is not valid with mode "${mode}".`
-    : null;
 }

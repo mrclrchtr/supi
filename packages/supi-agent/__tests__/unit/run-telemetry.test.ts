@@ -49,7 +49,7 @@ describe("AgentRunTelemetry", () => {
       type: "tool_execution_start",
       toolCallId: "semantic",
       toolName: "code_find",
-      args: { mode: "semantic" },
+      args: { search: { semantic: { query: "widget" } } },
     });
     now = 260;
     telemetry.observe({

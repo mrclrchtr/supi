@@ -30,7 +30,7 @@ export async function runInspectWorkflow(
   const parsed = parseInspectWorkflowInput(input);
   if (parsed.kind === "invalid-input") return parsed;
   const request = parsed.value;
-  const point = validateInspectPoint(request.point, deps.cwd);
+  const point = validateInspectPoint(request.anchor, deps.cwd);
   if (point.kind === "invalid-input") return point;
   throwIfAborted(control);
 
@@ -63,7 +63,7 @@ export async function runInspectWorkflow(
     structural: deps.capability.getStructuralProvider(deps.cwd),
     semantic,
     semanticUnavailableReason: semantic
-      ? "Semantic point query unavailable."
+      ? "Semantic anchor query unavailable."
       : semanticReadinessReason(readiness),
     lspState,
   });
@@ -72,7 +72,7 @@ export async function runInspectWorkflow(
   if (everySectionUnavailable(sections)) {
     return {
       kind: "unavailable",
-      reason: "No semantic, structural, or diagnostic provider could inspect this point.",
+      reason: "No semantic, structural, or diagnostic provider could inspect this anchor.",
     };
   }
 

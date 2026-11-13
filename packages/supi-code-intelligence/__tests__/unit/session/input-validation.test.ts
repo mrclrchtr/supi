@@ -15,32 +15,40 @@ import { TARGET_SYMBOL_KINDS } from "../../../src/session/target-input.ts";
 describe("code_find query validation", () => {
   it.each(["ast", "semantic"] as const)("preserves significant whitespace in %s mode", (mode) => {
     const query = " foo ";
-    const outcome = parseFindWorkflowInput({
-      query,
-      mode,
-      ...(mode === "ast" ? { kind: "definition" as const } : {}),
-    });
+    const search =
+      mode === "ast" ? { ast: { kind: "definition", query } } : { semantic: { query } };
 
-    expect(outcome.kind).toBe("valid");
-    if (outcome.kind === "valid") expect(outcome.value.query).toBe(query);
+    expect(parseFindWorkflowInput({ search })).toEqual({ kind: "valid", value: { search } });
   });
 
   it.each(["", "   ", "\t\n"])("rejects an all-whitespace query (%j)", (query) => {
-    expect(parseFindWorkflowInput({ query, mode: "semantic" })).toEqual({
+    expect(parseFindWorkflowInput({ search: { semantic: { query } } })).toEqual({
       kind: "invalid-input",
-      message: "query must not be empty.",
+      message: "search.semantic.query must not be empty.",
     });
   });
 
-  it.each([undefined, "text", "regex"])("rejects removed or omitted mode %j", (mode) => {
-    expect(parseFindWorkflowInput({ query: "Widget", ...(mode ? { mode } : {}) })).toEqual({
+  it.each([
+    {},
+    { text: { query: "Widget" } },
+    { ast: { kind: "definition", query: "Widget" }, semantic: { query: "Widget" } },
+  ])("rejects a search that does not select exactly one supported mode: %j", (search) => {
+    expect(parseFindWorkflowInput({ search })).toMatchObject({ kind: "invalid-input" });
+  });
+
+  it("rejects an AST kind on a semantic search", () => {
+    expect(
+      parseFindWorkflowInput({ search: { semantic: { query: "Widget", kind: "definition" } } }),
+    ).toEqual({
       kind: "invalid-input",
-      message: "mode is required and must be one of ast or semantic.",
+      message: "search.semantic contains unsupported field: `kind`.",
     });
   });
 
   it("rejects removed contextLines input", () => {
-    expect(parseFindWorkflowInput({ query: "Widget", mode: "semantic", contextLines: 2 })).toEqual({
+    expect(
+      parseFindWorkflowInput({ search: { semantic: { query: "Widget" } }, contextLines: 2 }),
+    ).toEqual({
       kind: "invalid-input",
       message: "code_find input contains unsupported field: `contextLines`.",
     });
@@ -48,8 +56,8 @@ describe("code_find query validation", () => {
 
   it("accepts duplicate scopes for canonical path deduplication", () => {
     expect(
-      parseFindWorkflowInput({ query: "Widget", mode: "semantic", scope: ["src", "src"] }),
-    ).toMatchObject({ kind: "valid", value: { scope: ["src", "src"] } });
+      parseFindWorkflowInput({ search: { semantic: { query: "Widget" } }, scopes: ["src", "src"] }),
+    ).toMatchObject({ kind: "valid", value: { scopes: ["src", "src"] } });
   });
 });
 
@@ -102,7 +110,7 @@ describe("session runtime input validation", () => {
   it.each([
     [
       "rejects fractional inspection coordinates",
-      () => parseInspectWorkflowInput({ point: { file: "src/a.ts", line: 1.5, character: 1 } }),
+      () => parseInspectWorkflowInput({ anchor: { file: "src/a.ts", line: 1.5, character: 1 } }),
     ],
     [
       "rejects an unknown Orientation focus branch",

@@ -44,7 +44,7 @@ describe("executor onUpdate progress beats", () => {
     const { onUpdate, beats } = captureProgress();
     try {
       await executeFindTool(
-        { query: "foo", mode: "semantic" },
+        { search: { semantic: { query: "foo" } } },
         { cwd: dir, onUpdate, session: sessionCache.getOrCreate(dir) },
       );
       expect(beats.length).toBeGreaterThanOrEqual(1);

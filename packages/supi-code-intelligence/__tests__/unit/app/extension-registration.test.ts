@@ -65,7 +65,7 @@ describe("focused code intelligence tool registration", () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
 
-    expect(propertiesOf(getTool(pi, "code_inspect"))).toHaveProperty("point");
+    expect(propertiesOf(getTool(pi, "code_inspect"))).toHaveProperty("anchor");
     const orientation = propertiesOf(getTool(pi, "code_orientation"));
     expect(orientation).toHaveProperty("focus");
     expect(orientation).not.toHaveProperty("file");
@@ -183,17 +183,6 @@ describe("focused code intelligence tool registration", () => {
         expect(bullet, `${name} guideline`).toContain(name);
       }
     }
-  });
-
-  it("describes the mode-specific code_find query contract in its schema", () => {
-    const pi = createPiMock();
-    codeIntelligenceExtension(pi as never);
-
-    const find = propertiesOf(getTool(pi, "code_find"));
-    expect(JSON.stringify(find.query)).toMatch(/AST mode.*name.*module-specifier substring/i);
-    expect(JSON.stringify(find.query)).toMatch(/semantic mode.*workspace-symbol query/i);
-    expect(JSON.stringify(find.mode)).toMatch(/AST mode requires.*kind/i);
-    expect(JSON.stringify(find.mode)).toMatch(/semantic mode rejects.*kind/i);
   });
 
   it("uses an exact-one nested refactor operation and a plan-only apply input", () => {

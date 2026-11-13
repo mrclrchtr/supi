@@ -1,16 +1,13 @@
 /** Thin Pi adapter for the session-owned code_find workflow. */
 
-import type { FindMode, FindWorkflowInput } from "../../session/find-types.ts";
+import type { FindSearchInput, FindWorkflowInput } from "../../session/find-types.ts";
 import type { CodeIntelResult, CodeIntelToolExecCtx } from "../../types/index.ts";
 import { toWorkflowControl } from "../infra/workflow-control.ts";
-import type { CodeFindAstKind } from "./ast-kinds.ts";
 import { finishFindResult } from "./result.ts";
 
 export interface CodeFindToolParams {
-  query: string;
-  scope?: string[];
-  mode: FindMode;
-  kind?: CodeFindAstKind;
+  search: FindSearchInput;
+  scopes?: string[];
   maxResults?: number;
 }
 
@@ -19,5 +16,7 @@ export async function executeFindTool(
   ctx: CodeIntelToolExecCtx,
 ): Promise<CodeIntelResult> {
   const outcome = await ctx.session.find(params as FindWorkflowInput, toWorkflowControl(ctx));
-  return finishFindResult(outcome, ctx.cwd, params.scope, params.mode);
+  const semantic =
+    typeof params.search === "object" && params.search !== null && "semantic" in params.search;
+  return finishFindResult(outcome, ctx.cwd, params.scopes, semantic ? "semantic" : "ast");
 }

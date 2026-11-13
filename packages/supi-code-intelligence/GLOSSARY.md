@@ -263,11 +263,11 @@ The invariant that composing a refactor and mutating files are done by separate 
 _Avoid_: "auto-apply", "preview-and-apply in one call" (these collapse the split into one mutating step)
 
 **Scope**:
-A workspace-relative path filter inside a symbol selector or a member of `code_find`'s scope set. Scope narrows discovery; it is not a target, an Orientation focus, or a search pattern. Every scope path must resolve independently, and invalid input is a hard error rather than a silent workspace-wide search.
+A workspace-relative path filter inside a symbol selector or a member of `code_find`'s `scopes` set. Scope narrows discovery; it is not a target, an Orientation focus, or a search pattern. Every scope path must resolve independently, and invalid input is a hard error rather than a silent workspace-wide search.
 _Avoid_: `searchPath`, treating scope as a target, precedence between scope and a precise target, silent scope widening
 
 **Scope set**:
-A `code_find` scope value containing more than one workspace-relative search root. Each member must resolve independently; duplicate or nested members may produce overlapping provider evidence, so public results deduplicate identical evidence atoms.
+A `code_find` `scopes` value containing more than one workspace-relative search root. Each member must resolve independently; duplicate or nested members may produce overlapping provider evidence, so public results deduplicate identical evidence atoms.
 _Avoid_: treating a space-separated search pattern as scope, silently ignoring missing members, widening to the whole workspace when one member is invalid
 
 **AST Scan universe**:

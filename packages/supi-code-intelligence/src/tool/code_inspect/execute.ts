@@ -7,7 +7,7 @@ import { toWorkflowControl } from "../infra/workflow-control.ts";
 import { finishInspectResult } from "./result.ts";
 
 export interface CodeInspectToolParams {
-  point: SourcePointInput;
+  anchor: SourcePointInput;
   maxResults?: number;
 }
 

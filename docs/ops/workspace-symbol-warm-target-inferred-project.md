@@ -3,7 +3,7 @@
 **Status:** fixed in `supi-lsp`; observed 2026-11-08 on SuPi `supi-stable` @ `bcf06cfd`
 **Packages:** `supi-lsp` (warm-up, fixed), `supi-code-intelligence` (rendering, unchanged)
 **Backends:** tsserver (TypeScript ≤ 6) only. The native TypeScript 7 server searches the configured program even when only an out-of-project file is open.
-**Affected tools:** `code_find` with `mode: "semantic"`, and symbol targets in `code_resolve`, `code_graph`, and `code_orientation`
+**Affected tools:** `code_find` with `search.semantic`, and symbol targets in `code_resolve`, `code_graph`, and `code_orientation`
 
 ## Summary
 
@@ -81,7 +81,7 @@ The tracked-files event does not record which file it opened. That the warm file
 ## Reproduction
 
 1. In a fresh Pi session in `/Users/mrclrchtr/Development/octalog-de/octalog-next`, without opening any file through code tools, run:
-   `code_find({ query: "DeleteConfirmModal", mode: "semantic" })`
+   `code_find({ search: { semantic: { query: "DeleteConfirmModal" } } })`
    **Expected:** `src/components/DeleteConfirmModal.tsx:29`. **Actual:** "No LSP workspace-symbol results found in `.`."
 2. Run `code_inspect` on `src/components/DeleteConfirmModal.tsx:1:1`, then repeat step 1. You now get 7 symbols.
 
