@@ -8,7 +8,6 @@ import { reviewInputSchema } from "./schemas.ts";
 
 function endpointSchema() {
   return Type.String({
-    minLength: 1,
     maxLength: 512,
     pattern: "^\\S+$",
   });
@@ -16,7 +15,6 @@ function endpointSchema() {
 
 const scopePathsSchema = Type.Array(
   Type.String({
-    minLength: 1,
     maxLength: REVIEW_LIMITS.reviewScopePathCharacters,
     pattern: "\\S",
     description: "Repository-relative path in the frozen after state; a leading @ is accepted.",

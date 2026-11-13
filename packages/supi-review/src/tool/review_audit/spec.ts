@@ -16,7 +16,8 @@ const reviewAuditParameters = Type.Object(
       }),
     ),
     view: Type.Optional(
-      Type.Union([Type.Literal("outline"), Type.Literal("message"), Type.Literal("raw")], {
+      Type.Enum(["outline", "message", "raw"] as const, {
+        type: "string",
         description:
           "Artifact view. Omit for Replay Outline; message needs messageIndex; raw returns exact persisted JSON.",
       }),
@@ -30,11 +31,7 @@ const reviewAuditParameters = Type.Object(
     offset: pageOffsetSchema,
     limit: pageLimitSchema,
   },
-  {
-    additionalProperties: false,
-    description:
-      "Omit artifactId to list replays. Artifact access defaults to bounded Replay Outline; select one message or explicit raw JSON when needed.",
-  },
+  { additionalProperties: false },
 );
 
 /** Canonical provider-facing metadata for the review_audit tool. */

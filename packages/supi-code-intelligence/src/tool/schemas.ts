@@ -9,31 +9,28 @@ import { CODE_FIND_AST_KINDS } from "./code_find/ast-kinds.ts";
 export const ScopeParam = Type.String({
   description: "Workspace-relative file or directory scope.",
 });
-export const FindScopesParam = Type.Array(
-  Type.String({ description: "Workspace-relative search scope." }),
-  {
-    description: "One or more workspace-relative search scopes.",
-    minItems: 1,
-  },
-);
-const FileParam = Type.String({ description: "File path." });
+export const FindScopesParam = Type.Array(Type.String(), {
+  description: "One or more workspace-relative search scopes.",
+  minItems: 1,
+});
+const FileParam = Type.String();
 export const QueryParam = Type.String({
   description: "Human or code reference to resolve or search for.",
   minLength: 1,
 });
-const LineParam = Type.Integer({ description: "1-based line.", minimum: 1 });
-const CharacterParam = Type.Integer({
-  description: "1-based UTF-16 column.",
-  minimum: 1,
-});
+const LineParam = Type.Integer({ minimum: 1 });
+const CharacterParam = Type.Integer({ minimum: 1 });
 export const MaxResultsParam = Type.Integer({
   description: "Maximum displayed results.",
   minimum: 1,
 });
 
+/** One home for the position convention; the leaf fields stay undescribed. */
+const POSITION_DESCRIPTION = "1-based line and UTF-16 column.";
+
 export const SourcePointParam = Type.Object(
   { file: FileParam, line: LineParam, character: CharacterParam },
-  { additionalProperties: false },
+  { additionalProperties: false, description: POSITION_DESCRIPTION },
 );
 
 const SymbolTargetParam = Type.Object(
@@ -47,10 +44,7 @@ const SymbolTargetParam = Type.Object(
       }),
     ),
   },
-  {
-    description: "Semantic symbol query.",
-    additionalProperties: false,
-  },
+  { additionalProperties: false },
 );
 
 /**
@@ -152,11 +146,12 @@ const RangeParam = Type.Object(
   },
   {
     additionalProperties: false,
-    description: "Source range; end is exclusive. Equal start and end mark a cursor position.",
+    description:
+      "Source range with 1-based lines and UTF-16 columns; end is exclusive. Equal start and end mark a cursor position.",
   },
 );
 
-const NewNameParam = Type.String({ description: "New symbol name.", minLength: 1 });
+const NewNameParam = Type.String({ minLength: 1 });
 const ActionTitleParam = Type.String({
   description:
     "Exact action title from a previous ambiguous result; selects one of several matching actions.",

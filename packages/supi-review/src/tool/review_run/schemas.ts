@@ -5,13 +5,11 @@ import { REVIEW_LIMITS } from "../../review-limits.ts";
 export const reviewTaskSchema = Type.Object(
   {
     id: Type.String({
-      minLength: 1,
       maxLength: REVIEW_LIMITS.taskIdCharacters,
       pattern: "\\S",
       description: "Task id for its result, such as standards or spec.",
     }),
     instructions: Type.String({
-      minLength: 1,
       maxLength: REVIEW_LIMITS.taskInstructionCharacters,
       pattern: "\\S",
       description:
@@ -27,13 +25,11 @@ export const reviewTaskSchema = Type.Object(
         Type.Object(
           {
             reference: Type.String({
-              minLength: 1,
               maxLength: REVIEW_LIMITS.criteriaReferenceCharacters,
               pattern: "\\S",
               description: "Issue reference, URL, or repository-relative document path.",
             }),
             summary: Type.String({
-              minLength: 1,
               maxLength: REVIEW_LIMITS.criteriaSummaryCharacters,
               pattern: "\\S",
               description: "Source summary; the reviewer retrieves more detail only when needed.",
@@ -79,13 +75,11 @@ export const reviewInputSchema = Type.Object(
 export const reviewFindingSchema = Type.Object(
   {
     title: Type.String({
-      minLength: 1,
       maxLength: REVIEW_LIMITS.findingTitleCharacters,
       pattern: "\\S",
       description: "Short, specific assertion of one problem.",
     }),
     description: Type.String({
-      minLength: 1,
       maxLength: REVIEW_LIMITS.findingDescriptionCharacters,
       pattern: "\\S",
       description: "Concrete evidence, consequence, and needed correction.",
@@ -139,7 +133,6 @@ export const reviewFindingSchema = Type.Object(
 export const reviewSubmissionSchema = Type.Object(
   {
     summary: Type.String({
-      minLength: 1,
       maxLength: REVIEW_LIMITS.summaryCharacters,
       pattern: "\\S",
       description: "Brief task conclusion, required even when findings is empty.",
@@ -157,7 +150,6 @@ export const reviewSubmissionSchema = Type.Object(
         }),
         reason: Type.Optional(
           Type.String({
-            minLength: 1,
             maxLength: REVIEW_LIMITS.criteriaCoverageReasonCharacters,
             pattern: "\\S",
             description: "Use only when status is incomplete; omit it when status is complete.",

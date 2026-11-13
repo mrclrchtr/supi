@@ -15,10 +15,7 @@ const reviewOutputParameters = Type.Object(
     offset: pageOffsetSchema,
     limit: pageLimitSchema,
   },
-  {
-    additionalProperties: false,
-    description: "Read one page of an artifact from an agent or interactive Review.",
-  },
+  { additionalProperties: false },
 );
 
 /** Canonical provider-facing metadata for the review_output tool. */

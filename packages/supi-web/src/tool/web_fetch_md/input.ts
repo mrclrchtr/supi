@@ -20,7 +20,6 @@ export type WebFetchMode = (typeof WEB_FETCH_MODES)[number];
 const OutputModeEnum = Type.Enum(WEB_FETCH_OUTPUT_MODES, {
   type: "string",
   default: "auto",
-  description: "auto, inline, or file output",
 });
 
 export const webFetchMdParameters = Type.Object(

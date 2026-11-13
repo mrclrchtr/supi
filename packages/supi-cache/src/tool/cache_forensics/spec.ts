@@ -25,20 +25,20 @@ export const cacheForensicsSpec = {
       }),
       since: Type.Optional(
         Type.String({
-          description: 'Duration string like "7d", "24h", "30m". Default: "7d"',
+          description: 'Duration string like "7d", "24h", "30m".',
           default: "7d",
         }),
       ),
       minDrop: Type.Optional(
         Type.Number({
-          description: "Minimum hit-rate drop in percentage points to include. Default: 0",
+          description: "Minimum hit-rate drop in percentage points to include.",
           default: 0,
         }),
       ),
       maxSessions: Type.Optional(
         Type.Integer({
           minimum: 1,
-          description: "Maximum sessions to scan. Default: 100",
+          description: "Maximum sessions to scan.",
           default: 100,
         }),
       ),
@@ -46,7 +46,7 @@ export const cacheForensicsSpec = {
         Type.Integer({
           minimum: 1,
           maximum: MAX_FINDINGS_LIMIT,
-          description: `Maximum findings to return. Default: ${DEFAULT_FINDINGS_LIMIT}`,
+          description: "Maximum findings to return.",
           default: DEFAULT_FINDINGS_LIMIT,
         }),
       ),
