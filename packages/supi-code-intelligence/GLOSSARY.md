@@ -55,7 +55,7 @@ The session-internal module that materializes orientation evidence — context f
 _Avoid_: brief generator, treating it as the public Orientation surface
 
 **Project declaration**:
-An identity or property explicitly established by parsed project metadata, with its source and native declaration kind retained. It does not establish workspace membership, source-file ownership, or relationships unless those facts are also declared. Workspace declarations retain their patterns and exclusions, including values that match no observed project.
+An identity or property explicitly established by parsed project metadata, with its source and native declaration kind retained. It does not establish workspace membership, source-file ownership, or relationships unless those facts are also declared. Workspace declarations retain their patterns and exclusions, including values that match no observed project. Maven aggregation (`modules` / `subprojects`) is a workspace declaration; Maven parent inheritance is not.
 _Avoid_: inferred project role, treating every project declaration as a workspace member, inferred source root
 
 **Gradle model observation**:

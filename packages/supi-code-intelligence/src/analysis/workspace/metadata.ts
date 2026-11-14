@@ -5,6 +5,7 @@ import * as path from "node:path";
 import type { CodeRequestControl } from "@mrclrchtr/supi-code-runtime/api";
 import { parse as parseToml } from "smol-toml";
 import { parseDocument } from "yaml";
+import { parsePom } from "./maven.ts";
 import type { MetadataReadResult, ParsedDocument } from "./metadata-types.ts";
 import { isRecord, issue } from "./metadata-utils.ts";
 import { errorMessage, relativeDirectory } from "./paths.ts";
@@ -25,6 +26,7 @@ const KIND_BY_BASENAME = new Map<string, MetadataDocumentKind>([
   ["Cargo.toml", "cargo"],
   ["go.mod", "go-mod"],
   ["go.work", "go-work"],
+  ["pom.xml", "maven-pom"],
 ]);
 
 interface ReadOutcome {
@@ -106,6 +108,7 @@ function parseText(relativePath: string, kind: MetadataDocumentKind, text: strin
       return complete(relativePath, kind, document.toJS());
     }
     if (kind === "go-mod" || kind === "go-work") return complete(relativePath, kind, text);
+    if (kind === "maven-pom") return complete(relativePath, kind, parsePom(text));
     return complete(relativePath, kind, parseToml(text));
   } catch (error) {
     return failed(relativePath, kind, `Could not parse metadata: ${errorMessage(error)}`);

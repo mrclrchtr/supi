@@ -23,9 +23,12 @@ const Project = Type.Object(
   {
     id: Type.String(),
     manifestPath: Type.String(),
-    kind: Type.Enum(["node-package", "python-project", "rust-package", "go-module"], {
-      type: "string",
-    }),
+    kind: Type.Enum(
+      ["node-package", "python-project", "rust-package", "go-module", "maven-project"],
+      {
+        type: "string",
+      },
+    ),
     directory: Type.String(),
     name: nullableString,
     nameField: nullableString,

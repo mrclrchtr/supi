@@ -3,6 +3,7 @@
 import * as path from "node:path";
 import { readGoDocument } from "./go.ts";
 import { collectInventory, DEFAULT_MAX_INVENTORY_ENTRIES } from "./inventory.ts";
+import { readMavenDocument } from "./maven.ts";
 import { applyMemberships } from "./membership.ts";
 import { readMetadataDocuments } from "./metadata.ts";
 import type { DocumentContribution, ParsedDocument } from "./metadata-types.ts";
@@ -133,6 +134,8 @@ function readDocument(document: ParsedDocument): DocumentContribution {
     case "go-mod":
     case "go-work":
       return readGoDocument(document);
+    case "maven-pom":
+      return readMavenDocument(document);
   }
 }
 

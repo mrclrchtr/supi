@@ -44,6 +44,7 @@
     "@mrclrchtr/supi-core": "workspace:*",
     "@mrclrchtr/supi-lsp": "workspace:*",
     "@mrclrchtr/supi-tree-sitter": "workspace:*",
+    "fast-xml-parser": "5.12.0",
     "ignore": "^7.0.12",
     "smol-toml": "^1.9.1",
     "yaml": "^2.9.0"
@@ -53,6 +54,7 @@
     "@mrclrchtr/supi-core",
     "@mrclrchtr/supi-lsp",
     "@mrclrchtr/supi-tree-sitter",
+    "fast-xml-parser",
     "ignore",
     "smol-toml",
     "yaml"

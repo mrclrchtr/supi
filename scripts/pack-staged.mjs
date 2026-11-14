@@ -270,6 +270,8 @@ function ensureBundledDep(localNm, depName, pjPath) {
     if (depName.startsWith("@mrclrchtr/")) {
       copyPackageTree(sourcePath, localPath);
     } else {
+      // Scoped names need their scope directory before cp can create the package directory.
+      mkdirSync(dirname(localPath), { recursive: true });
       execFileSync("cp", ["-RL", `${sourcePath}/.`, localPath]);
     }
   }

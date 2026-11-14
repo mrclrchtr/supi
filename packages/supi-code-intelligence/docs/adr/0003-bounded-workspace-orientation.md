@@ -12,7 +12,7 @@ Supersedes the content, rendering, and warning decisions in [Workspace Overview]
 | Automatic boundary | The session working directory is the root. Ancestor repositories and workspace manifests do not expand it. An explicit focus is a separate request. |
 | Inclusion | Include Git-tracked and non-ignored untracked files, subject to configured exclusions. Keep ignored-but-tracked files. Without Git, use accessible files and configured exclusions. Do not classify directories by their names. |
 | Links | Record symbolic links, but do not follow them during navigation collection. |
-| Metadata | Parse explicit Node, Python, Rust, and Go declarations. Preserve native kinds, fields, values, and manifest identities. Static readers never run project code or build tools. Separately authorized Gradle model observations are the explicit execution exception below. |
+| Metadata | Parse explicit Node, Python, Rust, Go, and Maven POM declarations. Preserve native kinds, fields, values, and manifest identities. Static readers never run project code or build tools. Separately authorized Gradle model observations are the explicit execution exception below. |
 | Descriptions | Retain source-written prose with its source field. Treat it as untrusted evidence. Do not generate responsibilities or architectural roles. |
 | Relationships | Directory-focused output uses Mermaid. Keep separate dependency fields between the same pair of projects. Name matches do not establish installed resolution or runtime architecture. |
 | Context independence | Each tool response must work without the overview or earlier tool output. Do not suppress ordinary facts based on session history. |
@@ -35,6 +35,16 @@ Supersedes the content, rendering, and warning decisions in [Workspace Overview]
 - Do not replace a failed Git inventory with a broader filesystem scan. A missing Git executable permits a disclosed filesystem fallback.
 - Configuration exclusions are not access controls. An exact ignored or excluded directory can have its own observation.
 
+## Static Maven POM declarations
+
+| Area | Rule |
+| --- | --- |
+| Mechanism | Static `pom.xml` parsing only. Never run Maven, a wrapper, extensions, or plugins; the Gradle permission does not apply. An effective Maven model is not needed to choose a project or directory. |
+| Supported forms | Model versions 4.0.0 and 4.1.0 (declared `modelVersion`, else the POM namespace). Other or missing versions, malformed XML, and other root elements produce no project. Custom DOCTYPE entities are never expanded. |
+| Identity | Literal `project.artifactId` as the name, `project.description` as the description. Interpolated or missing values yield a null name with a disclosed issue. groupId/version coordinates are not reported because they are commonly inherited. |
+| Membership | Only `project.modules.module` (4.0.0) or `project.subprojects.subproject` (4.1.0), as exact paths from the aggregator directory to an observed `pom.xml` project. `<parent>` never establishes membership. Interpolated, profile-scoped, absolute, out-of-root, non-`pom.xml` file, and unmatched values are disclosed. |
+| Non-goals | No parent or property resolution, profile activation, implicit 4.1.0 subproject discovery, dependencies, relationships, plugins, or effective model. |
+
 ## Authorized Gradle model observations
 
 | Area | Rule |
@@ -47,7 +57,7 @@ Supersedes the content, rendering, and warning decisions in [Workspace Overview]
 | Changes | Project-only `/supi-settings` editor; changes affect the next query. Reset deletes the key and restores asking at the next eligible startup. Deny/reset cancel owned work where possible. Cancellation does not reverse side effects or stop unrelated daemons. |
 | Bounds | Existing inventory, metadata, request deadline (including Overview's 10 seconds), token budgets, captures, and untrusted-evidence rules stay in force. The JVM helper additionally caps model output at 1 MiB and 10,000 projects. These bounds do not sandbox Gradle. |
 | Failure | Retain generic navigation and disclose blocked, unavailable, interrupted, unsupported, failed, expired, or oversized model collection; never equate these with no projects. No retries, CLI-report parsing, or stale-model reuse. |
-| Non-goals | No Maven/CMake, Gradle ≤8 or ≥10, recursive included-build queries, task scheduling, dependency/task/source-set/IDE models, or changes to language support/LSP readiness/static readers. |
+| Non-goals | No Maven execution or CMake, Gradle ≤8 or ≥10, recursive included-build queries, task scheduling, dependency/task/source-set/IDE models, or changes to language support/LSP readiness/static readers. |
 
 ## Captured results
 

@@ -144,6 +144,29 @@ describe("compact workspace project evidence", () => {
     ]);
   });
 
+  it("renders Maven artifactId identity and module aggregation with native provenance", async () => {
+    const ns = 'xmlns="http://maven.apache.org/POM/4.0.0"';
+    write(
+      root,
+      "pom.xml",
+      `<project ${ns}><modelVersion>4.0.0</modelVersion><artifactId>parent</artifactId><modules><module>api</module></modules></project>`,
+    );
+    write(
+      root,
+      "api/pom.xml",
+      `<project ${ns}><modelVersion>4.0.0</modelVersion><artifactId>api</artifactId></project>`,
+    );
+    const sections = projectSections(await facts(), 10, false);
+
+    expect(paragraphs(section(sections, "workspace.projects"))).toEqual([
+      "maven-project; identity source: `pom.xml#project.artifactId` relative to each listed project path.",
+    ]);
+    expect(rows(section(sections, "workspace.projects"))).toEqual([["`api`", "`api`"]]);
+    expect(paragraphs(section(sections, "workspace.memberships"))).toEqual([
+      "maven-modules; source: `pom.xml#project.modules.module`; value: `api`. Projects: all 1 listed maven-project declarations.",
+    ]);
+  });
+
   it("keeps overlapping values and distinct sources separate and names partial member sets explicitly", async () => {
     writeJson(root, "package.json", { name: "root", workspaces: ["units/*", "units/app"] });
     write(root, "pnpm-workspace.yaml", "packages:\n  - units/*\n");

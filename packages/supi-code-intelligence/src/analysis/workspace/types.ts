@@ -76,7 +76,8 @@ export type MetadataDocumentKind =
   | "pyproject"
   | "cargo"
   | "go-mod"
-  | "go-work";
+  | "go-work"
+  | "maven-pom";
 
 /** Metadata read outcome retained for provenance. */
 export interface MetadataDocument {
@@ -117,12 +118,17 @@ export interface WorkspaceMetadataObservation {
 }
 
 /** Native project declaration kinds supported by this collector. */
-export type ProjectKind = "node-package" | "python-project" | "rust-package" | "go-module";
+export type ProjectKind =
+  | "node-package"
+  | "python-project"
+  | "rust-package"
+  | "go-module"
+  | "maven-project";
 
 /** How one configuration explicitly established project membership. */
 export interface ProjectMembership {
   /** Native workspace declaration family. */
-  readonly kind: "node-workspace" | "cargo-workspace" | "go-work";
+  readonly kind: "node-workspace" | "cargo-workspace" | "go-work" | "maven-modules";
   /** Root-relative configuration or manifest path that declared membership. */
   readonly manifestPath: string;
   /** Exact declaring field or directive. */
