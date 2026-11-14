@@ -178,11 +178,38 @@ describe("Evidence list module", () => {
       disclosure:
         "_(showing 2 of 3; 1 omitted; 1 invalid provider location omitted (invalid-provider-location))_",
     },
+    {
+      name: "partial when provider-limited collection also excluded invalid locations",
+      build: () =>
+        createPartialEvidenceList({
+          key: "k",
+          items: ["a", "b", "c"],
+          maxResults: 2,
+          partialReason: "provider-limited",
+          invalidLocationCount: 1,
+        }),
+      items: ["a", "b"],
+      metadata: {
+        key: "k",
+        completeness: "partial",
+        totalCount: null,
+        shownCount: 2,
+        omittedCount: 1,
+        partialReason: "provider-limited",
+        invalidLocationCount: 1,
+      },
+      phrase:
+        "2; 1 collected omitted; more may exist — provider-limited; 1 invalid provider location omitted (invalid-provider-location)",
+      disclosure:
+        "_(showing 2; 1 collected omitted; more may exist — provider-limited; 1 invalid provider location omitted (invalid-provider-location))_",
+    },
   ])("is $name", ({ build, items, metadata, phrase, disclosure }) => {
     const list = build();
 
     expect(list.items).toEqual(items);
     expect(list.metadata).toEqual(metadata);
+    // Every constructed list must survive persistence and be read back unchanged.
+    expect(readEvidenceListFacts(JSON.parse(JSON.stringify(list.metadata)))).toEqual(metadata);
     expect(describeEvidenceList(list.metadata)).toBe(phrase);
     expect(renderEvidenceListDisclosure(list)).toBe(disclosure);
   });

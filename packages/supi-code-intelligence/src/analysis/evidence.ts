@@ -216,13 +216,16 @@ function readFactsShape(value: unknown): EvidenceListFacts | null {
 function isConsistent(facts: EvidenceListFacts): boolean {
   const { totalCount, shownCount, omittedCount, partialReason } = facts;
   const invalidReason = partialReason === "invalid-provider-location";
+  const invalidCount = facts.invalidLocationCount ?? 0;
   // Only invalid provider locations keep an exact total beside a partial reason.
   const exactTotal = partialReason === null || invalidReason;
   return (
     facts.completeness === completenessOf(partialReason, omittedCount) &&
     exactTotal === (totalCount !== null) &&
     (totalCount === null || totalCount === shownCount + (omittedCount ?? -1)) &&
-    invalidReason === (facts.invalidLocationCount ?? 0) > 0
+    // Invalid locations always carry a reason; it may be a collection reason such as
+    // provider-limited, whose metadata still records the invalid count.
+    (invalidReason ? invalidCount > 0 : invalidCount === 0 || partialReason !== null)
   );
 }
 
