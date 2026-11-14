@@ -174,6 +174,7 @@ describe("refactor result projections", () => {
             evidenceLists: [
               {
                 key: "refactor.edits",
+                completeness: "capped",
                 totalCount: 3,
                 shownCount: 2,
                 omittedCount: 1,
@@ -189,7 +190,7 @@ describe("refactor result projections", () => {
     );
 
     const text = rendered.render(120).join("\n");
-    expect(text).toContain("2 of 3 edits (1 omitted)");
+    expect(text).toContain("2 of 3 edits; 1 omitted");
     if (expanded) expect(text).toContain("showing 2 of 3; 1 omitted");
   });
 });

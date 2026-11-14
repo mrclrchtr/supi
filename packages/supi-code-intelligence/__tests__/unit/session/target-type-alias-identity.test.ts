@@ -42,8 +42,12 @@ describe("type-alias Target identity", () => {
     expect(outcome).toMatchObject({
       kind: "file-outline",
       confidence: "semantic",
-      totalCount: 1,
-      omittedCount: 0,
+      targetEvidence: {
+        key: "resolve.targets",
+        completeness: "complete",
+        totalCount: 1,
+        omittedCount: 0,
+      },
       targets: [
         {
           name: "UserId",
@@ -147,7 +151,7 @@ describe("type-alias Target identity", () => {
     expect(fromFile.kind).toBe("file-outline");
     expect(fromSymbol.kind).toBe("disambiguation");
     if (fromFile.kind !== "file-outline" || fromSymbol.kind !== "disambiguation") return;
-    expect(fromFile.totalCount).toBe(2);
+    expect(fromFile.targetEvidence.totalCount).toBe(2);
     expect(fromFile.confidence).toBe("semantic");
     expect(fromFile.targets.map((target) => target.kind)).toEqual(["Variable", "Variable"]);
     expect(new Set(fromFile.targets.map((target) => target.targetId))).toHaveLength(2);

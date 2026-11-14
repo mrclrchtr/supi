@@ -231,6 +231,7 @@ describe("runFindWorkflow", () => {
     const assembly = assembleFindWorkflowResult(outcome, tmpDir);
     expect(assembly.details.evidenceLists).toContainEqual({
       key: "find.astMatches",
+      completeness: "capped",
       totalCount: 2,
       shownCount: 1,
       omittedCount: 1,
@@ -305,6 +306,7 @@ describe("runFindWorkflow", () => {
 
     expect(assembly.details.evidenceLists).toContainEqual({
       key: "find.astMatches",
+      completeness: "partial",
       totalCount: null,
       shownCount: 1,
       omittedCount: 1,

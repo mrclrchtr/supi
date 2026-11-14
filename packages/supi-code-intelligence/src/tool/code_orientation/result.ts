@@ -1,6 +1,10 @@
 import type { ConfidenceMode } from "@mrclrchtr/supi-code-runtime/api";
 import {
+  createEvidenceList,
+  createPartialEvidenceList,
+  describeEvidenceList,
   type EvidenceListMetadata,
+  rekeyEvidence,
   renderEvidenceListMetadataDisclosure,
 } from "../../analysis/evidence.ts";
 import type { ReadNextItem } from "../../analysis/read-next.ts";
@@ -19,7 +23,7 @@ import {
   type ResultSection,
   type ToolResultAssembly,
 } from "../result/assembly.ts";
-import { formatCandidateRow, formatPartialCandidateDisclosure } from "../result/candidate-row.ts";
+import { formatCandidateRow } from "../result/candidate-row.ts";
 import {
   createToolDisplaySection,
   MAX_TUI_DISPLAY_ITEMS,
@@ -65,11 +69,8 @@ export function orientationCandidateDisplaySections(
       key: "orientation.candidates",
       title: "Candidates",
       items: candidates,
-      totalCount: evidence.totalCount,
-      omittedCount: evidence.omittedCount,
-      partialReason: evidence.partialReason,
-      partialMessage: evidence.partialMessage,
-      format: (candidate) => formatCandidateRow(candidate, "rank-first"),
+      evidence,
+      format: (candidate: OrientationCandidate) => formatCandidateRow(candidate, "rank-first"),
     }),
   ];
 }
@@ -140,25 +141,16 @@ export function assembleOrientationDetails(input: OrientationDetailsInput): Cont
 
 function orientationDisplaySection(section: OrientationSectionData): ToolDisplaySection {
   const items = section.items.filter((item) => item.kind !== "blank");
-  const input = {
-    key: `orientation.${section.key}`,
-    title: section.title,
-    partialReason:
-      section.evidenceLists.find((evidence) => evidence.partialReason)?.partialReason ??
-      (section.reason ? "provider-limited" : null),
-    ...(section.reason ? { partialMessage: section.reason } : {}),
-  };
+  const key = `orientation.${section.key}`;
   const evidence = section.evidenceLists.find((list) => list.key === section.tableEvidenceKey);
   if (evidence) {
     const rows = orientationTableRows(items);
     const display = createToolDisplaySection({
-      ...input,
+      key,
+      title: section.title,
       items: rows,
-      totalCount: evidence.totalCount,
-      omittedCount: evidence.omittedCount,
-      partialReason: evidence.partialReason ?? input.partialReason,
-      partialMessage: evidence.partialMessage ?? input.partialMessage,
-      format: (row) => row,
+      evidence,
+      format: (row: string) => row,
     });
     return rows.length
       ? display
@@ -174,11 +166,12 @@ function orientationDisplaySection(section: OrientationSectionData): ToolDisplay
     const prefix = section.evidenceLists.length > 1 ? `${list.key}: ` : "";
     return `${prefix}${orientationEvidenceSelection(list, grouped ? "memberships" : undefined)}`;
   });
+  // Preview blocks are framing, not Evidence atoms; the summary carries the evidence.
   return createToolDisplaySection({
-    ...input,
+    key,
+    title: section.title,
     items,
-    totalCount: items.length,
-    omittedCount: 0,
+    evidence: blockEvidence(key, items, section.reason),
     format: formatOrientationItem,
     preview: {
       unit: grouped ? "group" : "block",
@@ -187,19 +180,22 @@ function orientationDisplaySection(section: OrientationSectionData): ToolDisplay
   });
 }
 
-/** Describe canonical selection separately: a capped group preview need not show every atom. */
+function blockEvidence(key: string, items: readonly OrientationItem[], reason: string | null) {
+  return reason
+    ? createPartialEvidenceList({
+        key,
+        items,
+        partialReason: "provider-limited",
+        partialMessage: reason,
+      }).metadata
+    : createEvidenceList({ key, items }).metadata;
+}
+
+/** Canonical selection phrase; a capped group preview need not show every atom. */
 function orientationEvidenceSelection(list: EvidenceListMetadata, noun?: string): string {
-  const label = noun ? ` ${noun}` : "";
-  const explanation = list.partialMessage ? `; ${list.partialMessage}` : "";
-  if (list.totalCount === null) {
-    const omitted = list.omittedCount ? `; ${list.omittedCount} collected omitted` : "";
-    return `${list.shownCount}${label} selected${omitted}; more may exist — ${list.partialReason ?? "partial"}${explanation}`;
-  }
-  const partial = list.partialReason ? `; partial — ${list.partialReason}` : "";
-  if (list.omittedCount) {
-    return `${list.shownCount} of ${list.totalCount}${label} selected; ${list.omittedCount} omitted${partial}${explanation}`;
-  }
-  return `${list.totalCount}${label || " observed"}${partial}${explanation}`;
+  return list.completeness === "complete" && !noun
+    ? `${list.totalCount} observed`
+    : describeEvidenceList(list, noun);
 }
 
 /** Keep table headers and group context with the first evidence row, outside its count. */
@@ -297,16 +293,8 @@ export function finishOrientationResult(outcome: OrientationOutcome, cwd: string
         `${candidate.rank}. **${candidate.name}** (\`${candidate.kind ?? "unknown"}\`) — \`${candidate.file}\`:${candidate.line}:${candidate.character} — \`${candidate.targetId}\``,
       );
     }
-    const evidence: EvidenceListMetadata = {
-      key: "orientation.candidates",
-      totalCount: outcome.totalCount,
-      shownCount: candidates.length,
-      omittedCount: outcome.omittedCount,
-      partialReason: outcome.partialReason,
-      partialMessage: outcome.partialMessage,
-    };
-    const disclosure =
-      formatPartialCandidateDisclosure(evidence) ?? renderEvidenceListMetadataDisclosure(evidence);
+    const evidence = rekeyEvidence(outcome.candidateEvidence, "orientation.candidates");
+    const disclosure = renderEvidenceListMetadataDisclosure(evidence);
     if (disclosure) lines.push("", disclosure);
     const nextQueries =
       outcome.kind === "kind-mismatch"

@@ -19,6 +19,7 @@ import {
   type ToolResult,
 } from "../../ui/tui/common.ts";
 import {
+  describeDisplayOmission,
   MAX_TUI_DISPLAY_ITEMS,
   readToolDisplaySections,
   truncateDisplayText,
@@ -182,11 +183,15 @@ function sectionSummary(
 ): string {
   if (section.unavailable) return `${section.label}: unavailable`;
   if (!metadata) return `${section.label}: evidence unavailable`;
-  // The display has its own bounded row count; the underlying evidence total is unchanged.
-  const shown = display
-    ? { ...metadata, shownCount: display.shownCount, omittedCount: display.omittedCount }
-    : metadata;
-  return `${section.label}: ${formatGraphEvidence(shown, section.rel === "callees" ? "call sites" : "locations", section.externalCount)}`;
+  const summary = formatGraphEvidence(
+    metadata,
+    section.rel === "callees" ? "call sites" : "locations",
+    section.externalCount,
+  );
+  // View-hidden rows are a Display omission; the evidence counts are unchanged.
+  const hiddenPhrase = describeDisplayOmission(display?.displayOmittedCount ?? 0);
+  const hidden = hiddenPhrase ? `; ${hiddenPhrase}` : "";
+  return `${section.label}: ${summary}${hidden}`;
 }
 
 function readSections(value: unknown): SectionView[] {

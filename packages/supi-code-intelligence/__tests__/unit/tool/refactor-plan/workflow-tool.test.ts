@@ -373,6 +373,7 @@ describe("code_refactor_plan / code_refactor_apply workflow wrappers", () => {
     expect(result.details?.data.omittedCount).toBe(1);
     expect(result.details?.data.evidenceLists).toContainEqual({
       key: "refactor.edits",
+      completeness: "capped",
       totalCount: 6,
       shownCount: 5,
       omittedCount: 1,

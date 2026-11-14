@@ -214,9 +214,21 @@ _Avoid_: treating every rendered list as evidence, convention-derived relationsh
 The code-intelligence flow that turns collected facts into public result evidence: typed result sections, evidence lists, omission metadata, confidence, read-next guidance, and details data. Tool result assembly stops before presentation; markdown and TUI rendering are adapters over the assembled evidence.
 _Avoid_: markdown-first result building, generic result builder, mixing evidence collection with rendering
 
+**Tool outcome dispatch**:
+The tool-layer mapping of shared non-success workflow outcomes—unavailable, invalid-input, disambiguation, and Symbol-kind mismatch—to one canonical public result per tool: thrown failure, invalid-input result, or candidate selection with handle-first rows, Evidence list disclosure, and shared next-query guidance. Tools keep their own details type and may supply recovery wording; per-tool result modules project only completed outcomes.
+_Avoid_: per-tool error shells, per-tool candidate formatting, treating Symbol-kind mismatch as invalid input
+
 **Evidence list**:
-A bounded collection of tool evidence with explicit completeness metadata: which evidence atoms are shown and whether the list is complete. Normal public-tool paths compute exact totals and omitted counts. Unknown totals are reserved for exceptional interruption or limited collection, such as timeout, safety-limit, interrupted enumeration, unreadable filesystem/configuration input, or an upstream provider that cannot expose a true total, and must carry an explicit partial reason instead of pretending exact completeness. Rejected provider locations are tracked separately: valid normalized evidence retains exact counts while `invalidLocationCount` and an explicit partial reason disclose unusable provider atoms. Markdown and structured details should describe the same evidence list rather than computing truncation separately.
-_Avoid_: raw capped arrays, renderer-only omission math, details-only omission math, inventing exact totals, using unknown totals as a routine performance shortcut
+A bounded collection of tool evidence with explicit completeness metadata: which evidence atoms are shown and whether the list is complete. Normal public-tool paths compute exact totals and omitted counts. Unknown totals are reserved for exceptional interruption or limited collection, such as timeout, safety-limit, interrupted enumeration, unreadable filesystem/configuration input, or an upstream provider that cannot expose a true total, and must carry an explicit partial reason instead of pretending exact completeness. Rejected provider locations are tracked separately: valid normalized evidence retains exact counts while `invalidLocationCount` and an explicit partial reason disclose unusable provider atoms. Markdown and structured details should describe the same evidence list rather than computing truncation separately. Evidence list metadata has one producer; every other module reads it.
+_Avoid_: raw capped arrays, renderer-only omission math, details-only omission math, hand-built list metadata, inventing exact totals, using unknown totals as a routine performance shortcut
+
+**Evidence completeness state**:
+The classification of one Evidence list: `complete` (every collected Evidence atom shown and collection finished), `capped` (exact total, some atoms omitted by a Result cap), `partial` (collection incomplete, or invalid provider locations excluded beside an exact valid total; hidden collected atoms are counted), or `unbounded` (collection incomplete; hidden collected atoms are not counted). It is published with the list, not inferred by readers.
+_Avoid_: inferring completeness from a null total, treating `capped` as incomplete collection, treating `partial` as exact
+
+**Display omission**:
+Rows a presentation surface hides to fit its own view limit, such as a TUI section row cap. Display omissions are not Evidence atoms and never change an Evidence list's totals, omitted count, or Evidence completeness state.
+_Avoid_: adding view-hidden rows to evidence omissions, treating a TUI row cap as a Result cap
 
 **Actionable list**:
 A bounded list of generated executable or check actions a user or agent may run, such as verification commands. Actionable lists are not tool evidence, but they follow the same truncation-disclosure rule because omitting actions silently can mislead follow-up work. Prose navigation hints such as `nextQueries` are guidance chrome, not actionable lists.

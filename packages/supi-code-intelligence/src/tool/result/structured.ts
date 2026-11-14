@@ -5,10 +5,11 @@ export const ConfidenceSchema = Type.Enum(["semantic", "structural", "heuristic"
   type: "string",
 });
 
-/** Canonical evidence counts; null totals mean collection could not establish completeness. */
+/** Canonical evidence counts and Evidence completeness state; readers never infer completeness. */
 export const EvidenceListSchema = Type.Object(
   {
     key: Type.String(),
+    completeness: Type.Enum(["complete", "capped", "partial", "unbounded"], { type: "string" }),
     totalCount: Type.Union([Type.Integer(), Type.Null()]),
     shownCount: Type.Integer(),
     omittedCount: Type.Union([Type.Integer(), Type.Null()]),

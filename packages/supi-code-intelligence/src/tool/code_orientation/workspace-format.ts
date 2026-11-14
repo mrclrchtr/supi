@@ -1,4 +1,5 @@
 import * as path from "node:path";
+import { createEvidenceList } from "../../analysis/evidence.ts";
 import { toDisplayPath } from "../../analysis/search/paths.ts";
 import type { WorkspaceOrientationFacts } from "../../session/orientation/workspace-context.ts";
 import type { OrientationSectionData } from "../../session/orientation-types.ts";
@@ -46,7 +47,8 @@ export function tableSection(
   },
 ): OrientationSectionData {
   const { headers, rows, limit, detail, source = "filesystem" } = options;
-  const shown = rows.slice(0, limit);
+  const evidence = createEvidenceList({ key, items: rows, maxResults: limit });
+  const shown = evidence.items;
   return {
     key,
     title,
@@ -54,15 +56,7 @@ export function tableSection(
     reason: null,
     confidence: "unavailable",
     provenance: [{ source, detail }],
-    evidenceLists: [
-      {
-        key,
-        totalCount: rows.length,
-        shownCount: shown.length,
-        omittedCount: rows.length - shown.length,
-        partialReason: null,
-      },
-    ],
+    evidenceLists: [evidence.metadata],
     tableEvidenceKey: key,
     items:
       rows.length === 0

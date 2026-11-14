@@ -76,7 +76,7 @@ describe("target workflow symbol-kind mismatch", () => {
           kind: "Variable",
         },
       ],
-      omittedCount: 1,
+      candidateEvidence: { key: "target.candidates", omittedCount: 1 },
     });
     if (outcome.kind !== "kind-mismatch") return;
     expect(outcome.candidates[0]?.targetId).toMatch(/^tg-/);

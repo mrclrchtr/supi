@@ -1,6 +1,6 @@
 import type { ConfidenceMode, SourceRange } from "@mrclrchtr/supi-code-runtime/api";
 import type { CapabilityWarningReport } from "../../analysis/capability/capability-warnings.ts";
-import type { EvidenceListMetadata } from "../../analysis/evidence.ts";
+import type { EvidenceListFacts, EvidenceListMetadata } from "../../analysis/evidence.ts";
 import type { InstructionFilesMetadata } from "../../analysis/instruction-files.ts";
 import type { ReadNextItem } from "../../analysis/read-next.ts";
 import type { AutomaticPathExclusionDisplay } from "../../analysis/search/exclusions.ts";
@@ -43,12 +43,10 @@ export interface ToolDisplaySection {
   key: string;
   title: string;
   lines: readonly string[];
-  shownCount: number;
-  totalCount: number | null;
-  omittedCount: number | null;
-  partialReason: string | null;
-  /** Provider explanation for incomplete collection, when available. */
-  partialMessage?: string;
+  /** Canonical Evidence list facts previewed by this section. */
+  evidence: EvidenceListFacts;
+  /** Rows hidden by the view cap; a Display omission, not an Evidence atom count. */
+  displayOmittedCount: number;
   /** Content counts are separate from canonical evidence when rows are grouped or framed. */
   preview?: {
     unit: "group" | "block";

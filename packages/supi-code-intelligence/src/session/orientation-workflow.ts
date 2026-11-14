@@ -3,6 +3,7 @@
 import { existsSync, statSync } from "node:fs";
 import { buildArchitectureModel } from "../analysis/architecture/discovery.ts";
 import type { ArchitectureModel } from "../analysis/architecture/model.ts";
+import { createEvidenceList } from "../analysis/evidence.ts";
 import {
   collectInstructionFiles,
   findInstructionFilesForDirectory,
@@ -148,19 +149,9 @@ async function orientTarget(options: {
           kind: "kind-mismatch",
           requestedKind: target.requestedKind,
           candidates,
-          totalCount: target.totalCount,
-          omittedCount: target.omittedCount,
-          partialReason: target.partialReason,
-          partialMessage: target.partialMessage,
+          candidateEvidence: target.candidateEvidence,
         }
-      : {
-          kind: "disambiguation",
-          candidates,
-          totalCount: target.totalCount,
-          omittedCount: target.omittedCount,
-          partialReason: target.partialReason,
-          partialMessage: target.partialMessage,
-        };
+      : { kind: "disambiguation", candidates, candidateEvidence: target.candidateEvidence };
   }
   if (target.kind !== "resolved") return target;
   throwIfAborted(control);
@@ -280,13 +271,7 @@ function addInstructionFiles(
     confidence: "unavailable",
     provenance: [{ source: "filesystem", detail: "configured instruction files" }],
     evidenceLists: [
-      {
-        key: "instructions.files",
-        totalCount: collected.files.length,
-        shownCount: collected.files.length,
-        omittedCount: 0,
-        partialReason: null,
-      },
+      createEvidenceList({ key: "instructions.files", items: collected.files }).metadata,
     ],
     items,
   };

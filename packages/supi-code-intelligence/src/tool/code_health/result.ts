@@ -1,4 +1,5 @@
 import type { ConfidenceMode } from "@mrclrchtr/supi-code-runtime/api";
+import { createEvidenceList, createPartialEvidenceList } from "../../analysis/evidence.ts";
 import {
   countProjectServerRouteStatuses,
   formatProjectServerCompiler,
@@ -103,9 +104,7 @@ function buildHealthDisplaySections(data: HealthData, cwd?: string): ToolDisplay
         key: "health.diagnostics",
         title: "Diagnostics",
         items: data.diagnostics.entries,
-        totalCount: data.diagnostics.kind === "completed" ? data.diagnostics.entries.length : null,
-        omittedCount: data.diagnostics.kind === "completed" ? 0 : null,
-        partialReason: diagnosticPartialReason(data),
+        evidence: diagnosticEvidence(data),
         format: formatDiagnosticEntry,
       }),
     );
@@ -117,8 +116,8 @@ function buildHealthDisplaySections(data: HealthData, cwd?: string): ToolDisplay
         key: "health.servers",
         title: "Servers",
         items: data.servers,
-        totalCount: data.servers.length,
-        format: (server) => {
+        evidence: createEvidenceList({ key: "health.servers", items: data.servers }).metadata,
+        format: (server: HealthData["servers"][number]) => {
           const root = cwd ? formatProjectServerRoot(cwd, server.root) : server.root;
           const compiler = formatProjectServerCompiler(server.typescript);
           const support = [
@@ -137,10 +136,17 @@ function buildHealthDisplaySections(data: HealthData, cwd?: string): ToolDisplay
   return sections;
 }
 
-function diagnosticPartialReason(data: HealthData): string | null {
-  return data.diagnostics.kind === "partial" || data.diagnostics.kind === "unavailable"
-    ? data.diagnostics.reason
-    : null;
+/** Every collected diagnostic file is shown; an incomplete observation may hide more. */
+function diagnosticEvidence(data: HealthData) {
+  const params = { key: "health.diagnostics", items: data.diagnostics.entries };
+  const observation = data.diagnostics;
+  return observation.kind === "partial" || observation.kind === "unavailable"
+    ? createPartialEvidenceList({
+        ...params,
+        partialReason: "provider-limited",
+        partialMessage: observation.reason,
+      }).metadata
+    : createEvidenceList(params).metadata;
 }
 
 function formatDiagnosticEntry(entry: HealthData["diagnostics"]["entries"][number]): string {

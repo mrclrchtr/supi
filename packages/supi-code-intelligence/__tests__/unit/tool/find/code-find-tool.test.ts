@@ -823,6 +823,7 @@ describe("code_find tool", () => {
       expect(text).toContain("_(showing 1 of 2; 1 omitted)_");
       expect(result.details?.data.evidenceLists).toContainEqual({
         key: "find.astMatches",
+        completeness: "capped",
         totalCount: 2,
         shownCount: 1,
         omittedCount: 1,
@@ -1248,6 +1249,7 @@ describe("code_find tool", () => {
       expect(result.details?.data.omittedCount).toBe(1);
       expect(result.details?.data.evidenceLists).toContainEqual({
         key: "find.semanticSymbols",
+        completeness: "capped",
         totalCount: 2,
         shownCount: 1,
         omittedCount: 1,

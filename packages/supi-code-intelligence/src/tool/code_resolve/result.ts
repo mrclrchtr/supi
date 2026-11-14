@@ -1,6 +1,6 @@
 import type { ConfidenceMode } from "@mrclrchtr/supi-code-runtime/api";
 import type { EvidenceListMetadata } from "../../analysis/evidence.ts";
-import { createEvidenceList } from "../../analysis/evidence.ts";
+import { createEvidenceList, knownEvidenceCount, rekeyEvidence } from "../../analysis/evidence.ts";
 import { toDisplayPath } from "../../analysis/search/paths.ts";
 import type { ResolveTargetInput } from "../../session/target-input.ts";
 import type { TargetStoreEntry } from "../../session/target-store.ts";
@@ -125,18 +125,8 @@ function projectFileOutline(
   outcome: Extract<TargetWorkflowOutcome, { kind: "file-outline" }>,
   cwd: string,
 ): ResolveProjection {
-  const evidence = {
-    key: "resolve.targets",
-    items: [...outcome.targets],
-    metadata: {
-      key: "resolve.targets",
-      totalCount: outcome.totalCount,
-      shownCount: outcome.targets.length,
-      omittedCount: outcome.omittedCount,
-      partialReason: outcome.partial ? ("provider-limited" as const) : null,
-      partialMessage: outcome.partial?.reason,
-    },
-  };
+  const evidence = { items: [...outcome.targets], metadata: outcome.targetEvidence };
+  const declarationCount = knownEvidenceCount(outcome.targetEvidence);
   return {
     key: "resolve.file-outline",
     title: "File outline",
@@ -153,12 +143,12 @@ function projectFileOutline(
       outlineErrorRanges: outcome.partial?.errorRanges,
       outlineNotListed: outcome.notListed,
       confidence: outcome.confidence,
-      targetCount: outcome.totalCount,
-      omittedCount: evidence.metadata.omittedCount,
+      targetCount: declarationCount,
+      omittedCount: evidence.metadata.omittedCount ?? 0,
       evidenceLists: [evidence.metadata],
       targets: evidence.items.map((target) => toTargetDetails(target, cwd)),
       nextQueries:
-        outcome.totalCount > 0
+        declarationCount > 0
           ? [
               "Pass one declaration handle from the file outline as target.handle to code_graph, code_inspect, or code_refactor_plan",
             ]
@@ -171,20 +161,12 @@ function projectCandidateOutcome(
   outcome: Extract<TargetWorkflowOutcome, { kind: "disambiguation" | "kind-mismatch" }>,
   cwd: string,
 ): ResolveProjection {
-  const evidence: EvidenceListMetadata = {
-    key: "resolve.candidates",
-    totalCount: outcome.totalCount,
-    shownCount: outcome.candidates.length,
-    omittedCount: outcome.omittedCount,
-    partialReason: outcome.partialReason,
-    partialMessage: outcome.partialMessage,
-  };
-  const collectedCount = evidence.shownCount + (evidence.omittedCount ?? 0);
+  const evidence = rekeyEvidence(outcome.candidateEvidence, "resolve.candidates");
   const mismatch = outcome.kind === "kind-mismatch";
   return {
     key: "resolve.candidates",
     title: mismatch ? "Near matches" : "Candidates",
-    status: outcome.partialReason ? "partial" : "complete",
+    status: evidence.partialReason ? "partial" : "complete",
     items: outcome.candidates,
     confidence: "semantic",
     evidence,
@@ -192,8 +174,8 @@ function projectCandidateOutcome(
       resultKind: outcome.kind,
       ...(mismatch ? { requestedKind: outcome.requestedKind } : {}),
       confidence: "semantic",
-      targetCount: evidence.totalCount ?? collectedCount,
-      omittedCount: outcome.omittedCount,
+      targetCount: knownEvidenceCount(evidence),
+      omittedCount: evidence.omittedCount ?? 0,
       evidenceLists: [evidence],
       targets: [],
       candidates: outcome.candidates.map((candidate) => ({
@@ -263,33 +245,30 @@ function toTargetDetails(
 }
 
 function resolveDisplaySections(details: ResolveDetails): ToolDisplaySection[] {
+  const evidence = details.evidenceLists?.[0];
+  if (!evidence) return [];
   if (details.targets.length > 0) {
     return [
       createToolDisplaySection({
         key: "resolve.targets",
         title: "Targets",
         items: details.targets,
-        totalCount: details.targetCount,
-        omittedCount: details.omittedCount,
-        format: (target) =>
+        evidence,
+        format: (target: ResolveDetails["targets"][number]) =>
           `${target.name ?? "anonymous"} (${target.nativeKind ?? target.kind ?? "unknown"}) — ${target.file}:${target.displayLine}:${target.displayCharacter} [${target.targetId}]`,
       }),
     ];
   }
 
   if (details.candidates && details.candidates.length > 0) {
-    const evidence = details.evidenceLists?.find((entry) => entry.key === "resolve.candidates");
-    if (!evidence) return [];
     return [
       createToolDisplaySection({
         key: "resolve.candidates",
         title: "Candidates",
         items: details.candidates,
-        totalCount: evidence.totalCount,
-        omittedCount: evidence.omittedCount,
-        partialReason: evidence.partialReason,
-        partialMessage: evidence.partialMessage,
-        format: (candidate) => formatCandidateRow(candidate, "rank-first"),
+        evidence,
+        format: (candidate: NonNullable<ResolveDetails["candidates"]>[number]) =>
+          formatCandidateRow(candidate, "rank-first"),
       }),
     ];
   }

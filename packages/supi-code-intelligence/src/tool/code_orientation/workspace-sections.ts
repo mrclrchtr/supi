@@ -1,4 +1,5 @@
 import * as path from "node:path";
+import { createEvidenceList, markEvidencePartial } from "../../analysis/evidence.ts";
 import { toDisplayPath } from "../../analysis/search/paths.ts";
 import type { InventoryEntry, WorkspaceObservation } from "../../analysis/workspace/types.ts";
 import {
@@ -116,11 +117,9 @@ function collectionStatus(
     ...section,
     status: "partial",
     reason: state.reason,
-    evidenceLists: section.evidenceLists.map((list) => ({
-      ...list,
-      totalCount: null,
-      partialReason: state.partialReason,
-    })),
+    evidenceLists: section.evidenceLists.map((list) =>
+      markEvidencePartial(list, state.partialReason),
+    ),
   };
 }
 
@@ -239,11 +238,14 @@ function directFileList(
   directFiles: readonly InventoryEntry[],
   fileLimit: number,
 ): OrientationSectionData {
-  const names = directFiles
-    .slice(0, fileLimit)
-    .map((entry) =>
-      entry.kind === "symlink" ? `${code(entry.path)} (symlink)` : code(entry.path),
-    );
+  const evidence = createEvidenceList({
+    key: "workspace.files",
+    items: directFiles,
+    maxResults: fileLimit,
+  });
+  const names = evidence.items.map((entry) =>
+    entry.kind === "symlink" ? `${code(entry.path)} (symlink)` : code(entry.path),
+  );
   return {
     key: "workspace.files",
     title: "Direct files",
@@ -251,15 +253,7 @@ function directFileList(
     reason: null,
     confidence: "unavailable",
     provenance: [{ source: "filesystem", detail: "included paths" }],
-    evidenceLists: [
-      {
-        key: "workspace.files",
-        totalCount: directFiles.length,
-        shownCount: names.length,
-        omittedCount: directFiles.length - names.length,
-        partialReason: null,
-      },
-    ],
+    evidenceLists: [evidence.metadata],
     items: [
       {
         kind: "paragraph",

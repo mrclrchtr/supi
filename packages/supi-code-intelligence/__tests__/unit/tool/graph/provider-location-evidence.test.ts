@@ -179,6 +179,7 @@ function expectEvidenceMetadata(
   if (result.details?.type !== "graph") return;
   expect(result.details.data.evidenceLists).toContainEqual({
     key,
+    completeness: "partial",
     totalCount: 2,
     shownCount: 1,
     omittedCount: 1,

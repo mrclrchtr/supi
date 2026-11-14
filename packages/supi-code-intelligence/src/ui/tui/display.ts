@@ -1,7 +1,10 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { type Container, Text } from "@earendil-works/pi-tui";
-import { readToolDisplaySections, truncateDisplayText } from "../../tool/result/display.ts";
-import type { ToolDisplaySection } from "../../tool/result/types.ts";
+import {
+  formatDisplaySectionBounds,
+  readToolDisplaySections,
+  truncateDisplayText,
+} from "../../tool/result/display.ts";
 
 /** Render bounded structured rows for an expanded TUI body. */
 export function renderToolDisplaySections(
@@ -11,33 +14,12 @@ export function renderToolDisplaySections(
 ): void {
   for (const section of readToolDisplaySections(value)) {
     container.addChild(
-      new Text(theme.fg("dim", `${section.title}${formatDisplayBounds(section)}`), 0, 0),
+      new Text(theme.fg("dim", `${section.title}${formatDisplaySectionBounds(section)}`), 0, 0),
     );
     for (const line of section.lines) {
       container.addChild(new Text(theme.fg("muted", line), 0, 0));
     }
   }
-}
-
-function formatDisplayBounds(section: ToolDisplaySection): string {
-  const summary = section.preview?.evidenceSummary;
-  const prefix = summary ? `${summary}; ` : "";
-  const unit = section.preview?.unit;
-  const label = (count: number) => (unit ? ` preview ${unit}${count === 1 ? "" : "s"}` : "");
-  if (section.totalCount === null) {
-    const omitted = section.omittedCount
-      ? `; ${section.omittedCount}${label(section.omittedCount)} collected omitted`
-      : "";
-    const reason = section.partialReason
-      ? `; more may exist — ${section.partialReason}`
-      : "; partial";
-    const message = section.partialMessage ? `; ${section.partialMessage}` : "";
-    return ` (${prefix}${section.shownCount}${label(section.shownCount)}${omitted}${reason}${message})`;
-  }
-  if (section.omittedCount && section.omittedCount > 0) {
-    return ` (${prefix}${section.shownCount} of ${section.totalCount}${label(section.totalCount)}; ${section.omittedCount}${label(section.omittedCount)} omitted)`;
-  }
-  return ` (${prefix}${section.totalCount}${label(section.totalCount)})`;
 }
 
 /** Format one call argument for a compact human transcript row. */

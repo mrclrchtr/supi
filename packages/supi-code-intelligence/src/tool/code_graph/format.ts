@@ -1,28 +1,14 @@
-import type { EvidenceListMetadata } from "../../analysis/evidence.ts";
+import { describeEvidenceList, type EvidenceListFacts } from "../../analysis/evidence.ts";
 
-/** Format graph counts and all known limits in one place. */
+/** Canonical evidence phrase for one graph list, plus its external-location count. */
 export function formatGraphEvidence(
-  metadata: Omit<EvidenceListMetadata, "partialReason"> & { partialReason: string | null },
+  facts: EvidenceListFacts,
   noun: "locations" | "call sites" | "candidates",
   externalCount = 0,
 ): string {
-  const { shownCount, totalCount, omittedCount, partialReason, invalidLocationCount } = metadata;
-  const count = totalCount ?? shownCount;
-  const label = count === 1 ? singularGraphNoun(noun) : noun;
-  let text =
-    totalCount === null
-      ? `${shownCount} ${label} shown${omittedCount ? `; ${omittedCount} collected omitted` : ""}; more may exist — ${partialReason}`
-      : omittedCount
-        ? `${shownCount} of ${totalCount} ${label} shown; ${omittedCount} omitted`
-        : `${totalCount} ${label}`;
-  if (externalCount > 0)
-    text += `; ${externalCount} external location${externalCount === 1 ? "" : "s"}`;
-  if (metadata.partialMessage) text += ` — ${metadata.partialMessage}`;
-  if (invalidLocationCount) {
-    const invalidNoun = invalidLocationCount === 1 ? "location" : "locations";
-    text += `; ${invalidLocationCount} invalid provider ${invalidNoun} omitted (invalid-provider-location)`;
-  }
-  return text;
+  const text = describeEvidenceList(facts, { one: singularGraphNoun(noun), other: noun });
+  if (externalCount === 0) return text;
+  return `${text}; ${externalCount} external location${externalCount === 1 ? "" : "s"}`;
 }
 
 function singularGraphNoun(noun: "locations" | "call sites" | "candidates"): string {

@@ -1,5 +1,6 @@
 import { initTheme } from "@earendil-works/pi-coding-agent";
 import { beforeAll, describe, expect, it } from "vitest";
+import { createEvidenceList } from "../../../src/analysis/evidence.ts";
 import { renderResolveResult as renderResolveMarkdown } from "../../../src/tool/code_resolve/markdown.ts";
 import { assembleResolveResult } from "../../../src/tool/code_resolve/result.ts";
 import { renderResolveResult as renderResolveTui } from "../../../src/tool/code_resolve/tui.ts";
@@ -35,8 +36,11 @@ describe("code_resolve result rendering", () => {
         confidence: "semantic",
         discoveryProvenance: ["semantic"],
         targets: [target],
-        totalCount: 2,
-        omittedCount: 1,
+        targetEvidence: createEvidenceList({
+          key: "resolve.targets",
+          items: [target, target],
+          maxResults: 1,
+        }).metadata,
         unknownLevelCount: 1,
         notListed: {
           importedNames: null,

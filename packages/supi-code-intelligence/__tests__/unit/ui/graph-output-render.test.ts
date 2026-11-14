@@ -147,9 +147,8 @@ describe("code_graph human output", () => {
         makeTestCtx(cwd),
       );
       expect(result.details?.displaySections?.[0]).toMatchObject({
-        shownCount: 1,
-        totalCount: 2,
-        omittedCount: 1,
+        evidence: { completeness: "capped", shownCount: 1, totalCount: 2, omittedCount: 1 },
+        displayOmittedCount: 0,
       });
       for (const text of [result.content, render(result, false), render(result, true)]) {
         expect(text).toContain("1 of 2");
@@ -179,16 +178,21 @@ describe("code_graph human output", () => {
       makeTestCtx(cwd),
     );
     expect(result.details?.displaySections?.[0]).toMatchObject({
-      shownCount: 1,
-      totalCount: null,
-      omittedCount: 1,
-      partialReason: "provider-limited",
-      partialMessage: "one workspace-symbol route failed",
+      evidence: {
+        completeness: "partial",
+        shownCount: 1,
+        totalCount: null,
+        omittedCount: 1,
+        partialReason: "provider-limited",
+        partialMessage: "one workspace-symbol route failed",
+      },
+      displayOmittedCount: 0,
     });
     for (const text of [result.content, render(result, false), render(result, true)]) {
-      expect(text).toContain("Showing 1 of 2 collected candidates; 1 omitted.");
-      expect(text).toContain("Search completeness is unknown: one workspace-symbol route failed");
-      expect(text.match(/1 omitted/g)).toHaveLength(1);
+      expect(text).toContain(
+        "1 collected omitted; more may exist — provider-limited; one workspace-symbol route failed",
+      );
+      expect(text.match(/1 collected omitted/g)).toHaveLength(1);
       expect(text).not.toContain("other.ts");
     }
   });
@@ -243,8 +247,10 @@ describe("code_graph human output", () => {
         ),
     });
     const result = await execute(30);
-    expect(render(result, true)).toContain("20 of 25 locations shown; 5 omitted");
-    expect(render(result, false)).toContain("20 of 25 locations shown; 5 omitted");
+    // All 25 locations are returned; only the expanded view hides 5 rows.
+    expect(render(result, true)).toContain("25 locations; 5 rows hidden in view");
+    expect(render(result, false)).toContain("25 locations");
+    expect(render(result, false)).not.toContain("omitted");
     expect(render(result, true)).not.toContain("L2:145");
     expect(result.content).toContain("L2:145");
   });

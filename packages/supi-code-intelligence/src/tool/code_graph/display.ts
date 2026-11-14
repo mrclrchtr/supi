@@ -1,3 +1,4 @@
+import { createEvidenceList } from "../../analysis/evidence.ts";
 import type { CallEntry, ReferenceEntry } from "../../analysis/relations/types.ts";
 import { toDisplayPath } from "../../analysis/search/paths.ts";
 import { createToolDisplaySection } from "../result/display.ts";
@@ -20,6 +21,7 @@ export function graphDisplaySection(
         key: `graph.${section.rel}`,
         title: section.rel,
         items: [],
+        evidence: createEvidenceList({ key: `graph.${section.rel}`, items: [] }).metadata,
         format: () => "",
       }),
       fileGroups: [],
@@ -30,11 +32,8 @@ export function graphDisplaySection(
     key: `graph.${section.rel}`,
     title: section.rel,
     items,
-    totalCount: section.evidence.metadata.totalCount,
-    omittedCount: section.evidence.metadata.omittedCount,
-    partialReason: section.evidence.metadata.partialReason,
-    partialMessage: section.evidence.metadata.partialMessage,
-    format: (item) => {
+    evidence: section.evidence.metadata,
+    format: (item: CallEntry | ReferenceEntry) => {
       const site = `L${item.line}:${item.character}`;
       if (section.rel !== "callees") return site;
       const call = item as CallEntry;
@@ -42,7 +41,7 @@ export function graphDisplaySection(
     },
   });
   const groups = new Map<string, string[]>();
-  for (let index = 0; index < display.shownCount; index++) {
+  for (let index = 0; index < display.lines.length; index++) {
     const file = toDisplayPath(cwd, items[index].file);
     const rows = groups.get(file) ?? [];
     rows.push(display.lines[index]);

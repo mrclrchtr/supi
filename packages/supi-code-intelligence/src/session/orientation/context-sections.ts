@@ -9,8 +9,11 @@ import {
 } from "@mrclrchtr/supi-code-runtime/api";
 import { isWithinOrEqual } from "@mrclrchtr/supi-core/project";
 import type { WorkspaceLspRuntimeState } from "@mrclrchtr/supi-lsp/api";
-import type { EvidenceListMetadata, EvidencePartialReason } from "../../analysis/evidence.ts";
-import { createEvidenceList } from "../../analysis/evidence.ts";
+import {
+  type CollectionPartialReason,
+  createEvidenceList,
+  createPartialEvidenceList,
+} from "../../analysis/evidence.ts";
 import type { CodeProvider } from "../../analysis/provider.ts";
 import { toDisplayPath } from "../../analysis/search/paths.ts";
 import type {
@@ -38,7 +41,7 @@ export interface ListSectionInput<T> {
   readonly status?: "complete" | "partial";
   readonly reason?: string | null;
   readonly unknownRemainder?: boolean;
-  readonly partialReason?: EvidencePartialReason;
+  readonly partialReason?: CollectionPartialReason;
   readonly errorRanges?: readonly SourceRange[];
   readonly facts?: (items: readonly T[]) => import("./facts.ts").OrientationFacts;
 }
@@ -58,19 +61,14 @@ export function appendList<T>(
   builder: ContextOrientationBuilder,
   input: ListSectionInput<T>,
 ): void {
-  const list = createEvidenceList({
-    key: input.key,
-    items: [...input.items],
-    maxResults: builder.maxResults,
-  });
-  const metadata: EvidenceListMetadata = input.unknownRemainder
-    ? {
-        ...list.metadata,
-        totalCount: null,
+  const params = { key: input.key, items: [...input.items], maxResults: builder.maxResults };
+  const list = input.unknownRemainder
+    ? createPartialEvidenceList({
+        ...params,
         partialReason: input.partialReason ?? "filesystem-error",
         ...(input.reason ? { partialMessage: input.reason } : {}),
-      }
-    : list.metadata;
+      })
+    : createEvidenceList(params);
   builder.sections.push({
     key: input.key,
     title: input.title,
@@ -78,7 +76,7 @@ export function appendList<T>(
     reason: input.reason ?? null,
     confidence: input.confidence,
     provenance: input.provenance,
-    evidenceLists: [{ ...metadata, key: input.key }],
+    evidenceLists: [list.metadata],
     items: list.items.map((item) => ({ kind: "list-item", text: input.render(item) })),
     ...(input.facts ? { facts: input.facts(list.items) } : {}),
     ...(input.errorRanges ? { errorRanges: [...input.errorRanges] } : {}),

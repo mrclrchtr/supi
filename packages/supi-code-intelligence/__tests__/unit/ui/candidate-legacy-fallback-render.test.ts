@@ -28,6 +28,7 @@ function legacyOrientationResult(content: unknown[]): ToolResult {
         evidenceLists: [
           {
             key: "orientation.candidates",
+            completeness: "capped",
             shownCount: 1,
             totalCount: 2,
             omittedCount: 1,
@@ -43,10 +44,15 @@ function legacyOrientationResult(content: unknown[]): ToolResult {
           lines: [
             "1. renderGraphResult (Function) — packages/supi-code-intelligence/src/tool/code_graph/markdown.ts:16:17 [tg-old]",
           ],
-          shownCount: 1,
-          totalCount: 2,
-          omittedCount: 1,
-          partialReason: null,
+          evidence: {
+            key: "orientation.candidates",
+            completeness: "capped",
+            shownCount: 1,
+            totalCount: 2,
+            omittedCount: 1,
+            partialReason: null,
+          },
+          displayOmittedCount: 0,
         },
       ],
     },
@@ -168,6 +174,7 @@ describe("legacy candidate fallback rendering", () => {
   ])("does not duplicate old $name selection guidance", (case_) => {
     const evidence = {
       key: case_.key,
+      completeness: "capped" as const,
       shownCount: 1,
       totalCount: 2,
       omittedCount: 1,
@@ -185,9 +192,11 @@ describe("legacy candidate fallback rendering", () => {
         },
         displaySections: [
           {
-            ...evidence,
+            key: case_.key,
             title: "Candidates",
             lines: ["candidate row"],
+            evidence,
+            displayOmittedCount: 0,
           },
         ],
       },

@@ -13,6 +13,7 @@ const theme = {
 function savedResult(key: string, partialMessage: string, withDisplay: boolean): ToolResult {
   const evidence = {
     key,
+    completeness: "partial",
     shownCount: 1,
     totalCount: null,
     omittedCount: 0,
@@ -42,7 +43,15 @@ function savedResult(key: string, partialMessage: string, withDisplay: boolean):
           ],
         },
         displaySections: withDisplay
-          ? [{ ...evidence, title: "Candidates", lines: ["tg-one — Widget"] }]
+          ? [
+              {
+                key,
+                title: "Candidates",
+                lines: ["tg-one — Widget"],
+                evidence,
+                displayOmittedCount: 0,
+              },
+            ]
           : undefined,
       },
     }),

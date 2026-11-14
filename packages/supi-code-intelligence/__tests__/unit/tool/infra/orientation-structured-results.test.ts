@@ -637,8 +637,14 @@ describe("orientation structured results", () => {
               status: "complete",
               reason: null,
               entries: [{ file: "index.ts", range }],
-              collectedCount: 1,
-              omittedCount: 0,
+              evidence: {
+                key: "context.definitions",
+                completeness: "complete",
+                totalCount: 1,
+                shownCount: 1,
+                omittedCount: 0,
+                partialReason: null,
+              },
             },
             sourceContext: expect.objectContaining({
               outline: expect.objectContaining({
@@ -771,7 +777,18 @@ describe("orientation structured results", () => {
           status,
           reason: definitionReason,
           ...(mode === "empty" || mode === "partial"
-            ? { entries: [], collectedCount: 0, omittedCount: 0 }
+            ? {
+                entries: [],
+                evidence: {
+                  key: "context.definitions",
+                  completeness: mode === "empty" ? "complete" : "partial",
+                  totalCount: mode === "empty" ? 0 : null,
+                  shownCount: 0,
+                  omittedCount: 0,
+                  partialReason: mode === "empty" ? null : "provider-limited",
+                  ...(mode === "partial" ? { partialMessage: "definition incomplete" } : {}),
+                },
+              }
             : {}),
         },
       });
@@ -835,8 +852,15 @@ describe("orientation structured results", () => {
       contextDefinitions: {
         status: "partial",
         reason: "partial definitions",
-        collectedCount: 2,
-        omittedCount: 1,
+        evidence: {
+          key: "context.definitions",
+          completeness: "partial",
+          totalCount: null,
+          shownCount: 1,
+          omittedCount: 1,
+          partialReason: "provider-limited",
+          partialMessage: "partial definitions",
+        },
         entries: [{ range }],
       },
     });

@@ -36,10 +36,15 @@ describe("symbol candidates", () => {
 
     expect(result).toMatchObject({
       kind: "disambiguation",
-      totalCount: null,
-      omittedCount: 0,
-      partialReason: "provider-limited",
-      partialMessage: "One route failed.",
+      candidateEvidence: {
+        key: "target.candidates",
+        completeness: "partial",
+        totalCount: null,
+        shownCount: 1,
+        omittedCount: 0,
+        partialReason: "provider-limited",
+        partialMessage: "One route failed.",
+      },
       candidates: [{ name: "Widget", rank: 1 }],
     });
   });
@@ -77,7 +82,10 @@ describe("symbol candidates", () => {
 
     await expect(
       resolveSymbolTarget("Widget", "/project", mixed, { maxResults: 6 }),
-    ).resolves.toMatchObject({ kind: "disambiguation", totalCount: null });
+    ).resolves.toMatchObject({
+      kind: "disambiguation",
+      candidateEvidence: { completeness: "partial", totalCount: null },
+    });
   });
 
   it("preserves the reason and name order when the requested kind has no match", async () => {
@@ -93,10 +101,15 @@ describe("symbol candidates", () => {
 
     expect(result).toMatchObject({
       kind: "kind-mismatch",
-      totalCount: null,
-      omittedCount: 1,
-      partialReason: "provider-limited",
-      partialMessage: "One route failed.",
+      candidateEvidence: {
+        key: "target.candidates",
+        completeness: "partial",
+        totalCount: null,
+        shownCount: 1,
+        omittedCount: 1,
+        partialReason: "provider-limited",
+        partialMessage: "One route failed.",
+      },
       candidates: [{ name: "Widget", rank: 1 }],
     });
   });
@@ -113,9 +126,14 @@ describe("symbol candidates", () => {
 
     expect(result).toMatchObject({
       kind: "disambiguation",
-      totalCount: 2,
-      omittedCount: maxResults === 1 ? 1 : 0,
-      partialReason: null,
+      candidateEvidence: {
+        key: "target.candidates",
+        completeness: maxResults === 1 ? "capped" : "complete",
+        totalCount: 2,
+        shownCount: maxResults === 1 ? 1 : 2,
+        omittedCount: maxResults === 1 ? 1 : 0,
+        partialReason: null,
+      },
     });
     if (result.kind !== "disambiguation") throw new Error("Expected candidates");
     expect(result.candidates.map(({ name, rank }) => ({ name, rank }))).toEqual(

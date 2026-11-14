@@ -38,6 +38,7 @@ describe("code_find result rendering", () => {
       label: "known truncation",
       evidence: {
         key: "find.astMatches",
+        completeness: "capped",
         totalCount: 3,
         shownCount: 1,
         omittedCount: 2,
@@ -45,12 +46,13 @@ describe("code_find result rendering", () => {
       },
       markdown: "_(showing 1 of 3; 2 omitted)_",
       renderedMarkdown: "showing 1 of 3; 2 omitted",
-      badge: "1 of 3 AST matches (2 omitted)",
+      badge: "1 of 3 AST matches; 2 omitted",
     },
     {
       label: "unknown partial evidence",
       evidence: {
         key: "find.astMatches",
+        completeness: "unbounded",
         totalCount: null,
         shownCount: 1,
         omittedCount: null,
@@ -58,12 +60,13 @@ describe("code_find result rendering", () => {
       },
       markdown: "_(showing 1; more may exist — timeout)_",
       renderedMarkdown: "showing 1; more may exist — timeout",
-      badge: "1 AST matches (more may exist — timeout)",
+      badge: "1 AST matches; more may exist — timeout",
     },
     {
       label: "display-capped partial evidence",
       evidence: {
         key: "find.astMatches",
+        completeness: "partial",
         totalCount: null,
         shownCount: 1,
         omittedCount: 2,
@@ -71,7 +74,7 @@ describe("code_find result rendering", () => {
       },
       markdown: "_(showing 1; 2 collected omitted; more may exist — timeout)_",
       renderedMarkdown: "showing 1; 2 collected omitted; more may exist — timeout",
-      badge: "1 AST matches (2 collected omitted; more may exist — timeout)",
+      badge: "1 AST matches; 2 collected omitted; more may exist — timeout",
     },
   ])(
     "projects $label from serialized evidence in compact and expanded views",

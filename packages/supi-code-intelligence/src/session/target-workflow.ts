@@ -7,6 +7,11 @@
 // biome-ignore lint/style/noExcessiveLinesPerFile: target workflow keeps anchored, symbol, and file resolution together.
 import { existsSync } from "node:fs";
 import type { CodeRequestControl } from "@mrclrchtr/supi-code-runtime/api";
+import {
+  createEvidenceList,
+  createPartialEvidenceList,
+  type EvidenceListMetadata,
+} from "../analysis/evidence.ts";
 import { withSemanticRequestControl, withStructuralRequestControl } from "../analysis/provider.ts";
 import { normalizePath, resolveScope } from "../analysis/search/paths.ts";
 import { resolveAnchoredSymbolTarget } from "../analysis/target/anchored.ts";
@@ -63,8 +68,8 @@ export type TargetWorkflowOutcome =
       confidence: ResolvedTargetData["confidence"];
       discoveryProvenance: FileOutlineData["discoveryProvenance"];
       targets: ReadonlyArray<Readonly<TargetStoreEntry>>;
-      totalCount: number;
-      omittedCount: number;
+      /** Declaration Evidence list: exact total, visible handles only. */
+      targetEvidence: EvidenceListMetadata;
       unknownLevelCount: number;
       partial?: FileOutlineData["partial"];
       notListed: FileOutlineData["notListed"];
@@ -328,19 +333,9 @@ function toWorkflowOutcome(
         kind: "kind-mismatch",
         requestedKind: outcome.requestedKind,
         candidates,
-        totalCount: outcome.totalCount,
-        omittedCount: outcome.omittedCount,
-        partialReason: outcome.partialReason,
-        partialMessage: outcome.partialMessage,
+        candidateEvidence: outcome.candidateEvidence,
       }
-    : {
-        kind: "disambiguation",
-        candidates,
-        totalCount: outcome.totalCount,
-        omittedCount: outcome.omittedCount,
-        partialReason: outcome.partialReason,
-        partialMessage: outcome.partialMessage,
-      };
+    : { kind: "disambiguation", candidates, candidateEvidence: outcome.candidateEvidence };
 }
 
 function registerFileOutline(
@@ -348,8 +343,21 @@ function registerFileOutline(
   deps: TargetWorkflowDeps,
   maxResults: number,
 ): TargetWorkflowOutcome {
-  const totalCount = outline.targets.length;
-  const visibleTargets = outline.targets.slice(0, Math.max(0, maxResults));
+  // A partial outline enumerated what syntax recovery exposed; more may exist.
+  const visible = outline.partial
+    ? createPartialEvidenceList({
+        key: "resolve.targets",
+        items: outline.targets,
+        maxResults: Math.max(0, maxResults),
+        partialReason: "provider-limited",
+        partialMessage: outline.partial.reason,
+      })
+    : createEvidenceList({
+        key: "resolve.targets",
+        items: outline.targets,
+        maxResults: Math.max(0, maxResults),
+      });
+  const visibleTargets = visible.items;
   const fingerprint = computeFileFingerprint(outline.file);
   const fileFingerprint = fingerprint.kind === "ok" ? fingerprint.fingerprint : "unfingerprinted";
   const targets = visibleTargets.map((target) =>
@@ -361,8 +369,7 @@ function registerFileOutline(
     confidence: outline.confidence,
     discoveryProvenance: Object.freeze([...outline.discoveryProvenance]),
     targets: Object.freeze(targets),
-    totalCount,
-    omittedCount: totalCount - targets.length,
+    targetEvidence: visible.metadata,
     unknownLevelCount: outline.unknownLevelCount,
     ...(outline.partial ? { partial: outline.partial } : {}),
     notListed: outline.notListed,

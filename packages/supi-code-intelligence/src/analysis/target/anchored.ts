@@ -18,6 +18,7 @@ import {
 } from "@mrclrchtr/supi-code-runtime/api";
 import type { AnchorKind } from "../../session/target-store.ts";
 import type { AnchoredResolutionSource } from "../../types/index.ts";
+import { createEvidenceList, type EvidenceListMetadata } from "../evidence.ts";
 import { resolveFromStructural } from "./anchored-structural.ts";
 import {
   canonicalFileDeclarationKind,
@@ -133,9 +134,7 @@ async function candidatesFromSymbols(
 ): Promise<{
   kind: "disambiguation";
   candidates: DisambiguationCandidateData[];
-  totalCount: number;
-  omittedCount: number;
-  partialReason: null;
+  candidateEvidence: EvidenceListMetadata;
 }> {
   const candidates = await Promise.all(
     matched.map(async (s, idx) => {
@@ -162,9 +161,7 @@ async function candidatesFromSymbols(
   return {
     kind: "disambiguation",
     candidates,
-    totalCount: candidates.length,
-    omittedCount: 0,
-    partialReason: null,
+    candidateEvidence: createEvidenceList({ key: "target.candidates", items: candidates }).metadata,
   };
 }
 

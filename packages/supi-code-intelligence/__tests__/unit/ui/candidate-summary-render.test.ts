@@ -1,8 +1,11 @@
 import { initTheme } from "@earendil-works/pi-coding-agent";
 import { beforeAll, describe, expect, it } from "vitest";
+import type { EvidenceListFacts } from "../../../src/analysis/evidence.ts";
+import { createEvidenceList } from "../../../src/analysis/evidence.ts";
 import { renderGraphResult } from "../../../src/tool/code_graph/tui.ts";
 import { renderOrientationResult } from "../../../src/tool/code_orientation/tui.ts";
 import { renderResolveResult } from "../../../src/tool/code_resolve/tui.ts";
+import { createToolDisplaySection } from "../../../src/tool/result/display.ts";
 import type { ToolResult } from "../../../src/ui/tui/common.ts";
 
 const theme = {
@@ -12,9 +15,14 @@ const theme = {
 
 beforeAll(() => initTheme("dark"));
 
+function displaySection(evidence: EvidenceListFacts, lines: string[]) {
+  return { key: evidence.key, title: "Candidates", lines, evidence, displayOmittedCount: 0 };
+}
+
 function candidateResult(key: string, partial = false): ToolResult {
-  const evidence = {
+  const evidence: EvidenceListFacts = {
     key,
+    completeness: partial ? "partial" : "capped",
     shownCount: 1,
     totalCount: partial ? null : 2,
     omittedCount: 1,
@@ -36,9 +44,7 @@ function candidateResult(key: string, partial = false): ToolResult {
           ? ["Choose one candidate handle, or narrow the symbol selector with scope or symbolKind"]
           : ["Use one candidate handle as focus.target.handle"],
       },
-      displaySections: [
-        { ...evidence, title: "Candidates", lines: ["tg-visible — work at a.ts:1:10"] },
-      ],
+      displaySections: [displaySection(evidence, ["tg-visible — work at a.ts:1:10"])],
     },
   };
 }
@@ -48,6 +54,7 @@ describe("candidate summaries", () => {
     {
       name: "exact plural",
       lines: ["first", "second"],
+      completeness: "complete" as const,
       shownCount: 2,
       totalCount: 2,
       omittedCount: 0,
@@ -57,15 +64,17 @@ describe("candidate summaries", () => {
     {
       name: "partial",
       lines: ["first"],
+      completeness: "partial" as const,
       shownCount: 1,
       totalCount: null,
       omittedCount: 1,
-      partialReason: "provider-limited",
-      expected: "1 candidate (1 collected omitted; more may exist — provider-limited)",
+      partialReason: "provider-limited" as const,
+      expected: "1 candidate; 1 collected omitted; more may exist — provider-limited",
     },
     {
       name: "exact singular",
       lines: ["first"],
+      completeness: "complete" as const,
       shownCount: 1,
       totalCount: 1,
       omittedCount: 0,
@@ -73,8 +82,9 @@ describe("candidate summaries", () => {
       expected: "1 candidate",
     },
   ])("uses the human Graph candidate label for $name", (case_) => {
-    const evidence = {
+    const evidence: EvidenceListFacts = {
       key: "graph.candidates",
+      completeness: case_.completeness,
       shownCount: case_.shownCount,
       totalCount: case_.totalCount,
       omittedCount: case_.omittedCount,
@@ -91,7 +101,7 @@ describe("candidate summaries", () => {
           evidenceLists: [evidence],
           nextQueries: ["Choose a handle"],
         },
-        displaySections: [{ ...evidence, title: "Candidates", lines: case_.lines }],
+        displaySections: [displaySection(evidence, case_.lines)],
       },
     };
 
@@ -115,7 +125,7 @@ describe("candidate summaries", () => {
         .join("\n");
 
       expect(text).toContain("Choose a target");
-      expect(text).toContain("Candidates (1 of 2; 1 omitted)");
+      expect(text).toMatch(/Candidates\s*\n1 of 2 candidates; 1 omitted\s*\n/);
       expect(text).toContain("tg-visible");
       expect(text).toContain(
         tool === "resolve" ? "Choose one candidate handle" : "Use one candidate handle",
@@ -137,6 +147,7 @@ describe("candidate summaries", () => {
           evidenceLists: [
             {
               key: "graph.candidates",
+              completeness: "capped",
               shownCount: 1,
               totalCount: 2,
               omittedCount: 1,
@@ -146,15 +157,17 @@ describe("candidate summaries", () => {
           nextQueries: ["Retry without symbolKind"],
         },
         displaySections: [
-          {
-            key: "graph.candidates",
-            title: "Candidates",
-            lines: ["tg-visible — work (Function) at a.ts:1:10"],
-            shownCount: 1,
-            totalCount: 2,
-            omittedCount: 1,
-            partialReason: null,
-          },
+          displaySection(
+            {
+              key: "graph.candidates",
+              completeness: "capped",
+              shownCount: 1,
+              totalCount: 2,
+              omittedCount: 1,
+              partialReason: null,
+            },
+            ["tg-visible — work (Function) at a.ts:1:10"],
+          ),
         ],
       },
     };
@@ -183,7 +196,7 @@ describe("candidate summaries", () => {
       )
         .render(120)
         .join("\n");
-      expect(text).toContain("1 of 2 candidates (1 omitted)");
+      expect(text).toContain("1 of 2 candidates; 1 omitted");
       expect(text).not.toContain("Agent content");
       expect(text).not.toContain("tg-visible");
     },
@@ -209,9 +222,8 @@ describe("candidate summaries", () => {
       const text = renderOrientationResult(result, { expanded, isPartial: false }, theme, undefined)
         .render(160)
         .join("\n");
-      expect(text).toContain(
-        expanded ? "Candidates (1 of 2; 1 omitted)" : "1 of 2 candidates (1 omitted)",
-      );
+      if (expanded) expect(text).toMatch(/Candidates\s*\n1 of 2 candidates; 1 omitted\s*\n/);
+      else expect(text).toContain("1 of 2 candidates; 1 omitted");
       expect(text).not.toContain("orientation.candidates");
     },
   );
@@ -224,7 +236,7 @@ describe("candidate summaries", () => {
       const text = render(result, { expanded: false, isPartial: false }, theme, undefined)
         .render(160)
         .join("\n");
-      expect(text).toContain("1 candidate (1 collected omitted;");
+      expect(text).toContain("1 candidate; 1 collected omitted;");
       expect(text).not.toContain("1 candidates");
     },
   );
@@ -237,7 +249,18 @@ describe("candidate summaries", () => {
       ...result.details,
       type: "resolve",
       data: {},
-      displaySections: [{ ...section, lines: ["first", "second"], shownCount: 2, omittedCount: 0 }],
+      displaySections: [
+        {
+          ...section,
+          lines: ["first", "second"],
+          evidence: {
+            ...section.evidence,
+            completeness: "complete",
+            shownCount: 2,
+            omittedCount: 0,
+          },
+        },
+      ],
     };
     const text = renderResolveResult(
       result,
@@ -263,32 +286,25 @@ describe("candidate summaries", () => {
     )
       .render(120)
       .join("\n");
-    expect(text).toContain("1 of 2 candidates (1 omitted)");
+    expect(text).toContain("1 of 2 candidates; 1 omitted");
   });
 
-  it("uses the display count when the transcript has a lower row cap", () => {
+  it("reports transcript row-cap hiding separately from evidence omissions", () => {
     const result = candidateResult("resolve.candidates");
     if (!result.details) throw new Error("Expected details");
-    result.details.data.evidenceLists = [
-      {
-        key: "resolve.candidates",
-        shownCount: 25,
-        totalCount: 30,
-        omittedCount: 5,
-        partialReason: null,
-      },
-    ];
-    result.details.displaySections = [
-      {
-        key: "resolve.candidates",
-        title: "Candidates",
-        lines: Array.from({ length: 25 }, (_, index) => `candidate ${index}`),
-        shownCount: 25,
-        totalCount: 30,
-        omittedCount: 5,
-        partialReason: null,
-      },
-    ];
+    const evidence = createEvidenceList({
+      key: "resolve.candidates",
+      items: Array.from({ length: 30 }, (_, index) => `candidate ${index}`),
+      maxResults: 25,
+    });
+    const section = createToolDisplaySection({
+      title: "Candidates",
+      items: evidence.items,
+      evidence: evidence.metadata,
+      format: (row) => row,
+    });
+    result.details.data.evidenceLists = [section.evidence];
+    result.details.displaySections = [section];
     const collapsed = renderResolveResult(
       result,
       { expanded: false, isPartial: false },
@@ -305,11 +321,12 @@ describe("candidate summaries", () => {
     )
       .render(120)
       .join("\n");
-    expect(collapsed).toContain("20 of 30 candidates (10 omitted)");
-    expect(collapsed).not.toContain("25 of 30");
-    expect(expanded).toContain("Candidates (20 of 30; 10 omitted)");
+    // Evidence counts stay canonical; the view cap is a separate Display omission.
+    expect(collapsed).toContain("25 of 30 candidates; 5 omitted");
+    expect(expanded).toContain("25 of 30 candidates; 5 omitted; 5 rows hidden in view");
+    expect(expanded).toContain("candidate 19");
     expect(expanded).not.toContain("candidate 20");
-    expect(expanded.match(/20 of 30/g)).toHaveLength(1);
+    expect(expanded.match(/25 of 30/g)).toHaveLength(1);
   });
 
   it("does not invent counts from older details or unrelated validation rows", () => {
@@ -325,10 +342,15 @@ describe("candidate summaries", () => {
             key: "resolve.error",
             title: "Reason",
             lines: ["Missing file"],
-            shownCount: 1,
-            totalCount: 1,
-            omittedCount: 0,
-            partialReason: null,
+            evidence: {
+              key: "resolve.error",
+              completeness: "complete",
+              shownCount: 1,
+              totalCount: 1,
+              omittedCount: 0,
+              partialReason: null,
+            },
+            displayOmittedCount: 0,
           },
         ],
       },

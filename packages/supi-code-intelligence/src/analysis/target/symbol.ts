@@ -17,13 +17,10 @@ import {
 import { isWithinOrEqual } from "@mrclrchtr/supi-core/project";
 import type { TargetSymbolKind } from "../../session/target-input.ts";
 import type { AnchorKind } from "../../session/target-store.ts";
+import { createEvidenceList, createPartialEvidenceList } from "../evidence.ts";
 import { describePartialQuery } from "../search/exclusions.ts";
 import { normalizePath } from "../search/paths.ts";
-import type {
-  DisambiguationCandidateData,
-  TargetCandidateCompleteness,
-  TargetOutcome,
-} from "./types.ts";
+import type { DisambiguationCandidateData, TargetOutcome } from "./types.ts";
 
 const MAX_CANDIDATES = 8; // default fallback when maxResults is not provided
 const NON_EXPORTED_KINDS = new Set(["Variable", "Field", "Property"]);
@@ -151,7 +148,7 @@ export async function resolveSymbolTarget(
       return buildCandidateOutcome({
         kind: "kind-mismatch",
         candidates: eligible,
-        ...candidateCompleteness(result, eligible.length, cwd),
+        discovery: candidateDiscovery(result, cwd),
         semantic,
         cwd,
         maxResults: options.maxResults,
@@ -161,7 +158,7 @@ export async function resolveSymbolTarget(
     }
     return resolveCandidates({
       candidates: exactKind,
-      ...candidateCompleteness(result, exactKind.length, cwd),
+      discovery: candidateDiscovery(result, cwd),
       exclusionNote: exclusionOnlyNote(result, cwd),
       semantic,
       cwd,
@@ -172,7 +169,7 @@ export async function resolveSymbolTarget(
 
   return resolveCandidates({
     candidates: eligible,
-    ...candidateCompleteness(result, eligible.length, cwd),
+    discovery: candidateDiscovery(result, cwd),
     exclusionNote: exclusionOnlyNote(result, cwd),
     semantic,
     cwd,
@@ -190,28 +187,18 @@ function normalizeProviderKind(kind: string): string {
 }
 
 async function resolveCandidates(
-  options: CandidateOutcomeBase &
-    Omit<TargetCandidateCompleteness, "omittedCount"> & {
-      /** Disclosure for a unique match beside policy-excluded rows. */
-      exclusionNote?: string;
-    },
+  options: CandidateOutcomeBase & {
+    discovery: CandidateDiscovery;
+    /** Disclosure for a unique match beside policy-excluded rows. */
+    exclusionNote?: string;
+  },
 ): Promise<TargetOutcome> {
-  const {
-    candidates,
-    semantic,
-    cwd,
-    maxResults,
-    control,
-    totalCount,
-    partialReason,
-    partialMessage,
-    exclusionNote,
-  } = options;
+  const { candidates, semantic, cwd, maxResults, control, discovery, exclusionNote } = options;
   const ranged = candidates.filter(
     (candidate) =>
       candidate.declarationAnchor.line > 0 || candidate.declarationAnchor.character > 0,
   );
-  if (ranged.length === 1 && totalCount !== null) {
+  if (ranged.length === 1 && discovery.partialMessage === null) {
     const resolved = resolvedTarget(await refineResolvedSymbolAnchor(ranged[0], semantic, control));
     // Exclusion-only evidence resolves, but the excluded rows stay disclosed.
     return exclusionNote ? { ...resolved, notes: [exclusionNote] } : resolved;
@@ -222,9 +209,7 @@ async function resolveCandidates(
     semantic,
     cwd,
     maxResults,
-    totalCount,
-    partialReason,
-    partialMessage,
+    discovery,
     control,
   });
 }
@@ -258,21 +243,24 @@ interface CandidateOutcomeBase {
   control?: CodeRequestControl;
 }
 
-function candidateCompleteness(
+/**
+ * Candidate collection status before the cap: exact when the provider was
+ * complete or removed only policy-excluded rows; otherwise provider-limited.
+ */
+interface CandidateDiscovery {
+  readonly partialMessage: string | null;
+}
+
+function candidateDiscovery(
   result: Exclude<CodeQueryResult<CodeSymbol[]>, { kind: "unavailable" }>,
-  totalCount: number,
   cwd: string,
-): Omit<TargetCandidateCompleteness, "omittedCount"> {
+): CandidateDiscovery {
   // Policy exclusions alone remove only rows the workspace marked out of
   // automatic scope; the retained in-policy rows are complete. Failures and
   // coverage gaps keep the total unknown.
   return result.kind === "partial" && result.metadata?.exclusionOnly !== true
-    ? {
-        totalCount: null,
-        partialReason: "provider-limited",
-        partialMessage: describePartialQuery(result.reason, result.metadata, cwd),
-      }
-    : { totalCount, partialReason: null };
+    ? { partialMessage: describePartialQuery(result.reason, result.metadata, cwd) }
+    : { partialMessage: null };
 }
 
 /** Describe exclusion-only evidence so a resolved target still discloses dropped rows. */
@@ -284,9 +272,7 @@ function exclusionOnlyNote(
   return describePartialQuery(result.reason, result.metadata, cwd);
 }
 
-type CandidateOutcomeOptions = CandidateOutcomeBase &
-  Omit<TargetCandidateCompleteness, "omittedCount"> &
-  (
+type CandidateOutcomeOptions = CandidateOutcomeBase & { discovery: CandidateDiscovery } & (
     | { kind: "disambiguation"; requestedKind?: never }
     | { kind: "kind-mismatch"; requestedKind: TargetSymbolKind }
   );
@@ -322,17 +308,25 @@ async function buildCandidateOutcome(
   options: CandidateOutcomeOptions,
 ): Promise<Extract<TargetOutcome, { kind: "disambiguation" | "kind-mismatch" }>> {
   const cap = options.maxResults ?? MAX_CANDIDATES;
+  const { partialMessage } = options.discovery;
+  const bounded =
+    partialMessage === null
+      ? createEvidenceList({ key: "target.candidates", items: options.candidates, maxResults: cap })
+      : createPartialEvidenceList({
+          key: "target.candidates",
+          items: options.candidates,
+          maxResults: cap,
+          partialReason: "provider-limited",
+          partialMessage,
+        });
   const refined = await Promise.all(
-    options.candidates
-      .slice(0, cap)
-      .map((candidate) => refineResolvedSymbolAnchor(candidate, options.semantic, options.control)),
+    bounded.items.map((candidate) =>
+      refineResolvedSymbolAnchor(candidate, options.semantic, options.control),
+    ),
   );
   const common = {
     candidates: toDisambiguationCandidates(refined, options.cwd),
-    totalCount: options.totalCount,
-    omittedCount: Math.max(0, options.candidates.length - cap),
-    partialReason: options.partialReason,
-    partialMessage: options.partialMessage,
+    candidateEvidence: bounded.metadata,
   };
   return options.kind === "kind-mismatch"
     ? {

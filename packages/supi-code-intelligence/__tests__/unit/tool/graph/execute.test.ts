@@ -52,11 +52,12 @@ describe("code_graph workflow", () => {
     expect(result.content).toContain("Target: `foo`");
     expect(result.content).toContain("consumer-a.ts");
     expect(result.content).not.toContain("consumer-b.ts");
-    expect(result.content).toContain("1 of 2 locations shown; 1 omitted");
+    expect(result.content).toContain("1 of 2 locations; 1 omitted");
     expect(result.details?.type).toBe("graph");
     if (result.details?.type !== "graph") return;
     expect(result.details.data.evidenceLists).toContainEqual({
       key: "references.locations",
+      completeness: "capped",
       totalCount: 2,
       shownCount: 1,
       omittedCount: 1,

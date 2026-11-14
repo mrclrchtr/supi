@@ -116,7 +116,8 @@ describe("code_graph file display", () => {
     expect(content).toContain("L1:169");
     expect(readFileSync(file as string, "utf8")).toBe(content);
     expect(render(result, true)).not.toContain("L1:169");
-    expect(render(result, true)).toContain("20 of 25 locations shown; 5 omitted");
+    // All 25 locations are returned evidence; the view cap hides 5 rows as a Display omission.
+    expect(render(result, true)).toContain("25 locations; 5 rows hidden in view");
     expect(render(result, true)).toContain(file);
     expect(render(result, true)).toContain("full returned evidence");
     expect(content).not.toContain(file);
@@ -129,7 +130,7 @@ describe("code_graph file display", () => {
     expect(text).toContain("L1:1");
     expect(text).toContain("L1:8");
     expect(text).toContain("L1:15");
-    expect(text).toContain("3 of 25 locations shown; 22 omitted");
+    expect(text).toContain("3 of 25 locations; 22 omitted");
     expect(result.details?.truncation?.fullOutputPath).toBeUndefined();
     for (const width of [40, 80, 120]) {
       const rows = render(result, true, width).split("\n");

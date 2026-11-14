@@ -25,6 +25,7 @@ describe("code_graph result rendering", () => {
               evidenceLists: [
                 {
                   key: "references.locations",
+                  completeness: "partial",
                   totalCount: 2,
                   shownCount: 1,
                   omittedCount: 1,
@@ -41,7 +42,7 @@ describe("code_graph result rendering", () => {
       );
 
       expect(component.render(160).join("\n")).toContain(
-        "1 of 2 references (1 omitted); 2 invalid provider locations omitted — invalid-provider-location",
+        "1 of 2 references; 1 omitted; 2 invalid provider locations omitted (invalid-provider-location)",
       );
     },
   );

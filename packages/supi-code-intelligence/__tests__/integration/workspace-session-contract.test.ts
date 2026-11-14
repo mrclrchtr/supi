@@ -393,7 +393,7 @@ describe("WorkspaceCodeIntelligenceSession real-substrate contract", () => {
     ]);
     expect(fileOutcome.targets.every((target) => target.container === null)).toBe(true);
     expect(fileOutcome.unknownLevelCount).toBe(0);
-    expect(fileOutcome.omittedCount).toBeGreaterThan(0);
+    expect(fileOutcome.targetEvidence.omittedCount).toBeGreaterThan(0);
 
     const fileTarget = fileOutcome.targets.find((target) => target.name === "coordinateTarget");
     if (!fileTarget) throw new Error("Expected coordinateTarget in the file outline.");

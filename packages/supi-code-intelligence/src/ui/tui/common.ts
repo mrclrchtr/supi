@@ -9,7 +9,11 @@ import {
   type ToolRenderResultOptions,
 } from "@earendil-works/pi-coding-agent";
 import { type Component, Container, Markdown, Spacer, Text } from "@earendil-works/pi-tui";
-import { formatEvidenceBadge } from "@mrclrchtr/supi-core/evidence-badge";
+import {
+  describeEvidenceList,
+  type EvidenceListFacts,
+  readEvidenceListFacts,
+} from "../../analysis/evidence.ts";
 import { truncateDisplayText } from "../../tool/result/display.ts";
 import { renderToolDisplaySections } from "./display.ts";
 import { renderExecutionError } from "./execution-error.ts";
@@ -72,86 +76,26 @@ export function evidenceLabel(key: string): string {
 
 // ── Serialized evidence ──────────────────────────────────────────
 
-/** Evidence metadata projected by result assembly into tool details. */
-export interface EvidenceEntry {
-  key: string;
-  shownCount: number;
-  totalCount: number | null;
-  omittedCount: number | null;
-  partialReason: string | null;
-  /** Provider explanation for incomplete collection, when available. */
-  partialMessage?: string;
-  invalidLocationCount?: number;
-}
+/** Evidence list facts projected by result assembly into tool details. */
+export type EvidenceEntry = EvidenceListFacts;
 
 /**
- * Read only complete serialized evidence metadata from tool details.
- *
- * Renderers intentionally discard malformed or absent entries rather than
- * reconstructing totals from candidate counts or omission hints.
+ * Read only complete, consistent serialized evidence facts from tool details.
+ * Renderers discard malformed entries rather than reconstructing totals.
  */
 export function readEvidenceEntries(value: unknown): EvidenceEntry[] {
   if (!Array.isArray(value)) return [];
   return value.flatMap((entry) => {
-    const parsed = readEvidenceEntry(entry);
+    const parsed = readEvidenceListFacts(entry);
     return parsed ? [parsed] : [];
   });
 }
 
-function readEvidenceEntry(value: unknown): EvidenceEntry | null {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) return null;
-  const record = value as Record<string, unknown>;
-  const { key, shownCount, totalCount, omittedCount, partialReason, invalidLocationCount } = record;
-  if (
-    typeof key !== "string" ||
-    typeof shownCount !== "number" ||
-    !isNullableNumber(totalCount) ||
-    !isNullableNumber(omittedCount) ||
-    !isNullableString(partialReason) ||
-    !isOptionalCount(invalidLocationCount)
-  ) {
-    return null;
-  }
-  return {
-    key,
-    shownCount,
-    totalCount,
-    omittedCount,
-    partialReason,
-    ...(typeof record.partialMessage === "string" ? { partialMessage: record.partialMessage } : {}),
-    ...(invalidLocationCount === undefined ? {} : { invalidLocationCount }),
-  };
-}
-
-function isNullableNumber(value: unknown): value is number | null {
-  return value === null || typeof value === "number";
-}
-
-function isNullableString(value: unknown): value is string | null {
-  return value === null || typeof value === "string";
-}
-
-function isOptionalCount(value: unknown): value is number | undefined {
-  return (
-    value === undefined || (typeof value === "number" && Number.isInteger(value) && value >= 0)
-  );
-}
-
-/** Format one assembled evidence list without recomputing its bounds. */
+/** Format one assembled evidence list with the canonical phrase and its label. */
 export function formatEvidenceEntry(entry: EvidenceEntry): string {
   const label = evidenceLabel(entry.key);
-  const singleCandidate = label === "candidates" && (entry.totalCount ?? entry.shownCount) === 1;
-  const badge = formatEvidenceBadge({
-    shownCount: entry.shownCount,
-    totalCount: entry.totalCount,
-    omittedCount: entry.omittedCount,
-    partialReason: entry.partialReason,
-    label: singleCandidate ? "candidate" : label,
-  });
-  if (!entry.invalidLocationCount) return badge;
-  const noun = entry.invalidLocationCount === 1 ? "location" : "locations";
-  const reason = entry.partialReason ? ` — ${entry.partialReason}` : "";
-  return `${badge}; ${entry.invalidLocationCount} invalid provider ${noun} omitted${reason}`;
+  const singular = label === "candidates" ? "candidate" : label;
+  return describeEvidenceList(entry, { one: singular, other: label });
 }
 
 /** Append formatted evidence badge lines to a container. */
@@ -173,7 +117,9 @@ export function renderMarkdownDetail(
   source: MarkdownSource,
   theme: Theme,
 ): void {
-  const markdownText = source.content?.find((c) => c.type === "text")?.text ?? "";
+  // Persisted content can hold malformed blocks; skip anything that is not a text block.
+  const block = source.content?.find((c) => c?.type === "text" && typeof c.text === "string");
+  const markdownText = block?.text ?? "";
   if (!markdownText) return;
   container.addChild(new Spacer(1));
   const divider = `${theme.fg("border", "────")} ${theme.fg("dim", "raw markdown")} ${theme.fg("border", "────")}`;

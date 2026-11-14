@@ -16,10 +16,11 @@ beforeAll(() => initTheme("dark"));
 function candidateResult(key: string, partial = false): ToolResult {
   const evidence = {
     key,
+    completeness: partial ? ("partial" as const) : ("capped" as const),
     shownCount: 1,
     totalCount: partial ? null : 2,
     omittedCount: 1,
-    partialReason: partial ? "provider-limited" : null,
+    partialReason: partial ? ("provider-limited" as const) : null,
   };
   const resolve = key === "resolve.candidates";
   return {
@@ -38,7 +39,13 @@ function candidateResult(key: string, partial = false): ToolResult {
           : ["Use one candidate handle as focus.target.handle"],
       },
       displaySections: [
-        { ...evidence, title: "Candidates", lines: ["tg-visible — work at a.ts:1:10"] },
+        {
+          key,
+          title: "Candidates",
+          lines: ["tg-visible — work at a.ts:1:10"],
+          evidence,
+          displayOmittedCount: 0,
+        },
       ],
     },
   };
@@ -112,6 +119,7 @@ describe("candidate selection rendering", () => {
           evidenceLists: [
             {
               key: "graph.candidates",
+              completeness: "capped",
               shownCount: 1,
               totalCount: 2,
               omittedCount: 1,
@@ -153,6 +161,7 @@ describe("candidate selection rendering", () => {
           evidenceLists: [
             {
               key: "graph.candidates",
+              completeness: "capped",
               shownCount: 1,
               totalCount: 2,
               omittedCount: 1,
@@ -167,7 +176,7 @@ describe("candidate selection rendering", () => {
       .render(120)
       .join("\n");
 
-    expect(text).toContain("Candidates (1 of 2; 1 omitted)");
+    expect(text).toMatch(/Candidates\s*\n1 of 2 candidates; 1 omitted\s*\n/);
     expect(text).toContain("Choose one candidate handle");
   });
 
@@ -216,10 +225,15 @@ describe("candidate selection rendering", () => {
         key: "resolve.candidates",
         title: "Candidates",
         lines: ["candidate-".repeat(80)],
-        shownCount: 1,
-        totalCount: 1,
-        omittedCount: 0,
-        partialReason: null,
+        evidence: {
+          key: "resolve.candidates",
+          completeness: "complete",
+          shownCount: 1,
+          totalCount: 1,
+          omittedCount: 0,
+          partialReason: null,
+        },
+        displayOmittedCount: 0,
       },
     ];
 
@@ -360,6 +374,7 @@ describe("candidate selection rendering", () => {
           evidenceLists: [
             {
               key: "resolve.candidates",
+              completeness: "complete",
               shownCount: 1,
               totalCount: 1,
               omittedCount: 0,
@@ -373,10 +388,16 @@ describe("candidate selection rendering", () => {
             key: "resolve.candidates",
             title: "Candidates",
             lines: [],
-            shownCount: 0,
-            totalCount: 1,
-            omittedCount: 1,
-            partialReason: null,
+            // Stale display evidence must not override the structured details evidence.
+            evidence: {
+              key: "resolve.candidates",
+              completeness: "capped",
+              shownCount: 0,
+              totalCount: 1,
+              omittedCount: 1,
+              partialReason: null,
+            },
+            displayOmittedCount: 0,
           },
         ],
       },
@@ -386,7 +407,8 @@ describe("candidate selection rendering", () => {
       .render(120)
       .join("\n");
 
-    expect(text).toContain("Candidates (1)");
+    expect(text).toMatch(/Candidates\s*\n1 candidate\s*\n/);
+    expect(text).not.toContain("omitted");
     expect(text).toContain("1. work (Function) — src/work.ts:4:10 [tg-structured]");
   });
 
@@ -448,6 +470,7 @@ describe("candidate selection rendering", () => {
           evidenceLists: [
             {
               key: "graph.candidates",
+              completeness: "complete",
               shownCount: 1,
               totalCount: 1,
               omittedCount: 0,
@@ -460,10 +483,15 @@ describe("candidate selection rendering", () => {
             key: "graph.candidates",
             title: "Candidates",
             lines: ["tg-visible — work (Function) at a.ts:1:10"],
-            shownCount: 1,
-            totalCount: 1,
-            omittedCount: 0,
-            partialReason: null,
+            evidence: {
+              key: "graph.candidates",
+              completeness: "complete",
+              shownCount: 1,
+              totalCount: 1,
+              omittedCount: 0,
+              partialReason: null,
+            },
+            displayOmittedCount: 0,
           },
         ],
       },

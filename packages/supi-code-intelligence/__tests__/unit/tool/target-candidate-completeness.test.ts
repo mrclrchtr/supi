@@ -107,9 +107,9 @@ describe("public target candidate completeness", () => {
       maxResults: 1,
       shownCount: 1,
       omittedCount: 1,
-      count: "Showing 1 of 2 collected candidates; 1 omitted.",
+      label: "1 candidate",
     },
-    { maxResults: 6, shownCount: 2, omittedCount: 0, count: "Showing all 2 collected candidates." },
+    { maxResults: 6, shownCount: 2, omittedCount: 0, label: "2 candidates" },
   ])("keeps the provider reason and display counts with maxResults=$maxResults", async (case_) => {
     registerLimitedProvider();
     const pi = createPiMock();
@@ -131,6 +131,7 @@ describe("public target candidate completeness", () => {
     )) as PublicResult;
 
     const expected = {
+      completeness: "partial",
       totalCount: null,
       shownCount: case_.shownCount,
       omittedCount: case_.omittedCount,
@@ -146,7 +147,11 @@ describe("public target candidate completeness", () => {
         expect.objectContaining({ key, ...expected }),
       );
       expect(result.details?.displaySections).toContainEqual(
-        expect.objectContaining({ key, ...expected }),
+        expect.objectContaining({
+          key,
+          evidence: { key, ...expected },
+          displayOmittedCount: 0,
+        }),
       );
       expect(result.details?.data?.candidates).toHaveLength(case_.shownCount);
       const transcript = [false, true].map((expanded) =>
@@ -154,9 +159,13 @@ describe("public target candidate completeness", () => {
           .render(200)
           .join("\n"),
       );
+      // Canonical partial phrase: shown count, collected omissions, then the reason.
+      const tail = `${case_.omittedCount ? `; ${case_.omittedCount} collected omitted` : ""}; more may exist — provider-limited; one workspace-symbol route failed`;
+      const [collapsed, expanded] = transcript;
+      expect(resultText(result)).toContain(`_(showing ${case_.shownCount}${tail})_`);
+      expect(collapsed).toContain(`${case_.label}${tail}`);
+      expect(expanded).toContain(`${case_.label}${tail}`);
       for (const text of [resultText(result), ...transcript]) {
-        expect(text).toContain(case_.count);
-        expect(text).toContain("Search completeness is unknown: one workspace-symbol route failed");
         if (case_.maxResults === 1) expect(text).not.toContain("src/b.ts");
       }
     }

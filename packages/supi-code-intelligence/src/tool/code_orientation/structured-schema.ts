@@ -58,8 +58,7 @@ const Provenance = Type.Object(
 const SourceListFields = {
   status: Type.Enum(["complete", "partial", "unavailable"], { type: "string" }),
   reason: nullableString,
-  collectedCount: Type.Integer(),
-  omittedCount: Type.Integer(),
+  evidence: EvidenceListSchema,
 };
 const Observation = Type.Union([
   Type.Object(
@@ -96,12 +95,7 @@ const ContextDefinitionEntries = {
       ),
     ]),
   ),
-  collectedCount: Type.Integer({
-    description: "Collected locations; a partial observation may have an unknown remainder.",
-  }),
-  omittedCount: Type.Integer({
-    description: "Collected locations omitted by the requested selection limit.",
-  }),
+  evidence: EvidenceListSchema,
 };
 const ContextDefinitions = Type.Union([
   Type.Object(
@@ -291,7 +285,7 @@ const Facts = Type.Object(
         {
           additionalProperties: false,
           description:
-            "Best-effort source lists; collectedCount is not a completeness claim when status is partial or unavailable.",
+            "Best-effort source lists; each evidence completeness state states whether more may exist.",
         },
       ),
     ),

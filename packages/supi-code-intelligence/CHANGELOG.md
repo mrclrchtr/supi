@@ -1,5 +1,10 @@
 # Changelog
 
+## [12.1.0]
+
+- **Breaking:** every `code_*` evidence list in structured details now carries `completeness`: `complete`, `capped`, `partial`, or `unbounded`. Scripts can read it directly instead of inferring completeness from a null `totalCount`. `code_orientation` source lists and context definitions replace `collectedCount`/`omittedCount` with one `evidence` list. Expanded TUI sections report rows hidden by the 20-row view separately (for example `25 of 30; 5 omitted; 5 rows hidden in view`), instead of adding them to the evidence omission count. Structured TUI chrome from sessions saved before this change falls back to the markdown output on resume.
+- Truncation wording is the same in markdown, candidate lists, graph summaries, and TUI headers. For example, provider-limited candidate searches now read `1 candidate; 1 collected omitted; more may exist — provider-limited; <reason>` instead of a separate "Search completeness is unknown" sentence.
+
 ## [12.0.0]
 
 - **Breaking:** `code_find` takes one `search` selector instead of flat `query`, `mode`, and `kind`: `search: { ast: { kind, query } }` or `search: { semantic: { query } }`. A semantic search can no longer carry an AST kind. `scope` is renamed to `scopes`, because it takes a list; `code_resolve` and `code_health` keep the single-path `scope`. Migration: `{ query, mode: "ast", kind, scope }` becomes `{ search: { ast: { kind, query } }, scopes }`.

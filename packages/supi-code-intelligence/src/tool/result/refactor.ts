@@ -1,5 +1,9 @@
 import type { FileEdit } from "@mrclrchtr/supi-code-runtime/api";
-import { createEvidenceList, type EvidenceList } from "../../analysis/evidence.ts";
+import {
+  createEvidenceList,
+  type EvidenceList,
+  knownEvidenceCount,
+} from "../../analysis/evidence.ts";
 import type { ApplyResult } from "../../analysis/refactor/apply.ts";
 import { toDisplayPath } from "../../analysis/search/paths.ts";
 import type { RefactorPlan } from "../../session/refactor-plans.ts";
@@ -74,7 +78,7 @@ export function assembleRefactorPlanDetails(
         ? ["After applying, use rename_symbol to rename any server-generated names"]
         : []),
     ],
-    candidateCount: edits.metadata.totalCount ?? edits.metadata.shownCount,
+    candidateCount: knownEvidenceCount(edits.metadata),
     confidence: evidenceSource,
     provenance,
   });
@@ -86,10 +90,8 @@ export function assembleRefactorPlanDetails(
         key: "refactor.edits",
         title: "Proposed edits",
         items: edits.items,
-        totalCount: edits.metadata.totalCount,
-        omittedCount: edits.metadata.omittedCount,
-        partialReason: edits.metadata.partialReason,
-        format: (edit) => formatEdit(edit, cwd),
+        evidence: edits.metadata,
+        format: (edit: (typeof edits.items)[number]) => formatEdit(edit, cwd),
       }),
     ],
     details: {
@@ -153,8 +155,9 @@ export function assembleRefactorApplyDetails(
               key: "refactor.changedFiles",
               title: "Changed files",
               items: changedFiles,
-              totalCount: changedFiles.length,
-              format: (file) => file,
+              evidence: createEvidenceList({ key: "refactor.changedFiles", items: changedFiles })
+                .metadata,
+              format: (file: string) => file,
             }),
           ]
         : [],

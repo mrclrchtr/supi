@@ -1,4 +1,5 @@
 import type { SourceRange } from "@mrclrchtr/supi-code-runtime/api";
+import type { EvidenceListFacts } from "../../analysis/evidence.ts";
 
 /** Named, selected observations retained independently of their text rendering. */
 export interface OrientationFacts {
@@ -84,8 +85,7 @@ export interface OrientationFacts {
           readonly reason: string;
         }
     )[];
-    readonly collectedCount?: number;
-    readonly omittedCount?: number;
+    readonly evidence?: EvidenceListFacts;
   };
   readonly recovery?: readonly {
     readonly operation: string;
@@ -103,22 +103,19 @@ export interface OrientationFacts {
         readonly startLine: number;
         readonly endLine: number;
       }[];
-      readonly collectedCount: number;
-      readonly omittedCount: number;
+      readonly evidence: EvidenceListFacts;
     };
     readonly imports: {
       readonly status: "complete" | "partial" | "unavailable";
       readonly reason: string | null;
       readonly entries: readonly { readonly moduleSpecifier: string }[];
-      readonly collectedCount: number;
-      readonly omittedCount: number;
+      readonly evidence: EvidenceListFacts;
     };
     readonly exports: {
       readonly status: "complete" | "partial" | "unavailable";
       readonly reason: string | null;
       readonly entries: readonly { readonly name: string; readonly kind: string }[];
-      readonly collectedCount: number;
-      readonly omittedCount: number;
+      readonly evidence: EvidenceListFacts;
     };
   };
   readonly documentation?: readonly string[];

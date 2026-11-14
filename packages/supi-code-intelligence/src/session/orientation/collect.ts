@@ -9,6 +9,7 @@ import {
   createEvidenceList,
   createPartialEvidenceList,
   type EvidenceListMetadata,
+  toEvidenceListFacts,
 } from "../../analysis/evidence.ts";
 import {
   type ReadNextItem,
@@ -237,19 +238,34 @@ function targetContextFacts(
                     : { file: toDisplayPath(cwd, uri) }),
                   range: publicRange(range),
                 })),
-                collectedCount: treeContext.definition.length,
-                omittedCount: Math.max(0, treeContext.definition.length - limit),
+                evidence: sourceEvidence(
+                  "context.definitions",
+                  treeContext.operations.definition,
+                  treeContext.definition,
+                  limit,
+                ),
               }
             : {}),
         },
         sourceContext: {
-          outline: sourceSelection(treeContext.operations.outline, treeContext.outline, limit),
+          outline: sourceSelection(
+            "context.outline",
+            treeContext.operations.outline,
+            treeContext.outline,
+            limit,
+          ),
           imports: sourceSelection(
+            "context.imports",
             treeContext.operations.imports,
             treeContext.imports.map(({ moduleSpecifier }) => ({ moduleSpecifier })),
             limit,
           ),
-          exports: sourceSelection(treeContext.operations.exports, treeContext.exports, limit),
+          exports: sourceSelection(
+            "context.exports",
+            treeContext.operations.exports,
+            treeContext.exports,
+            limit,
+          ),
         },
       }
     : {};
@@ -675,8 +691,9 @@ function publicRange(range: SourceRange): SourceRange {
   };
 }
 
-/** These best-effort lists preserve availability separately from collected counts. */
+/** These best-effort lists preserve availability separately from their Evidence list. */
 function sourceSelection<T>(
+  key: string,
   status: { status: "complete" | "partial" | "unavailable"; reason: string | null },
   entries: readonly T[],
   limit: number,
@@ -684,9 +701,27 @@ function sourceSelection<T>(
   return {
     ...status,
     entries: entries.slice(0, limit),
-    collectedCount: entries.length,
-    omittedCount: Math.max(0, entries.length - limit),
+    evidence: sourceEvidence(key, status, entries, limit),
   };
+}
+
+/** A partial observation counts its collected atoms; more may exist. */
+function sourceEvidence<T>(
+  key: string,
+  status: { status: string; reason: string | null },
+  entries: readonly T[],
+  limit: number,
+) {
+  const params = { key, items: entries, maxResults: limit };
+  return toEvidenceListFacts(
+    status.status === "complete"
+      ? createEvidenceList(params).metadata
+      : createPartialEvidenceList({
+          ...params,
+          partialReason: "provider-limited",
+          ...(status.reason ? { partialMessage: status.reason } : {}),
+        }).metadata,
+  );
 }
 
 function uniqueRecoveryRanges(

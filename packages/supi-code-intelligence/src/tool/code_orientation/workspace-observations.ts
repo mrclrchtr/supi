@@ -1,5 +1,5 @@
 import * as path from "node:path";
-import type { EvidencePartialReason } from "../../analysis/evidence.ts";
+import type { CollectionPartialReason } from "../../analysis/evidence.ts";
 import type {
   ProjectDeclaration,
   WorkspaceCollection,
@@ -57,7 +57,7 @@ export function projectRelationships(
 export function workspaceCollectionStatus(collection: WorkspaceCollection): {
   inventoryPartial: boolean;
   metadataPartial: boolean;
-  partialReason: EvidencePartialReason;
+  partialReason: CollectionPartialReason;
   reason: string;
 } {
   const inventoryPartial =

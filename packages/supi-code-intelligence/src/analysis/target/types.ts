@@ -13,6 +13,7 @@ import type {
 } from "@mrclrchtr/supi-code-runtime/api";
 import type { TargetSymbolKind } from "../../session/target-input.ts";
 import type { AnchorKind, TargetProviderProvenance } from "../../session/target-store.ts";
+import type { EvidenceListMetadata } from "../evidence.ts";
 
 export type { TargetProviderProvenance } from "../../session/target-store.ts";
 
@@ -167,16 +168,10 @@ export interface DisambiguationCandidateData {
   anchorKind: AnchorKind;
 }
 
-/** Completeness metadata for a bounded candidate collection. */
+/** Completeness of a bounded candidate collection, keyed `target.candidates`. */
 export interface TargetCandidateCompleteness {
-  /** Exact candidate total, or null when the provider returned partial data. */
-  totalCount: number | null;
-  /** Candidates returned by the provider but hidden by the target cap. */
-  omittedCount: number;
-  /** Why the provider cannot establish an exact candidate total. */
-  partialReason: "provider-limited" | null;
-  /** Provider explanation for incomplete discovery, when available. */
-  partialMessage?: string;
+  /** Candidate Evidence list metadata; consumers re-key it, never rebuild it. */
+  candidateEvidence: EvidenceListMetadata;
 }
 
 /**

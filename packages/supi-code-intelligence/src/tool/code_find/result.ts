@@ -65,11 +65,9 @@ export function assembleFindWorkflowResult(
     createToolDisplaySection({
       key: `find.${outcome.data.kind}`,
       title: outcome.data.kind === "semantic" ? "Symbols" : "Matches",
-      items: findItems(outcome.data),
-      totalCount: evidence.metadata.totalCount,
-      omittedCount: evidence.metadata.omittedCount,
-      partialReason: evidence.metadata.partialReason,
-      format: (item) => formatFindDisplayItem(outcome.data.kind, item),
+      items: findItems(outcome.data).slice(0, evidence.metadata.shownCount),
+      evidence: evidence.metadata,
+      format: (item: unknown) => formatFindDisplayItem(outcome.data.kind, item),
     }),
   ];
 
@@ -79,8 +77,8 @@ export function assembleFindWorkflowResult(
         key: "find.excludedPaths",
         title: "Excluded path examples",
         items: exclusion.examples,
-        totalCount: exclusion.examples.length,
-        omittedCount: 0,
+        evidence: createEvidenceList({ key: "find.excludedPaths", items: exclusion.examples })
+          .metadata,
         format: describeExcludedPath,
       }),
     );

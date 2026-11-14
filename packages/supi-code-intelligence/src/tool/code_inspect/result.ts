@@ -109,9 +109,9 @@ function buildInspectDisplaySections(input: {
         key: "inspect.node",
         title: "Syntax node",
         items: [node],
-        format: (item) =>
+        evidence: observationEvidence("inspect.node", data.sections.node),
+        format: (item: typeof node) =>
           `${item.type} at ${data.relPath}:${item.startLine}:${item.startCharacter}–${item.endLine}:${item.endCharacter}${item.text ? ` — ${truncateDisplayText(item.text, 160)}` : ""}`,
-        partialReason: observationReason(data.sections.node),
       }),
     );
   }
@@ -123,9 +123,9 @@ function buildInspectDisplaySections(input: {
         key: "inspect.enclosingSymbol",
         title: "Enclosing symbol",
         items: [symbol],
-        format: (item) =>
+        evidence: observationEvidence("inspect.enclosingSymbol", data.sections.enclosingSymbol),
+        format: (item: typeof symbol) =>
           `${item.name} (${item.kind}) L${item.startLine}:${item.startCharacter}–L${item.endLine}:${item.endCharacter}`,
-        partialReason: observationReason(data.sections.enclosingSymbol),
       }),
     );
   }
@@ -136,36 +136,33 @@ function buildInspectDisplaySections(input: {
         key: "inspect.hover",
         title: "Hover",
         items: [data.sections.hover.data],
-        format: (hover) => truncateDisplayText(hover, 240),
-        partialReason: observationReason(data.sections.hover),
+        evidence: observationEvidence("inspect.hover", data.sections.hover),
+        format: (hover: string) => truncateDisplayText(hover, 240),
       }),
     );
   }
 
-  if (input.displayedDefinitions.length > 0) {
+  if (input.definitionEvidence && input.displayedDefinitions.length > 0) {
     sections.push(
       createToolDisplaySection({
         key: "inspect.definitions",
         title: "Definitions",
         items: input.displayedDefinitions,
-        totalCount: input.definitionEvidence?.metadata.totalCount,
-        omittedCount: input.definitionEvidence?.metadata.omittedCount,
-        partialReason: input.definitionEvidence?.metadata.partialReason,
-        format: (definition) => `${definition.file}:${definition.line}:${definition.character}`,
+        evidence: input.definitionEvidence.metadata,
+        format: (definition: InspectDefinition) =>
+          `${definition.file}:${definition.line}:${definition.character}`,
       }),
     );
   }
 
-  if (input.displayedDiagnostics.length > 0) {
+  if (input.diagnosticEvidence && input.displayedDiagnostics.length > 0) {
     sections.push(
       createToolDisplaySection({
         key: "inspect.diagnostics",
         title: "Diagnostics",
         items: input.displayedDiagnostics,
-        totalCount: input.diagnosticEvidence?.metadata.totalCount,
-        omittedCount: input.diagnosticEvidence?.metadata.omittedCount,
-        partialReason: input.diagnosticEvidence?.metadata.partialReason,
-        format: (diagnostic) =>
+        evidence: input.diagnosticEvidence.metadata,
+        format: (diagnostic: InspectDiagnostic) =>
           `L${diagnostic.line}:${diagnostic.character} ${formatDiagnosticSeverity(diagnostic.severity)}: ${truncateDisplayText(diagnostic.message, 200)}`,
       }),
     );
@@ -174,8 +171,16 @@ function buildInspectDisplaySections(input: {
   return sections;
 }
 
-function observationReason<T>(observation: InspectObservation<T>): string | null {
-  return observation.kind === "partial" ? observation.reason : null;
+/** One Point inspection observation is one Evidence atom. */
+function observationEvidence<T>(key: string, observation: InspectObservation<T>) {
+  return observation.kind === "partial"
+    ? createPartialEvidenceList({
+        key,
+        items: [key],
+        partialReason: "provider-limited",
+        partialMessage: observation.reason,
+      }).metadata
+    : createEvidenceList({ key, items: [key] }).metadata;
 }
 
 function formatDiagnosticSeverity(severity: number): string {

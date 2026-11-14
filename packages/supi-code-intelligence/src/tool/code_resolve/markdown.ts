@@ -4,7 +4,6 @@ import { renderEvidenceListMetadataDisclosure } from "../../analysis/evidence.ts
 import { toDisplayPath } from "../../analysis/search/paths.ts";
 import type { TargetProviderProvenance } from "../../session/target-store.ts";
 import type { TargetWorkflowOutcome } from "../../session/target-workflow.ts";
-import { formatPartialCandidateDisclosure } from "../result/candidate-row.ts";
 import type { ResolveDetails } from "../result/types.ts";
 import type { ResolveResultAssembly } from "./result.ts";
 
@@ -233,8 +232,6 @@ function appendCandidates(lines: string[], details: ResolveDetails): void {
 
 function appendDisclosure(lines: string[], details: ResolveDetails): void {
   const evidence = details.evidenceLists?.[0];
-  const disclosure = evidence
-    ? (formatPartialCandidateDisclosure(evidence) ?? renderEvidenceListMetadataDisclosure(evidence))
-    : null;
+  const disclosure = evidence ? renderEvidenceListMetadataDisclosure(evidence) : null;
   if (disclosure) lines.push("", disclosure);
 }

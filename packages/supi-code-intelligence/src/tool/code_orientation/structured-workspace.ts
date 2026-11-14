@@ -1,4 +1,9 @@
 import * as path from "node:path";
+import {
+  createEvidenceList,
+  createPartialEvidenceList,
+  toEvidenceListFacts,
+} from "../../analysis/evidence.ts";
 import { toDisplayPath } from "../../analysis/search/paths.ts";
 import type { ProjectDeclaration } from "../../analysis/workspace/types.ts";
 import { within } from "../../session/orientation/workspace-context.ts";
@@ -53,13 +58,14 @@ export function workspaceFacts(data: OrientationResultData) {
   const { inventoryPartial, metadataPartial, partialReason } =
     workspaceCollectionStatus(collection);
   // These are counts of this native selection, not text-budget omissions.
-  const selection = (key: string, total: number, incomplete = metadataPartial) => ({
-    key,
-    totalCount: incomplete ? null : total,
-    shownCount: Math.min(limit, total),
-    omittedCount: Math.max(0, total - limit),
-    partialReason: incomplete ? partialReason : null,
-  });
+  const selection = (key: string, total: number, incomplete = metadataPartial) => {
+    const items = Array.from({ length: total });
+    return toEvidenceListFacts(
+      incomplete
+        ? createPartialEvidenceList({ key, items, maxResults: limit, partialReason }).metadata
+        : createEvidenceList({ key, items, maxResults: limit }).metadata,
+    );
+  };
   return {
     root: observation.root,
     focus: toDisplayPath(facts.cwd, root),

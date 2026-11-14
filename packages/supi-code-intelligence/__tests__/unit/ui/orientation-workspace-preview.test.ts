@@ -1,5 +1,9 @@
 import { initTheme } from "@earendil-works/pi-coding-agent";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
+import {
+  createBoundedEvidenceList,
+  createPartialEvidenceList,
+} from "../../../src/analysis/evidence.ts";
 import { observeWorkspace } from "../../../src/analysis/workspace/observe.ts";
 import type { OrientationSectionData } from "../../../src/session/orientation-types.ts";
 import { renderOrientationResult as renderOrientationMarkdown } from "../../../src/tool/code_orientation/markdown.ts";
@@ -104,16 +108,16 @@ describe("Workspace Orientation structured previews", () => {
     const preview = renderPreview(assembly);
 
     expect(assembly.displaySections[0]).toMatchObject({
-      shownCount: 20,
-      totalCount: 25,
-      omittedCount: 5,
+      evidence: { completeness: "complete", shownCount: 25, totalCount: 25, omittedCount: 0 },
+      displayOmittedCount: 5,
     });
-    expect(preview).toContain("Project declarations (20 of 25; 5 omitted)");
+    expect(preview).toContain("Project declarations (25; 5 rows hidden in view)");
     expect(preview).toContain("Name | Path");
     expect(preview).toContain("project-20 | packages/project-20");
     expect(preview).not.toContain("project-21");
     expect(assembly.details.evidenceLists).toContainEqual({
       key: "workspace.projects",
+      completeness: "complete",
       totalCount: 25,
       shownCount: 25,
       omittedCount: 0,
@@ -147,9 +151,8 @@ describe("Workspace Orientation structured previews", () => {
     const preview = renderPreview(assembly);
 
     expect(assembly.displaySections[0]).toMatchObject({
-      shownCount: 20,
-      totalCount: 25,
-      omittedCount: 5,
+      evidence: { completeness: "complete", shownCount: 25, totalCount: 25, omittedCount: 0 },
+      displayOmittedCount: 5,
     });
     expect(preview).toContain("node-12");
     expect(preview).toContain("rust-8");
@@ -167,6 +170,7 @@ describe("Workspace Orientation structured previews", () => {
     );
     expect(assembly.details.evidenceLists).toContainEqual({
       key: "workspace.memberships",
+      completeness: "complete",
       totalCount: 25,
       shownCount: 25,
       omittedCount: 0,
@@ -178,13 +182,13 @@ describe("Workspace Orientation structured previews", () => {
     const assembly = assemblePreview(await projectMemberships(25, 5));
 
     expect(renderPreview(assembly)).toContain(
-      "Declared memberships (5 of 25 memberships selected; 20 omitted; 1 preview group)",
+      "Declared memberships (5 of 25 memberships; 20 omitted; 1 preview group)",
     );
   });
 
   it.each([
     { count: 25, summary: "25 memberships", omitted: 0 },
-    { count: 30, summary: "25 of 30 memberships selected; 5 omitted", omitted: 5 },
+    { count: 30, summary: "25 of 30 memberships; 5 omitted", omitted: 5 },
   ])(
     "bounds preview groups separately from $count canonical memberships",
     async ({ count, summary, omitted }) => {
@@ -192,12 +196,13 @@ describe("Workspace Orientation structured previews", () => {
       const preview = renderPreview(assembly);
 
       expect(preview).toContain(
-        `Declared memberships (${summary}; 20 of 25 preview groups; 5 preview groups omitted)`,
+        `Declared memberships (${summary}; 20 preview groups; 5 preview groups hidden in view)`,
       );
       expect(preview).toContain("units/member-20");
       expect(preview).not.toContain("units/member-21");
       expect(assembly.details.evidenceLists).toContainEqual({
         key: "workspace.memberships",
+        completeness: omitted ? "capped" : "complete",
         totalCount: count,
         shownCount: 25,
         omittedCount: omitted,
@@ -211,20 +216,24 @@ describe("Workspace Orientation structured previews", () => {
     const assembly = assemblePreview({
       ...section,
       status: "partial",
-      evidenceLists: section.evidenceLists.map((list) => ({
-        ...list,
-        totalCount: null,
-        omittedCount: null,
-        partialReason: "timeout",
-      })),
+      evidenceLists: section.evidenceLists.map(
+        (list) =>
+          createPartialEvidenceList({
+            key: list.key,
+            items: Array.from({ length: list.shownCount }),
+            collectedCount: null,
+            partialReason: "timeout",
+          }).metadata,
+      ),
     });
     const preview = renderPreview(assembly);
 
     expect(preview).toContain(
-      "Declared memberships (5 memberships selected; more may exist — timeout; 1 preview group)",
+      "Declared memberships (5 memberships; more may exist — timeout; 1 preview group)",
     );
     expect(assembly.details.evidenceLists).toContainEqual({
       key: "workspace.memberships",
+      completeness: "unbounded",
       totalCount: null,
       shownCount: 5,
       omittedCount: null,
@@ -233,63 +242,74 @@ describe("Workspace Orientation structured previews", () => {
   });
 
   it.each([
-    { count: 30, limit: 25, shown: 20, omitted: 10 },
-    { count: 25, limit: 5, shown: 5, omitted: 20 },
-    { count: 5, limit: 0, shown: 0, omitted: 5 },
+    { count: 30, limit: 25, hidden: 5, bounds: "25 of 30; 5 omitted; 5 rows hidden in view" },
+    { count: 25, limit: 5, hidden: 0, bounds: "5 of 25; 20 omitted" },
+    { count: 5, limit: 0, hidden: 0, bounds: "0 of 5; 5 omitted" },
   ])("preserves upstream omissions for $count rows with limit $limit", (testCase) => {
     const assembly = assemblePreview(projectTable(testCase.count, testCase.limit));
 
     expect(assembly.displaySections[0]).toMatchObject({
-      shownCount: testCase.shown,
-      totalCount: testCase.count,
-      omittedCount: testCase.omitted,
+      evidence: {
+        completeness: "capped",
+        shownCount: testCase.limit,
+        totalCount: testCase.count,
+        omittedCount: testCase.count - testCase.limit,
+      },
+      displayOmittedCount: testCase.hidden,
     });
-    expect(renderPreview(assembly)).toContain(
-      `Project declarations (${testCase.shown} of ${testCase.count}; ${testCase.omitted} omitted)`,
-    );
+    expect(renderPreview(assembly)).toContain(`Project declarations (${testCase.bounds})`);
   });
 
   it.each([
-    { limit: 25, upstreamOmitted: 5, shown: 20, displayOmitted: 10 },
-    { limit: 25, upstreamOmitted: null, shown: 20, displayOmitted: 5 },
-    { limit: 5, upstreamOmitted: null, shown: 5, displayOmitted: null },
-  ])("keeps partial totals unknown with $limit rows and $upstreamOmitted omissions", (testCase) => {
-    const section = projectTable(30, testCase.limit);
-    const assembly = assemblePreview({
-      ...section,
-      status: "partial",
-      reason: "Inventory collection is incomplete",
-      evidenceLists: [
-        {
-          key: section.key,
-          totalCount: null,
+    { limit: 25, upstreamOmitted: 5, completeness: "partial", hidden: 5 },
+    { limit: 25, upstreamOmitted: null, completeness: "unbounded", hidden: 5 },
+    { limit: 5, upstreamOmitted: null, completeness: "unbounded", hidden: 0 },
+  ] as const)(
+    "keeps partial totals unknown with $limit rows and $upstreamOmitted omissions",
+    (testCase) => {
+      const section = projectTable(30, testCase.limit);
+      const assembly = assemblePreview({
+        ...section,
+        status: "partial",
+        reason: "Inventory collection is incomplete",
+        evidenceLists: [
+          createPartialEvidenceList({
+            key: section.key,
+            items: Array.from({ length: testCase.limit }),
+            collectedCount:
+              testCase.upstreamOmitted === null ? null : testCase.limit + testCase.upstreamOmitted,
+            partialReason: "safety-limit",
+            partialMessage: "Collection stopped at its entry limit.",
+          }).metadata,
+        ],
+      });
+
+      // Evidence stays partial with an unknown total; view-hidden rows stay a separate count.
+      expect(assembly.displaySections[0]).toMatchObject({
+        evidence: {
+          completeness: testCase.completeness,
           shownCount: testCase.limit,
+          totalCount: null,
           omittedCount: testCase.upstreamOmitted,
           partialReason: "safety-limit",
           partialMessage: "Collection stopped at its entry limit.",
         },
-      ],
-    });
-
-    expect(assembly.displaySections[0]).toMatchObject({
-      shownCount: testCase.shown,
-      totalCount: null,
-      omittedCount: testCase.displayOmitted,
-      partialReason: "safety-limit",
-      partialMessage: "Collection stopped at its entry limit.",
-    });
-    const preview = renderPreview(assembly);
-    expect(preview).toContain("more may exist — safety-limit");
-    expect(preview).toContain("Collection stopped at its entry limit.");
-    expect(assembly.details.evidenceLists).toContainEqual({
-      key: section.key,
-      totalCount: null,
-      shownCount: testCase.limit,
-      omittedCount: testCase.upstreamOmitted,
-      partialReason: "safety-limit",
-      partialMessage: "Collection stopped at its entry limit.",
-    });
-  });
+        displayOmittedCount: testCase.hidden,
+      });
+      const preview = renderPreview(assembly);
+      expect(preview).toContain("more may exist — safety-limit");
+      expect(preview).toContain("Collection stopped at its entry limit.");
+      expect(assembly.details.evidenceLists).toContainEqual({
+        key: section.key,
+        completeness: testCase.completeness,
+        totalCount: null,
+        shownCount: testCase.limit,
+        omittedCount: testCase.upstreamOmitted,
+        partialReason: "safety-limit",
+        partialMessage: "Collection stopped at its entry limit.",
+      });
+    },
+  );
 
   it("distinguishes graph evidence from non-table preview blocks", () => {
     const assembly = assemblePreview({
@@ -300,13 +320,11 @@ describe("Workspace Orientation structured previews", () => {
       confidence: "unavailable",
       provenance: [{ source: "manifest" }],
       evidenceLists: [
-        {
+        createBoundedEvidenceList({
           key: "project.relationships",
+          items: Array.from({ length: 25 }),
           totalCount: 25,
-          shownCount: 25,
-          omittedCount: 0,
-          partialReason: null,
-        },
+        }).metadata,
       ],
       items: [
         { kind: "paragraph", text: "Declared edges are not a runtime graph." },
@@ -314,10 +332,10 @@ describe("Workspace Orientation structured previews", () => {
       ],
     });
 
+    // Preview blocks are framing; their section evidence counts blocks, not graph atoms.
     expect(assembly.displaySections[0]).toMatchObject({
-      shownCount: 2,
-      totalCount: 2,
-      omittedCount: 0,
+      evidence: { completeness: "complete", shownCount: 2, totalCount: 2, omittedCount: 0 },
+      displayOmittedCount: 0,
     });
     expect(renderPreview(assembly)).toContain(
       "Declared project relationships (25 observed; 2 preview blocks)",
@@ -329,9 +347,8 @@ describe("Workspace Orientation structured previews", () => {
     const preview = renderPreview(assembly);
 
     expect(assembly.displaySections[0]).toMatchObject({
-      shownCount: 0,
-      totalCount: 0,
-      omittedCount: 0,
+      evidence: { completeness: "complete", shownCount: 0, totalCount: 0, omittedCount: 0 },
+      displayOmittedCount: 0,
     });
     expect(preview).toContain("Project declarations (0)");
     expect(preview).toContain("No collected entries.");

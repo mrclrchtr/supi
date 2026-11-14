@@ -1,4 +1,5 @@
 import { DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES } from "@earendil-works/pi-coding-agent";
+import { createBoundedEvidenceList } from "../../analysis/evidence.ts";
 import type {
   OrientationItem,
   OrientationResultData,
@@ -81,13 +82,11 @@ function replaceInstructions(
     ...original,
     items,
     evidenceLists: [
-      {
+      createBoundedEvidenceList({
         key: "instructions.files",
+        items: items.filter((item) => item.kind === "subheading"),
         totalCount: data.instructions?.files.length ?? count,
-        shownCount: count,
-        omittedCount: (data.instructions?.files.length ?? count) - count,
-        partialReason: null,
-      },
+      }).metadata,
     ],
   };
   return {

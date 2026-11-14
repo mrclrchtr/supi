@@ -1,5 +1,9 @@
 import type { ConfidenceMode } from "@mrclrchtr/supi-code-runtime/api";
-import type { EvidenceList, EvidenceListMetadata } from "../../analysis/evidence.ts";
+import {
+  type EvidenceList,
+  type EvidenceListMetadata,
+  rekeyEvidence,
+} from "../../analysis/evidence.ts";
 import { toDisplayPath } from "../../analysis/search/paths.ts";
 import type { GraphSection } from "../../session/graph-types.ts";
 import {
@@ -8,7 +12,7 @@ import {
   type ResultProvenance,
   type ToolResultAssembly,
 } from "../result/assembly.ts";
-import { formatCandidateRow, formatPartialCandidateDisclosure } from "../result/candidate-row.ts";
+import { formatCandidateRow } from "../result/candidate-row.ts";
 import { createToolDisplaySection } from "../result/display.ts";
 import type { ToolDisplaySection } from "../result/types.ts";
 import type { GraphDetails, GraphFileGroup, GraphSectionDetails } from "./details.ts";
@@ -225,10 +229,7 @@ function finishGraphCandidates(
     );
   }
   const evidence = graphCandidateEvidence(outcome);
-  lines.push(
-    "",
-    formatPartialCandidateDisclosure(evidence) ?? formatGraphEvidence(evidence, "candidates"),
-  );
+  lines.push("", formatGraphEvidence(evidence, "candidates"));
   if (outcome.kind === "kind-mismatch") {
     lines.push(
       "",
@@ -240,11 +241,9 @@ function finishGraphCandidates(
       key: "graph.candidates",
       title: "Candidates",
       items: outcome.candidates,
-      totalCount: evidence.totalCount,
-      omittedCount: evidence.omittedCount,
-      partialReason: evidence.partialReason,
-      partialMessage: evidence.partialMessage,
-      format: (candidate) => formatCandidateRow(candidate, "handle-first"),
+      evidence,
+      format: (candidate: (typeof outcome.candidates)[number]) =>
+        formatCandidateRow(candidate, "handle-first"),
     }),
   ];
   const nextQueries =
@@ -271,20 +270,12 @@ function finishGraphCandidates(
 function graphCandidateEvidence(
   outcome: Extract<GraphOutcome, { kind: "disambiguation" | "kind-mismatch" }>,
 ): EvidenceListMetadata {
-  return {
-    key: "graph.candidates",
-    totalCount: outcome.totalCount,
-    shownCount: outcome.candidates.length,
-    omittedCount: outcome.omittedCount,
-    partialReason: outcome.partialReason,
-    partialMessage: outcome.partialMessage,
-  };
+  return rekeyEvidence(outcome.candidateEvidence, "graph.candidates");
 }
 
 function hasHiddenDisplayEvidence(assembly: GraphResultAssembly): boolean {
   return assembly.sections.some(
     (section, index) =>
-      section.kind === "ok" &&
-      assembly.displaySections[index].shownCount < section.evidence.items.length,
+      section.kind === "ok" && assembly.displaySections[index].displayOmittedCount > 0,
   );
 }

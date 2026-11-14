@@ -61,29 +61,21 @@ export function assembleGraphSection(
       };
     }
     case "callees": {
-      const evidence = section.data.recovery
-        ? createPartialEvidenceList({
-            key: "callees.calls",
-            items: [...section.data.calls],
-            maxResults,
-            partialReason: "provider-limited",
-          })
-        : createEvidenceList({
-            key: "callees.calls",
-            items: [...section.data.calls],
-            maxResults,
-          });
       return {
         ...section,
         evidence: section.data.recovery
-          ? {
-              ...evidence,
-              metadata: {
-                ...evidence.metadata,
-                partialMessage: recoveryMessage(section.data.recovery, cwd),
-              },
-            }
-          : evidence,
+          ? createPartialEvidenceList({
+              key: "callees.calls",
+              items: [...section.data.calls],
+              maxResults,
+              partialReason: "provider-limited",
+              partialMessage: recoveryMessage(section.data.recovery, cwd),
+            })
+          : createEvidenceList({
+              key: "callees.calls",
+              items: [...section.data.calls],
+              maxResults,
+            }),
       };
     }
     case "implements":
@@ -109,20 +101,16 @@ function createRelationEvidenceList<T>(params: {
   partialReason: RelationLocationPartialReason | null;
   partialMessage: string | null;
 }): EvidenceList<T> {
-  const evidence =
-    params.partialReason === "provider-limited"
-      ? createPartialEvidenceList({ ...params, partialReason: params.partialReason })
-      : createEvidenceList(params);
-  if (params.partialReason === null) return evidence;
-  return {
-    ...evidence,
-    metadata: {
-      ...evidence.metadata,
-      partialReason: params.partialReason,
-      invalidLocationCount: params.invalidLocationCount,
-      ...(params.partialMessage ? { partialMessage: params.partialMessage } : {}),
-    },
+  const common = {
+    key: params.key,
+    items: params.items,
+    maxResults: params.maxResults,
+    invalidLocationCount: params.invalidLocationCount,
+    ...(params.partialMessage ? { partialMessage: params.partialMessage } : {}),
   };
+  return params.partialReason === "provider-limited"
+    ? createPartialEvidenceList({ ...common, partialReason: "provider-limited" })
+    : createEvidenceList(common);
 }
 
 function recoveryMessage(

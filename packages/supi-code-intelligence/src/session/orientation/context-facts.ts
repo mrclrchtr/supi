@@ -9,7 +9,7 @@ import type {
   ModuleInfo,
 } from "../../analysis/architecture/model.ts";
 import { findModuleForPath } from "../../analysis/architecture/model.ts";
-import type { EvidencePartialReason } from "../../analysis/evidence.ts";
+import type { CollectionPartialReason } from "../../analysis/evidence.ts";
 import type { CodeProvider } from "../../analysis/provider.ts";
 import type { OrientationProvenance, OrientationResultData } from "../orientation-types.ts";
 import {
@@ -290,7 +290,7 @@ function appendRelationshipFacts(
     edges: readonly DependencyEdge[];
     status: "complete" | "partial" | "unavailable";
     reason: string | null;
-    partialReason: EvidencePartialReason | undefined;
+    partialReason: CollectionPartialReason | undefined;
   },
 ): void {
   if (input.status === "unavailable") return;
@@ -318,7 +318,7 @@ function appendRelationshipFacts(
   });
 }
 
-function topologyPartialReason(model: ArchitectureModel): EvidencePartialReason | undefined {
+function topologyPartialReason(model: ArchitectureModel): CollectionPartialReason | undefined {
   if (model.topology.status !== "partial") return undefined;
   return model.topology.failedPackageManifestCount > 0 ? "filesystem-error" : "configuration-error";
 }

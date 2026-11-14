@@ -1,4 +1,5 @@
 import * as path from "node:path";
+import { createBoundedEvidenceList } from "../../analysis/evidence.ts";
 import type {
   ProjectDeclaration,
   ProjectMembership,
@@ -187,13 +188,11 @@ function projectListSection(
     confidence: "unavailable",
     provenance: [{ source: "manifest", detail: options.detail }],
     evidenceLists: [
-      {
+      createBoundedEvidenceList({
         key,
+        items: Array.from({ length: options.shownCount }),
         totalCount: options.totalCount,
-        shownCount: options.shownCount,
-        omittedCount: options.totalCount - options.shownCount,
-        partialReason: null,
-      },
+      }).metadata,
     ],
     items: options.items.length
       ? options.items
@@ -256,13 +255,11 @@ function relationshipSection(
       { source: "manifest", detail: "dependency fields in each source node's manifest" },
     ],
     evidenceLists: [
-      {
+      createBoundedEvidenceList({
         key: `${project.id}.relationships`,
+        items: selected,
         totalCount: edges.length,
-        shownCount: selected.length,
-        omittedCount: edges.length - selected.length,
-        partialReason: null,
-      },
+      }).metadata,
     ],
     items: [
       {

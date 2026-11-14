@@ -2,7 +2,7 @@ import type { StructuralProvider as StructuralSubstrate } from "@mrclrchtr/supi-
 import type { AutomaticLspPathPolicy } from "@mrclrchtr/supi-lsp/api";
 import type { StructuralSearchOperation } from "@mrclrchtr/supi-tree-sitter/api";
 import type { CodeFindAstKind } from "../../tool/code_find/ast-kinds.ts";
-import type { EvidencePartialReason } from "../evidence.ts";
+import type { CollectionPartialReason } from "../evidence.ts";
 import {
   type AstScanExclusion,
   type AstScanOperations,
@@ -46,7 +46,7 @@ export interface StructuredScanSummary {
 
 export interface StructuredPatternResult {
   readonly matches: readonly StructuredMatch[];
-  readonly partialReason: EvidencePartialReason | null;
+  readonly partialReason: CollectionPartialReason | null;
   /** Per-file parse/analysis failures surfaced to the agent. */
   readonly failures: readonly StructuredFailure[];
   readonly scan: StructuredScanSummary;
@@ -190,7 +190,7 @@ export async function getStructuredPatternMatches(
 
 function primaryPartialReason(
   limitations: readonly StructuredScanLimitation[],
-): EvidencePartialReason {
+): CollectionPartialReason {
   if (limitations.some((limitation) => limitation.reason === "timeout")) return "timeout";
   if (limitations.some((limitation) => limitation.reason === "safety-limit")) {
     return "safety-limit";

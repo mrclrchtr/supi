@@ -335,8 +335,14 @@ describe("registered code-tool external source paths", () => {
             contextDefinitions: {
               status: "complete",
               reason: null,
-              collectedCount: 1,
-              omittedCount: 0,
+              evidence: {
+                key: "context.definitions",
+                completeness: "complete",
+                totalCount: 1,
+                shownCount: 1,
+                omittedCount: 0,
+                partialReason: null,
+              },
               entries: [
                 {
                   uri,

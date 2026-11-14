@@ -339,7 +339,9 @@ describe("target-workflow (deep session seam)", () => {
       if (outcome.kind === "disambiguation") {
         expect(outcome.candidates).toHaveLength(1);
         expect(outcome.candidates[0]?.targetId).toMatch(/^tg-/);
-        expect(outcome).toMatchObject({
+        expect(outcome.candidateEvidence).toMatchObject({
+          key: "target.candidates",
+          completeness: "capped",
           totalCount: 2,
           omittedCount: 1,
           partialReason: null,
@@ -698,8 +700,12 @@ describe("target-workflow (deep session seam)", () => {
       if (outcome.kind !== "file-outline") return;
       expect(outcome.targets.map((target) => target.name)).toEqual(["laterTop"]);
       expect(store).toHaveLength(1);
-      expect(outcome.totalCount).toBe(3);
-      expect(outcome.omittedCount).toBe(2);
+      expect(outcome.targetEvidence).toMatchObject({
+        key: "resolve.targets",
+        completeness: "capped",
+        totalCount: 3,
+        omittedCount: 2,
+      });
       expect(outcome.unknownLevelCount).toBe(1);
 
       const repeated = await resolveTargetWorkflow(
@@ -717,7 +723,10 @@ describe("target-workflow (deep session seam)", () => {
         "unknown",
       ]);
       expect(repeated.targets[0]?.targetId).toBe(outcome.targets[0]?.targetId);
-      expect(repeated).toMatchObject({ totalCount: 3, omittedCount: 0, unknownLevelCount: 1 });
+      expect(repeated).toMatchObject({
+        targetEvidence: { completeness: "complete", totalCount: 3, omittedCount: 0 },
+        unknownLevelCount: 1,
+      });
     });
   });
 

@@ -1,4 +1,4 @@
-import type { EvidenceListMetadata } from "../../analysis/evidence.ts";
+import { rekeyEvidence, toEvidenceListFacts } from "../../analysis/evidence.ts";
 import type { OrientationWorkflowOutcome } from "../../session/orientation-types.ts";
 import { workspaceFacts } from "./structured-workspace.ts";
 import { workspaceSections } from "./workspace-sections.ts";
@@ -61,16 +61,7 @@ function orientationProjection(
         }),
       ),
       evidenceLists: [
-        {
-          key: "orientation.candidates",
-          totalCount: outcome.totalCount,
-          shownCount: outcome.candidates.length,
-          omittedCount: outcome.omittedCount,
-          partialReason: outcome.partialReason,
-          ...(outcome.partialMessage === undefined
-            ? {}
-            : { partialMessage: outcome.partialMessage }),
-        },
+        toEvidenceListFacts(rekeyEvidence(outcome.candidateEvidence, "orientation.candidates")),
       ],
       nextQueries: [
         outcome.kind === "kind-mismatch"
@@ -99,7 +90,7 @@ function orientationProjection(
           ...(capability === undefined ? {} : { capability }),
           ...(detail === undefined ? {} : { detail }),
         })),
-        evidenceLists: evidenceLists.map(copyEvidence),
+        evidenceLists: evidenceLists.map(toEvidenceListFacts),
         ...(errorRanges
           ? {
               errorRanges: errorRanges.map(({ start, end }) => ({
@@ -138,7 +129,9 @@ function orientationProjection(
           },
         ]
       : [],
-    evidenceLists: selected.sections.flatMap((section) => section.evidenceLists.map(copyEvidence)),
+    evidenceLists: selected.sections.flatMap((section) =>
+      section.evidenceLists.map(toEvidenceListFacts),
+    ),
     nextQueries: [...data.nextQueries],
     readNext: data.readNext.map(({ file, startLine, endLine, reason }) => ({
       file,
@@ -171,19 +164,5 @@ function orientationProjection(
       : [
           "Provider and diagnostic observations are point-in-time evidence, not a complete or refreshed workspace scan.",
         ],
-  };
-}
-
-function copyEvidence(list: EvidenceListMetadata) {
-  return {
-    key: list.key,
-    totalCount: list.totalCount,
-    shownCount: list.shownCount,
-    omittedCount: list.omittedCount,
-    partialReason: list.partialReason,
-    ...(list.partialMessage === undefined ? {} : { partialMessage: list.partialMessage }),
-    ...(list.invalidLocationCount === undefined
-      ? {}
-      : { invalidLocationCount: list.invalidLocationCount }),
   };
 }

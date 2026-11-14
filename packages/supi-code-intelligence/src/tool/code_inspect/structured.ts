@@ -1,4 +1,5 @@
 import { type Static, type TSchema, Type } from "typebox";
+import { toEvidenceListFacts } from "../../analysis/evidence.ts";
 import type { InspectObservation } from "../../session/inspect-types.ts";
 import { ConfidenceSchema, EvidenceListSchema, RecoveryRangeSchema } from "../result/structured.ts";
 import type { InspectResultAssembly } from "./result.ts";
@@ -203,25 +204,7 @@ export function structuredInspectResult(
         ),
       ),
     },
-    evidenceLists: assembled.evidenceLists.map(
-      ({
-        key,
-        totalCount,
-        shownCount,
-        omittedCount,
-        partialReason,
-        partialMessage,
-        invalidLocationCount,
-      }) => ({
-        key,
-        totalCount,
-        shownCount,
-        omittedCount,
-        partialReason,
-        ...(partialMessage === undefined ? {} : { partialMessage }),
-        ...(invalidLocationCount === undefined ? {} : { invalidLocationCount }),
-      }),
-    ),
+    evidenceLists: assembled.evidenceLists.map(toEvidenceListFacts),
     provenance: assembled.provenance.map(({ source, capability }) => ({
       source: source as "semantic" | "structural",
       capability: capability ?? "",

@@ -1,4 +1,8 @@
 import { describe, expect, it } from "vitest";
+import {
+  createEvidenceList,
+  createPartialEvidenceList,
+} from "../../../../src/analysis/evidence.ts";
 import { renderGraphResult } from "../../../../src/tool/code_graph/markdown.ts";
 import { assembleGraphResult } from "../../../../src/tool/code_graph/result.ts";
 import { assembleOrientationResult } from "../../../../src/tool/code_orientation/result.ts";
@@ -24,13 +28,12 @@ describe("canonical Tool result assembly", () => {
         },
       ],
       evidenceLists: [
-        {
+        createPartialEvidenceList({
           key: "items",
-          totalCount: null,
-          shownCount: 2,
-          omittedCount: null,
+          items: [1, 2],
+          collectedCount: null,
           partialReason: "timeout",
-        },
+        }).metadata,
       ],
       nextQueries: ["narrow the query"],
       readNext: [{ file: "src/a.ts", startLine: 1, endLine: 5, reason: "inspect" }],
@@ -147,7 +150,7 @@ describe("canonical Tool result assembly", () => {
     expect(markdown).not.toContain("callB");
     expect(markdown).toContain("impl-a.ts");
     expect(markdown).not.toContain("impl-b.ts");
-    expect(markdown.match(/1 of 2 (?:locations|call sites) shown; 1 omitted/g)).toHaveLength(3);
+    expect(markdown.match(/1 of 2 (?:locations|call sites); 1 omitted/g)).toHaveLength(3);
   });
 
   it("assembles a resolved target with provenance and no unconditional graph advice", () => {
@@ -257,9 +260,7 @@ describe("canonical Tool result assembly", () => {
             anchorKind: "name",
           },
         ],
-        totalCount: 1,
-        omittedCount: 0,
-        partialReason: null,
+        candidateEvidence: createEvidenceList({ key: "target.candidates", items: [null] }).metadata,
       },
       "/repo",
     );
@@ -309,8 +310,8 @@ describe("canonical Tool result assembly", () => {
             row("hidden", "Method", 12, "NotShown"),
             row("ON", "EnumMember", 14, null),
           ],
-          totalCount: 5,
-          omittedCount: 0,
+          targetEvidence: createEvidenceList({ key: "resolve.targets", items: [1, 2, 3, 4, 5] })
+            .metadata,
           unknownLevelCount: 0,
           notListed: {
             importedNames: null,
@@ -358,8 +359,13 @@ describe("canonical Tool result assembly", () => {
         confidence: "semantic",
         discoveryProvenance: ["semantic", "structural"],
         targets: [makeTarget("one", 1)],
-        totalCount: 2,
-        omittedCount: 1,
+        targetEvidence: createPartialEvidenceList({
+          key: "resolve.targets",
+          items: [makeTarget("one", 1)],
+          collectedCount: 2,
+          partialReason: "provider-limited",
+          partialMessage: "Tree-sitter recovered syntax.",
+        }).metadata,
         unknownLevelCount: 1,
         notListed: {
           importedNames: { count: 3, startLine: 1, endLine: 2 },
@@ -389,7 +395,8 @@ describe("canonical Tool result assembly", () => {
     });
     expect(assembly.details.evidenceLists).toContainEqual({
       key: "resolve.targets",
-      totalCount: 2,
+      completeness: "partial",
+      totalCount: null,
       shownCount: 1,
       omittedCount: 1,
       partialReason: "provider-limited",
@@ -410,7 +417,9 @@ describe("canonical Tool result assembly", () => {
     expect(markdown).not.toContain("in export lists");
     expect(markdown).toContain("1 declaration has no enclosing declaration reported");
     expect(markdown).not.toContain("tg-two");
-    expect(markdown).toContain("showing 1 of 2; 1 omitted");
+    expect(markdown).toContain(
+      "_(showing 1; 1 collected omitted; more may exist — provider-limited; Tree-sitter recovered syntax.)_",
+    );
     // A partial outline keeps the advice to pass one declaration handle onward.
     expect(assembly.details.nextQueries[0]).toContain("as target.handle");
   });

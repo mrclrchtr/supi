@@ -89,6 +89,7 @@ describe("code_graph agent output", () => {
           ],
           evidence: {
             key: "references.locations",
+            completeness: "capped",
             totalCount: 42,
             shownCount: 5,
             omittedCount: 37,
@@ -98,7 +99,7 @@ describe("code_graph agent output", () => {
       ]),
     });
     expect(result.content).toContain(
-      "5 of 42 locations shown; 37 omitted — Selection: one site per file per round.",
+      "5 of 42 locations; 37 omitted — Selection: one site per file per round.",
     );
     expect(result.content).toContain("- `a.ts`: L1:1, L2:1, L3:1\n");
     expect(result.content).toContain("- `b.ts`: L1:1\n- `c.ts`: L1:1");
@@ -191,7 +192,7 @@ describe("code_graph agent output", () => {
 
   it("bounds call sites before grouping repeated names", async () => {
     const { content } = await execute(2);
-    expect(content).toContain("2 of 3 call sites shown; 1 omitted");
+    expect(content).toContain("2 of 3 call sites; 1 omitted");
     expect(content.match(/`bar`/g)).toHaveLength(1);
     expect(content).toContain("L2:3, L2:10");
     expect(content).not.toContain("L3:3");

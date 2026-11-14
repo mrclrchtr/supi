@@ -1,11 +1,9 @@
 /** Shared human transcript renderer for target-candidate selections. */
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { type Component, Container, Spacer, Text } from "@earendil-works/pi-tui";
+import { formatCandidateRow } from "../../tool/result/candidate-row.ts";
 import {
-  formatCandidateRow,
-  formatPartialCandidateDisclosure,
-} from "../../tool/result/candidate-row.ts";
-import {
+  describeDisplayOmission,
   MAX_TUI_DISPLAY_ITEMS,
   readToolDisplaySections,
   truncateDisplayText,
@@ -78,16 +76,17 @@ function readCandidateSelection(
 
   // A status or message alone is not a candidate-selection marker. Require a
   // candidate key or a structured candidate collection before changing views.
-  if (!display && !evidence && !structuredCandidates) return null;
+  // Older persisted entries keep their key but fail strict evidence parsing;
+  // they still select this view and use its bounded legacy body.
+  const keyed =
+    display ||
+    evidence ||
+    hasRawKey(result.details?.displaySections, key) ||
+    hasRawKey(data?.evidenceLists, key);
+  if (!keyed && !structuredCandidates) return null;
 
   const rows = candidateRowsFor(display, structuredCandidates, key);
-  const selectionEvidence = candidateEvidenceFor({
-    display,
-    evidence,
-    structuredCandidates,
-    rows,
-    key,
-  });
+  const selectionEvidence = candidateEvidenceFor({ display, evidence });
   const reason = selectionReason(result, data);
   const structuredGuidance = readStructuredNextQueries(data);
   const guidance = selectionGuidance(result, data, key);
@@ -122,45 +121,12 @@ function candidateRowsFor(
   );
 }
 
+/** Prefer canonical details evidence; a display section carries the same facts. */
 function candidateEvidenceFor(input: {
   display: ToolDisplaySection | null;
   evidence: EvidenceEntry | null;
-  structuredCandidates: CandidateRow[] | null;
-  rows: string[];
-  key: CandidateSelectionKey;
 }): EvidenceEntry | null {
-  if (input.display?.lines.length) return displayEvidence(input.display, input.key);
-  if (input.evidence && input.structuredCandidates?.length) {
-    return evidenceForRows(input.evidence, input.rows.length);
-  }
-  if (input.display) return displayEvidence(input.display, input.key);
-  return input.evidence;
-}
-
-function displayEvidence(display: ToolDisplaySection, key: CandidateSelectionKey): EvidenceEntry {
-  const shownCount = display.lines.length;
-  return {
-    key,
-    shownCount,
-    totalCount: display.totalCount,
-    omittedCount:
-      display.totalCount === null
-        ? unknownOmittedCount(display.omittedCount, Math.max(0, display.shownCount - shownCount))
-        : Math.max(0, display.totalCount - shownCount),
-    partialReason: display.partialReason,
-    partialMessage: display.partialMessage,
-  };
-}
-
-function evidenceForRows(evidence: EvidenceEntry, shownCount: number): EvidenceEntry {
-  return {
-    ...evidence,
-    shownCount,
-    omittedCount:
-      evidence.totalCount === null
-        ? unknownOmittedCount(evidence.omittedCount, Math.max(0, evidence.shownCount - shownCount))
-        : Math.max(0, evidence.totalCount - shownCount),
-  };
+  return input.evidence ?? input.display?.evidence ?? null;
 }
 
 function readCandidateRows(value: unknown): CandidateRow[] | null {
@@ -278,14 +244,14 @@ class CandidateSelectionComponent implements Component {
   invalidate(): void {}
 
   private renderCollapsed(container: Container, width: number): string[] {
-    const disclosure = this.selection.evidence
-      ? formatPartialCandidateDisclosure(this.selection.evidence)
-      : null;
-    if (disclosure) {
-      container.addChild(new BoundedCandidateDisclosure(disclosure, false, this.theme));
-    } else if (this.selection.evidence) {
-      const summary = formatEvidenceEntry(this.selection.evidence);
-      container.addChild(new Text(this.theme.fg("muted", summary), 0, 0));
+    if (this.selection.evidence) {
+      container.addChild(
+        new BoundedCandidateDisclosure(
+          formatEvidenceEntry(this.selection.evidence),
+          false,
+          this.theme,
+        ),
+      );
     }
     this.appendTruncation(container);
     return this.renderContainer(container, width);
@@ -316,16 +282,15 @@ class CandidateSelectionComponent implements Component {
   private appendStructuredSelection(container: Container): void {
     container.addChild(new Spacer(1));
     const title = this.selection.display?.title ?? "Candidates";
-    const disclosure = this.selection.evidence
-      ? formatPartialCandidateDisclosure(this.selection.evidence)
-      : null;
-    const bounds =
-      !disclosure && this.selection.evidence ? formatSectionBounds(this.selection.evidence) : "";
-    container.addChild(
-      new Text(this.theme.fg("dim", `${title}${bounds ? ` (${bounds})` : ""}`), 0, 0),
-    );
-    if (disclosure) {
-      container.addChild(new BoundedCandidateDisclosure(disclosure, true, this.theme));
+    container.addChild(new Text(this.theme.fg("dim", title), 0, 0));
+    if (this.selection.evidence) {
+      container.addChild(
+        new BoundedCandidateDisclosure(
+          `${formatEvidenceEntry(this.selection.evidence)}${hiddenRows(this.selection.display)}`,
+          true,
+          this.theme,
+        ),
+      );
     }
     for (const row of this.selection.rows) {
       container.addChild(new Text(this.theme.fg("muted", row), 0, 0));
@@ -350,20 +315,13 @@ class CandidateSelectionComponent implements Component {
   }
 }
 
-function formatSectionBounds(entry: EvidenceEntry): string {
-  if (entry.totalCount === null) {
-    const omitted = entry.omittedCount ? `; ${entry.omittedCount} collected omitted` : "";
-    const reason = entry.partialReason ? `; more may exist — ${entry.partialReason}` : "; partial";
-    return `${entry.shownCount}${omitted}${reason}`;
-  }
-  if (entry.omittedCount)
-    return `${entry.shownCount} of ${entry.totalCount}; ${entry.omittedCount} omitted`;
-  return `${entry.totalCount}`;
+function hiddenRows(display: ToolDisplaySection | null): string {
+  const phrase = describeDisplayOmission(display?.displayOmittedCount ?? 0);
+  return phrase ? `; ${phrase}` : "";
 }
 
-function unknownOmittedCount(base: number | null, additional: number): number | null {
-  const omitted = (base ?? 0) + additional;
-  return base !== null || omitted > 0 ? omitted : null;
+function hasRawKey(value: unknown, key: CandidateSelectionKey): boolean {
+  return Array.isArray(value) && value.some((entry) => asRecord(entry)?.key === key);
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {

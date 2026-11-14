@@ -1,3 +1,9 @@
+import {
+  describeEvidenceList,
+  type EvidenceListMetadata,
+  readEvidenceListFacts,
+  toEvidenceListFacts,
+} from "../../analysis/evidence.ts";
 import type { ToolDisplaySection } from "./types.ts";
 
 /** Maximum number of rows shown for one expanded TUI section. */
@@ -8,47 +14,51 @@ export const MAX_TUI_DISPLAY_LINE_LENGTH = 240;
 
 /** Inputs for one bounded structured TUI section. */
 export interface ToolDisplaySectionInput<T> {
-  key: string;
+  /** Section key; defaults to the evidence key. */
+  key?: string;
   title: string;
+  /** Rows to show; the view may hide some as Display omissions. */
   items: readonly T[];
+  /** Canonical Evidence list metadata this section previews; only constructors produce it. */
+  evidence: EvidenceListMetadata;
   format: (item: T) => string;
-  totalCount?: number | null;
-  omittedCount?: number | null;
-  partialReason?: string | null;
-  /** Provider explanation for incomplete collection, when available. */
-  partialMessage?: string;
   maxItems?: number;
   /** Explicit content-count meaning when display rows are not individual Evidence atoms. */
   preview?: ToolDisplaySection["preview"];
 }
 
-/** Build a bounded, serializable TUI section from collected facts. */
+/**
+ * Build a bounded, serializable TUI section. Evidence facts are copied
+ * unchanged; rows the view cap hides are reported as a separate Display
+ * omission and never merged into evidence counts.
+ */
 export function createToolDisplaySection<T>(input: ToolDisplaySectionInput<T>): ToolDisplaySection {
   const maxItems = Math.max(0, input.maxItems ?? MAX_TUI_DISPLAY_ITEMS);
   const items = input.items.slice(0, maxItems);
-  const lines = items.map((item) => truncateDisplayText(input.format(item)));
-  const displayOmittedCount = Math.max(0, input.items.length - items.length);
-  let totalCount: number | null;
-  if (input.totalCount === undefined) totalCount = input.items.length;
-  else totalCount = input.totalCount;
-  const omittedCount =
-    totalCount === null
-      ? input.omittedCount === null || input.omittedCount === undefined
-        ? displayOmittedCount || null
-        : input.omittedCount + displayOmittedCount
-      : Math.max(0, totalCount - lines.length);
-
   return {
-    key: input.key,
+    key: input.key ?? input.evidence.key,
     title: input.title,
-    lines,
-    shownCount: lines.length,
-    totalCount,
-    omittedCount,
-    partialReason: input.partialReason ?? null,
-    ...(input.partialMessage === undefined ? {} : { partialMessage: input.partialMessage }),
+    lines: items.map((item) => truncateDisplayText(input.format(item))),
+    evidence: toEvidenceListFacts(input.evidence),
+    displayOmittedCount: input.items.length - items.length,
     ...(input.preview ? { preview: { ...input.preview } } : {}),
   };
+}
+
+/** Canonical Display omission phrase, e.g. `5 rows hidden in view`; null when none. */
+export function describeDisplayOmission(count: number, unit = "row"): string | null {
+  return count > 0 ? `${count} ${unit}${count === 1 ? "" : "s"} hidden in view` : null;
+}
+
+/** Canonical bounds suffix for one TUI section title, e.g. ` (3 of 5; 2 omitted)`. */
+export function formatDisplaySectionBounds(section: ToolDisplaySection): string {
+  const unit = section.preview?.unit;
+  const parts = [
+    section.preview?.evidenceSummary ?? (unit ? null : describeEvidenceList(section.evidence)),
+    unit ? `${section.lines.length} preview ${unit}${section.lines.length === 1 ? "" : "s"}` : null,
+    describeDisplayOmission(section.displayOmittedCount, unit ? `preview ${unit}` : "row"),
+  ].filter((part): part is string => Boolean(part));
+  return parts.length ? ` (${parts.join("; ")})` : "";
 }
 
 /** Keep structured TUI rows readable without parsing or emitting Markdown. */
@@ -72,15 +82,14 @@ export function readToolDisplaySections(value: unknown): ToolDisplaySection[] {
   return value.flatMap((entry) => {
     if (typeof entry !== "object" || entry === null || Array.isArray(entry)) return [];
     const record = entry as Record<string, unknown>;
+    const evidence = readEvidenceListFacts(record.evidence);
     if (
       typeof record.key !== "string" ||
       typeof record.title !== "string" ||
       !Array.isArray(record.lines) ||
       !record.lines.every((line) => typeof line === "string") ||
-      !isCount(record.shownCount) ||
-      !isNullableCount(record.totalCount) ||
-      !isNullableCount(record.omittedCount) ||
-      !isNullableString(record.partialReason)
+      !evidence ||
+      !isCount(record.displayOmittedCount)
     ) {
       return [];
     }
@@ -92,13 +101,8 @@ export function readToolDisplaySections(value: unknown): ToolDisplaySection[] {
         lines: record.lines
           .slice(0, MAX_TUI_DISPLAY_ITEMS)
           .map((line) => truncateDisplayText(line)),
-        shownCount: record.shownCount,
-        totalCount: record.totalCount,
-        omittedCount: record.omittedCount,
-        partialReason: record.partialReason,
-        ...(typeof record.partialMessage === "string"
-          ? { partialMessage: record.partialMessage }
-          : {}),
+        evidence,
+        displayOmittedCount: record.displayOmittedCount,
         ...(preview ? { preview } : {}),
       },
     ];
@@ -119,12 +123,4 @@ function readPreview(value: unknown): ToolDisplaySection["preview"] {
 
 function isCount(value: unknown): value is number {
   return typeof value === "number" && Number.isInteger(value) && value >= 0;
-}
-
-function isNullableCount(value: unknown): value is number | null {
-  return value === null || isCount(value);
-}
-
-function isNullableString(value: unknown): value is string | null {
-  return value === null || typeof value === "string";
 }
