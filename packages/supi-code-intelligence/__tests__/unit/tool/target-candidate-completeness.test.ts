@@ -162,7 +162,8 @@ describe("public target candidate completeness", () => {
       // Canonical partial phrase: shown count, collected omissions, then the reason.
       const tail = `${case_.omittedCount ? `; ${case_.omittedCount} collected omitted` : ""}; more may exist — provider-limited; one workspace-symbol route failed`;
       const [collapsed, expanded] = transcript;
-      expect(resultText(result)).toContain(`_(showing ${case_.shownCount}${tail})_`);
+      const noun = case_.shownCount === 1 ? "candidate" : "candidates";
+      expect(resultText(result)).toContain(`_(showing ${case_.shownCount} ${noun}${tail})_`);
       expect(collapsed).toContain(`${case_.label}${tail}`);
       expect(expanded).toContain(`${case_.label}${tail}`);
       for (const text of [resultText(result), ...transcript]) {
@@ -175,60 +176,57 @@ describe("public target candidate completeness", () => {
     {
       name: "kind mismatch",
       symbol: { query: "Widget", symbolKind: "interface" as const },
-      message: "No Orientation target matched provider kind interface.",
+      message: "No target matched provider kind interface.",
       nextQuery: "Retry without symbolKind, use an observed provider kind, or focus one handle",
-      contentMarker: "# No Orientation target matched provider kind `interface`",
+      contentMarker: "# No target matched provider kind `interface`",
     },
     {
       name: "ambiguity",
       symbol: { query: "Widget" },
-      message: "Multiple Orientation targets require one candidate.",
+      message: "Multiple target matches require one candidate.",
       nextQuery: "Use one candidate handle as focus.target.handle",
-      contentMarker: "# Multiple Orientation targets",
+      contentMarker: "# Multiple targets match",
     },
-  ])(
-    "keeps Orientation $name content and status while exposing selection metadata",
-    async (case_) => {
-      registerMockProvider(cwd, {
-        workspaceSymbols: async () =>
-          completedCodeQuery(
-            ["a.ts", "b.ts"].map((file) => ({
-              name: "Widget",
-              kind: "Class",
-              file: path.join(cwd, "src", file),
-              declarationAnchor: { line: 1, character: 1 },
-              nameAnchor: { line: 1, character: 14 },
-              container: null,
-            })),
-          ),
-      });
-      markLspReady();
+  ])("reports Orientation $name as a candidate selection with its recovery", async (case_) => {
+    registerMockProvider(cwd, {
+      workspaceSymbols: async () =>
+        completedCodeQuery(
+          ["a.ts", "b.ts"].map((file) => ({
+            name: "Widget",
+            kind: "Class",
+            file: path.join(cwd, "src", file),
+            declarationAnchor: { line: 1, character: 1 },
+            nameAnchor: { line: 1, character: 14 },
+            container: null,
+          })),
+        ),
+    });
+    markLspReady();
 
-      const pi = createPiMock();
-      codeIntelligenceExtension(pi as never, undefined, homeDir);
-      const orientation = (await getTool(pi, "code_orientation").execute(
-        `orientation-${case_.name}`,
-        { focus: { target: { symbol: case_.symbol } } },
-        undefined,
-        undefined,
-        makeCtx({ cwd }),
-      )) as PublicResult;
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never, undefined, homeDir);
+    const orientation = (await getTool(pi, "code_orientation").execute(
+      `orientation-${case_.name}`,
+      { focus: { target: { symbol: case_.symbol } } },
+      undefined,
+      undefined,
+      makeCtx({ cwd }),
+    )) as PublicResult;
 
-      expect(orientation.details?.status).toBe("completed");
-      expect(orientation.details?.message).toBe(case_.message);
-      expect(resultText(orientation)).toContain(case_.contentMarker);
-      expect(resultText(orientation)).toContain("Widget");
-      expect(resultText(orientation)).not.toContain(case_.nextQuery);
-      expect(orientation.details?.data?.evidenceLists).toContainEqual(
-        expect.objectContaining({
-          key: "orientation.candidates",
-          totalCount: 2,
-          shownCount: 2,
-          omittedCount: 0,
-          partialReason: null,
-        }),
-      );
-      expect(orientation.details?.data?.nextQueries).toContain(case_.nextQuery);
-    },
-  );
+    expect(orientation.details?.status).toBe("disambiguation");
+    expect(orientation.details?.message).toBe(case_.message);
+    expect(resultText(orientation)).toContain(case_.contentMarker);
+    expect(resultText(orientation)).toContain("Widget");
+    expect(resultText(orientation)).toContain(`${case_.nextQuery}.`);
+    expect(orientation.details?.data?.evidenceLists).toContainEqual(
+      expect.objectContaining({
+        key: "orientation.candidates",
+        totalCount: 2,
+        shownCount: 2,
+        omittedCount: 0,
+        partialReason: null,
+      }),
+    );
+    expect(orientation.details?.data?.nextQueries).toContain(case_.nextQuery);
+  });
 });

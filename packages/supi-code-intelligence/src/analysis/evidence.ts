@@ -289,9 +289,12 @@ export function describeEvidenceList(facts: EvidenceListFacts, noun?: EvidenceNo
 }
 
 /** Markdown Truncation disclosure; null when the list is complete. */
-export function renderEvidenceListMetadataDisclosure(facts: EvidenceListFacts): string | null {
+export function renderEvidenceListMetadataDisclosure(
+  facts: EvidenceListFacts,
+  noun?: EvidenceNoun,
+): string | null {
   if (facts.completeness === "complete") return null;
-  return `_(showing ${describeEvidenceList(facts)})_`;
+  return `_(showing ${describeEvidenceList(facts, noun)})_`;
 }
 
 /** Markdown Truncation disclosure for one list; null when the list is complete. */

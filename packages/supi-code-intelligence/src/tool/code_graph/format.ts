@@ -3,7 +3,7 @@ import { describeEvidenceList, type EvidenceListFacts } from "../../analysis/evi
 /** Canonical evidence phrase for one graph list, plus its external-location count. */
 export function formatGraphEvidence(
   facts: EvidenceListFacts,
-  noun: "locations" | "call sites" | "candidates",
+  noun: "locations" | "call sites",
   externalCount = 0,
 ): string {
   const text = describeEvidenceList(facts, { one: singularGraphNoun(noun), other: noun });
@@ -11,14 +11,12 @@ export function formatGraphEvidence(
   return `${text}; ${externalCount} external location${externalCount === 1 ? "" : "s"}`;
 }
 
-function singularGraphNoun(noun: "locations" | "call sites" | "candidates"): string {
+function singularGraphNoun(noun: "locations" | "call sites"): string {
   switch (noun) {
     case "locations":
       return "location";
     case "call sites":
       return "call site";
-    case "candidates":
-      return "candidate";
   }
 }
 

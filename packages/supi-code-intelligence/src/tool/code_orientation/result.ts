@@ -4,8 +4,6 @@ import {
   createPartialEvidenceList,
   describeEvidenceList,
   type EvidenceListMetadata,
-  rekeyEvidence,
-  renderEvidenceListMetadataDisclosure,
 } from "../../analysis/evidence.ts";
 import type { ReadNextItem } from "../../analysis/read-next.ts";
 import { toDisplayPath } from "../../analysis/search/paths.ts";
@@ -23,7 +21,7 @@ import {
   type ResultSection,
   type ToolResultAssembly,
 } from "../result/assembly.ts";
-import { formatCandidateRow } from "../result/candidate-row.ts";
+import { assembleCandidateSelection } from "../result/candidate-selection.ts";
 import {
   createToolDisplaySection,
   MAX_TUI_DISPLAY_ITEMS,
@@ -57,22 +55,6 @@ export interface OrientationResultAssembly {
   readonly assembled: ToolResultAssembly<OrientationResultData>;
   readonly details: ContextDetails;
   readonly displaySections: readonly ToolDisplaySection[];
-}
-
-/** Build structured candidate rows for an unresolved Orientation target. */
-export function orientationCandidateDisplaySections(
-  candidates: readonly OrientationCandidate[],
-  evidence: EvidenceListMetadata,
-): readonly ToolDisplaySection[] {
-  return [
-    createToolDisplaySection({
-      key: "orientation.candidates",
-      title: "Candidates",
-      items: candidates,
-      evidence,
-      format: (candidate: OrientationCandidate) => formatCandidateRow(candidate, "rank-first"),
-    }),
-  ];
 }
 
 /** Assemble Orientation facts and shared result policy before rendering. */
@@ -278,44 +260,32 @@ export function finishOrientationResult(outcome: OrientationOutcome, cwd: string
   if (outcome.kind === "unavailable") throw new Error(outcome.reason);
   if (outcome.kind === "invalid-input") return invalidOrientationResult(outcome);
   if (outcome.kind === "disambiguation" || outcome.kind === "kind-mismatch") {
-    const candidates = outcome.candidates.map((candidate) => ({
-      ...candidate,
-      file: toDisplayPath(cwd, candidate.file),
-    }));
-    const lines = [
-      outcome.kind === "kind-mismatch"
-        ? `# No Orientation target matched provider kind \`${outcome.requestedKind}\``
-        : "# Multiple Orientation targets",
-      "",
-    ];
-    for (const candidate of candidates) {
-      lines.push(
-        `${candidate.rank}. **${candidate.name}** (\`${candidate.kind ?? "unknown"}\`) — \`${candidate.file}\`:${candidate.line}:${candidate.character} — \`${candidate.targetId}\``,
-      );
-    }
-    const evidence = rekeyEvidence(outcome.candidateEvidence, "orientation.candidates");
-    const disclosure = renderEvidenceListMetadataDisclosure(evidence);
-    if (disclosure) lines.push("", disclosure);
-    const nextQueries =
-      outcome.kind === "kind-mismatch"
-        ? ["Retry without symbolKind, use an observed provider kind, or focus one handle"]
-        : ["Use one candidate handle as focus.target.handle"];
-    const details = assembleOrientationDetails({
-      confidence: "semantic",
-      omittedCount: evidence.omittedCount ?? 0,
-      evidenceLists: [evidence],
-      candidates,
-      nextQueries,
+    const selection = assembleCandidateSelection({
+      outcome,
+      key: "orientation.candidates",
+      cwd,
+      recovery:
+        outcome.kind === "kind-mismatch"
+          ? "Retry without symbolKind, use an observed provider kind, or focus one handle"
+          : "Use one candidate handle as focus.target.handle",
     });
+    const candidates = [...selection.candidates];
+    const nextQueries = [...selection.nextQueries];
     return {
-      content: lines.join("\n"),
-      structuredContent: structuredOrientation({ ...outcome, candidates }),
+      content: selection.content,
+      structuredContent: structuredOrientation({ ...outcome, candidates }, { nextQueries }),
       details: {
         type: "context",
-        data: details,
-        status: "completed",
-        message: orientationSelectionMessage(outcome),
-        displaySections: orientationCandidateDisplaySections(candidates, evidence),
+        data: assembleOrientationDetails({
+          confidence: "semantic",
+          omittedCount: selection.evidence.omittedCount ?? 0,
+          evidenceLists: [selection.evidence],
+          candidates,
+          nextQueries,
+        }),
+        status: selection.status,
+        message: selection.message,
+        displaySections: selection.displaySections,
       },
     };
   }
@@ -353,7 +323,10 @@ function finishCompletedOrientation(input: OrientationResultData, cwd: string): 
   const assembly = assembleOrientationResult(navigation?.data ?? data);
   return {
     content: navigation?.content ?? renderOrientationResult(assembly),
-    structuredContent: structuredOrientation({ kind: "completed", data }, navigation?.snapshotPath),
+    structuredContent: structuredOrientation(
+      { kind: "completed", data },
+      { snapshotPath: navigation?.snapshotPath },
+    ),
     details: {
       type: "context",
       data: assembly.details,
@@ -363,12 +336,4 @@ function finishCompletedOrientation(input: OrientationResultData, cwd: string): 
       displaySections: assembly.displaySections,
     },
   };
-}
-
-function orientationSelectionMessage(
-  outcome: Extract<OrientationOutcome, { kind: "disambiguation" | "kind-mismatch" }>,
-): string {
-  return outcome.kind === "kind-mismatch"
-    ? `No Orientation target matched provider kind ${outcome.requestedKind}.`
-    : "Multiple Orientation targets require one candidate.";
 }

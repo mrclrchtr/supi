@@ -1,9 +1,5 @@
 import type { ConfidenceMode } from "@mrclrchtr/supi-code-runtime/api";
-import {
-  type EvidenceList,
-  type EvidenceListMetadata,
-  rekeyEvidence,
-} from "../../analysis/evidence.ts";
+import type { EvidenceList } from "../../analysis/evidence.ts";
 import { toDisplayPath } from "../../analysis/search/paths.ts";
 import type { GraphSection } from "../../session/graph-types.ts";
 import {
@@ -12,12 +8,9 @@ import {
   type ResultProvenance,
   type ToolResultAssembly,
 } from "../result/assembly.ts";
-import { formatCandidateRow } from "../result/candidate-row.ts";
-import { createToolDisplaySection } from "../result/display.ts";
 import type { ToolDisplaySection } from "../result/types.ts";
 import type { GraphDetails, GraphFileGroup, GraphSectionDetails } from "./details.ts";
 import { graphDisplaySection } from "./display.ts";
-import { formatGraphEvidence } from "./format.ts";
 import { graphReadNext } from "./read-next.ts";
 import { type AssembledGraphSection, assembleGraphSection } from "./section.ts";
 import { structuredGraphCandidates, structuredGraphResult } from "./structured.ts";
@@ -159,6 +152,7 @@ function graphConfidence(sections: readonly AssembledGraphSection[]): Confidence
 }
 
 import type { CodeIntelResult, CodeIntelToolExecCtx } from "../../types/index.ts";
+import { assembleCandidateSelection } from "../result/candidate-selection.ts";
 import { searchErrorResult } from "../result/errors.ts";
 import { renderGraphResult } from "./markdown.ts";
 
@@ -207,70 +201,26 @@ export function finishGraphResult(outcome: GraphOutcome, cwd: string): CodeIntel
 }
 
 function finishGraphCandidates(
-  input: Extract<GraphOutcome, { kind: "disambiguation" | "kind-mismatch" }>,
+  outcome: Extract<GraphOutcome, { kind: "disambiguation" | "kind-mismatch" }>,
   cwd: string,
 ): CodeIntelResult {
-  const outcome = {
-    ...input,
-    candidates: input.candidates.map((candidate) => ({
-      ...candidate,
-      file: toDisplayPath(cwd, candidate.file),
-    })),
-  };
-  const lines = [
-    outcome.kind === "kind-mismatch"
-      ? `**No target matched provider kind \`${outcome.requestedKind}\`. Near matches:**`
-      : "**Target is ambiguous. Choose one candidate handle:**",
-    "",
-  ];
-  for (const candidate of outcome.candidates) {
-    lines.push(
-      `- \`${candidate.targetId}\` — ${candidate.name} (\`${candidate.kind ?? "unknown"}\`) at ${candidate.file}:${candidate.line}:${candidate.character}`,
-    );
-  }
-  const evidence = graphCandidateEvidence(outcome);
-  lines.push("", formatGraphEvidence(evidence, "candidates"));
-  if (outcome.kind === "kind-mismatch") {
-    lines.push(
-      "",
-      "Retry without `symbolKind`, use an observed provider kind, or choose a handle.",
-    );
-  }
-  const displaySections = [
-    createToolDisplaySection({
-      key: "graph.candidates",
-      title: "Candidates",
-      items: outcome.candidates,
-      evidence,
-      format: (candidate: (typeof outcome.candidates)[number]) =>
-        formatCandidateRow(candidate, "handle-first"),
-    }),
-  ];
-  const nextQueries =
-    outcome.kind === "kind-mismatch"
-      ? ["Retry without symbolKind, use an observed provider kind, or choose a near-match handle"]
-      : ["Choose one candidate handle, or narrow the symbol selector with scope or symbolKind"];
-  const message =
-    outcome.kind === "kind-mismatch"
-      ? `No target matched provider kind ${outcome.requestedKind}.`
-      : "The target is ambiguous.";
+  const selection = assembleCandidateSelection({ outcome, key: "graph.candidates", cwd });
+  const nextQueries = [...selection.nextQueries];
   return {
-    ...searchErrorResult(lines.join("\n"), {
+    ...searchErrorResult(selection.content, {
       confidence: "semantic",
-      evidenceLists: [evidence],
+      evidenceLists: [selection.evidence],
       nextQueries,
-      status: outcome.kind === "disambiguation" ? "disambiguation" : "invalid-input",
-      message,
-      displaySections,
+      status: selection.status,
+      message: selection.message,
+      displaySections: selection.displaySections,
     }),
-    structuredContent: structuredGraphCandidates(outcome, evidence, { message, nextQueries }),
+    structuredContent: structuredGraphCandidates(
+      { ...outcome, candidates: [...selection.candidates] },
+      selection.evidence,
+      { message: selection.message, nextQueries },
+    ),
   };
-}
-
-function graphCandidateEvidence(
-  outcome: Extract<GraphOutcome, { kind: "disambiguation" | "kind-mismatch" }>,
-): EvidenceListMetadata {
-  return rekeyEvidence(outcome.candidateEvidence, "graph.candidates");
 }
 
 function hasHiddenDisplayEvidence(assembly: GraphResultAssembly): boolean {

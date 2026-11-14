@@ -1,7 +1,10 @@
 /** Shared human transcript renderer for target-candidate selections. */
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { type Component, Container, Spacer, Text } from "@earendil-works/pi-tui";
-import { formatCandidateRow } from "../../tool/result/candidate-row.ts";
+import {
+  type CandidateSelectionKey,
+  formatCandidateRow,
+} from "../../tool/result/candidate-selection.ts";
 import {
   describeDisplayOmission,
   MAX_TUI_DISPLAY_ITEMS,
@@ -20,12 +23,6 @@ import {
   type ToolResult,
 } from "./common.ts";
 
-/** Display-section keys that identify candidate-selection results. */
-export type CandidateSelectionKey =
-  | "graph.candidates"
-  | "resolve.candidates"
-  | "orientation.candidates";
-
 interface CandidateRow {
   targetId: string;
   name: string;
@@ -33,8 +30,6 @@ interface CandidateRow {
   file: string;
   line: number;
   character: number;
-  rank: number;
-  container: string | null;
 }
 
 interface CandidateSelectionData {
@@ -85,7 +80,7 @@ function readCandidateSelection(
     hasRawKey(data?.evidenceLists, key);
   if (!keyed && !structuredCandidates) return null;
 
-  const rows = candidateRowsFor(display, structuredCandidates, key);
+  const rows = candidateRowsFor(display, structuredCandidates);
   const selectionEvidence = candidateEvidenceFor({ display, evidence });
   const reason = selectionReason(result, data);
   const structuredGuidance = readStructuredNextQueries(data);
@@ -109,16 +104,9 @@ function readCandidateSelection(
 function candidateRowsFor(
   display: ToolDisplaySection | null,
   structuredCandidates: CandidateRow[] | null,
-  key: CandidateSelectionKey,
 ): string[] {
   if (display?.lines.length) return [...display.lines];
-  return (structuredCandidates ?? []).map((candidate, index) =>
-    formatCandidateRow(
-      candidate,
-      key === "graph.candidates" ? "handle-first" : "rank-first",
-      index + 1,
-    ),
-  );
+  return (structuredCandidates ?? []).map((candidate) => formatCandidateRow(candidate));
 }
 
 /** Prefer canonical details evidence; a display section carries the same facts. */
@@ -135,6 +123,7 @@ function readCandidateRows(value: unknown): CandidateRow[] | null {
   return rows.every((row): row is CandidateRow => row !== null) ? rows : null;
 }
 
+/** Rejects malformed persisted rows, including invalid optional rank and container. */
 function readCandidateRow(value: unknown): CandidateRow | null {
   const record = asRecord(value);
   if (
@@ -158,8 +147,6 @@ function readCandidateRow(value: unknown): CandidateRow | null {
     file: record.file,
     line: record.line,
     character: record.character,
-    rank: isCount(record.rank) ? record.rank : 0,
-    container: typeof record.container === "string" ? record.container : null,
   };
 }
 

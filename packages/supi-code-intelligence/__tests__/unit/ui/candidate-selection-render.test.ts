@@ -301,13 +301,13 @@ describe("candidate selection rendering", () => {
     },
     {
       key: "resolve.candidates" as const,
-      expected: "1. work (Function) — src/work.ts:4:10 [tg-structured]",
+      expected: "tg-structured — work (Function) at src/work.ts:4:10",
     },
     {
       key: "orientation.candidates" as const,
-      expected: "1. work (Function) — src/work.ts:4:10 [tg-structured]",
+      expected: "tg-structured — work (Function) at src/work.ts:4:10",
     },
-  ])("uses the public $key row format for structured fallback", (case_) => {
+  ])("uses the shared handle-first row for $key structured fallback", (case_) => {
     const render =
       case_.key === "graph.candidates"
         ? renderGraphResult
@@ -409,7 +409,7 @@ describe("candidate selection rendering", () => {
 
     expect(text).toMatch(/Candidates\s*\n1 candidate\s*\n/);
     expect(text).not.toContain("omitted");
-    expect(text).toContain("1. work (Function) — src/work.ts:4:10 [tg-structured]");
+    expect(text).toContain("tg-structured — work (Function) at src/work.ts:4:10");
   });
 
   it.each([

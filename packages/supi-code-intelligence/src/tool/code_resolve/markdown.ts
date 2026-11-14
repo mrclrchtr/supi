@@ -16,9 +16,10 @@ export function renderResolveResult(assembly: ResolveResultAssembly): string {
     case "file-outline":
       return renderFileOutline(assembly.details);
     case "disambiguation":
-      return renderDisambiguation(assembly.details);
     case "kind-mismatch":
-      return renderKindMismatch(assembly.details);
+      if (!assembly.selection)
+        throw new Error(`Resolve ${outcome.kind} lacks a candidate selection`);
+      return assembly.selection.content;
     case "invalid-input":
       return `**Error:** ${outcome.message}`;
     case "unavailable":
@@ -188,46 +189,6 @@ function appendUnknownLevelDisclosure(lines: string[], count: number): void {
   lines.push(
     `- Position unknown: ${count} ${declarations} no enclosing declaration reported by the language server, so ${count === 1 ? "it is" : "they are"} listed after the top-level declarations.`,
   );
-}
-
-function renderDisambiguation(details: ResolveDetails): string {
-  const lines = [
-    "# Multiple matches found",
-    "",
-    "Choose one handle, or narrow target.symbol with scope or symbolKind:",
-    "",
-  ];
-  appendCandidates(lines, details);
-  appendDisclosure(lines, details);
-  return lines.join("\n");
-}
-
-function renderKindMismatch(details: ResolveDetails): string {
-  const lines = [
-    "# No exact symbol-kind match",
-    "",
-    `No query candidate was reported as provider kind \`${details.requestedKind ?? "unknown"}\`.`,
-    "Near matches:",
-    "",
-  ];
-  appendCandidates(lines, details);
-  lines.push(
-    "",
-    "Retry without `symbolKind`, use an observed provider kind, or choose a handle explicitly.",
-  );
-  appendDisclosure(lines, details);
-  return lines.join("\n");
-}
-
-function appendCandidates(lines: string[], details: ResolveDetails): void {
-  for (const candidate of details.candidates ?? []) {
-    const kind = candidate.kind ? ` (\`${candidate.kind}\`)` : "";
-    const container = candidate.container ? ` in \`${candidate.container}\`` : "";
-    lines.push(
-      `${candidate.rank}. **${candidate.name}**${kind}${container} — \`${candidate.file}\`:${candidate.line}:${candidate.character}`,
-      `   Target ID: \`${candidate.targetId}\``,
-    );
-  }
 }
 
 function appendDisclosure(lines: string[], details: ResolveDetails): void {

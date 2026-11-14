@@ -1,6 +1,6 @@
 import type { ConfidenceMode } from "@mrclrchtr/supi-code-runtime/api";
 import type { EvidenceListMetadata } from "../../analysis/evidence.ts";
-import { createEvidenceList, knownEvidenceCount, rekeyEvidence } from "../../analysis/evidence.ts";
+import { createEvidenceList, knownEvidenceCount } from "../../analysis/evidence.ts";
 import { toDisplayPath } from "../../analysis/search/paths.ts";
 import type { ResolveTargetInput } from "../../session/target-input.ts";
 import type { TargetStoreEntry } from "../../session/target-store.ts";
@@ -11,7 +11,11 @@ import {
   type ResultProvenance,
   type ToolResultAssembly,
 } from "../result/assembly.ts";
-import { formatCandidateRow } from "../result/candidate-row.ts";
+import {
+  assembleCandidateSelection,
+  type CandidateSelection,
+  type SelectionCandidate,
+} from "../result/candidate-selection.ts";
 import { createToolDisplaySection } from "../result/display.ts";
 import { scopedSymbolFailureMessage } from "../result/errors.ts";
 import type {
@@ -27,6 +31,8 @@ export interface ResolveResultAssembly {
   readonly assembled: ToolResultAssembly<TargetWorkflowOutcome>;
   readonly details: ResolveDetails;
   readonly displaySections: readonly ToolDisplaySection[];
+  /** Canonical Candidate selection for disambiguation and Symbol-kind mismatch. */
+  readonly selection: CandidateSelection<SelectionCandidate> | null;
 }
 
 interface ResolveProjection {
@@ -37,6 +43,7 @@ interface ResolveProjection {
   readonly confidence: ConfidenceMode;
   readonly evidence: EvidenceListMetadata | null;
   readonly details: ResolveDetails;
+  readonly selection?: CandidateSelection<SelectionCandidate>;
 }
 
 /** Assemble resolved-target facts before markdown and TUI adapters render them. */
@@ -77,7 +84,8 @@ export function assembleResolveResult(
     cwd,
     assembled,
     details,
-    displaySections: resolveDisplaySections(details),
+    displaySections: projection.selection?.displaySections ?? resolveDisplaySections(details),
+    selection: projection.selection ?? null,
   });
 }
 
@@ -161,37 +169,37 @@ function projectCandidateOutcome(
   outcome: Extract<TargetWorkflowOutcome, { kind: "disambiguation" | "kind-mismatch" }>,
   cwd: string,
 ): ResolveProjection {
-  const evidence = rekeyEvidence(outcome.candidateEvidence, "resolve.candidates");
-  const mismatch = outcome.kind === "kind-mismatch";
+  const selection = assembleCandidateSelection({ outcome, key: "resolve.candidates", cwd });
+  const evidence = selection.evidence;
   return {
     key: "resolve.candidates",
-    title: mismatch ? "Near matches" : "Candidates",
+    title: selection.displaySections[0]?.title ?? "Candidates",
     status: evidence.partialReason ? "partial" : "complete",
-    items: outcome.candidates,
+    items: selection.candidates,
     confidence: "semantic",
     evidence,
+    selection,
     details: {
       resultKind: outcome.kind,
-      ...(mismatch ? { requestedKind: outcome.requestedKind } : {}),
+      ...(outcome.kind === "kind-mismatch" ? { requestedKind: outcome.requestedKind } : {}),
+      message: selection.message,
       confidence: "semantic",
       targetCount: knownEvidenceCount(evidence),
       omittedCount: evidence.omittedCount ?? 0,
       evidenceLists: [evidence],
       targets: [],
-      candidates: outcome.candidates.map((candidate) => ({
+      candidates: selection.candidates.map((candidate) => ({
         targetId: candidate.targetId,
         name: candidate.name,
         kind: candidate.kind,
         container: candidate.container,
-        file: toDisplayPath(cwd, candidate.file),
+        file: candidate.file,
         line: candidate.line,
         character: candidate.character,
         rank: candidate.rank,
         anchorKind: candidate.anchorKind,
       })),
-      nextQueries: mismatch
-        ? ["Retry without symbolKind, use an observed provider kind, or choose a near-match handle"]
-        : ["Choose one candidate handle, or narrow the symbol selector with scope or symbolKind"],
+      nextQueries: [...selection.nextQueries],
     },
   };
 }
@@ -260,19 +268,6 @@ function resolveDisplaySections(details: ResolveDetails): ToolDisplaySection[] {
     ];
   }
 
-  if (details.candidates && details.candidates.length > 0) {
-    return [
-      createToolDisplaySection({
-        key: "resolve.candidates",
-        title: "Candidates",
-        items: details.candidates,
-        evidence,
-        format: (candidate: NonNullable<ResolveDetails["candidates"]>[number]) =>
-          formatCandidateRow(candidate, "rank-first"),
-      }),
-    ];
-  }
-
   return [];
 }
 
@@ -324,19 +319,16 @@ export function finishResolveResult(
     details: {
       type: "resolve",
       data: assembly.details,
-      status:
-        outcome.kind === "resolved" || outcome.kind === "file-outline"
-          ? "completed"
-          : outcome.kind === "disambiguation" || outcome.kind === "kind-mismatch"
-            ? "disambiguation"
-            : "invalid-input",
-      ...(outcome.kind === "invalid-input"
-        ? { message: outcome.message }
-        : outcome.kind === "disambiguation"
-          ? { message: "Multiple target matches require one candidate." }
-          : outcome.kind === "kind-mismatch"
-            ? { message: `No target matched provider kind ${outcome.requestedKind}.` }
-            : {}),
+      status: assembly.selection
+        ? assembly.selection.status
+        : outcome.kind === "invalid-input"
+          ? "invalid-input"
+          : "completed",
+      ...(assembly.selection
+        ? { message: assembly.selection.message }
+        : outcome.kind === "invalid-input"
+          ? { message: outcome.message }
+          : {}),
       displaySections: assembly.displaySections,
     },
   };

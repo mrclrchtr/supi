@@ -273,8 +273,9 @@ describe("canonical Tool result assembly", () => {
       candidates: [{ targetId: "tg-near", kind: "Variable" }],
     });
     expect(assembly.details.candidates?.[0]).not.toHaveProperty("reason");
-    expect(markdown).toContain("No exact symbol-kind match");
-    expect(markdown).toContain("Retry without `symbolKind`");
+    expect(markdown).toContain("# No target matched provider kind `class`");
+    expect(markdown).toContain("Near matches:");
+    expect(markdown).toContain("Retry without symbolKind");
     // Ambiguity keeps established corrective advice.
     expect(assembly.details.nextQueries[0]).toContain("Retry without symbolKind");
   });

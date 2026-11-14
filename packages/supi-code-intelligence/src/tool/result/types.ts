@@ -141,7 +141,7 @@ export interface ResolveDetails {
   /** Strict provider kind that produced a near-match result. */
   requestedKind?: TargetSymbolKind;
   confidence: ConfidenceMode;
-  /** Plain workflow failure message, present for invalid-input and unavailable results. */
+  /** Plain workflow message: the failure for invalid-input and unavailable, the selection reason for candidates. */
   message?: string;
   targetCount: number;
   omittedCount: number;

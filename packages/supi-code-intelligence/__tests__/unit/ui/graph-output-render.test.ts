@@ -84,21 +84,21 @@ describe("code_graph human output", () => {
       name: "ambiguity",
       target: { symbol: { query: "work" } },
       status: "disambiguation" as const,
-      message: "The target is ambiguous.",
+      message: "Multiple target matches require one candidate.",
       nextQuery:
         "Choose one candidate handle, or narrow the symbol selector with scope or symbolKind",
-      contentMarker: "**Target is ambiguous. Choose one candidate handle:**",
+      contentMarker: "# Multiple targets match",
     },
     {
       name: "kind mismatch",
       target: { symbol: { query: "work", symbolKind: "class" as const } },
-      status: "invalid-input" as const,
+      status: "disambiguation" as const,
       message: "No target matched provider kind class.",
       nextQuery:
         "Retry without symbolKind, use an observed provider kind, or choose a near-match handle",
-      contentMarker: "**No target matched provider kind `class`. Near matches:**",
+      contentMarker: "# No target matched provider kind `class`",
     },
-  ])("keeps graph $name content and status while exposing selection guidance", async (case_) => {
+  ])("reports graph $name as a candidate selection with its recovery", async (case_) => {
     writeFileSync(path.join(cwd, "other.ts"), "function work() {}\n");
     registerMockProvider(cwd, {
       workspaceSymbols: async () =>
@@ -115,7 +115,7 @@ describe("code_graph human output", () => {
     const result = await executeGraphTool({ target: case_.target }, makeTestCtx(cwd));
 
     expect(result.content).toContain(case_.contentMarker);
-    expect(result.content).not.toContain(case_.nextQuery);
+    expect(result.content).toContain(`${case_.nextQuery}.`);
     expect(result.details?.status).toBe(case_.status);
     expect(result.details?.message).toBe(case_.message);
     if (result.details?.type !== "search") throw new Error("Expected search details");

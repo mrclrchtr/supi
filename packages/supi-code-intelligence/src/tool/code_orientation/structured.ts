@@ -6,18 +6,18 @@ import { workspaceSections } from "./workspace-sections.ts";
 /** Public, allowlisted projection of one returned workflow outcome. */
 export function structuredOrientation(
   outcome: Exclude<OrientationWorkflowOutcome, { kind: "unavailable" }>,
-  snapshotPath?: string,
+  options: { snapshotPath?: string; nextQueries?: readonly string[] } = {},
 ): import("../../types/index.ts").CodeIntelResult["structuredContent"] {
   // Manifest values are parsed JSON but typed as unknown in the collector. Normalize the
   // allowlisted projection to the same JSON value that programmatic callers receive.
-  return JSON.parse(JSON.stringify(orientationProjection(outcome, snapshotPath)));
+  return JSON.parse(JSON.stringify(orientationProjection(outcome, options)));
 }
 
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: each workflow outcome has a distinct public projection
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: explicit allowlisting keeps private target state out of the result
 function orientationProjection(
   outcome: Exclude<OrientationWorkflowOutcome, { kind: "unavailable" }>,
-  snapshotPath?: string,
+  { snapshotPath, nextQueries }: { snapshotPath?: string; nextQueries?: readonly string[] },
 ) {
   const base = {
     sections: [],
@@ -63,11 +63,8 @@ function orientationProjection(
       evidenceLists: [
         toEvidenceListFacts(rekeyEvidence(outcome.candidateEvidence, "orientation.candidates")),
       ],
-      nextQueries: [
-        outcome.kind === "kind-mismatch"
-          ? "Retry without symbolKind, use an observed provider kind, or focus one handle"
-          : "Use one candidate handle as focus.target.handle",
-      ],
+      // Candidate selection owns this guidance; finishOrientationResult passes it through.
+      nextQueries: [...(nextQueries ?? [])],
       ...(outcome.kind === "kind-mismatch" ? { requestedKind: outcome.requestedKind } : {}),
     };
   const data = outcome.data;
