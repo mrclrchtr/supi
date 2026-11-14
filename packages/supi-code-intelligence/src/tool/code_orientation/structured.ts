@@ -3,11 +3,27 @@ import type { OrientationWorkflowOutcome } from "../../session/orientation-types
 import { workspaceFacts } from "./structured-workspace.ts";
 import { workspaceSections } from "./workspace-sections.ts";
 
-/** Public, allowlisted projection of one returned workflow outcome. */
+type ProjectedOutcome = Exclude<OrientationWorkflowOutcome, { kind: "unavailable" }>;
+type CandidateOutcome = Extract<ProjectedOutcome, { kind: "disambiguation" | "kind-mismatch" }>;
+type ProjectionOptions = { snapshotPath?: string; nextQueries?: readonly string[] };
+type StructuredContent = import("../../types/index.ts").CodeIntelResult["structuredContent"];
+
+/**
+ * Public, allowlisted projection of one returned workflow outcome. Candidate
+ * outcomes require the Candidate selection's next queries, which own that guidance.
+ */
 export function structuredOrientation(
-  outcome: Exclude<OrientationWorkflowOutcome, { kind: "unavailable" }>,
-  options: { snapshotPath?: string; nextQueries?: readonly string[] } = {},
-): import("../../types/index.ts").CodeIntelResult["structuredContent"] {
+  outcome: CandidateOutcome,
+  options: { nextQueries: readonly string[] },
+): StructuredContent;
+export function structuredOrientation(
+  outcome: Exclude<ProjectedOutcome, CandidateOutcome>,
+  options?: { snapshotPath?: string },
+): StructuredContent;
+export function structuredOrientation(
+  outcome: ProjectedOutcome,
+  options: ProjectionOptions = {},
+): StructuredContent {
   // Manifest values are parsed JSON but typed as unknown in the collector. Normalize the
   // allowlisted projection to the same JSON value that programmatic callers receive.
   return JSON.parse(JSON.stringify(orientationProjection(outcome, options)));
@@ -16,8 +32,8 @@ export function structuredOrientation(
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: each workflow outcome has a distinct public projection
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: explicit allowlisting keeps private target state out of the result
 function orientationProjection(
-  outcome: Exclude<OrientationWorkflowOutcome, { kind: "unavailable" }>,
-  { snapshotPath, nextQueries }: { snapshotPath?: string; nextQueries?: readonly string[] },
+  outcome: ProjectedOutcome,
+  { snapshotPath, nextQueries }: ProjectionOptions,
 ) {
   const base = {
     sections: [],
@@ -63,7 +79,7 @@ function orientationProjection(
       evidenceLists: [
         toEvidenceListFacts(rekeyEvidence(outcome.candidateEvidence, "orientation.candidates")),
       ],
-      // Candidate selection owns this guidance; finishOrientationResult passes it through.
+      // Required by the candidate overload; Candidate selection owns this guidance.
       nextQueries: [...(nextQueries ?? [])],
       ...(outcome.kind === "kind-mismatch" ? { requestedKind: outcome.requestedKind } : {}),
     };

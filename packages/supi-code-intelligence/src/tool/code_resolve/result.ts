@@ -173,7 +173,7 @@ function projectCandidateOutcome(
   const evidence = selection.evidence;
   return {
     key: "resolve.candidates",
-    title: selection.displaySections[0]?.title ?? "Candidates",
+    title: selection.title,
     status: evidence.partialReason ? "partial" : "complete",
     items: selection.candidates,
     confidence: "semantic",

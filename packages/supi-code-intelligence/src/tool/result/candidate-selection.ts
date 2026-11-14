@@ -67,6 +67,8 @@ export interface CandidateSelectionInput<C extends SelectionCandidate> {
 /** Assembled candidate selection; tools project it into their own details and schema. */
 export interface CandidateSelection<C extends SelectionCandidate> {
   readonly content: string;
+  /** Section title: "Near matches" for a Symbol-kind mismatch, else "Candidates". */
+  readonly title: string;
   /** Candidates with display-relative file paths, in rank order. */
   readonly candidates: readonly C[];
   /** Candidate Evidence list re-keyed to the tool's public key. */
@@ -96,6 +98,7 @@ export function assembleCandidateSelection<C extends SelectionCandidate>(
   }));
   const evidence = rekeyEvidence(outcome.candidateEvidence, key);
   const recovery = input.recovery ?? (mismatch ? MISMATCH_RECOVERY : DISAMBIGUATION_RECOVERY);
+  const title = mismatch ? "Near matches" : "Candidates";
 
   const lines = mismatch
     ? [`# No target matched provider kind \`${outcome.requestedKind}\``, "", "Near matches:", ""]
@@ -107,12 +110,13 @@ export function assembleCandidateSelection<C extends SelectionCandidate>(
 
   return Object.freeze({
     content: lines.join("\n"),
+    title,
     candidates,
     evidence,
     displaySections: [
       createToolDisplaySection({
         key,
-        title: mismatch ? "Near matches" : "Candidates",
+        title,
         items: candidates,
         evidence,
         format: (candidate: C) => formatCandidateRow(candidate),
