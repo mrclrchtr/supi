@@ -9,7 +9,12 @@ import { afterEach, describe, expect, it } from "vitest";
 import codeIntelligenceExtension from "../../src/extension.ts";
 import { clearMockRuntime } from "../helpers/register-mock-runtime.ts";
 
-const WORKER_CLIENT_PATH = "../../../supi-tree-sitter/src/session/structural-worker-client.ts";
+// Resolve against this file: Vitest resolves a bare relative specifier in a variable
+// import from the process cwd, which breaks package-directory runs.
+const WORKER_CLIENT_PATH = new URL(
+  "../../../supi-tree-sitter/src/session/structural-worker-client.ts",
+  import.meta.url,
+).href;
 const workerClient = await import(WORKER_CLIENT_PATH);
 
 let session: { dispose(): Promise<void> } | undefined;
