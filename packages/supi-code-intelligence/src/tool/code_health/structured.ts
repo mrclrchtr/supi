@@ -1,5 +1,6 @@
 import type { DiagnosticEvidenceSummary, ServerOperationSupport } from "@mrclrchtr/supi-lsp/api";
 import type { Static } from "typebox";
+import { classifyDiagnosticCoverage } from "../../diagnostics/coverage.ts";
 import type {
   HealthData,
   HealthDiagnosticScope,
@@ -151,6 +152,7 @@ export function structuredHealthResult(data: HealthData): Output {
           entries,
           scope: copyScope(observation.scope),
           evidence: copyEvidence(observation.evidence),
+          coverage: classifyDiagnosticCoverage(observation),
           ...(observation.kind === "completed" ? {} : { reason: observation.reason }),
           ...(observation.scopeStatus
             ? {

@@ -1,5 +1,6 @@
 import { resolve } from "node:path";
 import type { DiagnosticEvidenceSummary } from "@mrclrchtr/supi-lsp/api";
+import { classifyDiagnosticCoverage } from "../diagnostics/coverage.ts";
 import type {
   HealthDiagnosticObservation,
   HealthWorkflowOutcome,
@@ -21,16 +22,12 @@ export function presentDiagnosticEvidence(observation: HealthDiagnosticObservati
     return { summary: "Diagnostics not requested.", tone: "dim" };
   const evidence = observation.evidence;
   const counts = `${evidence.confirmed}/${evidence.requested} confirmed tracked files · ${evidence.unconfirmed} unconfirmed · ${evidence.failed} failed · ${evidence.removed} removed`;
+  const coverage = classifyDiagnosticCoverage(observation);
   if (observation.kind === "unavailable")
     return { counts, summary: `Diagnostics unavailable — ${observation.reason}`, tone: "warning" };
-  if (evidence.requested === 0)
+  if (coverage === "none")
     return { counts, summary: "No tracked diagnostic evidence.", tone: "dim" };
-  const confirmed =
-    evidence.confirmed === evidence.requested &&
-    evidence.unconfirmed === 0 &&
-    evidence.failed === 0 &&
-    evidence.removed === 0;
-  if (!confirmed)
+  if (coverage === "incomplete")
     return {
       counts,
       summary: `Diagnostic evidence is incomplete${observation.kind === "partial" ? ` — ${observation.reason}` : "."}`,

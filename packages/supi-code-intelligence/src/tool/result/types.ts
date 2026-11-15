@@ -10,6 +10,7 @@ import type {
   StructuredScanSummary,
 } from "../../analysis/search/pattern.ts";
 import type { FileOutlineNotListed } from "../../analysis/target/types.ts";
+import type { DiagnosticCoverage } from "../../diagnostics/coverage.ts";
 import type {
   HealthDiagnosticObservation,
   HealthRefreshState,
@@ -281,6 +282,8 @@ export interface HealthDetails {
   serverInventoryScope: "workspace";
   /** Diagnostic result scope and exact evidence boundary for this health call. */
   diagnosticObservation: HealthDiagnosticObservation;
+  /** Shared coverage classification of `diagnosticObservation`; null when not requested. */
+  diagnosticCoverage: DiagnosticCoverage | null;
   /** Current or most recent refresh, including typed maintenance scope and evidence. */
   refresh: HealthRefreshState;
   structuralAvailable: boolean;

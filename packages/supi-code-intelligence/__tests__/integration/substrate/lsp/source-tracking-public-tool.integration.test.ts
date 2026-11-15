@@ -133,6 +133,6 @@ describe("registered public code_health source tracking", () => {
     });
     expect(resultText(directoryResult)).toContain("1 skipped");
     expect(resultText(directoryResult)).not.toContain("unsupported");
-    expect(resultText(directoryResult).match(/source discovery/gi)).toHaveLength(1);
+    expect(resultText(directoryResult).match(/\*\*Source discovery\*\*/g)).toHaveLength(1);
   });
 });

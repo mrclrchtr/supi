@@ -221,6 +221,26 @@ function buildStatusBar(data: Record<string, unknown> | null, theme: Theme): Tex
   return new Text(lines.join("  "), 0, 0);
 }
 
+/** An empty entry list is clean only when the shared coverage classification is `confirmed`. */
+function buildEmptyDiagnosticSummary(data: Record<string, unknown> | null, theme: Theme): Text {
+  const coverage = data?.diagnosticCoverage;
+  if (coverage === "none") {
+    const files = diagnosticScopeKind(data) === "file" ? "requested" : "tracked";
+    const label = `No source diagnostics checked (0 ${files} files)`;
+    return new Text(theme.fg("dim", withDiagnosticScope(label, data)), 0, 0);
+  }
+  if (coverage === "incomplete") {
+    const counts = formatDiagnosticEvidence(readDiagnosticEvidence(data));
+    const label = `Diagnostic evidence incomplete${counts ? ` (${counts})` : ""}`;
+    return new Text(theme.fg("warning", withDiagnosticScope(label, data)), 0, 0);
+  }
+  return new Text(
+    theme.fg("success", withDiagnosticScope(diagnosticEmptySummary(data), data)),
+    0,
+    0,
+  );
+}
+
 function diagnosticEmptySummary(data: Record<string, unknown> | null): string {
   return diagnosticScopeKind(data) === "file"
     ? "No errors or warnings for file"
@@ -306,19 +326,14 @@ function buildDiagnosticSummary(data: Record<string, unknown> | null, theme: The
     return new Text(theme.fg("warning", withDiagnosticScope(label, data)), 0, 0);
   }
   const trackedFiles = diagnosticScopeKind(data) === "tracked-files";
+  if (data?.diagnosticCoverage === "none") return buildEmptyDiagnosticSummary(data, theme);
   if (section.status === "partial") {
     const coverage = formatDiagnosticEvidence(readDiagnosticEvidence(data));
     const label = trackedFiles ? "Tracked-file diagnostics partial" : "Diagnostics partial";
     const summary = coverage ? `${label} (${coverage})` : label;
     return new Text(theme.fg("warning", withDiagnosticScope(summary, data)), 0, 0);
   }
-  if (section.itemCount === 0) {
-    return new Text(
-      theme.fg("success", withDiagnosticScope(diagnosticEmptySummary(data), data)),
-      0,
-      0,
-    );
-  }
+  if (section.itemCount === 0) return buildEmptyDiagnosticSummary(data, theme);
 
   const fileLabel = `${trackedFiles ? "tracked " : ""}${section.itemCount === 1 ? "file" : "files"}`;
   return new Text(

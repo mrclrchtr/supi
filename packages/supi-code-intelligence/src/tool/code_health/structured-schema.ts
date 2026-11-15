@@ -55,6 +55,11 @@ const diagnosticEntry = object({
     ),
   ),
 });
+const coverage = Type.Enum(["unavailable", "none", "incomplete", "confirmed"], {
+  type: "string",
+  description:
+    "What the evidence establishes: none = zero files checked; incomplete = some requested files unconfirmed, failed, or removed; confirmed = every requested file confirmed (never project-wide validation).",
+});
 const diagnostics = Type.Union([
   object({ kind: Type.Literal("not-requested"), entries: Type.Array(diagnosticEntry) }),
   object({
@@ -62,6 +67,7 @@ const diagnostics = Type.Union([
     scope,
     entries: Type.Array(diagnosticEntry),
     evidence,
+    coverage,
     scopeStatus: Type.Optional(scopeStatus),
   }),
   object({
@@ -69,6 +75,7 @@ const diagnostics = Type.Union([
     scope,
     entries: Type.Array(diagnosticEntry),
     evidence,
+    coverage,
     reason: Type.String(),
     scopeStatus: Type.Optional(scopeStatus),
   }),

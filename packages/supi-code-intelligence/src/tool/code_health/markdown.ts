@@ -7,7 +7,9 @@ import {
   formatProjectServerRouteSummary,
   formatProjectServerStatusReason,
 } from "../../analysis/health/server-status.ts";
+import { classifyDiagnosticCoverage } from "../../diagnostics/coverage.ts";
 import { makeRelative, renderFileScopeStatus } from "./file-scope-markdown.ts";
+import { DIAGNOSTIC_NEXT_ACTION } from "./guidance.ts";
 import {
   formatProcessCrashRecovery,
   formatRefreshElapsed,
@@ -287,20 +289,62 @@ function renderDiagnosticObservation(lines: string[], data: HealthData, cwd: str
     }
     return;
   }
-  if (observation.kind === "partial") {
-    lines.push(`Diagnostics partially collected — ${asSentence(observation.reason)}`);
-    if (observation.entries.length > 0) {
-      lines.push("");
-      lines.push("Partial results:");
-      renderDiagnosticEntries(lines, data, cwd);
-    }
+  const coverage = classifyDiagnosticCoverage(observation);
+  if (coverage === "none") {
+    renderNoDiagnosticEvidence(lines, observation);
+    return;
+  }
+  if (coverage === "incomplete") {
+    renderIncompleteDiagnosticEvidence(lines, data, observation, cwd);
     return;
   }
   if (observation.entries.length === 0) {
-    lines.push("No errors or warnings reported in this scope.");
+    lines.push(confirmedCleanText(observation.scope, observation.evidence.confirmed, cwd));
     return;
   }
   renderDiagnosticEntries(lines, data, cwd);
+}
+
+type CollectedObservation = Extract<HealthData["diagnostics"], { kind: "completed" | "partial" }>;
+
+/** Zero requested files: nothing was checked, so no clean wording is allowed. */
+function renderNoDiagnosticEvidence(lines: string[], observation: CollectedObservation): void {
+  const files = observation.scope.kind === "file" ? "requested" : "tracked";
+  lines.push(
+    `No source diagnostics checked (0 ${files} files). Running servers and source discovery are not diagnostic confirmation.`,
+  );
+  if (observation.kind === "partial") lines.push(`Limitation: ${asSentence(observation.reason)}`);
+  lines.push(`Next: ${DIAGNOSTIC_NEXT_ACTION}.`);
+}
+
+/** Some requested files lack confirmation: keep reported messages visible as partial results. */
+function renderIncompleteDiagnosticEvidence(
+  lines: string[],
+  data: HealthData,
+  observation: CollectedObservation,
+  cwd: string,
+): void {
+  const { confirmed, requested, removed } = observation.evidence;
+  lines.push(
+    observation.kind === "partial"
+      ? `Diagnostics partially collected — ${asSentence(observation.reason)}`
+      : `Diagnostic evidence is incomplete — ${confirmed} of ${requested} requested file${plural(requested)} confirmed${removed > 0 ? `, ${removed} removed` : ""}.`,
+  );
+  if (observation.entries.length === 0) {
+    lines.push("No errors or warnings were reported, but this is not a clean result.");
+    return;
+  }
+  lines.push("");
+  lines.push("Partial results:");
+  renderDiagnosticEntries(lines, data, cwd);
+}
+
+function confirmedCleanText(scope: HealthDiagnosticScope, confirmed: number, cwd: string): string {
+  if (scope.kind === "file") {
+    return `No errors or warnings in confirmed file \`${makeRelative(cwd, scope.path)}\`. This is a file-level LSP check, not project-wide validation.`;
+  }
+  const under = scope.filter ? ` under \`${makeRelative(cwd, scope.filter)}\`` : "";
+  return `No errors or warnings in ${confirmed} confirmed tracked file${plural(confirmed)}${under}. Untracked files were not checked; run the project's own typecheck or build for project-wide validation.`;
 }
 
 function currentRefreshAttempt(data: HealthData): HealthRefreshAttempt | null {

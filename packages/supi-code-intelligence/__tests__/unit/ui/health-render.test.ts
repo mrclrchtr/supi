@@ -45,6 +45,7 @@ function makeDetails(overrides: Record<string, unknown> = {}): Record<string, un
         documents: [],
       },
     },
+    diagnosticCoverage: "none",
     refresh: {
       kind: "not-requested",
       reason: "Refresh was not requested.",
@@ -410,6 +411,7 @@ describe("code_health TUI projection", () => {
         },
         reason: "Diagnostic evidence is partial.",
       },
+      diagnosticCoverage: "incomplete",
     });
 
     expect(render(details, true)).toContain(
@@ -418,6 +420,26 @@ describe("code_health TUI projection", () => {
     expect(render(details, true).replace(/\s+/g, " ")).toContain(
       "evidence scope: tracked-file diagnostic snapshot",
     );
+  });
+
+  it("does not render zero diagnostic evidence as a clean result", () => {
+    const details = makeDetails({
+      sections: [
+        {
+          key: "diagnostics",
+          title: "Diagnostics",
+          status: "complete",
+          confidence: "semantic",
+          provenance: [{ source: "semantic", capability: "LSP" }],
+          itemCount: 0,
+          available: true,
+        },
+      ],
+    });
+
+    const output = render(details, true);
+    expect(output).toContain("No source diagnostics checked (0 tracked files)");
+    expect(output).not.toContain("No reported issues");
   });
 
   it("renders the previous refresh attempt in the compact view", () => {

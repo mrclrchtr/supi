@@ -166,9 +166,116 @@ describe("code_health result assembly", () => {
     });
     expect(markdown).toContain("tracked-file diagnostic snapshot");
     expect(markdown.match(/tracked-file diagnostic snapshot/g)).toHaveLength(1);
-    expect(markdown).toContain("No errors or warnings reported in this scope.");
+    expect(markdown).toContain("No source diagnostics checked (0 tracked files).");
+    expect(markdown).toContain(
+      "Running servers and source discovery are not diagnostic confirmation.",
+    );
+    expect(markdown).toContain("`scope` set to that file and `refresh: true`");
+    expect(markdown).toContain("run the project's own typecheck or build");
     expect(markdown).toContain("0 requested, 0 confirmed, 0 unconfirmed, 0 failed, 0 removed");
-    expect(markdown).not.toContain("No diagnostics found");
+    expect(markdown).not.toMatch(/No errors or warnings/);
+  });
+
+  it("names the confirmed file count and scope for a confirmed clean snapshot", () => {
+    const markdown = renderHealthResult(
+      assembleHealthResult(
+        makeHealthData({
+          diagnostics: {
+            kind: "completed",
+            scope: { kind: "tracked-files", filter: "/repo/src" },
+            entries: [],
+            evidence: {
+              requested: 2,
+              confirmed: 2,
+              unconfirmed: 0,
+              failed: 0,
+              removed: 0,
+              documents: [
+                { file: "/repo/src/a.ts", status: "confirmed" },
+                { file: "/repo/src/b.ts", status: "confirmed" },
+              ],
+            },
+          },
+        }),
+      ),
+      "/repo",
+    );
+
+    expect(markdown).toContain("No errors or warnings in 2 confirmed tracked files under `src`.");
+    expect(markdown).toContain("Untracked files were not checked");
+    expect(markdown).not.toContain("No source diagnostics checked");
+  });
+
+  it("keeps removed-file evidence incomplete instead of reporting a clean snapshot", () => {
+    const markdown = renderHealthResult(
+      assembleHealthResult(
+        makeHealthData({
+          diagnostics: {
+            kind: "completed",
+            scope: { kind: "tracked-files", filter: null },
+            entries: [],
+            evidence: {
+              requested: 2,
+              confirmed: 1,
+              unconfirmed: 0,
+              failed: 0,
+              removed: 1,
+              documents: [
+                { file: "/repo/src/a.ts", status: "confirmed" },
+                { file: "/repo/src/gone.ts", status: "removed" },
+              ],
+            },
+          },
+        }),
+      ),
+      "/repo",
+    );
+
+    expect(markdown).toContain(
+      "Diagnostic evidence is incomplete — 1 of 2 requested files confirmed, 1 removed.",
+    );
+    expect(markdown).toContain("this is not a clean result");
+    expect(markdown).not.toContain("No errors or warnings in");
+  });
+
+  it("keeps partial evidence visible alongside reported diagnostic messages", () => {
+    const markdown = renderHealthResult(
+      assembleHealthResult(
+        makeHealthData({
+          level: "detailed",
+          diagnostics: {
+            kind: "partial",
+            scope: { kind: "tracked-files", filter: null },
+            reason: "1 tracked file is unconfirmed",
+            evidence: {
+              requested: 2,
+              confirmed: 1,
+              unconfirmed: 1,
+              failed: 0,
+              removed: 0,
+              documents: [
+                { file: "/repo/src/a.ts", status: "confirmed" },
+                { file: "/repo/src/b.ts", status: "unconfirmed" },
+              ],
+            },
+            entries: [
+              {
+                file: "/repo/src/a.ts",
+                errors: 1,
+                warnings: 0,
+                messages: [{ line: 3, severity: "error", message: "Type mismatch" }],
+              },
+            ],
+          },
+        }),
+      ),
+      "/repo",
+    );
+
+    expect(markdown).toContain("Diagnostics partially collected — 1 tracked file is unconfirmed.");
+    expect(markdown).toContain("2 requested, 1 confirmed, 1 unconfirmed");
+    expect(markdown).toContain("Partial results:");
+    expect(markdown).toContain("L3 error: Type mismatch");
   });
 
   it("retains snapshot scope, confirmation counts, and warnings in an oversized preview", () => {
@@ -209,10 +316,38 @@ describe("code_health result assembly", () => {
       expect(text.length).toBeLessThanOrEqual(8000);
       expect(text).toContain("Diagnostics: partial; tracked-file snapshot; filter=src");
       expect(text).toContain("not workspace-wide verification");
-      expect(text).toContain("requested=1, confirmed=0, unconfirmed=1, failed=0, removed=0");
+      expect(text).toContain(
+        "Diagnostic coverage: incomplete; requested=1, confirmed=0, unconfirmed=1, failed=0, removed=0",
+      );
       expect(text).toContain("Fresh diagnostics were not confirmed");
       expect(text).toContain("Rust language server missing");
       expect(readFileSync(snapshot as string, "utf8")).toBe(raw.content);
+    } finally {
+      if (snapshot) rmSync(dirname(snapshot), { recursive: true, force: true });
+    }
+  });
+
+  it("keeps zero-evidence guidance in an oversized preview", () => {
+    const raw = finishHealthResult(
+      {
+        kind: "completed",
+        data: makeHealthData({
+          capabilityWarnings: {
+            hasWarnings: true,
+            warnings: [{ type: "missing-server", message: "Long warning. ".repeat(2000) }],
+          },
+        }),
+      },
+      "/repo",
+    );
+    const result = boundCodeToolResult(raw.content, raw.details, { toolName: "code_health" });
+    const snapshot = result.details?.truncation?.fullOutputPath;
+    expect(snapshot).toBeDefined();
+    try {
+      const text = result.content[0].text;
+      expect(text).toContain("Diagnostic coverage: none; requested=0");
+      expect(text).toContain("No source diagnostics checked; this is not a clean result.");
+      expect(text).toContain("run the project's own typecheck or build");
     } finally {
       if (snapshot) rmSync(dirname(snapshot), { recursive: true, force: true });
     }
@@ -370,7 +505,7 @@ describe("code_health result assembly", () => {
     expect(markdown).toContain(
       "**Source discovery**: limited (file-limit); 50001 source files observed, 0 discovered, 0 tracked, 0 skipped, 0 unavailable, 4 deferred.",
     );
-    expect(markdown.match(/source discovery/gi)).toHaveLength(1);
+    expect(markdown.match(/\*\*Source discovery\*\*/g)).toHaveLength(1);
     expect(markdown).toContain("Evidence coverage**: 0 requested, 0 confirmed");
   });
 

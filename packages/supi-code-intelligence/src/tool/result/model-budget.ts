@@ -1,4 +1,6 @@
+import { classifyDiagnosticCoverage } from "../../diagnostics/coverage.ts";
 import type { CodeIntelResult } from "../../types/index.ts";
+import { DIAGNOSTIC_NEXT_ACTION } from "../code_health/guidance.ts";
 import { formatSemanticHealthState } from "../code_health/semantic-state.ts";
 import type { HealthDetails, SearchDetails } from "./types.ts";
 
@@ -178,10 +180,15 @@ function healthFacts(data: HealthDetails): string[] {
   if ("reason" in data.refresh) lines.push(`Refresh reason: ${data.refresh.reason}`);
   if (observation.kind !== "not-requested") {
     const scope = observation.scope;
+    const coverage = classifyDiagnosticCoverage(observation);
     lines.push(
       `Diagnostics: ${observation.kind}; ${scope.kind === "file" ? `file=${scope.path}` : `tracked-file snapshot; filter=${scope.filter ?? "none"}; not workspace-wide verification`}.`,
-      `Diagnostic coverage: requested=${observation.evidence.requested}, confirmed=${observation.evidence.confirmed}, unconfirmed=${observation.evidence.unconfirmed}, failed=${observation.evidence.failed}, removed=${observation.evidence.removed}.`,
+      `Diagnostic coverage: ${coverage}; requested=${observation.evidence.requested}, confirmed=${observation.evidence.confirmed}, unconfirmed=${observation.evidence.unconfirmed}, failed=${observation.evidence.failed}, removed=${observation.evidence.removed}.`,
     );
+    if (coverage === "none")
+      lines.push(
+        `No source diagnostics checked; this is not a clean result. Next: ${DIAGNOSTIC_NEXT_ACTION}.`,
+      );
     if ("reason" in observation) lines.push(`Diagnostic limitation: ${observation.reason}`);
     if (observation.scopeStatus)
       lines.push(`File scope status: ${JSON.stringify(observation.scopeStatus)}`);

@@ -118,6 +118,7 @@ export function healthErrorResult(content: string, reason?: string): CodeIntelRe
         serverInventoryAvailable: false,
         serverInventoryScope: "workspace",
         diagnosticObservation: { kind: "not-requested", entries: [] },
+        diagnosticCoverage: null,
         refresh: {
           kind: "not-attempted",
           reason: reason ?? content,

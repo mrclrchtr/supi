@@ -7,6 +7,7 @@ import {
   formatProjectServerRoot,
   formatProjectServerStatusReason,
 } from "../../analysis/health/server-status.ts";
+import { classifyDiagnosticCoverage } from "../../diagnostics/coverage.ts";
 import type { HealthData, HealthSection } from "../../session/health-types.ts";
 import {
   assembleToolResult,
@@ -83,6 +84,10 @@ export function assembleHealthResult(input: HealthData, cwd?: string): HealthRes
       serverInventoryAvailable: data.serverInventoryAvailable,
       serverInventoryScope: "workspace",
       diagnosticObservation: data.diagnostics,
+      diagnosticCoverage:
+        data.diagnostics.kind === "not-requested"
+          ? null
+          : classifyDiagnosticCoverage(data.diagnostics),
       refresh: data.refresh,
       structuralAvailable: structuralCapabilityReady(data),
       structuralStatus: data.structuralStatus,

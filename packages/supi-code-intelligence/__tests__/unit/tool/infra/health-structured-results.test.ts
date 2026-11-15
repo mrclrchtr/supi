@@ -213,6 +213,7 @@ describe("registered health structured results", () => {
         kind: "completed",
         entries: [],
         evidence: empty,
+        coverage: "none",
         scope: { kind: "tracked-files", filter: null },
       },
       serverInventoryScope: "workspace",
@@ -244,7 +245,7 @@ describe("registered health structured results", () => {
     });
     const result = await call(tool(), {});
     expect(result.structuredContent).toMatchObject({
-      diagnostics: { kind: "partial", entries: [], evidence: empty },
+      diagnostics: { kind: "partial", entries: [], evidence: empty, coverage: "none" },
     });
     const { reason } = result.structuredContent.diagnostics as { reason: string };
     expect(reason).toMatch(/no document-level diagnostic evidence/i);
@@ -286,6 +287,7 @@ describe("registered health structured results", () => {
     expect(result.structuredContent).toMatchObject({
       diagnostics: {
         kind: "partial",
+        coverage: "incomplete",
         evidence: { unconfirmed: 1, documents: [{ file: "src/a.ts", status: "unconfirmed" }] },
       },
       servers: [
@@ -376,7 +378,7 @@ describe("registered health structured results", () => {
     const result = await call(tool(), { refresh: true });
     expect(result.structuredContent).toMatchObject({
       semanticState: { kind: "unavailable", reason: "offline" },
-      diagnostics: { kind: "unavailable", evidence: empty },
+      diagnostics: { kind: "unavailable", evidence: empty, coverage: "unavailable" },
       serverInventoryAvailable: false,
       servers: [],
       refresh: { kind: "not-attempted", lastAttempt: null },

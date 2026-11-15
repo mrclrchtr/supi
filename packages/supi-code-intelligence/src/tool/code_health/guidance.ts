@@ -4,3 +4,7 @@ export const toolDescription =
 export const promptSnippet = "check live diagnostics and language-server health";
 
 export const promptGuidelines: string[] = [];
+
+/** Next action for missing diagnostic evidence: file-level LSP check versus project-wide compiler check. */
+export const DIAGNOSTIC_NEXT_ACTION =
+  "for a file-level LSP check, call `code_health` with `scope` set to that file and `refresh: true`; for project-wide validation, run the project's own typecheck or build";
