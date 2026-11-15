@@ -17,9 +17,14 @@ vi.mock("node:fs", async (importOriginal) => {
 
 const theme = { fg: (_color: string, text: string) => text, bold: (text: string) => text } as never;
 let cwd: string;
+let spillTmp: string;
 
 beforeEach(() => {
   cwd = mkdtempSync(join(tmpdir(), "graph-file-display-"));
+  // Spill files are content-addressed and reused across runs, so a shared temp directory would
+  // skip the write in later runs. A fresh one keeps each test's spill write observable.
+  spillTmp = mkdtempSync(join(tmpdir(), "graph-file-display-spill-"));
+  vi.stubEnv("TMPDIR", spillTmp);
   writeFileSync(join(cwd, "target.ts"), "function work() {}\n");
   writeFileSync(join(cwd, "uses.ts"), "work();".repeat(25));
   registerMockProvider(cwd, {
@@ -38,8 +43,10 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllEnvs();
   clearMockRuntime();
   rmSync(cwd, { recursive: true, force: true });
+  rmSync(spillTmp, { recursive: true, force: true });
 });
 
 async function execute(maxResults: number): Promise<ToolResult> {
@@ -113,8 +120,9 @@ describe("code_graph file display", () => {
     expect(render(result, true)).not.toContain("L1:169");
     // All 25 locations are returned evidence; the view cap hides 5 rows as a Display omission.
     expect(render(result, true)).toContain("25 locations; 5 rows hidden in view");
-    // Wide enough that the spill path is not wrapped.
-    expect(render(result, true, 400)).toContain(file);
+    // Wide enough that the spill path is not wrapped. The TUI shortens paths over 160 characters,
+    // so compare the start, which does not depend on the temp directory's length.
+    expect(render(result, true, 400)).toContain((file as string).slice(0, 150));
     expect(render(result, true)).toContain("full returned evidence");
     expect(content).not.toContain(file);
   });
