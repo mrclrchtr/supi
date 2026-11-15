@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import {
   cpSync,
   existsSync,
@@ -181,20 +182,17 @@ function formatSkillMarketplaceManifest(
     },
     null,
     2,
-  )
-    // Keep generated JSON in Biome's form: string arrays that fit within 100 columns stay inline.
-    .replace(
-      /^( *)("skills": )\[\n((?:\s+"[^"\n]+",?\n)+)\s+\]/gmu,
-      (match, indent: string, key: string, items: string) => {
-        const inline = `${indent}${key}[${items
-          .trim()
-          .split(/,?\n\s*/u)
-          .map((item) => item.replace(/,$/u, ""))
-          .join(", ")}]`;
-        return inline.length + 1 <= 100 ? inline : match;
-      },
-    );
-  return `${manifest}\n`;
+  );
+  return formatWithBiome(`${manifest}\n`, skillMarketplaceManifestPath);
+}
+
+/** Format generated JSON with the workspace Biome config so `biome ci` and drift checks agree. */
+function formatWithBiome(content: string, filePath: string): string {
+  return execFileSync(
+    join(workspaceRoot, "node_modules/.bin/biome"),
+    ["format", `--stdin-file-path=${relative(workspaceRoot, filePath)}`],
+    { cwd: workspaceRoot, input: content, encoding: "utf8" },
+  );
 }
 
 function validateSkillMarketplaceManifest(

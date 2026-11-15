@@ -6,6 +6,8 @@ import { createContext, readInventory } from "../../src/inventory.mjs";
 import { applyPreset, createMatrix, getPlan, toggleCell } from "../../src/matrix.mjs";
 import { fixture, writeJson } from "../helpers/fixture.js";
 
+const CURRENT_PACKAGE_COUNT = catalog.filter((item) => !item.obsolete).length;
+
 const roots: string[] = [];
 function setup(global: unknown[] = [], project: unknown[] = []) {
   const files = fixture();
@@ -56,7 +58,7 @@ describe("Installation Matrix", () => {
       "supi-agent",
     ]);
     applyPreset(matrix, "project", "all");
-    expect(matrix.rows.filter((row) => row.selected.project)).toHaveLength(14);
+    expect(matrix.rows.filter((row) => row.selected.project)).toHaveLength(CURRENT_PACKAGE_COUNT);
   });
 
   it("allows removal-only undo but never an obsolete addition", () => {
@@ -86,7 +88,7 @@ describe("Installation Matrix", () => {
     applyPreset(matrix, "global", "all");
     expect(getPlan(matrix)).toEqual([]);
     applyPreset(matrix, "project", "all");
-    expect(getPlan(matrix)).toHaveLength(14);
+    expect(getPlan(matrix)).toHaveLength(CURRENT_PACKAGE_COUNT);
   });
 
   it("recognizes local package manifests without executing code", () => {
