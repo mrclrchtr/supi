@@ -9,3 +9,7 @@ The surface displays and filters an optional Debug Operation ID by exact equalit
 **Tooling Retrospective**:
 The `/supi-tooling-retro` Prompt Template that evaluates which SuPi surfaces were used, missed, missing, or noisy in the completed task. It is feedback for improving SuPi tooling, not a debug-event report.
 _Avoid_: retro, post-task review
+
+**Cache Forensics**:
+Cross-session analysis of prompt-cache hit-rate drops (`/supi-cache-forensics`, `cache_forensics`), grouped by cause. Per-turn current-branch usage is **Cache History** (`/supi-cache-history`). PI owns live cache statistics and cache-miss notices.
+_Avoid_: cache monitor

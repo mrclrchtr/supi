@@ -1,4 +1,5 @@
 import aliases from "./aliases.ts";
+import bashTimeout from "./bash-timeout.ts";
 import cloneSession from "./clone-session.ts";
 import copyPrompt from "./copy-prompt.ts";
 import gitEditor from "./git-editor.ts";
@@ -16,4 +17,5 @@ export default function (pi: Parameters<typeof tabSpinner>[0]) {
   aliases(pi);
   sessionCapabilities(pi);
   supiFooter(pi);
+  bashTimeout(pi);
 }

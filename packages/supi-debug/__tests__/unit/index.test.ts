@@ -99,16 +99,24 @@ describe("supi-debug extension setup", () => {
     vi.clearAllMocks();
   });
 
-  it("registers settings, context provider, command, tool, and lifecycle handlers", () => {
+  it("registers debug and cache settings, context provider, commands, tools, and lifecycle handlers", () => {
     const pi = setup();
 
-    expect(mockFns.defineConfigSettings).toHaveBeenCalledOnce();
-    expect(mockFns.registerSettings).toHaveBeenCalledOnce();
+    expect(mockFns.defineConfigSettings.mock.calls.map(([config]) => config.id)).toEqual([
+      "debug",
+      "cache",
+    ]);
+    expect(mockFns.registerSettings).toHaveBeenCalledTimes(2);
     expect(mockFns.registerContextProvider).toHaveBeenCalledOnce();
     expect(pi.handlers.has("session_start")).toBe(true);
     expect(pi.handlers.has("resources_discover")).toBe(true);
-    expect(pi.commands.has("supi-debug")).toBe(true);
-    expect(pi.tools.map((tool) => (tool as { name: string }).name)).toEqual(["debug"]);
+    expect([...pi.commands.keys()]).toEqual(
+      expect.arrayContaining(["supi-debug", "supi-cache-history", "supi-cache-forensics"]),
+    );
+    expect(pi.tools.map((tool) => (tool as { name: string }).name)).toEqual([
+      "debug",
+      "cache_forensics",
+    ]);
   });
 
   it("uses a string enum schema for debug levels", () => {

@@ -19,8 +19,8 @@ async function collectTools() {
   let m;
   m = await import(`${PACKAGES}/supi-ask-user/src/tool/ask_user/spec.ts`);
   add("supi-ask-user", "ask_user", m.askUserSpec);
-  m = await import(`${PACKAGES}/supi-cache/src/tool/cache_forensics/spec.ts`);
-  add("supi-cache", "cache_forensics", m.cacheForensicsSpec);
+  m = await import(`${PACKAGES}/supi-debug/src/tool/cache_forensics/spec.ts`);
+  add("supi-debug", "cache_forensics", m.cacheForensicsSpec);
   m = await import(`${PACKAGES}/supi-context/src/tool/context_report/spec.ts`);
   add("supi-context", "context_report", m.contextReportSpec);
   m = await import(`${PACKAGES}/supi-debug/src/tool/debug/spec.ts`);

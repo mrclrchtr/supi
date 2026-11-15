@@ -11,7 +11,7 @@ metadata:
 Use this skill with one workspace-relative package directory:
 
 ```text
-/skill:update-package-readme packages/supi-cache
+/skill:update-package-readme packages/supi-debug
 ```
 
 ## Subject boundary

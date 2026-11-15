@@ -20,7 +20,7 @@ This package is not a PI extension and is not published to npm. Skills installed
 
 One patch fragment exists for each changed upstream file under `patches/mattpocock-skills/files/`. pnpm consumes the generated `patches/mattpocock-skills/combined.patch`. The `grilling` patch uses `ask_user` from `@mrclrchtr/supi-ask-user` for each question round.
 
-SuPi-owned skills live directly in `skills/<name>/` (currently `skills/commit/`), with their own license. They are maintained in place, not patched into the upstream dependency, and sync preserves them. Upstream cross-skill references are retained; referenced unpatched skills are not bundled in this catalog.
+SuPi-owned skills live directly in `skills/<name>/` (currently `commit`, `claude-md-improver`, and `claude-md-revision`), with their own license. The two `claude-md-*` skills share identical `references/` files; `__tests__/unit/claude-md-references.test.ts` keeps them in sync. They are maintained in place, not patched into the upstream dependency, and sync preserves them. Upstream cross-skill references are retained; referenced unpatched skills are not bundled in this catalog.
 
 ```bash
 pnpm skills:patches:compose # rebuild the pnpm patch from fragments

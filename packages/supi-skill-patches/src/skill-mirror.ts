@@ -182,8 +182,18 @@ function formatSkillMarketplaceManifest(
     null,
     2,
   )
-    // Keep generated JSON in the same form as Biome for single-item arrays.
-    .replace(/("skills": )\[\n\s+("[^"\n]+")\n\s+\]/gu, "$1[$2]");
+    // Keep generated JSON in Biome's form: string arrays that fit within 100 columns stay inline.
+    .replace(
+      /^( *)("skills": )\[\n((?:\s+"[^"\n]+",?\n)+)\s+\]/gmu,
+      (match, indent: string, key: string, items: string) => {
+        const inline = `${indent}${key}[${items
+          .trim()
+          .split(/,?\n\s*/u)
+          .map((item) => item.replace(/,$/u, ""))
+          .join(", ")}]`;
+        return inline.length + 1 <= 100 ? inline : match;
+      },
+    );
   return `${manifest}\n`;
 }
 

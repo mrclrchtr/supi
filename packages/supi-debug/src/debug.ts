@@ -10,6 +10,7 @@ import {
   subscribeDebugPersistence,
 } from "@mrclrchtr/supi-core/debug";
 import { defineConfigSettings, registerSettings } from "@mrclrchtr/supi-core/settings";
+import { registerCacheSurfaces } from "./cache/register.ts";
 import { registerDebugCommand } from "./command.ts";
 import {
   applyDebugConfig,
@@ -102,7 +103,10 @@ function buildSummaryData(): Record<string, string | number> | null {
   return data;
 }
 
-/** Register the shared SuPi debug command, settings, context summary, and agent tool. */
+/**
+ * Register the shared SuPi debug command, settings, context summary, and agent tool,
+ * plus prompt-cache history and forensics (formerly `supi-cache`).
+ */
 export default function debugExtension(pi: ExtensionAPI) {
   applyDebugConfig(process.cwd());
   registerDebugSettings(pi);
@@ -135,4 +139,5 @@ export default function debugExtension(pi: ExtensionAPI) {
 
   registerDebugCommand(pi, applyDebugConfig, normalizeMaxEvents);
   registerDebugTool(pi);
+  registerCacheSurfaces(pi);
 }

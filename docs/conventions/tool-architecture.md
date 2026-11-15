@@ -182,7 +182,7 @@ Pi passes both fields through `pi.getAllTools()` and does not enforce them ([Too
 | `review` | `supi-review` | `review_output`, `review_audit` |
 | `debug` | `supi-debug` | `debug` |
 | `context` | `supi-context` | `context_report` |
-| `cache` | `supi-cache` | `cache_forensics` |
+| `cache` | `supi-debug` | `cache_forensics` |
 
 **Annotations** carry MCP semantics. A missing hint falls back to the pessimistic MCP default (not read-only, may be destructive, open world). Therefore every owned tool declares all four hints in its `spec.ts`, including the Review child-only tools. `scripts/__tests__/tool-schema-integrity.test.mjs` checks the specs for completeness and coherence; `scripts/__tests__/tool-registration-metadata.test.mjs` checks what registration forwards.
 

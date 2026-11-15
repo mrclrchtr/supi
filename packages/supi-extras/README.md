@@ -110,3 +110,9 @@ The package sets:
 - `GIT_SEQUENCE_EDITOR=true`
 
 That prevents git subprocesses from hanging while waiting for an interactive editor.
+
+### Default bash timeout
+
+PI's `bash` tool has no default timeout. When the model calls `bash` without `timeout`, the package fills in a default (120 seconds) so a hung command cannot stall an unattended session. Explicit `timeout` values are kept; other tools are untouched.
+
+Configure it in `/supi-settings` → **Bash Timeout** → **Default Timeout** (seconds), stored in the `bash-timeout` section of `~/.pi/agent/supi/config.json` or `.pi/supi/config.json`. This replaces the former `@mrclrchtr/supi-bash-timeout` package; existing settings keep working.

@@ -36,10 +36,10 @@ Tree-sitter support is bundled. Full LSP features require the matching language-
 - **Structured decisions** — ask you focused choice or text questions through a keyboard-driven form with [`supi-ask-user`](packages/supi-ask-user/README.md).
 - **Review workflows** — run independent, inspection-only reviews of exact Git targets with [`supi-review`](packages/supi-review/README.md).
 - **Agent Profile policy** — discover explicit `explore` and `general` profiles with bounded resource envelopes through [`supi-agent`](packages/supi-agent/README.md).
-- **Operational awareness** — inspect context pressure, cache history and forensics, and SuPi debug events with `supi-context`, `supi-cache`, and `supi-debug`. PI owns live cache statistics and cache-miss notices.
-- **Repository guidance** — maintain `CLAUDE.md` and `AGENTS.md` files with the skills in [`supi-claude-md`](packages/supi-claude-md/README.md).
+- **Operational awareness** — inspect context pressure, cache history and forensics, and SuPi debug events with `supi-context` and `supi-debug`. PI owns live cache statistics and cache-miss notices.
+- **Repository guidance** — maintain `CLAUDE.md` and `AGENTS.md` files with the `claude-md-improver` and `claude-md-revision` skills: `npx skills add mrclrchtr/supi --skill claude-md-improver claude-md-revision`.
 - **Skills on your terms** — use [`supi-skills`](packages/supi-skills/README.md) to choose, globally or per project, whether Pi can select each skill automatically, whether only you can start it, or whether it is disabled. Type `$` to search and start installed skills without remembering their full command names.
-- **Session polish** — use [`supi-extras`](packages/supi-extras/README.md) to choose session-only tool visibility and, with `supi-skills`, skill visibility. It also adds prompt stashing, activity indicators, and shortcuts.
+- **Session polish** — use [`supi-extras`](packages/supi-extras/README.md) to choose session-only tool visibility and, with `supi-skills`, skill visibility. It also adds prompt stashing, activity indicators, shortcuts, and a default `bash` timeout.
 
 ## Install
 
@@ -93,7 +93,7 @@ pi install npm:@mrclrchtr/supi-web
 | [`supi-context`](packages/supi-context/README.md) | Context-pressure snapshots and detailed TUI usage reports | `pi install npm:@mrclrchtr/supi-context` |
 | [`supi-settings`](packages/supi-settings/README.md) | One project/global settings UI for SuPi packages | `pi install npm:@mrclrchtr/supi-settings` |
 | [`supi-skills`](packages/supi-skills/README.md) | Scoped skill controls and `$skill-name` input shortcuts | `pi install npm:@mrclrchtr/supi-skills` |
-| [`supi-extras`](packages/supi-extras/README.md) | Session capability controls, prompt stash, shortcuts, and activity indicators | `pi install npm:@mrclrchtr/supi-extras` |
+| [`supi-extras`](packages/supi-extras/README.md) | Session capability controls, prompt stash, shortcuts, activity indicators, and default bash timeouts | `pi install npm:@mrclrchtr/supi-extras` |
 | [`supi-prompt-suggestions`](packages/supi-prompt-suggestions/README.md) | Advisory ghost-text suggestions from a model you choose | `pi install npm:@mrclrchtr/supi-prompt-suggestions` |
 
 ### Adapted skills
@@ -104,6 +104,8 @@ The root [`skills/`](skills) catalog contains patched SuPi-compatible editions o
 npx skills add mrclrchtr/supi --skill code-review commit
 ```
 
+The `claude-md-improver` and `claude-md-revision` skills (formerly `@mrclrchtr/supi-claude-md`) audit and revise `CLAUDE.md` and `AGENTS.md` files.
+
 [`supi-skill-patches`](packages/supi-skill-patches/README.md) is the private maintenance workspace that synchronizes and validates this catalog.
 
 ### DevTools
@@ -112,7 +114,7 @@ Not part of the Recommended release stack. Select these packages individually, u
 
 | Package | What it adds | Install |
 |---|---|---|
-| [`supi-debug`](packages/supi-debug/README.md) | Debug-event capture, troubleshooting tools, and post-task tooling feedback via `/supi-tooling-retro` | `pi install npm:@mrclrchtr/supi-debug` |
+| [`supi-debug`](packages/supi-debug/README.md) | Debug-event capture, troubleshooting tools, prompt-cache history and forensics, and post-task tooling feedback via `/supi-tooling-retro` | `pi install npm:@mrclrchtr/supi-debug` |
 
 ### Beta additions
 
@@ -123,10 +125,7 @@ Select beta packages individually or use All in the installer. Consulting is opt
 | [`supi-review`](packages/supi-review/README.md) | Caller-defined, inspection-only reviews in managed child sessions | `pi install npm:@mrclrchtr/supi-review` |
 | [`supi-agent`](packages/supi-agent/README.md) | Explicit Agent Profile catalogue and child resource policy | `pi install npm:@mrclrchtr/supi-agent` |
 | [`supi-consulting`](packages/supi-consulting/README.md) | **Agent** — bounded consultations with explicit agent and workspace selection and observed evidence; currently supports Antigravity | `pi install npm:@mrclrchtr/supi-consulting` |
-| [`supi-cache`](packages/supi-cache/README.md) | Prompt-cache history and cross-session regression forensics | `pi install npm:@mrclrchtr/supi-cache` |
 | [`supi-insights`](packages/supi-insights/README.md) | Historical session analytics and shareable HTML reports | `pi install npm:@mrclrchtr/supi-insights` |
-| [`supi-claude-md`](packages/supi-claude-md/README.md) | Skills for auditing and revising repository instruction files | `pi install npm:@mrclrchtr/supi-claude-md` |
-| [`supi-bash-timeout`](packages/supi-bash-timeout/README.md) | Default timeouts so forgotten shell limits do not stall the session | `pi install npm:@mrclrchtr/supi-bash-timeout` |
 
 ### Additional package
 

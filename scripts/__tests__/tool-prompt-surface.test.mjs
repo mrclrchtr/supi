@@ -15,7 +15,7 @@ async function collectPromptSurfaces() {
   let module;
   module = await import(`${PACKAGES}/supi-ask-user/src/tool/ask_user/guidance.ts`);
   add("ask_user", module.ASK_USER_PROMPT_SURFACE_DEFAULTS);
-  module = await import(`${PACKAGES}/supi-cache/src/tool/cache_forensics/guidance.ts`);
+  module = await import(`${PACKAGES}/supi-debug/src/tool/cache_forensics/guidance.ts`);
   add("cache_forensics", module);
   module = await import(`${PACKAGES}/supi-context/src/tool/context_report/guidance.ts`);
   add("context_report", module);

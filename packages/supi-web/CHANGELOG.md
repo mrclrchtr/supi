@@ -1,6 +1,6 @@
 # Changelog
 
-## [12.1.0]
+## [13.0.0]
 
 - `web_search` requests about half as much source text per search (a 4,096-token budget instead of the Brave default of about 8,192), so one search uses less of the context window. Results hold fewer sources; search again with a narrower query when the first results are not enough.
 

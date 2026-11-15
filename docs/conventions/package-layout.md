@@ -113,9 +113,6 @@ When multiple SuPi packages need the same path, URI, config, or session helper s
 | --- | --- |
 | `supi` | keep flat meta-package surface (`src/api.ts`, `src/extension.ts`) |
 | `supi-ask-user` | per-tool `tool/ask_user/`; interactive form stays in `ui/` |
-| `supi-bash-timeout` | stay flat unless it grows |
-| `supi-cache` | domain-first: `forensics/`, `report/` + per-tool `tool/cache_forensics/` |
-| `supi-claude-md` | skills-only behavior with thin `resources_discover` extension; keep flat |
 | `supi-code-intelligence` | per-tool directories for the eight `code_*` tools + shared tool modules; keep `app/`, `session/`, `substrate/`, `analysis/`, `ui/` |
 | `supi-code-runtime` | library-only: flat source with `capability/` + `workspace/`; no pi extension |
 | `supi-agent` | per-tool `tool/agent_run/`, `tool/agent_result/`, `tool/agent_cancel/`; `delegation/` owns session policy; catalogue/resource policy stays at root |
@@ -166,4 +163,4 @@ Keep ambiguous utilities at the root until they clearly belong somewhere.
 
 This convention is the default for new packages and for existing packages receiving structural work. Per-package target shapes and flat-package lists live in the matrix above.
 
-Per-tool layout migration: complete. All tool packages (`supi-review`, `supi-agent`, `supi-ask-user`, `supi-cache`, `supi-code-intelligence`, `supi-context`, `supi-debug`, `supi-web`) use per-tool directories.
+Per-tool layout migration: complete. All tool packages (`supi-review`, `supi-agent`, `supi-ask-user`, `supi-code-intelligence`, `supi-context`, `supi-debug`, `supi-web`) use per-tool directories.

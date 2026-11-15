@@ -18,7 +18,6 @@ import { describe, expect, it } from "vitest";
 const PACKAGES = new URL("../../packages", import.meta.url).pathname;
 const TOOL_PACKAGES = [
   "supi-agent",
-  "supi-cache",
   "supi-code-intelligence",
   "supi-debug",
   "supi-review",

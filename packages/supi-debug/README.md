@@ -31,6 +31,7 @@ After install, this package wires the shared debug registry into three user-faci
 - `/supi-debug` — show recent debug events in a readable TUI report
 - `debug` — let the model query recent debug events during troubleshooting
 - `/supi-settings` integration — configure whether events are captured and how much data is exposed
+- `/supi-cache-history`, `/supi-cache-forensics`, and `cache_forensics` — prompt-cache history and cross-session regression forensics (see [below](#prompt-cache-history-and-forensics))
 
 It also registers a **Debug** provider section for `/supi-context`, ships a `/supi-tooling-retro` prompt template for feedback on the task just completed, and discovers the **`gather-retrospectives` skill** for collecting feedback from past sessions.
 
@@ -184,6 +185,91 @@ Defaults come from the shared debug registry:
 }
 ```
 
+## Prompt-cache history and forensics
+
+Formerly the standalone `@mrclrchtr/supi-cache` package. PI owns live cache statistics and cache-miss notices (enable transcript notices with `showCacheMissNotices`); this package adds two views:
+
+1. **Current-branch history**
+   - reads usage from native PI assistant messages
+   - shows input, cache reads, cache writes, and hit rate for each request
+   - keeps old prompt-change notes and fingerprints when they exist
+
+2. **Historical forensics**
+   - scans active branches across past sessions
+   - finds cache hotspots and idle-time drops
+   - groups model changes, compactions, branch summaries, prompt changes, and unknown causes
+   - correlates drops with redacted tool-call shapes
+
+![Cache history report](https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-cache-history.png)
+
+### Cache Commands and tool
+
+#### `/supi-cache-history`
+
+Shows per-turn cache usage for the current branch.
+
+The report includes:
+
+- input tokens
+- cache-read tokens
+- cache-write tokens
+- cache hit rate
+- known cause notes from current or old session records
+
+#### `/supi-cache-forensics`
+
+Runs a cross-session investigation.
+
+Supported patterns:
+
+- `breakdown` — count findings by cause
+- `hotspots` — show the largest hit-rate drops
+- `correlate` — show preceding redacted tool shapes, ranked by hit-rate drop
+- `idle` — show drops after long gaps between requests
+
+Useful flags:
+
+- `--since 7d`
+- `--pattern breakdown`
+- `--min-drop 20`
+- `--limit 50` (maximum findings returned; list patterns default to 50)
+
+![Cache forensics report](https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-cache-forensics.png)
+
+#### `cache_forensics`
+
+Adds one model-callable tool with the same four patterns. The result uses structural tool fingerprints and removes raw command and path details before it reaches the model.
+
+List patterns return at most 50 findings by default. Use the tool's `limit` parameter, or the command's `--limit` flag, to request up to 200 findings. Hotspots exclude structural events with no measurable drop. The result is also bounded to 2,000 lines or 51,200 bytes. Large results are written to a private temporary file and return a summary envelope.
+
+Codemode receives native data matching the registered output schema; direct calls receive JSON for the same object. Both return either the complete result or a spill summary with `truncated: true` and `fullOutputPath`, never partial findings. The spill file contains the complete normalized, redacted, query-limited result. `findingsTotal` and `findingsLimit` appear only when the query limit removes findings. `sessionsScanned` counts sessions with extracted turns; unreadable sessions and sessions without turns are skipped.
+
+```js
+const result = await tools.cache_forensics({ pattern: "hotspots", limit: 5 });
+return "truncated" in result
+  ? { fullOutputPath: result.fullOutputPath }
+  : { sessions: result.sessionsScanned, drops: result.findings.map((finding) => finding.drop) };
+```
+
+### Cache Configuration
+
+Forensics reads these optional values from the `cache` section. They are also available in `/supi-settings` under **Cache Forensics**:
+
+```json
+{
+  "cache": {
+    "regressionThreshold": 25,
+    "idleThresholdMinutes": 5
+  }
+}
+```
+
+The loader also reads these two values from the old `cache-monitor` section. Old `enabled` and `notifications` values are ignored. Configure live PI cache notices with PI's `showCacheMissNotices` setting.
+
+### Cache Native session data
+
+Native assistant-message usage is the source of truth. SuPi Debug also reads old `supi-cache-turn` custom entries so old sessions keep their prompt-change details. New sessions do not create custom cache records.
+
 ## Extra status logging
 
 If `SUPI_LOG_STATUS` is enabled in the environment, the package emits a versioned SuPi load-status marker to stderr during `resources_discover` (after session-start registrations) and appends the same payload as a session entry. The payload uses `phase: "resources_discover"`. Version 2 reports observed tool and command inventory only; external harnesses decide which resources they require.
@@ -194,3 +280,5 @@ If `SUPI_LOG_STATUS` is enabled in the environment, the package emits a versione
 - `src/renderer.ts` — custom report renderer
 - `src/format.ts` — debug payload formatting
 - `src/status-log.ts` — optional load-status logging
+- `src/cache/` — cache history, forensics pipeline, reports, and settings
+- `src/tool/cache_forensics/` — cache forensics agent tool

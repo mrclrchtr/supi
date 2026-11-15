@@ -18,7 +18,6 @@ import { fileURLToPath } from "node:url";
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const PACKAGES_DIR = resolve(ROOT, "packages");
 const SPECIAL_NAMES = {
-  "claude-md": "Claude.md",
   lsp: "LSP",
   "tree-sitter": "Tree-sitter",
 };
@@ -27,14 +26,11 @@ const SOCIAL_BADGES = {
   agent: ["./api", "AgentProfile", "ProfileCatalogue"],
   "agent-runtime": ["./api", "startAgentRun()", "AgentRunHandle"],
   "ask-user": ["ask_user", "choice forms", "text forms"],
-  "bash-timeout": ["bash hook", "120s default", "/supi-settings"],
-  cache: ["/supi-cache-history", "cache_forensics"],
-  "claude-md": ["claude-md-improver", "claude-md-revision"],
   "code-intelligence": ["code_resolve", "code_graph", "code_refactor_plan"],
   "code-runtime": ["./api", "CodeQueryResult", "workspace registry"],
   context: ["/supi-context", "context_report"],
   core: ["./api", "./settings", "./report"],
-  debug: ["/supi-debug", "debug"],
+  debug: ["/supi-debug", "debug", "cache_forensics"],
   extras: ["/supi-stash", "/clone-session", "shortcuts"],
   insights: ["/supi-insights", "shareable HTML"],
   lsp: ["./api", "server lifecycle", "diagnostics"],
@@ -56,18 +52,6 @@ const SOCIAL_TAGLINES = {
     "creation through bounded teardown.",
   ],
   "ask-user": ["Blocking choice & text forms let the agent", "ask you instead of guessing."],
-  "bash-timeout": [
-    "Injects a default timeout into bash calls",
-    "so hung commands can't stall a session.",
-  ],
-  cache: [
-    "Monitors prompt-cache hit rates and explains",
-    "regressions: what dropped, when, and why.",
-  ],
-  "claude-md": [
-    "Skills that audit and revise CLAUDE.md and",
-    "AGENTS.md with durable session learnings.",
-  ],
   "code-intelligence": [
     "Model-callable LSP + AST tools: orient,",
     "inspect, graph, diagnose, and refactor.",

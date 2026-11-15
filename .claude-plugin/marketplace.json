@@ -20,7 +20,7 @@
       "name": "supi-skills",
       "source": "./",
       "description": "SuPi-owned public agent skills.",
-      "skills": ["./skills/commit"]
+      "skills": ["./skills/claude-md-improver", "./skills/claude-md-revision", "./skills/commit"]
     }
   ]
 }

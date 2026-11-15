@@ -30,11 +30,11 @@ Run every check. Each ends with a verdict: **ok**, **finding**, or **not checked
 
 Run `pi list`.
 
-- **Obsolete direct declarations**: `@mrclrchtr/supi-agents`, `@mrclrchtr/supi-rtk`, `@mrclrchtr/supi-lsp`, `@mrclrchtr/supi-tree-sitter`. LSP and Tree-sitter are still bundled by Code Intelligence; only their direct declarations are obsolete. Propose `pi remove npm:<name>` (add `--local` for project scope).
+- **Obsolete direct declarations**: `@mrclrchtr/supi-agents`, `@mrclrchtr/supi-rtk`, `@mrclrchtr/supi-lsp`, `@mrclrchtr/supi-tree-sitter`, `@mrclrchtr/supi-bash-timeout` (now in `supi-extras`), `@mrclrchtr/supi-cache` (now in `supi-debug`), `@mrclrchtr/supi-claude-md` (skills now via `npx skills add mrclrchtr/supi`). LSP and Tree-sitter are still bundled by Code Intelligence; only their direct declarations are obsolete. Propose `pi remove npm:<name>` (add `--local` for project scope).
 - **Legacy root package** `@mrclrchtr/supi`, or Git/local SuPi checkouts outside SuPi development: conflicts that block the installer for that scope. Propose removal with `pi remove <source>`.
 - **The same package in both scopes**: the project entry replaces the personal one (with `autoload: false` it filters the personal package instead). Report it; propose keeping one only if the user did not intend the override.
 - **Missing recommended packages**: propose `npx @mrclrchtr/supi-installer@latest` and pressing `r` for the Recommended column. The installer is interactive; the user runs it.
-- **Suggestions from project signals**, only with evidence, for example `supi-review` for a Git repository with active branches, or `supi-claude-md` when `CLAUDE.md` or `AGENTS.md` exists.
+- **Suggestions from project signals**, only with evidence, for example `supi-review` for a Git repository with active branches, or the `claude-md-improver`/`claude-md-revision` skills (`npx skills add mrclrchtr/supi --skill claude-md-improver claude-md-revision`) when `CLAUDE.md` or `AGENTS.md` exists.
 
 ### 2. Language servers
 
@@ -86,8 +86,8 @@ Automatic LSP work already skips `.git`, `.cache`, `.pi`, `.pnpm`, `node_modules
 | --- | --- |
 | `agent` | `supi-agent` |
 | `ask-user` | `supi-ask-user` |
-| `bash-timeout` | `supi-bash-timeout` |
-| `cache` | `supi-cache` |
+| `bash-timeout` | `supi-extras` |
+| `cache` | `supi-debug` |
 | `code-intelligence`, `lsp` | `supi-code-intelligence` |
 | `consulting` | `supi-consulting` |
 | `context` | `supi-context` |

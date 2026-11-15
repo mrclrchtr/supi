@@ -107,9 +107,6 @@ Use the `@mrclrchtr/` namespace for each package below.
 | --- | --- |
 | `supi-agent` | No |
 | `supi-ask-user` | Yes |
-| `supi-bash-timeout` | No |
-| `supi-cache` | No |
-| `supi-claude-md` | No |
 | `supi-code-intelligence` | Yes |
 | `supi-consulting` | No |
 | `supi-context` | Yes |
@@ -155,7 +152,7 @@ Infrastructure Packages are not new-install choices.
 - For blocked scopes, show the configured source and manual PI removal instructions. Keep an otherwise eligible scope available.
 - Do not migrate sources automatically or delete local checkouts.
 - Treat `@mrclrchtr/supi` as a legacy root conflict, not a new-install or removal-only preset member.
-- Known obsolete standalone declarations include `@mrclrchtr/supi-agents`, `@mrclrchtr/supi-rtk`, `@mrclrchtr/supi-lsp`, and `@mrclrchtr/supi-tree-sitter`.
+- Known obsolete standalone declarations include `@mrclrchtr/supi-agents`, `@mrclrchtr/supi-rtk`, `@mrclrchtr/supi-lsp`, `@mrclrchtr/supi-tree-sitter`, `@mrclrchtr/supi-bash-timeout` (merged into `supi-extras`), `@mrclrchtr/supi-cache` (merged into `supi-debug`), and `@mrclrchtr/supi-claude-md` (skills moved to the skills.sh catalog).
 - LSP and Tree-sitter remain current Infrastructure Packages. Only their obsolete direct installation declarations are cleanup choices; do not target bundled dependencies.
 - A removal-only cell is editable only where the declaration existed at startup. Users can clear it and undo that draft removal; they cannot add it to another scope.
 

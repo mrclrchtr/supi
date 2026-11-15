@@ -8,7 +8,7 @@
 /**
  * Wrap content in an `<extension-context>` XML tag.
  *
- * @param source - Extension identifier (e.g. "supi-claude-md", "supi-lsp")
+ * @param source - Extension identifier (e.g. "supi-lsp")
  * @param content - The text content to wrap
  * @param attrs - Optional additional attributes (rendered as key="value")
  * @returns Formatted XML string

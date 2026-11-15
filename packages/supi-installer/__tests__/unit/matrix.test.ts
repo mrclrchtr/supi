@@ -56,7 +56,7 @@ describe("Installation Matrix", () => {
       "supi-agent",
     ]);
     applyPreset(matrix, "project", "all");
-    expect(matrix.rows.filter((row) => row.selected.project)).toHaveLength(17);
+    expect(matrix.rows.filter((row) => row.selected.project)).toHaveLength(14);
   });
 
   it("allows removal-only undo but never an obsolete addition", () => {
@@ -86,7 +86,7 @@ describe("Installation Matrix", () => {
     applyPreset(matrix, "global", "all");
     expect(getPlan(matrix)).toEqual([]);
     applyPreset(matrix, "project", "all");
-    expect(getPlan(matrix)).toHaveLength(17);
+    expect(getPlan(matrix)).toHaveLength(14);
   });
 
   it("recognizes local package manifests without executing code", () => {
