@@ -20,4 +20,4 @@ Agent Runs will retain their private PI runtime and borrowed Provider Authority.
 - PI 0.85.1 OpenCode compatibility will be implemented once for direct completions. It will match PI's provider-ID or exact-host rule and preserve explicit header overrides. An explicit shared session header can remove the default separation.
 - Features will not copy resolved credentials into request options. No dependency from `supi-core` to `supi-agent-runtime` will be added.
 
-See the [issue #402 plan](../ops/issue-402-model-requests.md) for scope and verification criteria.
+See [Make model calls from an extension](../pi/model-call.md) for the current request, identity, and OpenCode header rules. The original plan and verification record are archived on [#402](https://github.com/mrclrchtr/supi/issues/402).

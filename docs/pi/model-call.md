@@ -95,4 +95,4 @@ Request handling was verified against PI and pi-ai 0.85.1. Registry simple compl
 - PI `dist/core/sdk.js` and `provider-attribution.js`: session ID and OpenCode headers.
 - pi-ai `README.md`: auth ownership, request header ordering, and compat migration.
 
-Related: [request decision](../adr/0023-pi-owned-model-requests.md), [issue #402 plan](../ops/issue-402-model-requests.md), and [context architecture](context-architecture.md).
+Related: [request decision](../adr/0023-pi-owned-model-requests.md), [issue #402](https://github.com/mrclrchtr/supi/issues/402), and [context architecture](context-architecture.md).

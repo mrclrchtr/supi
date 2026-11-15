@@ -52,12 +52,8 @@ Reference material for agents that develop PI extensions in this repo. Docs here
 
 - [Session Capability Profiles](ops/session-capability-profiles-design.md) — approved profile configuration, session-copy rules, selector behavior, and implementation checks.
 - [Web Search design investigation](ops/web-search-design.md) — approved bx search design, automated verification, and live tool checks.
-- [Issue 402 model requests](ops/issue-402-model-requests.md) — approved design and verification record for OpenCode routing, effective endpoints, cache separation, and suggestion warnings.
-- [Issue 407 follow-ups](ops/issue-407-follow-ups.md) — approved follow-up specification and verification record.
-- [Issue 407: TypeScript diagnostics and request-based confirmation](ops/issue-407-push-diagnostics.md) — historical measurements and current implementation status for request-confirmed diagnostics.
 - [Code tool usage report](ops/code-tool-usage.md) — session-log report of `code_*` result status, size, and the agent's next call, with interpretation limits.
 - [Code Orientation directory navigation](ops/code-orientation-directory-navigation.md) — inline entry points and direct files: evidence, change, benchmark results, and expected session effects to re-evaluate.
-- [Workspace-symbol warm-up and inferred projects](ops/workspace-symbol-warm-target-inferred-project.md) — root cause, fix, and verification for confident empty semantic results before a project file is open.
 
 ## Package design references
 
