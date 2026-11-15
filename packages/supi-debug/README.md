@@ -30,6 +30,7 @@ After install, this package wires the shared debug registry into three user-faci
 
 - `/supi-debug` — show recent debug events in a readable TUI report
 - `debug` — let the model query recent debug events during troubleshooting
+- `tui_render` (opt-in) — let the model see how any tool result renders in the TUI (see [below](#see-how-tool-results-render-tui_render))
 - `/supi-settings` integration — configure whether events are captured and how much data is exposed
 - `/supi-cache-history`, `/supi-cache-forensics`, and `cache_forensics` — prompt-cache history and cross-session regression forensics (see [below](#prompt-cache-history-and-forensics))
 
@@ -166,6 +167,7 @@ Available settings:
 - `agentAccess` — `off`, `sanitized`, or `raw`
 - `maxEvents` — maximum retained events in memory
 - `persistLevel` — minimum level (`debug`, `info`, `warning`, `error`) written to the session file; default `info`. Set `debug` to persist high-volume timing telemetry, which can add hundreds of MB across sessions. Live `/supi-debug` and `debug` queries still see all retained levels
+- `tuiRenderTool` — activate the `tui_render` tool; off by default, so it adds no prompt cost until enabled
 - `agentRunRetrospectivesEnabled` — opt in to Agent Run retrospectives; off by default and eligible only while Debug capture and its session persistence sink are active and `persistLevel` admits `info` events. Retrospective prose is stored in the sanitized event data using the existing Debug session-entry path.
 
 With retrospective collection enabled, completed Delegation and Reviewer Runs publish their task results before performing one tool-free assessment. Find the reports using category `agent-run-retrospective` and source `supi-agent` or `supi-review`. Reports include their own Usage, separate from task Usage, plus `runKey`, `batchId`, `taskId`, and a readable `label`. Delegation reports also include `conversationId` to match saved conversations and follow-ups. Collection is best effort and stops on cancellation or session shutdown. Assessment prose can still contain sensitive task details despite best-effort secret redaction; it is self-reported feedback, not verified savings.
@@ -181,10 +183,30 @@ Defaults come from the shared debug registry:
     "enabled": false,
     "agentAccess": "sanitized",
     "maxEvents": 100,
-    "agentRunRetrospectivesEnabled": false
+    "agentRunRetrospectivesEnabled": false,
+    "tuiRenderTool": false
   }
 }
 ```
+
+## See how tool results render (`tui_render`)
+
+`tui_render` lets an agent check its own TUI changes instead of asking for screenshots. It renders one stored tool result from the current session branch through the same renderers, theme, and frame the transcript uses. It works for any tool: built-in, SuPi, other extensions, and MCP. It never runs the rendered tool.
+
+Enable **TUI Render Tool** in the **Debug** section of `/supi-settings` (`tuiRenderTool`). Then, for example:
+
+```json
+{ "target": { "tool": { "name": "code_health" } }, "expanded": true, "format": "marked" }
+```
+
+- `target` — exactly one of `tool: { name, index? }` (`index` 0 is the latest result of that tool) or `toolCallId`
+- `expanded` — render the expanded view; default collapsed
+- `width` — terminal columns (20–400); default the current terminal width, clamped to that range
+- `format` — `plain` (visible text, default), `ansi` (raw terminal colors), or `marked` (theme tokens such as `[success]3[/success]`, in the `createMarkedTheme()` format of `@mrclrchtr/supi-test-utils`)
+
+`marked` wraps lines exactly where the TUI does. It marks styling that goes through the renderer's theme argument. Text Pi styles with its global theme, such as Markdown, the frame background, and Pi's generic fallback, stays unmarked; the result notes this. The result also reports whether each slot used the tool's own renderer or Pi's fallback, and any renderer exception that made Pi fall back.
+
+Renderers come from Pi's own resolution (`pi.registerToolRenderer`), recorded when the TUI draws a tool. After a renderer change, run `/reload`: the next render uses the reloaded code. A tool the TUI has not drawn since this extension loaded, and resolvers of extensions loaded before SuPi Debug, are not seen. `tui_render` needs the interactive TUI and fails in print, JSON, and RPC modes.
 
 ## Prompt-cache history and forensics
 

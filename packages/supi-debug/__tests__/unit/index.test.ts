@@ -117,8 +117,33 @@ describe("supi-debug extension setup", () => {
     );
     expect(pi.tools.map((tool) => (tool as { name: string }).name)).toEqual([
       "debug",
+      "tui_render",
       "cache_forensics",
     ]);
+    expect(pi.toolRenderers).toHaveLength(1);
+  });
+
+  it("activates tui_render only while its setting is on", () => {
+    const pi = setup();
+    expect(pi.tools.find((tool) => (tool as { name: string }).name === "tui_render")).toMatchObject(
+      { defaultActive: false },
+    );
+    pi.setActiveTools(["read", "debug"]);
+
+    mockFns.loadSupiConfig.mockReturnValue({ ...ENABLED_CONFIG, tuiRenderTool: true });
+    pi.handlers.get("session_start")?.[0]?.({}, { cwd: "/repo" });
+    expect(pi.getActiveTools()).toEqual(["read", "debug", "tui_render"]);
+
+    mockFns.loadSupiConfig.mockReturnValue({ ...ENABLED_CONFIG, tuiRenderTool: false });
+    mockFns.defineConfigSettings.mock.calls[0][0].afterPersist?.({
+      scope: "project",
+      cwd: "/repo",
+      fieldKey: "tuiRenderTool",
+      action: "delete",
+      effectiveValue: false,
+      effectiveSource: "default",
+    });
+    expect(pi.getActiveTools()).toEqual(["read", "debug"]);
   });
 
   it("uses a string enum schema for debug levels", () => {
@@ -322,7 +347,7 @@ describe("supi-debug settings", () => {
     const options = mockFns.defineConfigSettings.mock.calls[0][0];
 
     // Verify fields are declared declaratively
-    expect(options.fields).toHaveLength(5);
+    expect(options.fields).toHaveLength(6);
     expect(options.fields[0]).toMatchObject({ kind: "boolean", key: "enabled" });
     expect(options.fields[1]).toMatchObject({
       kind: "enum",
@@ -340,6 +365,7 @@ describe("supi-debug settings", () => {
       // biome-ignore lint/security/noSecrets: Setting name, not a credential.
       key: "agentRunRetrospectivesEnabled",
     });
+    expect(options.fields[5]).toMatchObject({ kind: "boolean", key: "tuiRenderTool" });
 
     // Verify afterPersist triggers live sync
     mockFns.configureDebugRegistry.mockClear();

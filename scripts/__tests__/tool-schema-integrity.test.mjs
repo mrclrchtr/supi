@@ -25,6 +25,8 @@ async function collectTools() {
   add("supi-context", "context_report", m.contextReportSpec);
   m = await import(`${PACKAGES}/supi-debug/src/tool/debug/spec.ts`);
   add("supi-debug", "debug", m.debugSpec);
+  m = await import(`${PACKAGES}/supi-debug/src/tool/tui_render/spec.ts`);
+  add("supi-debug", "tui_render", m.tuiRenderSpec);
   m = await import(`${PACKAGES}/supi-agent/src/tool/agent_run/spec.ts`);
   // agent_run parameters depend on the runtime profile catalogue; the
   // factory with an unloaded catalogue is the canonical static shape.

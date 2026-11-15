@@ -24,6 +24,7 @@ import { registerDebugMessageRenderer } from "./renderer.ts";
 import { DEBUG_EVENT_ENTRY_TYPE } from "./session-events.ts";
 import { maybeLogLoadStatus } from "./status-log.ts";
 import { registerDebugTool } from "./tool/debug/register.ts";
+import { registerTuiRenderTool, syncTuiRenderTool } from "./tool/tui_render/register.ts";
 
 const baseDir = dirname(dirname(fileURLToPath(import.meta.url)));
 
@@ -72,9 +73,17 @@ function registerDebugSettings(pi: ExtensionAPI): void {
           description:
             "Allow completed Agent Runs to request a retrospective when Debug logging is active",
         },
+        {
+          kind: "boolean" as const,
+          key: "tuiRenderTool",
+          label: "TUI Render Tool",
+          description:
+            "Give the agent the tui_render tool to see how tool results render in the TUI",
+        },
       ],
       afterPersist: ({ cwd }) => {
         syncLiveDebugRegistry(cwd);
+        syncTuiRenderTool(pi, cwd);
       },
     }),
   );
@@ -132,6 +141,7 @@ export default function debugExtension(pi: ExtensionAPI) {
   pi.on("session_start", async (event, ctx) => {
     clearDebugEvents();
     applyDebugConfig(ctx.cwd);
+    syncTuiRenderTool(pi, ctx.cwd);
     await recordRuntimeProvenance(ctx.cwd, event.reason);
   });
 
@@ -147,5 +157,6 @@ export default function debugExtension(pi: ExtensionAPI) {
 
   registerDebugCommand(pi, applyDebugConfig, normalizeMaxEvents);
   registerDebugTool(pi);
+  registerTuiRenderTool(pi);
   registerCacheSurfaces(pi);
 }

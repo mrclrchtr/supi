@@ -180,7 +180,7 @@ Pi passes both fields through `pi.getAllTools()` and does not enforce them ([Too
 | `code` | `supi-code-intelligence` | `code_*` |
 | `web` | `supi-web` | `web_*` |
 | `review` | `supi-review` | `review_output`, `review_audit` |
-| `debug` | `supi-debug` | `debug` |
+| `debug` | `supi-debug` | `debug`, `tui_render` |
 | `context` | `supi-context` | `context_report` |
 | `cache` | `supi-debug` | `cache_forensics` |
 
@@ -200,6 +200,7 @@ Audit the effects, not the name:
 | `code_refactor_apply` | – | ✓ | ✓ | – | Overwrites workspace files. Apply consumes the plan, so a repeated `planId` is rejected without further effect. |
 | `web_fetch_md`, `web_search`, `web_docs_search`, `web_docs_fetch` | ✓ | – | ✓ | ✓ | Public web, Firecrawl, bx search, and Context7. Large results spill to temp files. |
 | `debug`, `cache_forensics`, `context_report` | ✓ | – | ✓ | – | Read live state or past session logs. Large results spill to temp files. |
+| `tui_render` | ✓ | – | ✓ | – | Renders a stored tool result through its TUI renderers in memory. It never runs the rendered tool. |
 | `review_output` | ✓ | – | ✓ | – | Reads an in-memory artifact. |
 | `review_audit` | ✓ | – | ✓ | – | Reads replays. A read prunes only expired SuPi-owned replay files. |
 | `review_run` | – | ✓ | – | ✓ | Starts model-backed Reviewer Sessions, optionally with Web tools, and may store replays. Reviewers get `bash`; inspection-only is a protocol, not access control. |

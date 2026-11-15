@@ -7,6 +7,7 @@
 - `gather-retrospectives` adds `--read <evidence> --export <file.jsonl>`, which writes every selected report in full, one per line, so large snapshots can be analyzed in a script instead of paged through 16 KB displays.
 - The skill adds a theme-finding step: extract headings, define themes, count them with the Jev classifier, and recheck low-confidence hits.
 - Collector output adds `scope.recordSkipReason`, which explains why no last-gather marker was recorded. `--since` without an earlier marker reports `since-without-previous-gather`.
+- New opt-in `tui_render` tool: it renders a tool result from the current session branch as the TUI shows it, so an agent can check rendering changes itself. It works for any tool, collapsed or expanded, as plain text, raw ANSI, or theme-token markers such as `[success]3[/success]`. Enable **TUI Render Tool** (`tuiRenderTool`) in the **Debug** settings ([#604](https://github.com/mrclrchtr/supi/issues/604)).
 - Truncated `cache_forensics` reports are now written to one private per-user directory, `$TMPDIR/supi-<uid>/`, instead of a new `supi-*` directory per call. Identical content reuses one file. SuPi never deletes these files; the OS temp purge does ([#597](https://github.com/mrclrchtr/supi/issues/597)).
 
 ## [12.0.0]

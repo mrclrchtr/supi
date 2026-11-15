@@ -16,7 +16,7 @@ Keep `src/analysis/` independent of Pi. It owns evidence collection and refactor
 
 `WorkspaceCodeIntelligenceSession` owns target resolution, readiness, provider selection, workflow coordination, target/plan state, cancellation/progress, and overview/instruction deduplication. Workflows return immutable typed outcomes.
 
-`src/tool/result/assembly.ts` is the sole shared result-policy module. Graph evidence is bounded there once so Markdown and structured details consume the same list metadata. Markdown and TUI consume assembled facts independently. Do not collect evidence in renderers or parse markdown in TUI code.
+`src/tool/result/assembly.ts` is the sole shared result-policy module. Graph evidence is bounded there once so Markdown and structured details consume the same list metadata. Markdown and TUI consume assembled facts independently. Do not collect evidence in renderers or parse markdown in TUI code. After a renderer change, `/reload` and verify collapsed and expanded output with `tui_render` (`format: "marked"` for tone; enable `debug.tuiRenderTool`).
 
 Whole-workflow capability unavailable → throw from `execute()` so PI marks a real tool failure. Invalid usage → return error text so the model can self-correct. Zero matches are successful results.
 

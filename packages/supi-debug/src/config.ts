@@ -18,9 +18,11 @@ export interface DebugConfig extends Record<string, unknown> {
   maxEvents: number;
   agentRunRetrospectivesEnabled: boolean;
   persistLevel: DebugLevel;
+  /** Activate the opt-in `tui_render` tool. Not part of the shared debug registry config. */
+  tuiRenderTool: boolean;
 }
 
-export const DEBUG_DEFAULTS: DebugConfig = { ...DEBUG_REGISTRY_DEFAULTS };
+export const DEBUG_DEFAULTS: DebugConfig = { ...DEBUG_REGISTRY_DEFAULTS, tuiRenderTool: false };
 
 function normalizeAgentAccess(value: string): DebugAgentAccess {
   return value === "off" || value === "raw" ? value : "sanitized";
@@ -78,12 +80,14 @@ export function loadDebugConfig(cwd: string): DebugConfig {
       DEBUG_DEFAULTS.agentRunRetrospectivesEnabled,
     ),
     persistLevel: normalizePersistLevel(config.persistLevel),
+    tuiRenderTool: normalizeBoolean(config.tuiRenderTool, DEBUG_DEFAULTS.tuiRenderTool),
   };
 }
 
 export function applyDebugConfig(cwd: string): DebugConfig {
   const config = loadDebugConfig(cwd);
-  configureDebugRegistry(config);
+  const { tuiRenderTool: _tuiRenderTool, ...registryConfig } = config;
+  configureDebugRegistry(registryConfig);
   return config;
 }
 

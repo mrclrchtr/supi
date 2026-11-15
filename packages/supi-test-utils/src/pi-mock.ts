@@ -11,6 +11,7 @@ export function createPiMock(options: PiMockOptions = {}): PiMock {
   const tools: Array<unknown> = [];
   const renderers = new Map<string, unknown>();
   const entryRenderers = new Map<string, unknown>();
+  const toolRenderers: Array<unknown> = [];
   const entries: Array<{ type: string; data: unknown }> = [];
   const messages: Array<Record<string, unknown>> = [];
   const shortcuts = new Map<string, Array<(ctx: unknown) => unknown>>();
@@ -39,6 +40,10 @@ export function createPiMock(options: PiMockOptions = {}): PiMock {
 
     registerEntryRenderer: vi.fn((type: string, renderer: unknown) => {
       entryRenderers.set(type, renderer);
+    }),
+
+    registerToolRenderer: vi.fn((resolver: unknown) => {
+      toolRenderers.push(resolver);
     }),
 
     registerShortcut: vi.fn((key: string, opts: { handler: (ctx: unknown) => unknown }) => {
@@ -100,6 +105,7 @@ export function createPiMock(options: PiMockOptions = {}): PiMock {
     tools,
     renderers,
     entryRenderers,
+    toolRenderers,
     entries,
     messages,
     shortcuts,
@@ -163,6 +169,7 @@ export interface PiMock {
   registerTool: (tool: unknown) => void;
   registerMessageRenderer: (type: string, renderer: unknown) => void;
   registerEntryRenderer: (type: string, renderer: unknown) => void;
+  registerToolRenderer: (resolver: unknown) => void;
   registerShortcut: (key: string, opts: { handler: (ctx: unknown) => unknown }) => void;
   appendEntry: (type: string, data: unknown) => void;
   sendMessage: (message: Record<string, unknown>) => void;
@@ -184,6 +191,8 @@ export interface PiMock {
   tools: Array<unknown>;
   renderers: Map<string, unknown>;
   entryRenderers: Map<string, unknown>;
+  /** Resolvers passed to `registerToolRenderer()`, in registration order. */
+  toolRenderers: Array<unknown>;
   entries: Array<{ type: string; data: unknown }>;
   messages: Array<Record<string, unknown>>;
   shortcuts: Map<string, Array<(ctx: unknown) => unknown>>;

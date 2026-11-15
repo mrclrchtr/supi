@@ -15,6 +15,12 @@ Producers publish events through `supi-core`'s shared debug registry. This exten
 - When debug is disabled, `clearDebugEvents()` is called to flush the buffer. Re-enabling starts fresh.
 - `runtime-provenance` reads Git only when the package sits at `packages/<name>` of a checkout whose root `package.json` is `@mrclrchtr/supi-workspace`; otherwise a host repository's commit would be misattributed. Git failures omit fields, never fail `session_start`.
 
+## TUI render tool (`src/tool/tui_render/`)
+
+- Opt-in: registered with `defaultActive: false`; `syncTuiRenderTool()` activates it from `debug.tuiRenderTool` on `session_start` and after settings persist. `tuiRenderTool` is package config, not shared debug-registry config; `applyDebugConfig()` strips it before `configureDebugRegistry()`.
+- Renderers come from an observing `pi.registerToolRenderer` resolver that returns `next()` unchanged and replays the stored `next` on lookup. Never keep a renderer copy or a tool-name map; they go stale after `/reload` and miss built-in and MCP tools.
+- Capture goes through Pi's `ToolExecutionComponent` so framing and fallbacks match the transcript. `marked` emits zero-width OSC markers while rendering, so wrapping matches the TUI, and decodes them to `[token]` afterwards. Visible tokens would change line breaks.
+
 ## Cache history and forensics (`src/cache/`, `src/tool/cache_forensics/`)
 
 Merged from the former `supi-cache` package. PI owns live cache statistics, cache-miss notices, compaction notices, and provider recovery notices. Settings expose only forensics thresholds (`cache` section, registered as **Cache Forensics**). The `cache_forensics` tool is machine-only: it uses PI's transcript-rendering fallback, declares an output schema, and returns the same bounded public data as native `structuredContent` and direct-call JSON. List queries default to 50 findings, max 200.

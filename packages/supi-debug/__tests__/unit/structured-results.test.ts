@@ -28,6 +28,7 @@ const config: DebugConfig = {
   maxEvents: 100,
   agentRunRetrospectivesEnabled: false,
   persistLevel: "info",
+  tuiRenderTool: false,
 };
 const event = {
   source: "fixture",
