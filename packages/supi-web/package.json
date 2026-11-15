@@ -36,10 +36,10 @@
   "dependencies": {
     "@mrclrchtr/supi-core": "workspace:*",
     "@upstash/context7-sdk": "0.6.0",
-    "jsdom": "^31.0.0",
-    "@mozilla/readability": "^0.6.0",
-    "turndown": "^7.2.0",
-    "turndown-plugin-gfm": "^1.0.2"
+    "jsdom": "31.0.0",
+    "@mozilla/readability": "0.6.0",
+    "turndown": "7.2.5",
+    "turndown-plugin-gfm": "1.0.2"
   },
   "bundledDependencies": [
     "@mrclrchtr/supi-core"

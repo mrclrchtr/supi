@@ -21,8 +21,8 @@
     "node": ">=22.19.0"
   },
   "dependencies": {
-    "cross-spawn": "^7.0.6",
-    "string-width": "^8.3.0"
+    "cross-spawn": "7.0.6",
+    "string-width": "8.3.0"
   },
   "devDependencies": {
     "@types/cross-spawn": "6.0.6"

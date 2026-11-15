@@ -34,7 +34,7 @@
   ],
   "dependencies": {
     "@mrclrchtr/supi-core": "workspace:*",
-    "clipboardy": "^5.3.1"
+    "clipboardy": "5.3.2"
   },
   "bundledDependencies": [
     "@mrclrchtr/supi-core"

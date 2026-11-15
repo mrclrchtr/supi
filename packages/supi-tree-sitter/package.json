@@ -51,8 +51,8 @@
   "dependencies": {
     "@mrclrchtr/supi-code-runtime": "workspace:*",
     "@mrclrchtr/supi-core": "workspace:*",
-    "jiti": "^2.7.0",
-    "web-tree-sitter": "^0.27.0"
+    "jiti": "2.7.0",
+    "web-tree-sitter": "0.27.2"
   },
   "bundledDependencies": [
     "@mrclrchtr/supi-code-runtime",

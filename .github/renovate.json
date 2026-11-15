@@ -4,6 +4,7 @@
     "config:best-practices",
     ":automergeDigest",
     ":automergeMinor",
+    ":pinAllExceptPeerDependencies",
     ":semanticCommitTypeAll(fix)"
   ],
   "internalChecksFilter": "strict",

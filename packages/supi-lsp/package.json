@@ -34,12 +34,12 @@
   "dependencies": {
     "@mrclrchtr/supi-code-runtime": "workspace:*",
     "@mrclrchtr/supi-core": "workspace:*",
-    "ignore": "^7.0.5",
-    "semver": "^7.8.5",
+    "ignore": "7.0.14",
+    "semver": "7.8.6",
     "typescript": "6.0.3",
-    "vscode-jsonrpc": "^10.0.0",
-    "vscode-languageserver-protocol": "^3.18.5",
-    "vscode-languageserver-types": "^3.18.5"
+    "vscode-jsonrpc": "10.0.0",
+    "vscode-languageserver-protocol": "3.18.5",
+    "vscode-languageserver-types": "3.18.5"
   },
   "bundledDependencies": [
     "@mrclrchtr/supi-code-runtime",
