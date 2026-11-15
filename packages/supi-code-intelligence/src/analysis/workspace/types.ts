@@ -77,7 +77,8 @@ export type MetadataDocumentKind =
   | "cargo"
   | "go-mod"
   | "go-work"
-  | "maven-pom";
+  | "maven-pom"
+  | "cmake-lists";
 
 /** Metadata read outcome retained for provenance. */
 export interface MetadataDocument {
@@ -123,7 +124,8 @@ export type ProjectKind =
   | "python-project"
   | "rust-package"
   | "go-module"
-  | "maven-project";
+  | "maven-project"
+  | "cmake-project";
 
 /** How one configuration explicitly established project membership. */
 export interface ProjectMembership {

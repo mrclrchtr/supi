@@ -284,7 +284,7 @@ Do not update the README to present this design as delivered support before thes
 - Windows live qualification; do not deliberately break existing Windows behavior.
 - New workspace metadata readers.
 
-Workspace metadata readers are designed separately from this baseline: consent-gated Gradle observations ([#509](https://github.com/mrclrchtr/supi/issues/509)) and static Maven POM declarations ([#534](https://github.com/mrclrchtr/supi/issues/534)) are implemented; CMake remains a candidate. Generic workspace inventories remain available without those readers.
+Workspace metadata readers are designed separately from this baseline: consent-gated Gradle observations ([#509](https://github.com/mrclrchtr/supi/issues/509)), static Maven POM declarations ([#534](https://github.com/mrclrchtr/supi/issues/534)), and static CMake `project()` declarations ([#535](https://github.com/mrclrchtr/supi/issues/535)) are implemented. Generic workspace inventories remain available without those readers.
 
 ## Source references
 

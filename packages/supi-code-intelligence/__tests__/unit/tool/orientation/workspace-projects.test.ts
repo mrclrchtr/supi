@@ -59,6 +59,7 @@ function mixedProjects() {
   write(root, "service/pyproject.toml", ["[project]", 'name = "api"', ""].join("\n"));
   write(root, "crate/Cargo.toml", '[package]\nname = "crate"\nversion = "0.1.0"\n');
   write(root, "go/go.mod", "module example.com/go\n\ngo 1.22\n");
+  write(root, "native/CMakeLists.txt", "project(native LANGUAGES CXX)\n");
 }
 
 describe("compact workspace project evidence", () => {
@@ -69,19 +70,21 @@ describe("compact workspace project evidence", () => {
     expect(paragraphs(declarations)).toEqual([
       "rust-package; identity source: `Cargo.toml#package.name` relative to each listed project path.",
       "go-module; identity source: `go.mod#module` relative to each listed project path.",
+      "cmake-project; identity source: `CMakeLists.txt#project` relative to each listed project path.",
       "python-project; identity source: `pyproject.toml#project.name` relative to each listed project path.",
       "node-package; identity source: `package.json#name` relative to each listed project path.",
     ]);
     expect(rows(declarations)).toEqual([
       ["`crate`", "`crate`", "—"],
       ["`example.com/go`", "`go`", "—"],
+      ["`native`", "`native`", "—"],
       ["`api`", "`service`", "—"],
       // biome-ignore lint/security/noSecrets: Expected attributed fixture description, not a secret.
       ["`@test/app`", "`units/app`", "Application package (`units/app/package.json#description`)"],
       ["`@test/core`", "`units/core`", "—"],
     ]);
     expect(declarations.evidenceLists).toEqual([
-      expect.objectContaining({ totalCount: 5, shownCount: 5, omittedCount: 0 }),
+      expect.objectContaining({ totalCount: 6, shownCount: 6, omittedCount: 0 }),
     ]);
   });
 
@@ -121,13 +124,13 @@ describe("compact workspace project evidence", () => {
       selected.map((project) => [`\`${project.name}\``, `\`${project.directory}\``]),
     );
     expect(declarations.evidenceLists).toEqual([
-      expect.objectContaining({ totalCount: 5, shownCount: 3, omittedCount: 2 }),
+      expect.objectContaining({ totalCount: 6, shownCount: 3, omittedCount: 3 }),
     ]);
 
     const hidden = section(projectSections(input, 0, false), "workspace.projects");
     expect(paragraphs(hidden)).toEqual(["No entries shown."]);
     expect(hidden.evidenceLists).toEqual([
-      expect.objectContaining({ totalCount: 5, shownCount: 0, omittedCount: 5 }),
+      expect.objectContaining({ totalCount: 6, shownCount: 0, omittedCount: 6 }),
     ]);
   });
 

@@ -1,6 +1,7 @@
 /** Shared bounded workspace observation used by overview and Orientation surfaces. */
 
 import * as path from "node:path";
+import { readCMakeDocument } from "./cmake.ts";
 import { readGoDocument } from "./go.ts";
 import { collectInventory, DEFAULT_MAX_INVENTORY_ENTRIES } from "./inventory.ts";
 import { readMavenDocument } from "./maven.ts";
@@ -136,6 +137,8 @@ function readDocument(document: ParsedDocument): DocumentContribution {
       return readGoDocument(document);
     case "maven-pom":
       return readMavenDocument(document);
+    case "cmake-lists":
+      return readCMakeDocument(document);
   }
 }
 
