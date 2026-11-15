@@ -10,6 +10,7 @@ import {
   collectDiagnostics,
   diagnosticScope,
 } from "../../../../src/analysis/health/diagnostics.ts";
+import { classifyDiagnosticCoverage } from "../../../../src/diagnostics/coverage.ts";
 
 let cwd: string;
 
@@ -476,7 +477,7 @@ describe("code_health diagnostic observations", () => {
     });
   });
 
-  it("treats a known removed file as a complete terminal outcome", async () => {
+  it("reports removed-only evidence as partial so kind and coverage agree", async () => {
     const removedEvidence = {
       requested: 1,
       confirmed: 0,
@@ -494,12 +495,101 @@ describe("code_health diagnostic observations", () => {
       refreshEvidence: removedEvidence,
     });
 
-    expect(observation).toEqual({
-      kind: "completed",
+    expect(observation).toMatchObject({
+      kind: "partial",
       scope: { kind: "tracked-files", filter: null },
       entries: [],
       evidence: removedEvidence,
+      reason: expect.stringContaining("Removed since last tracked: `src/deleted.ts`"),
     });
+    if (observation.kind === "not-requested") throw new Error("expected a collected observation");
+    expect(classifyDiagnosticCoverage(observation)).toBe("incomplete");
+  });
+
+  it("adds removed refresh documents to a final report that already pruned them", async () => {
+    const reportEvidence = {
+      requested: 1,
+      confirmed: 1,
+      unconfirmed: 0,
+      failed: 0,
+      removed: 0,
+      documents: [{ file: "src/a.ts", status: "confirmed" as const }],
+    };
+    const refreshEvidence = {
+      requested: 3,
+      confirmed: 1,
+      unconfirmed: 0,
+      failed: 0,
+      removed: 2,
+      documents: [
+        { file: "src/a.ts", status: "confirmed" as const },
+        { file: "src/deleted.ts", status: "removed" as const },
+        { file: "other/deleted.ts", status: "removed" as const },
+      ],
+    };
+    const observation = await collectDiagnostics({
+      service: service({}),
+      included: ["diagnostics"],
+      scope: diagnosticScope(path.join(cwd, "src")),
+      cwd,
+      unavailableReason: "not ready",
+      refreshEvidence,
+      refreshReport: {
+        summary: { entries: [], current: true, evidence: reportEvidence },
+        outstanding: { entries: [], current: true, evidence: reportEvidence },
+      },
+    });
+
+    // The out-of-scope removal is filtered; the in-scope one blocks a clean claim.
+    expect(observation).toMatchObject({
+      kind: "partial",
+      evidence: {
+        requested: 2,
+        confirmed: 1,
+        removed: 1,
+        documents: [
+          { file: "src/a.ts", status: "confirmed" },
+          { file: "src/deleted.ts", status: "removed" },
+        ],
+      },
+      reason: expect.stringContaining("Removed since last tracked: `src/deleted.ts`"),
+    });
+    if (observation.kind === "not-requested") throw new Error("expected a collected observation");
+    expect(classifyDiagnosticCoverage(observation)).toBe("incomplete");
+  });
+
+  it("never pairs a completed observation with incomplete coverage", async () => {
+    const statuses = ["confirmed", "unconfirmed", "failed", "removed"] as const;
+    for (const second of statuses) {
+      const documents = [
+        { file: "src/a.ts", status: "confirmed" as const },
+        { file: "src/b.ts", status: second },
+      ];
+      const evidence = {
+        requested: 2,
+        confirmed: 0,
+        unconfirmed: 0,
+        failed: 0,
+        removed: 0,
+        documents,
+      };
+      for (const document of documents) evidence[document.status]++;
+      const observation = await collectDiagnostics({
+        service: service({}),
+        included: ["diagnostics"],
+        scope: diagnosticScope(null),
+        cwd,
+        unavailableReason: "not ready",
+        refreshEvidence: evidence,
+      });
+      if (observation.kind === "not-requested") throw new Error("expected a collected observation");
+      const coverage = classifyDiagnosticCoverage(observation);
+      expect({ second, kind: observation.kind, coverage }).toEqual({
+        second,
+        kind: second === "confirmed" ? "completed" : "partial",
+        coverage: second === "confirmed" ? "confirmed" : "incomplete",
+      });
+    }
   });
 
   it("shows tentative push errors as partial health evidence", async () => {

@@ -11,6 +11,7 @@ import type {
   WorkspaceDiagnosticReport,
   WorkspaceLspRuntime,
 } from "@mrclrchtr/supi-lsp/api";
+import { allRequestedFilesConfirmed } from "../../diagnostics/coverage.ts";
 import { mergeDiagnosticEvidence } from "../../diagnostics/evidence.ts";
 import type {
   HealthDiagnosticEntry,
@@ -107,7 +108,7 @@ function collectTrackedFileDiagnostics(
       ? collectWorkspaceDiagnosticsDetailed(service, scope.filter, cwd, refreshReport)
       : collectWorkspaceDiagnostics(service, scope.filter, cwd, refreshReport);
     const sourceEvidence = refreshReport
-      ? snapshot.evidence
+      ? withRefreshRemovals(snapshot.evidence, refreshEvidence, cwd)
       : mergeEvidence(refreshEvidence, snapshot.evidence, cwd);
     const scopedEvidence = selectTrackedFileEvidence(sourceEvidence, scope.filter, cwd);
     const evidence = ensureEvidenceCoversEntries(scopedEvidence, snapshot.entries, cwd);
@@ -250,6 +251,31 @@ function mergeEvidence(
     : snapshotEvidence;
 }
 
+/**
+ * Carry removed documents from refresh evidence into a coherent refresh report.
+ *
+ * The report is captured after `pruneMissingFiles()`, so files deleted before the refresh are
+ * absent from it; only the refresh evidence records them. Removal is terminal, so adding those
+ * documents cannot mix report generations. Files the report still tracks keep their report status.
+ */
+function withRefreshRemovals(
+  reportEvidence: DiagnosticEvidenceSummary,
+  refreshEvidence: DiagnosticEvidenceSummary | undefined,
+  cwd: string,
+): DiagnosticEvidenceSummary {
+  const removed = refreshEvidence?.documents.filter((document) => document.status === "removed");
+  if (!removed || removed.length === 0) return reportEvidence;
+  const reported = new Set(reportEvidence.documents.map((document) => resolve(cwd, document.file)));
+  const added = removed.filter((document) => !reported.has(resolve(cwd, document.file)));
+  if (added.length === 0) return reportEvidence;
+  return {
+    ...reportEvidence,
+    requested: reportEvidence.requested + added.length,
+    removed: reportEvidence.removed + added.length,
+    documents: [...reportEvidence.documents, ...added],
+  };
+}
+
 function selectTrackedFileEvidence(
   evidence: DiagnosticEvidenceSummary,
   scopeFilter: string | null,
@@ -302,12 +328,10 @@ function evidenceIsComplete(
 ): boolean {
   if (!snapshotCurrent && evidence.requested === 0) return false;
   if (evidence.requested === 0) return !hasDiagnosticEntries;
-  return (
-    evidence.confirmed + evidence.removed === evidence.requested &&
-    evidence.unconfirmed === 0 &&
-    evidence.failed === 0
-  );
+  return allRequestedFilesConfirmed(evidence);
 }
+
+const REMOVED_FILE_NAME_LIMIT = 3;
 
 function diagnosticEvidenceReason(evidence: DiagnosticEvidenceSummary): string {
   if (evidence.requested === 0) {
@@ -317,7 +341,20 @@ function diagnosticEvidenceReason(evidence: DiagnosticEvidenceSummary): string {
   if (evidence.unconfirmed > 0) {
     reason += " Unconfirmed documents have no request-based confirmation.";
   }
+  if (evidence.removed > 0) {
+    reason += ` Removed since last tracked: ${removedFileList(evidence)}. Files that imported them may not be re-checked yet; run code_health again with refresh: true to confirm the remaining files.`;
+  }
   return reason;
+}
+
+function removedFileList(evidence: DiagnosticEvidenceSummary): string {
+  const files = evidence.documents
+    .filter((document) => document.status === "removed")
+    .map((document) => `\`${document.file}\``);
+  if (files.length === 0) return `${evidence.removed} file${evidence.removed === 1 ? "" : "s"}`;
+  const shown = files.slice(0, REMOVED_FILE_NAME_LIMIT).join(", ");
+  const more = files.length - REMOVED_FILE_NAME_LIMIT;
+  return more > 0 ? `${shown} (+${more} more)` : shown;
 }
 
 export function isDirectory(filePath: string): boolean {

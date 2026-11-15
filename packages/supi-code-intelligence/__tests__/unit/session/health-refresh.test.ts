@@ -521,21 +521,38 @@ describe("code_health refresh evidence", () => {
     ).rejects.toThrow("cancelled mid-refresh");
   });
 
-  it("keeps removed evidence from maintenance after recovery prunes the file", async () => {
+  it("keeps removed evidence from maintenance after the final report prunes the file", async () => {
+    // Production order: maintenance refresh records the deletion, then recovery
+    // captures its final report after pruneMissingFiles(), without the file.
     const removedEvidence = {
-      requested: 1,
-      confirmed: 0,
+      requested: 2,
+      confirmed: 1,
       unconfirmed: 0,
       failed: 0,
       removed: 1,
-      documents: [{ file: "src/deleted.ts", status: "removed" as const }],
+      documents: [
+        { file: "src/a.ts", status: "confirmed" as const },
+        { file: "src/deleted.ts", status: "removed" as const },
+      ],
+    };
+    const prunedEvidence = {
+      requested: 1,
+      confirmed: 1,
+      unconfirmed: 0,
+      failed: 0,
+      removed: 0,
+      documents: [{ file: "src/a.ts", status: "confirmed" as const }],
     };
     const runtime = readyRuntime({
       refreshOpenDiagnostics: async () => removedEvidence,
       recoverDiagnostics: async () => ({
-        attemptedClients: 0,
+        attemptedClients: 1,
         restartedClients: 0,
         diagnosticEvidence: emptyEvidence(),
+        diagnosticReport: {
+          summary: { entries: [], current: true, evidence: prunedEvidence },
+          outstanding: { entries: [], current: true, evidence: prunedEvidence },
+        },
         staleAssessment: { suspected: false, matchedFiles: [], warning: null },
       }),
     });
@@ -550,8 +567,9 @@ describe("code_health refresh evidence", () => {
       data: {
         refresh: { kind: "completed", diagnosticEvidence: removedEvidence },
         diagnostics: {
-          kind: "completed",
+          kind: "partial",
           evidence: removedEvidence,
+          reason: expect.stringContaining("Removed since last tracked: `src/deleted.ts`"),
         },
       },
     });
