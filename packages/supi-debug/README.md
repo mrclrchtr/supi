@@ -50,7 +50,7 @@ The collector excludes older interactive `/supi-tooling-retro` reports. It does 
 ## Event behavior
 
 - events are session-local
-- sanitized events are also persisted in the session JSONL for later inspection
+- sanitized events at or above `persistLevel` (default `info`) are also persisted in the session JSONL for later inspection; lower-level events, such as per-file Tree-sitter and per-request LSP timings, stay in the live retained buffer only
 - the event buffer is cleared on `session_start`
 - if debug capture is disabled, no events are retained
 - agent-facing access is blocked, sanitized, or raw depending on settings
@@ -165,7 +165,8 @@ Available settings:
 - `enabled` — turn session-local event capture on or off
 - `agentAccess` — `off`, `sanitized`, or `raw`
 - `maxEvents` — maximum retained events in memory
-- `agentRunRetrospectivesEnabled` — opt in to Agent Run retrospectives; off by default and eligible only while Debug capture and its session persistence sink are active. Retrospective prose is stored in the sanitized event data using the existing Debug session-entry path.
+- `persistLevel` — minimum level (`debug`, `info`, `warning`, `error`) written to the session file; default `info`. Set `debug` to persist high-volume timing telemetry, which can add hundreds of MB across sessions. Live `/supi-debug` and `debug` queries still see all retained levels
+- `agentRunRetrospectivesEnabled` — opt in to Agent Run retrospectives; off by default and eligible only while Debug capture and its session persistence sink are active and `persistLevel` admits `info` events. Retrospective prose is stored in the sanitized event data using the existing Debug session-entry path.
 
 With retrospective collection enabled, completed Delegation and Reviewer Runs publish their task results before performing one tool-free assessment. Find the reports using category `agent-run-retrospective` and source `supi-agent` or `supi-review`. Reports include their own Usage, separate from task Usage, plus `runKey`, `batchId`, `taskId`, and a readable `label`. Delegation reports also include `conversationId` to match saved conversations and follow-ups. Collection is best effort and stops on cancellation or session shutdown. Assessment prose can still contain sensitive task details despite best-effort secret redaction; it is self-reported feedback, not verified savings.
 

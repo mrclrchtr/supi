@@ -495,7 +495,7 @@ export class StructuralWorkerClient {
       {
         operationId: request.control?.operationId,
         source: "tree-sitter",
-        level: "debug",
+        level: outcome === "failed" ? "warning" : "info",
         category: "structural.worker.restart.timing",
         message: `Structural Worker restart ${outcome}`,
         data: { outcome, cacheReset: true },

@@ -6,6 +6,8 @@ import {
   configureDebugRegistry,
   DEBUG_REGISTRY_DEFAULTS,
   type DebugAgentAccess,
+  type DebugLevel,
+  isDebugLevel,
 } from "@mrclrchtr/supi-core/debug";
 
 export const DEBUG_SECTION = "debug";
@@ -15,6 +17,7 @@ export interface DebugConfig extends Record<string, unknown> {
   agentAccess: DebugAgentAccess;
   maxEvents: number;
   agentRunRetrospectivesEnabled: boolean;
+  persistLevel: DebugLevel;
 }
 
 export const DEBUG_DEFAULTS: DebugConfig = { ...DEBUG_REGISTRY_DEFAULTS };
@@ -26,6 +29,10 @@ function normalizeAgentAccess(value: string): DebugAgentAccess {
 export function normalizeMaxEvents(value: string | number): number {
   const parsed = typeof value === "number" ? value : Number.parseInt(value, 10);
   return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : DEBUG_DEFAULTS.maxEvents;
+}
+
+function normalizePersistLevel(value: unknown): DebugLevel {
+  return isDebugLevel(value) ? value : DEBUG_DEFAULTS.persistLevel;
 }
 
 function normalizeBoolean(value: unknown, fallback: boolean): boolean {
@@ -70,6 +77,7 @@ export function loadDebugConfig(cwd: string): DebugConfig {
       config.agentRunRetrospectivesEnabled,
       DEBUG_DEFAULTS.agentRunRetrospectivesEnabled,
     ),
+    persistLevel: normalizePersistLevel(config.persistLevel),
   };
 }
 

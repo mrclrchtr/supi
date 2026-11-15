@@ -3,6 +3,7 @@ import {
   canRecordAgentRunRetrospective,
   configureDebugRegistry,
   DEBUG_REGISTRY_DEFAULTS,
+  getDebugEvents,
   recordDebugEvent,
   resetDebugRegistry,
   subscribeDebugEvents,
@@ -48,6 +49,33 @@ describe("debug persistence sink", () => {
       message: "Agent Run retrospective captured",
     });
     expect(persistenceSink).not.toHaveBeenCalled();
+  });
+
+  it("persists only events at or above persistLevel while retaining all events live", () => {
+    configureDebugRegistry({ enabled: true });
+    const persisted = vi.fn();
+    subscribeDebugPersistence(persisted);
+    const record = (level: "debug" | "info" | "warning") =>
+      recordDebugEvent({ source: "test", level, category: `c.${level}`, message: level });
+
+    expect(DEBUG_REGISTRY_DEFAULTS.persistLevel).toBe("info");
+    record("debug");
+    record("info");
+    expect(persisted.mock.calls.map(([event]) => event.level)).toEqual(["info"]);
+    expect(getDebugEvents().events.map((event) => event.level)).toEqual(["info", "debug"]);
+
+    persisted.mockClear();
+    configureDebugRegistry({ persistLevel: "debug" });
+    record("debug");
+    expect(persisted).toHaveBeenCalledOnce();
+
+    persisted.mockClear();
+    configureDebugRegistry({ persistLevel: "warning", agentRunRetrospectivesEnabled: true });
+    record("info");
+    record("warning");
+    expect(persisted.mock.calls.map(([event]) => event.level)).toEqual(["warning"]);
+    // Retrospectives are info-level, so a stricter threshold makes them ineligible.
+    expect(canRecordAgentRunRetrospective()).toBe(false);
   });
 
   it("sends best-effort-redacted retrospective prose to persistence sinks", () => {

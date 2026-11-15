@@ -1,4 +1,5 @@
 import {
+  type DebugLevel,
   recordDebugEvent,
   truncateDebugIdentity as truncateIdentity,
 } from "@mrclrchtr/supi-core/debug";
@@ -26,6 +27,15 @@ function boundedServerEntries(
   }));
 }
 
+/**
+ * Crashes warn; rare recovery and retirement snapshots are `info` so they persist
+ * by default. Frequent startup, readiness, and tracked-file transitions stay `debug`.
+ */
+function transitionLevel(kind: LspRuntimeTransition["kind"]): DebugLevel {
+  if (kind === "crash") return "warning";
+  return kind === "recovery" || kind === "retirement" ? "info" : "debug";
+}
+
 /** Record bounded aggregate telemetry for one runtime transition. */
 export function recordLspRuntimeTransition(cwd: string, transition: LspRuntimeTransition): void {
   const readyClients = transition.projectServers.filter(
@@ -37,7 +47,7 @@ export function recordLspRuntimeTransition(cwd: string, transition: LspRuntimeTr
   );
   recordDebugEvent({
     source: "lsp",
-    level: transition.kind === "crash" ? "warning" : "debug",
+    level: transitionLevel(transition.kind),
     category: "runtime.transition",
     message: `LSP runtime transition: ${transition.kind}`,
     cwd: truncateIdentity(cwd),

@@ -38,6 +38,7 @@ vi.mock("@mrclrchtr/supi-core/debug", () => ({
     agentAccess: "sanitized",
     maxEvents: 100,
     agentRunRetrospectivesEnabled: false,
+    persistLevel: "info",
   },
   getDebugEvents: mockFns.getDebugEvents,
   getDebugSummary: mockFns.getDebugSummary,

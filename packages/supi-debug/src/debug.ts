@@ -57,6 +57,14 @@ function registerDebugSettings(pi: ExtensionAPI): void {
           values: ["50", "100", "250", "500"],
         },
         {
+          kind: "enum" as const,
+          key: "persistLevel",
+          label: "Persist Level",
+          description:
+            "Minimum level written to the session file; lower levels stay in the live buffer only",
+          values: ["debug", "info", "warning", "error"],
+        },
+        {
           kind: "boolean" as const,
           // biome-ignore lint/security/noSecrets: Configuration field name, not a credential.
           key: "agentRunRetrospectivesEnabled",

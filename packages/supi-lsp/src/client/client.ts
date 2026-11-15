@@ -1767,7 +1767,7 @@ export class LspClient {
   }): void {
     recordDebugEvent({
       source: "lsp",
-      level: "debug",
+      level: options.outcome === "exhausted" || options.outcome === "failed" ? "warning" : "debug",
       category: "request.retry",
       message: "LSP request retry",
       cwd: boundCwd(this.cwd),
@@ -2123,7 +2123,7 @@ export class LspClient {
     if (becameReady) this.publishLifecycle("readiness");
     recordDebugEvent({
       source: "lsp",
-      level: "info",
+      level: becameReady ? "info" : "debug",
       category: "readiness.resolved",
       message: `LSP client ${this.name} is ready`,
       cwd: boundCwd(this.cwd),
@@ -2187,7 +2187,7 @@ export class LspClient {
       this.tokenTimeouts.delete(token);
       recordDebugEvent({
         source: "lsp",
-        level: "debug",
+        level: "info",
         category: "readiness.token-timeout",
         message: `Readiness per-token timeout fired for ${this.name} after ${timeoutMs}ms`,
         cwd: boundCwd(this.cwd),

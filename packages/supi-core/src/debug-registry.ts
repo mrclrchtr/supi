@@ -18,6 +18,12 @@ export interface DebugRegistryConfig {
   agentRunRetrospectivesEnabled: boolean;
   /** Maximum number of session-local events to keep in memory. */
   maxEvents: number;
+  /**
+   * Minimum level forwarded to persistence sinks. Lower-level events stay in the
+   * live retained buffer only, so high-volume `debug` telemetry does not grow
+   * session files.
+   */
+  persistLevel: DebugLevel;
 }
 
 export const DEBUG_REGISTRY_DEFAULTS: DebugRegistryConfig = {
@@ -25,7 +31,10 @@ export const DEBUG_REGISTRY_DEFAULTS: DebugRegistryConfig = {
   agentAccess: "sanitized",
   agentRunRetrospectivesEnabled: false,
   maxEvents: 100,
+  persistLevel: "info",
 };
+
+const DEBUG_LEVEL_RANK: Record<DebugLevel, number> = { debug: 0, info: 1, warning: 2, error: 3 };
 
 export interface DebugEventInput {
   /** Opaque identity for events directly owned by one public Tool call. */
@@ -150,6 +159,10 @@ export function isDebugLevel(value: unknown): value is DebugLevel {
   return value === "debug" || value === "info" || value === "warning" || value === "error";
 }
 
+function shouldPersist(state: DebugRegistryState, level: DebugLevel): boolean {
+  return DEBUG_LEVEL_RANK[level] >= DEBUG_LEVEL_RANK[state.config.persistLevel];
+}
+
 /** Return whether a value has the exact 16-byte base64url Debug Operation ID form. */
 export function isDebugOperationId(value: unknown): value is string {
   return typeof value === "string" && DEBUG_OPERATION_ID_RE.test(value);
@@ -194,6 +207,9 @@ export function configureDebugRegistry(config: Partial<DebugRegistryConfig>): De
     ...state.config,
     ...config,
     maxEvents: normalizeMaxEvents(config.maxEvents ?? state.config.maxEvents),
+    persistLevel: isDebugLevel(config.persistLevel)
+      ? config.persistLevel
+      : state.config.persistLevel,
   };
   trimToMaxEvents(state);
   return getDebugRegistryConfig();
@@ -211,14 +227,16 @@ export function isDebugRegistryEnabled(): boolean {
 
 /**
  * Return whether a retrospective can be captured: Debug and its explicit opt-in
- * must be enabled, and at least one persistence sink must be registered.
+ * must be enabled, at least one persistence sink must be registered, and the
+ * persistence threshold must admit `info` events.
  */
 export function canRecordAgentRunRetrospective(): boolean {
   const state = getState();
   return (
     state.config.enabled &&
     state.config.agentRunRetrospectivesEnabled &&
-    state.persistenceSinks.size > 0
+    state.persistenceSinks.size > 0 &&
+    shouldPersist(state, "info")
   );
 }
 
@@ -283,7 +301,8 @@ export function recordDebugEvent(input: DebugEventInput): DebugEvent | null {
       // Debug-event consumers must not alter producer behavior.
     }
   }
-  for (const sink of state.persistenceSinks) {
+  const sinks = shouldPersist(state, event.level) ? state.persistenceSinks : [];
+  for (const sink of sinks) {
     try {
       sink(toSanitizedView(event));
     } catch {

@@ -3,6 +3,7 @@
 ## [13.0.0]
 
 - **Breaking:** Absorbs the former `@mrclrchtr/supi-cache` package: `/supi-cache-history`, `/supi-cache-forensics`, the `cache_forensics` tool, and the **Cache Forensics** settings now ship with SuPi Debug. Migration: run `pi remove npm:@mrclrchtr/supi-cache` and install `@mrclrchtr/supi-debug`; the `cache` config section is unchanged.
+- Session files now persist only Debug events at `info` level or above by default. Per-file Tree-sitter timings, per-request LSP timings, and other `debug`-level telemetry stay in the live buffer, which cuts session file growth sharply ([#591](https://github.com/mrclrchtr/supi/issues/591)). Set the new `persistLevel` setting to `debug` to keep persisting them. Rare LSP recovery, runtime recovery/retirement transitions, and Structural Worker restart events now use `info` or `warning`, so they are still persisted.
 - `gather-retrospectives` adds `--read <evidence> --export <file.jsonl>`, which writes every selected report in full, one per line, so large snapshots can be analyzed in a script instead of paged through 16 KB displays.
 - The skill adds a theme-finding step: extract headings, define themes, count them with the Jev classifier, and recheck low-confidence hits.
 - Collector output adds `scope.recordSkipReason`, which explains why no last-gather marker was recorded. `--since` without an earlier marker reports `since-without-previous-gather`.

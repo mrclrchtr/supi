@@ -27,6 +27,7 @@ const config: DebugConfig = {
   agentAccess: "sanitized",
   maxEvents: 100,
   agentRunRetrospectivesEnabled: false,
+  persistLevel: "info",
 };
 const event = {
   source: "fixture",

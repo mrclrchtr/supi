@@ -122,6 +122,19 @@ describe("LSP runtime transition telemetry", () => {
     );
   });
 
+  it("persists rare recovery and retirement transitions at info, frequent ones at debug", () => {
+    for (const kind of ["recovery", "retirement", "startup", "tracked-files"] as const) {
+      recordLspRuntimeTransition("/project", transition({ kind }));
+    }
+
+    expect(mocks.recordDebugEvent.mock.calls.map(([event]) => event.level)).toEqual([
+      "info",
+      "info",
+      "debug",
+      "debug",
+    ]);
+  });
+
   it("bounds the server list to MAX_SERVERS entries", () => {
     const manyServers: ProjectServerInfo[] = Array.from(
       { length: MAX_SERVERS + 4 },

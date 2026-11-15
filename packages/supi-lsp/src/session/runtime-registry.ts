@@ -592,7 +592,7 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
       const outcome = result.refreshFailureReason ? "failed" : "completed";
       recordDebugEvent({
         source: "lsp",
-        level: "debug",
+        level: outcome === "failed" ? "warning" : "info",
         category: "runtime.recovery",
         message: `LSP diagnostic recovery ${outcome}`,
         cwd: truncateIdentity(this.manager.getCwd()),
@@ -618,7 +618,7 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
       if (isCodeRequestInterruption(error, options?.control)) {
         recordDebugEvent({
           source: "lsp",
-          level: "debug",
+          level: "info",
           category: "runtime.recovery",
           message: "LSP diagnostic recovery cancelled",
           cwd: truncateIdentity(this.manager.getCwd()),

@@ -1526,7 +1526,7 @@ export class LspManager {
     try {
       recordDebugEvent({
         source: "lsp",
-        level: outcome === "failure" || outcome === "exhausted" ? "warning" : "debug",
+        level: outcome === "failure" || outcome === "exhausted" ? "warning" : "info",
         category: "runtime.recovery",
         message: `LSP process-crash recovery ${outcome}`,
         cwd: boundCwd(this.cwd),

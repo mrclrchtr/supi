@@ -232,7 +232,7 @@ export class SuggestionGenerator {
   #recordGenerationTimeout(opts: RunOptions): void {
     recordDebugEvent({
       source: "prompt-suggestions",
-      level: "debug",
+      level: "warning",
       category: "generation.timeout",
       message: "Prompt suggestion generation timed out",
       cwd: opts.ctx.cwd,

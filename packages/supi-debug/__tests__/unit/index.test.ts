@@ -54,6 +54,7 @@ vi.mock("@mrclrchtr/supi-core/debug", () => ({
     agentAccess: "sanitized",
     maxEvents: 100,
     agentRunRetrospectivesEnabled: false,
+    persistLevel: "info",
   },
   getDebugEvents: mockFns.getDebugEvents,
   getDebugSummary: mockFns.getDebugSummary,
@@ -82,6 +83,7 @@ type MockDebugConfig = {
   agentAccess: unknown;
   maxEvents: unknown;
   agentRunRetrospectivesEnabled?: unknown;
+  persistLevel?: unknown;
 };
 
 function setup(config: MockDebugConfig = ENABLED_CONFIG) {
@@ -145,6 +147,7 @@ describe("supi-debug extension setup", () => {
       agentAccess: "raw",
       maxEvents: 250,
       agentRunRetrospectivesEnabled: false,
+      persistLevel: "info",
     });
   });
 
@@ -156,6 +159,7 @@ describe("supi-debug extension setup", () => {
       agentAccess: "raw",
       maxEvents: 250,
       agentRunRetrospectivesEnabled: false,
+      persistLevel: "info",
     });
   });
 
@@ -172,6 +176,7 @@ describe("supi-debug extension setup", () => {
       agentAccess: "raw",
       maxEvents: 250,
       agentRunRetrospectivesEnabled: true,
+      persistLevel: "info",
     });
 
     mockFns.configureDebugRegistry.mockClear();
@@ -186,7 +191,20 @@ describe("supi-debug extension setup", () => {
       agentAccess: "raw",
       maxEvents: 250,
       agentRunRetrospectivesEnabled: false,
+      persistLevel: "info",
     });
+  });
+
+  it("accepts a valid persistLevel and falls back to info otherwise", () => {
+    setup({ ...ENABLED_CONFIG, persistLevel: "warning" });
+    expect(mockFns.configureDebugRegistry).toHaveBeenLastCalledWith(
+      expect.objectContaining({ persistLevel: "warning" }),
+    );
+
+    setup({ ...ENABLED_CONFIG, persistLevel: "verbose" });
+    expect(mockFns.configureDebugRegistry).toHaveBeenLastCalledWith(
+      expect.objectContaining({ persistLevel: "info" }),
+    );
   });
 
   it("clears events and reapplies config on session_start", () => {
@@ -304,7 +322,7 @@ describe("supi-debug settings", () => {
     const options = mockFns.defineConfigSettings.mock.calls[0][0];
 
     // Verify fields are declared declaratively
-    expect(options.fields).toHaveLength(4);
+    expect(options.fields).toHaveLength(5);
     expect(options.fields[0]).toMatchObject({ kind: "boolean", key: "enabled" });
     expect(options.fields[1]).toMatchObject({
       kind: "enum",
@@ -313,6 +331,11 @@ describe("supi-debug settings", () => {
     });
     expect(options.fields[2]).toMatchObject({ kind: "number", key: "maxEvents" });
     expect(options.fields[3]).toMatchObject({
+      kind: "enum",
+      key: "persistLevel",
+      values: ["debug", "info", "warning", "error"],
+    });
+    expect(options.fields[4]).toMatchObject({
       kind: "boolean",
       // biome-ignore lint/security/noSecrets: Setting name, not a credential.
       key: "agentRunRetrospectivesEnabled",
