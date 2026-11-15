@@ -1,3 +1,5 @@
+<!-- Frozen agent-output example (see ADR 0003). Do not update it for workspace changes; package names and paths below are historical. -->
+
 # Project: Code Intelligence Overview
 
 **@mrclrchtr/supi-workspace** — SuPi (Super Pi) — a curated extension stack for the Pi coding agent.
