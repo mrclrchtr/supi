@@ -64,6 +64,7 @@ describe("captureToolRow", () => {
     const row = captureToolRow(input());
 
     expect(row.lines.filter((line) => line.trim())).toEqual([" probe src", " 0"]);
+    expect(row.resultLines).toEqual(["0"]);
     expect(row.renderer).toEqual({ call: "custom", result: "custom" });
     expect(row.shell).toEqual({ kind: "default", background: "toolSuccessBg" });
     expect(row.rendererErrors).toEqual([]);
@@ -98,6 +99,7 @@ describe("captureToolRow", () => {
     const row = captureToolRow(input({ renderers: undefined }, { isError: true }));
 
     expect(row.renderer).toEqual({ call: "fallback", result: "fallback" });
+    expect(row.resultLines).toEqual([]);
     expect(row.shell).toEqual({ kind: "fallback", background: "toolErrorBg" });
     expect(row.lines.join("\n")).toContain("model text");
   });
@@ -112,6 +114,7 @@ describe("captureToolRow", () => {
     const row = captureToolRow(input({ renderers: failing }));
 
     expect(row.rendererErrors).toEqual([{ slot: "result", message: "boom" }]);
+    expect(row.resultLines).toEqual([]);
     expect(row.lines.join("\n")).toContain("model text");
   });
 });

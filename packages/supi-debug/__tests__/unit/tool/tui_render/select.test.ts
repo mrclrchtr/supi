@@ -110,7 +110,7 @@ describe("selectToolResult", () => {
     expect(selectToolResult(nestedBranch, { tool: { name: "web_search" } })).toEqual({
       kind: "not-found",
       message:
-        '"web_search" ran 2 times only inside other tools. Pi stores no results for nested calls; render the parent row instead: target { toolCallId: "p1" } (codemode). Tool results on this branch: code_health (2), codemode (1), read (1).',
+        '"web_search" ran 2 times only inside other tools. Pi stores no results for nested calls; render the parent row instead: target { toolCallId: "p1" } (codemode).',
     });
     expect(selectToolResult(nestedBranch, { toolCallId: "p1/2" })).toEqual({
       kind: "not-found",

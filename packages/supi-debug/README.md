@@ -210,7 +210,7 @@ Renderers come from Pi's own resolution (`pi.registerToolRenderer`), recorded wh
 
 Calls a tool made inside another tool, such as `tools.read()` in a `codemode` script, have no stored result of their own. Pi draws them inside the parent row, so `tui_render` names the parent `toolCallId` to render instead.
 
-The model text omits the row's blank edge lines; `structuredContent.lines` keeps the exact row. In the transcript, a collapsed `tui_render` shows a summary and the first rendered lines; expand it for the full text.
+The model text omits the row's blank edge lines; `structuredContent.lines` keeps the exact row. In the transcript, a collapsed `tui_render` shows a summary and the first lines the result renderer drew (the call header is already in the summary); expand it for the full text.
 
 ## Prompt-cache history and forensics
 

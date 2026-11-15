@@ -3,7 +3,7 @@ import {
   ToolExecutionComponent,
   type ToolRenderers,
 } from "@earendil-works/pi-coding-agent";
-import { stripTerminalSequences, type TUI } from "@earendil-works/pi-tui";
+import { type Component, stripTerminalSequences, type TUI } from "@earendil-works/pi-tui";
 import type {
   RendererSlot,
   RendererSource,
@@ -39,6 +39,11 @@ export interface CaptureInput {
 /** Rendered lines and how Pi produced them. */
 export interface CaptureResult {
   lines: string[];
+  /**
+   * Lines the result renderer drew, without frame or call header, in the same format as
+   * `lines`. Empty when Pi drew the row as one generic fallback block.
+   */
+  resultLines: string[];
   renderer: Record<RendererSlot, RendererSource>;
   shell: ShellFacts;
   /** Renderer exceptions; Pi then draws that slot with its generic fallback. */
@@ -60,14 +65,21 @@ function recordFailure<T>(errors: RendererErrors, slot: RendererSlot, render: ()
   }
 }
 
+interface Instrumented {
+  definition: ToolRenderers;
+  /** Result component from the latest successful result render. */
+  lastResult(): Component | undefined;
+}
+
 /** Record renderer exceptions and, when `theme` is set, pass it instead of Pi's theme. */
 function instrument(
   renderers: ToolRenderers,
   theme: Theme | undefined,
   errors: RendererErrors,
-): ToolRenderers {
+): Instrumented {
   const { renderCall, renderResult } = renderers;
-  return {
+  let lastResult: Component | undefined;
+  const definition: ToolRenderers = {
     renderShell: renderers.renderShell,
     renderCall:
       renderCall &&
@@ -75,11 +87,16 @@ function instrument(
         recordFailure(errors, "call", () => renderCall(args, theme ?? piTheme, context))),
     renderResult:
       renderResult &&
-      ((result, options, piTheme, context) =>
-        recordFailure(errors, "result", () =>
+      ((result, options, piTheme, context) => {
+        lastResult = undefined;
+        const component = recordFailure(errors, "result", () =>
           renderResult(result, options, theme ?? piTheme, context),
-        )),
+        );
+        lastResult = component;
+        return component;
+      }),
   };
+  return { definition, lastResult: () => lastResult };
 }
 
 function describeShell(renderers: ToolRenderers | undefined, isError: boolean): ShellFacts {
@@ -110,13 +127,14 @@ function markedNotes(renderer: CaptureResult["renderer"], shell: ShellFacts): st
 export function captureToolRow(input: CaptureInput): CaptureResult {
   const { renderers, format, selection } = input;
   const rendererErrors: RendererErrors = [];
-  const definition =
+  const instrumented =
     renderers &&
     instrument(
       renderers,
       format === "marked" ? createMarkingTheme(input.theme) : undefined,
       rendererErrors,
     );
+  const definition = instrumented?.definition;
   const component = new ToolExecutionComponent(
     selection.toolName,
     selection.toolCallId,
@@ -139,12 +157,20 @@ export function captureToolRow(input: CaptureInput): CaptureResult {
   // The component re-renders on each state change; report each failing slot once.
   const raw = component.render(input.width);
   const uniqueErrors = [...new Map(rendererErrors.map((error) => [error.slot, error])).values()];
-  const lines =
+  const toFormat = (rendered: string[]) =>
     format === "ansi"
-      ? raw
-      : raw.map((line) =>
+      ? rendered
+      : rendered.map((line) =>
           stripTerminalSequences(format === "marked" ? decodeMarkers(line) : line).trimEnd(),
         );
+  const lines = toFormat(raw);
+  // Pi's default frame pads each side by `outputPad`; a self-drawn row gets the full width.
+  const innerWidth =
+    renderers?.renderShell === "self" ? input.width : input.width - 2 * input.outputPad;
+  const resultComponent = instrumented?.lastResult();
+  const resultLines = resultComponent
+    ? toFormat(resultComponent.render(Math.max(1, innerWidth)))
+    : [];
   const renderer = {
     call: renderers?.renderCall ? "custom" : "fallback",
     result: renderers?.renderResult ? "custom" : "fallback",
@@ -152,6 +178,7 @@ export function captureToolRow(input: CaptureInput): CaptureResult {
   const shell = describeShell(renderers, selection.isError);
   return {
     lines,
+    resultLines,
     renderer,
     shell,
     rendererErrors: uniqueErrors,

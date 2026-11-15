@@ -104,6 +104,14 @@ describe("tui_render tool", () => {
     expect(result.content[0]?.text).toMatch(/shell default \(toolSuccessBg\)\n\n probe\n v1 3$/);
   });
 
+  it("previews the result lines, not the call header, in the transcript details", async () => {
+    const result = (await setup().run({ target: { tool: { name: "probe" } }, width: 40 })) as {
+      details: { preview: { lines: string[]; omitted: number } };
+    };
+
+    expect(result.details.preview).toEqual({ lines: ["v1 3"], omitted: 0 });
+  });
+
   it("renders with the renderers the TUI resolves now, for example after /reload", async () => {
     let current = countRenderer("v1");
     const { run } = setup(() => current);

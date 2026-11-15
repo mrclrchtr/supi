@@ -92,6 +92,9 @@ export function buildTuiRenderResult(
     text += `\n\n[Rendered output truncated: showing ${truncation.outputLines} of ${truncation.totalLines} lines (${formatSize(truncation.outputBytes)} of ${formatSize(truncation.totalBytes)}). Use a collapsed view or read structuredContent.lines from codemode.]`;
   }
 
+  // Preview the result renderer's own lines; the call header is already in the summary.
+  const previewSource =
+    capture.resultLines.length > 0 ? trimBlankEdges(capture.resultLines) : rowLines;
   const facts: Omit<TuiRenderOutput, "lines"> = {
     toolName: selection.toolName,
     toolCallId: selection.toolCallId,
@@ -109,8 +112,8 @@ export function buildTuiRenderResult(
     details: {
       ...facts,
       preview: {
-        lines: rowLines.slice(0, PREVIEW_LINE_COUNT),
-        omitted: Math.max(0, rowLines.length - PREVIEW_LINE_COUNT),
+        lines: previewSource.slice(0, PREVIEW_LINE_COUNT),
+        omitted: Math.max(0, previewSource.length - PREVIEW_LINE_COUNT),
       },
     },
     structuredContent: { ...facts, lines: capture.lines },

@@ -157,11 +157,10 @@ function locateByTool(branch: Branch, name: string, index: number): Located {
     const calls = branch.nested.filter((call) => call.name === name);
     const latest = calls.at(-1);
     const times = calls.length === 1 ? "once" : `${calls.length} times`;
-    const tools = describeBranchTools(branch.results);
     return notFound(
       latest
-        ? `"${name}" ran ${times} only inside other tools. ${NESTED_HINT}: ${parentTarget(latest)}. ${tools}`
-        : `No "${name}" result on the current session branch. ${tools}`,
+        ? `"${name}" ran ${times} only inside other tools. ${NESTED_HINT}: ${parentTarget(latest)}.`
+        : `No "${name}" result on the current session branch. ${describeBranchTools(branch.results)}`,
     );
   }
   const record = matches[matchCount - 1 - index];
