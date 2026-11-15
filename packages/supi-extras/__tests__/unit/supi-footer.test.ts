@@ -3,6 +3,14 @@ import { createPiMock } from "@mrclrchtr/supi-test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import supiFooter from "../../src/supi-footer.ts";
 
+// Never spawn git: these tests use a nonexistent cwd, where starting a process blocks for
+// hundreds of milliseconds on macOS. Git status behavior is covered in footer-git-status.test.ts.
+vi.mock("node:child_process", () => ({
+  execFile: vi.fn((_file: string, _args: string[], _options: unknown, callback: unknown) => {
+    (callback as (error: Error) => void)(new Error("git is not run in footer tests"));
+  }),
+}));
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
