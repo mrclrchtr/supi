@@ -9,6 +9,7 @@ import type { TSchema } from "typebox";
 import { Value } from "typebox/value";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { registerCodeIntelligenceTools } from "../../../../src/tool/register.ts";
+import { truncateDisplayText } from "../../../../src/tool/result/display.ts";
 import { sessionCache } from "../../../helpers/execute-action.ts";
 import { clearMockRuntime, registerMockProvider } from "../../../helpers/register-mock-runtime.ts";
 
@@ -230,7 +231,8 @@ describe("registered code-tool external source paths", () => {
         displaySections: expect.arrayContaining([
           expect.objectContaining({
             key: "orientation.defs",
-            lines: expect.arrayContaining([warning]),
+            // The TUI line cap applies; whether it truncates depends on the temp path length.
+            lines: expect.arrayContaining([truncateDisplayText(warning)]),
           }),
         ]),
       });

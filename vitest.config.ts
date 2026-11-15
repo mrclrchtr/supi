@@ -1,4 +1,13 @@
+import { mkdirSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { defineConfig } from "vitest/config";
+
+// Collect test temp files under one fixed directory instead of thousands of top-level $TMPDIR
+// entries (#597). It must stay outside any Git repository, because workspace fixtures would
+// otherwise inherit the parent repo's ignore rules. No code deletes it; the OS temp purge does.
+const testTmpDir = join(tmpdir(), "supi-vitest");
+mkdirSync(testTmpDir, { recursive: true });
 
 // Ignore the known benign vscode-jsonrpc stream-destroyed rejection that can
 // surface during optional LSP integration-test shutdown on some servers.
@@ -24,6 +33,7 @@ export default defineConfig({
     testTimeout: 2000,
     hookTimeout: 5000,
     fsModuleCache: true,
+    env: { TMPDIR: testTmpDir, TMP: testTmpDir, TEMP: testTmpDir },
     exclude: ["**/node_modules/**", "**/.worktrees/**", "**/dist/**"],
     onUnhandledError(error) {
       if (isBenignVscodeJsonRpcShutdownNoise(error)) {
