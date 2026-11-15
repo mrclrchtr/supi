@@ -8,7 +8,7 @@
     }
   },
   "generatedWith": {
-    "treeSitterCli": "0.27.1"
+    "treeSitterCli": "0.27.2"
   },
   "patches": [
     {

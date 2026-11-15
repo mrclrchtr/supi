@@ -196,7 +196,7 @@ export class DiagnosticRequestScheduler {
       return;
     }
     execution.result.then(job.resolve, job.reject).catch(() => {});
-    execution.settled
+    void execution.settled
       .catch(() => {})
       .then(() => {
         if (this.#active !== job) return;

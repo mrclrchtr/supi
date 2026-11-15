@@ -173,7 +173,7 @@ export function parseTargetInput(
       "A target selector must contain exactly one of `handle`, `anchor`, `symbol`, or `file`.",
     );
   }
-  const branch = selected[0];
+  const branch: TargetBranch = selected[0];
   if (!allowed.includes(branch)) return invalid(`This workflow does not support target.${branch}.`);
 
   switch (branch) {
