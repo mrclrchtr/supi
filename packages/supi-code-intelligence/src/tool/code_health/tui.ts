@@ -23,6 +23,12 @@ import {
   type ToolRendererContext,
   type ToolResult,
 } from "../../ui/tui/common.ts";
+import {
+  buildEmptyDiagnosticSummary,
+  diagnosticScopeKind,
+  readDiagnosticEvidence,
+  readRecord,
+} from "./diagnostic-tui.ts";
 import type { CodeHealthToolParams } from "./execute.ts";
 import {
   isPendingFileReadiness,
@@ -140,16 +146,10 @@ function buildCompactSummary(data: Record<string, unknown> | null, theme: Theme)
   const semanticRequested = sections.some(
     (section) => section.key === "diagnostics" || section.key === "servers",
   );
-  const fileReadinessPending = isPendingFileReadiness(data);
   const segments = sections.map((section) =>
-    formatSectionSummary(
-      section,
-      section.key === "diagnostics"
-        ? formatCompactDiagnosticEvidence(readDiagnosticEvidence(data), diagnosticScopeKind(data))
-        : null,
-      theme,
-      fileReadinessPending,
-    ),
+    section.key === "diagnostics"
+      ? formatCompactDiagnostics(section, data, theme)
+      : formatSectionSummary(section, null, theme, false),
   );
   if (semanticRequested) {
     const semanticStatus = readSemanticStatus(data);
@@ -169,6 +169,25 @@ function buildCompactSummary(data: Record<string, unknown> | null, theme: Theme)
 
   const dot = theme.fg("dim", "·");
   return new Text(segments.join(` ${dot} `), 0, 0);
+}
+
+/** Compact diagnostics segment; zero or incomplete coverage never renders as a green count. */
+function formatCompactDiagnostics(
+  section: HealthSectionSummary,
+  data: Record<string, unknown> | null,
+  theme: Theme,
+): string {
+  const label = theme.fg("dim", sectionLabel(section.key));
+  const scopeKind = diagnosticScopeKind(data);
+  if (data?.diagnosticCoverage === "none") {
+    const files = scopeKind === "file" ? "requested" : "tracked";
+    return `${label} ${theme.fg("muted", `none checked (0 ${files} files)`)}`;
+  }
+  const evidence = formatCompactDiagnosticEvidence(readDiagnosticEvidence(data), scopeKind);
+  if (data?.diagnosticCoverage === "incomplete" && section.status === "complete") {
+    return `${label} ${theme.fg("warning", "incomplete")}${evidence ? ` (${evidence})` : ""}`;
+  }
+  return formatSectionSummary(section, evidence, theme, isPendingFileReadiness(data));
 }
 
 function formatSectionSummary(
@@ -219,48 +238,6 @@ function buildStatusBar(data: Record<string, unknown> | null, theme: Theme): Tex
   if (sourceTracking) lines.push(`Source discovery: ${theme.fg("dim", sourceTracking)}`);
 
   return new Text(lines.join("  "), 0, 0);
-}
-
-/** An empty entry list is clean only when the shared coverage classification is `confirmed`. */
-function buildEmptyDiagnosticSummary(data: Record<string, unknown> | null, theme: Theme): Text {
-  const coverage = data?.diagnosticCoverage;
-  if (coverage === "none") {
-    const files = diagnosticScopeKind(data) === "file" ? "requested" : "tracked";
-    const label = `No source diagnostics checked (0 ${files} files)`;
-    return new Text(theme.fg("dim", withDiagnosticScope(label, data)), 0, 0);
-  }
-  if (coverage === "incomplete") {
-    const counts = formatDiagnosticEvidence(readDiagnosticEvidence(data));
-    const label = `Diagnostic evidence incomplete${counts ? ` (${counts})` : ""}`;
-    return new Text(theme.fg("warning", withDiagnosticScope(label, data)), 0, 0);
-  }
-  return new Text(
-    theme.fg("success", withDiagnosticScope(diagnosticEmptySummary(data), data)),
-    0,
-    0,
-  );
-}
-
-function diagnosticEmptySummary(data: Record<string, unknown> | null): string {
-  return diagnosticScopeKind(data) === "file"
-    ? "No errors or warnings for file"
-    : "No reported issues in tracked files";
-}
-
-function diagnosticScopeKind(data: Record<string, unknown> | null): string | null {
-  const observation = readRecord(data?.diagnosticObservation);
-  const scope = readRecord(observation?.scope);
-  return typeof scope?.kind === "string" ? scope.kind : null;
-}
-
-function readDiagnosticEvidence(
-  data: Record<string, unknown> | null,
-): Record<string, unknown> | null {
-  return readRecord(readRecord(data?.diagnosticObservation)?.evidence);
-}
-
-function readRecord(value: unknown): Record<string, unknown> | null {
-  return typeof value === "object" && value !== null ? (value as Record<string, unknown>) : null;
 }
 
 interface RenderedCapabilityWarning {

@@ -45,7 +45,6 @@ function makeDetails(overrides: Record<string, unknown> = {}): Record<string, un
         documents: [],
       },
     },
-    diagnosticCoverage: "none",
     refresh: {
       kind: "not-requested",
       reason: "Refresh was not requested.",
@@ -435,11 +434,47 @@ describe("code_health TUI projection", () => {
           available: true,
         },
       ],
+      diagnosticCoverage: "none",
     });
 
     const output = render(details, true);
     expect(output).toContain("No source diagnostics checked (0 tracked files)");
     expect(output).not.toContain("No reported issues");
+    const compact = render(details, false);
+    expect(compact).toContain("diag none checked (0 tracked files)");
+    expect(compact).not.toContain("diag 0");
+  });
+
+  it("marks completed but incomplete evidence in the compact view", () => {
+    const details = makeDetails({
+      sections: [
+        {
+          key: "diagnostics",
+          title: "Diagnostics",
+          status: "complete",
+          confidence: "semantic",
+          provenance: [{ source: "semantic", capability: "LSP" }],
+          itemCount: 0,
+          available: true,
+        },
+      ],
+      diagnosticObservation: {
+        kind: "completed",
+        scope: { kind: "tracked-files", filter: null },
+        entries: [],
+        evidence: {
+          requested: 2,
+          confirmed: 1,
+          unconfirmed: 0,
+          failed: 0,
+          removed: 1,
+          documents: [],
+        },
+      },
+      diagnosticCoverage: "incomplete",
+    });
+
+    expect(render(details, false)).toContain("diag incomplete (tracked-file evidence req 2");
   });
 
   it("renders the previous refresh attempt in the compact view", () => {
