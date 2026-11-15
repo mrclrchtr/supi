@@ -8,6 +8,7 @@ node_modules/
 
 # TypeScript project references build artifacts
 packages/*/dist/
+/tsconfig.tsbuildinfo
 packages/*/tsconfig.tsbuildinfo
 packages/*/__tests__/**/tsconfig.tsbuildinfo
 
