@@ -1,6 +1,7 @@
 import aliases from "./aliases.ts";
 import bashTimeout from "./bash-timeout.ts";
 import cloneSession from "./clone-session.ts";
+import codemodeCompact from "./codemode-compact.ts";
 import copyPrompt from "./copy-prompt.ts";
 import gitEditor from "./git-editor.ts";
 import promptStash from "./prompt-stash.ts";
@@ -18,4 +19,5 @@ export default function (pi: Parameters<typeof tabSpinner>[0]) {
   sessionCapabilities(pi);
   supiFooter(pi);
   bashTimeout(pi);
+  codemodeCompact(pi);
 }

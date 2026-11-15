@@ -115,6 +115,16 @@ Configure the footer under `/supi-settings` → **Footer**:
 
 `auto` cannot detect the terminal font. It uses Nerd Font icons on a local UTF-8 terminal, Unicode symbols over SSH, and ASCII otherwise. If icons render as boxes, choose `unicode`. `ascii` keeps the former `path (branch)` layout.
 
+### Compact codemode rows
+
+Pi's `codemode` tool (including wrappers that keep its `code` input) shows a compact row while collapsed: the script's first line, every nested call, a status line with duration, call count, failures, and model cost, and the first output line. Expand tool output (`ctrl+o` by default) to see Pi's full view with the script and output. Nested calls show their key argument (for example a path, command, or code-intelligence query), the error of failed calls, and durations of 100 ms or more.
+
+Turn compact rows off under `/supi-settings` → **Codemode View**; the change applies to new rows and to rows rebuilt on `/reload`.
+
+| Setting | Default | Description |
+|---|---|---|
+| `codemode-view.compact` | `true` | Collapse codemode rows to a summary |
+
 ### Headless git safety
 
 The package sets:
