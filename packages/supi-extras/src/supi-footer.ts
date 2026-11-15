@@ -6,13 +6,19 @@
  * theme.getThinkingBorderColor, and integrates stats contributions from
  * the footer registry. No hardcoded hex colors, no animations.
  */
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ThemeColor } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import { FOOTER_INVALIDATE_EVENT, footerContributions } from "@mrclrchtr/supi-core/footer-registry";
+import { formatGitCounts, GitCountsRefresher } from "./footer-git-status.ts";
+import { type FooterGlyphs, getFooterGlyphs, resolveIconMode } from "./footer-icons.ts";
+import {
+  type FooterConfig,
+  loadFooterConfig,
+  registerFooterSettings,
+} from "./supi-footer-config.ts";
 import {
   buildPwdLine,
   buildStatsLeft,
-  colorContextPercent,
   type FooterData,
   type FooterTheme,
   gatherUsage,
@@ -32,10 +38,12 @@ export default function supiFooter(pi: ExtensionAPI) {
   let currentModel: unknown;
   let requestRender: (() => void) | undefined;
   let unregisterInvalidates: Array<() => void> | undefined;
+  const decor = createFooterDecor(pi, () => requestRender?.());
 
   pi.on("session_start", (_event, ctx) => {
     currentModel = ctx.model;
     unregisterInvalidates ??= registerFooterInvalidations(pi, () => requestRender?.());
+    decor.start(ctx.sessionManager.getCwd());
     installFooter(ctx);
   });
 
@@ -51,6 +59,7 @@ export default function supiFooter(pi: ExtensionAPI) {
   pi.on("session_shutdown", () => {
     currentModel = undefined;
     requestRender = undefined;
+    decor.stop();
     for (const unregister of unregisterInvalidates ?? []) unregister();
     unregisterInvalidates = undefined;
   });
@@ -60,7 +69,10 @@ export default function supiFooter(pi: ExtensionAPI) {
     ctx.ui.setFooter(
       (tui: { requestRender(): void }, theme: FooterTheme, footerData: FooterData) => {
         requestRender = () => tui.requestRender();
-        const branchUnsub = footerData.onBranchChange(() => tui.requestRender());
+        const branchUnsub = footerData.onBranchChange(() => {
+          decor.refreshGit(true);
+          tui.requestRender();
+        });
 
         return {
           dispose() {
@@ -103,22 +115,25 @@ export default function supiFooter(pi: ExtensionAPI) {
               .map((c) => c.render())
               .filter(Boolean);
 
-            const rawStats = buildStatsLeft({
-              contextWindow,
-              percent: contextUsage?.percent ?? null,
-              usage,
-              useSubscription,
-              extraParts: statContribs,
-              suffixParts: suffixContribs,
-            });
-
-            let statsLeft = rawStats.text;
+            const style = (color: ThemeColor, text: string) => theme.fg(color, text);
+            const decorParts = decor.pwdParts(style);
+            let statsLeft = buildStatsLeft(
+              {
+                contextWindow,
+                percent: contextUsage?.percent ?? null,
+                usage,
+                useSubscription,
+                contextBar: decorParts.glyphs !== undefined && decorParts.glyphs.mode !== "ascii",
+                extraParts: statContribs,
+                suffixParts: suffixContribs,
+              },
+              style,
+            );
             let statsLeftWidth = visibleWidth(statsLeft);
             if (statsLeftWidth > width) {
-              statsLeft = truncateToWidth(statsLeft, width, "...");
+              statsLeft = truncateToWidth(statsLeft, width, theme.fg("dim", "..."));
               statsLeftWidth = visibleWidth(statsLeft);
             }
-            statsLeft = colorContextPercent(statsLeft, rawStats.contextPercentValue, theme);
 
             // Right side
             const right = styleRightSide({
@@ -137,20 +152,12 @@ export default function supiFooter(pi: ExtensionAPI) {
 
             // Path line + assembly
             const pwdLine = truncateToWidth(
-              theme.fg(
-                "dim",
-                buildPwdLine({
-                  cwd: ctx.sessionManager.getCwd(),
-                  gitBranch: footerData.getGitBranch(),
-                  sessionName: ctx.sessionManager.getSessionName(),
-                }),
-              ),
+              buildPwdLine({ ...pwdSource(ctx, footerData), ...decorParts }, style),
               width,
               theme.fg("dim", "..."),
             );
 
-            const statsLine =
-              theme.fg("dim", statsLeft) + theme.fg("dim", laidOut.padding) + laidOut.styled;
+            const statsLine = statsLeft + laidOut.padding + laidOut.styled;
 
             const lines = [pwdLine, truncateToWidth(statsLine, width, theme.fg("dim", "..."))];
             buildStatusLine(lines, footerData, width, theme);
@@ -163,11 +170,78 @@ export default function supiFooter(pi: ExtensionAPI) {
   }
 }
 
+/**
+ * Icons and Git counts for the path line.
+ *
+ * Owns the footer config, the resolved glyph set, and the throttled Git
+ * reader. Tool executions request a refresh; `agent_end` flushes pending work.
+ */
+function createFooterDecor(pi: ExtensionAPI, rerender: () => void) {
+  let cwd: string | undefined;
+  let config: FooterConfig | undefined;
+  let glyphs: FooterGlyphs | undefined;
+  const git = new GitCountsRefresher(rerender);
+
+  function apply(nextCwd: string): void {
+    config = loadFooterConfig(nextCwd);
+    glyphs = getFooterGlyphs(resolveIconMode(config.icons));
+    if (config.gitStatus) git.request(nextCwd, true);
+    else git.dispose();
+  }
+
+  function refreshGit(immediate = false): void {
+    if (cwd && config?.gitStatus) git.request(cwd, immediate);
+  }
+
+  registerFooterSettings(pi, () => {
+    if (!cwd) return;
+    apply(cwd);
+    rerender();
+  });
+  pi.on("tool_execution_end", () => refreshGit());
+  pi.on("agent_end", () => git.flush());
+
+  return {
+    start(nextCwd: string): void {
+      cwd = nextCwd;
+      git.dispose();
+      apply(nextCwd);
+    },
+    stop(): void {
+      cwd = undefined;
+      git.dispose();
+    },
+    refreshGit,
+    pwdParts(style: (color: ThemeColor, text: string) => string): {
+      glyphs?: FooterGlyphs;
+      gitStatus?: string;
+    } {
+      const counts = config?.gitStatus ? git.current : null;
+      return {
+        glyphs,
+        gitStatus: counts && glyphs ? formatGitCounts(counts, glyphs, style) : undefined,
+      };
+    },
+  };
+}
+
 function registerFooterInvalidations(pi: ExtensionAPI, invalidate: () => void): Array<() => void> {
   return [
     pi.events.on("supi:lsp:invalidate", invalidate),
     pi.events.on(FOOTER_INVALIDATE_EVENT, invalidate),
   ];
+}
+
+/** Session-derived inputs for the path line. */
+function pwdSource(
+  ctx: { sessionManager: { getCwd(): string; getSessionName(): string | undefined } },
+  footerData: FooterData,
+) {
+  return {
+    cwd: ctx.sessionManager.getCwd(),
+    gitBranch: footerData.getGitBranch(),
+    sessionName: ctx.sessionManager.getSessionName(),
+  };
 }
 
 /** Resolve the current thinking level. */

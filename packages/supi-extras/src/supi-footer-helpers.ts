@@ -4,6 +4,7 @@
  */
 import type { ThemeColor } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
+import type { FooterGlyphs } from "./footer-icons.ts";
 
 // ---- re-exports for the extension entrypoint ----
 
@@ -131,95 +132,125 @@ export function gatherUsage(entries: ReadonlyArray<UsageEntry>): UsageTotals {
 
 // ---- stats builder ----
 
-/** Push token-metric parts (↑ ↓ R W) onto the array. */
-function pushTokenParts(parts: string[], usage: UsageTotals): void {
-  if (usage.totalInput) parts.push(`↑${formatTokens(usage.totalInput)}`);
-  if (usage.totalOutput) parts.push(`↓${formatTokens(usage.totalOutput)}`);
-  if (usage.totalCacheRead) parts.push(`R${formatTokens(usage.totalCacheRead)}`);
-  if (usage.totalCacheWrite) parts.push(`W${formatTokens(usage.totalCacheWrite)}`);
+/** Applies a theme color; identity in plain-text contexts. */
+export type FooterStyle = (color: ThemeColor, text: string) => string;
+
+const plainStyle: FooterStyle = (_color, text) => text;
+
+const CONTEXT_BAR_CELLS = 5;
+
+/** Label in muted, value in text, e.g. `↑1.2k`. */
+function metric(style: FooterStyle, label: string, value: string): string {
+  return style("muted", label) + style("text", value);
 }
 
-/**
- * Push CH (cumulative session cache hit rate) onto the array.
- * Denominator includes cacheRead + cacheWrite + input (matches PI's built-in footer).
- * Contrast with TCH which is per-turn and excludes cacheWrite.
- */
-function pushCHPart(parts: string[], usage: UsageTotals): void {
-  const { totalCacheRead, totalCacheWrite, totalInput } = usage;
-  const denom = totalCacheRead + totalCacheWrite + totalInput;
-  if ((totalCacheRead > 0 || totalCacheWrite > 0) && denom > 0) {
-    parts.push(`CH${((totalCacheRead / denom) * 100).toFixed(1)}%`);
-  }
-}
-
-/** Build the core stats parts array (↑↓RW CH extra cost context). */
-function buildStatsParts(
-  usage: UsageTotals,
-  params: {
-    contextWindow: number;
-    percent: number | null;
-    useSubscription: boolean;
-    extraParts?: string[];
-    suffixParts?: string[];
-  },
-): string[] {
-  const { totalCost } = usage;
-  const { contextWindow, percent, useSubscription, extraParts, suffixParts } = params;
-  const contextPercent = percent != null ? percent.toFixed(1) : "?";
-
+/** Token totals: `↑input ↓output`. */
+function tokenGroup(usage: UsageTotals, style: FooterStyle): string[] {
   const parts: string[] = [];
-  pushTokenParts(parts, usage);
-  pushCHPart(parts, usage);
-
-  for (const part of extraParts ?? []) {
-    if (part) parts.push(part);
-  }
-
-  if (totalCost || useSubscription) {
-    parts.push(`$${totalCost.toFixed(3)}${useSubscription ? " (sub)" : ""}`);
-  }
-
-  parts.push(
-    contextPercent === "?"
-      ? `?/${formatTokens(contextWindow)}`
-      : `${contextPercent}%/${formatTokens(contextWindow)}`,
-  );
-
-  for (const part of suffixParts ?? []) {
-    if (part) parts.push(part);
-  }
-
+  if (usage.totalInput) parts.push(metric(style, "↑", formatTokens(usage.totalInput)));
+  if (usage.totalOutput) parts.push(metric(style, "↓", formatTokens(usage.totalOutput)));
   return parts;
 }
 
-/** Build the left-side stats string. */
-export function buildStatsLeft(params: {
-  contextWindow: number;
-  percent: number | null;
-  usage: UsageTotals;
-  useSubscription: boolean;
-  /** Extra parts inserted after CH, before cost and context. */
-  extraParts?: string[];
-  /** Extra parts appended after cost and context. */
-  suffixParts?: string[];
-}): { text: string; contextPercentValue: number } {
-  const { usage } = params;
-  const contextPercentValue = params.percent ?? 0;
-  const parts = buildStatsParts(usage, params);
-  return { text: parts.join(" "), contextPercentValue };
+/**
+ * Cache totals and CH (cumulative session cache hit rate).
+ * Denominator includes cacheRead + cacheWrite + input (matches PI's built-in footer).
+ * Contrast with TCH which is per-turn and excludes cacheWrite.
+ */
+function cacheGroup(usage: UsageTotals, style: FooterStyle): string[] {
+  const { totalCacheRead, totalCacheWrite, totalInput } = usage;
+  const parts: string[] = [];
+  if (totalCacheRead) parts.push(metric(style, "R", formatTokens(totalCacheRead)));
+  if (totalCacheWrite) parts.push(metric(style, "W", formatTokens(totalCacheWrite)));
+  const denom = totalCacheRead + totalCacheWrite + totalInput;
+  if ((totalCacheRead > 0 || totalCacheWrite > 0) && denom > 0) {
+    const rate = (totalCacheRead / denom) * 100;
+    const color: ThemeColor = rate >= 80 ? "success" : rate >= 50 ? "warning" : "error";
+    parts.push(style("muted", "CH") + style(color, `${rate.toFixed(1)}%`));
+  }
+  return parts;
 }
 
-// ---- context-percent coloring ----
+function contextColor(percent: number): ThemeColor {
+  if (percent > 90) return "error";
+  if (percent > 70) return "warning";
+  return "muted";
+}
 
-/** Color the context-% portion based on thresholds. */
-export function colorContextPercent(statsLeft: string, pctVal: number, theme: FooterTheme): string {
-  if (pctVal > 90) {
-    return statsLeft.replace(/\d+\.?\d*%/, (m) => theme.fg("error", m));
+/** Context usage: optional bar, then `percent%/window`. */
+function contextGroup(
+  params: { contextWindow: number; percent: number | null; bar: boolean },
+  style: FooterStyle,
+): string {
+  const window = style("dim", `/${formatTokens(params.contextWindow)}`);
+  if (params.percent == null) return style("muted", "?") + window;
+  const color = contextColor(params.percent);
+  const label = style(color, `${params.percent.toFixed(1)}%`) + window;
+  if (!params.bar) return label;
+  const filled = Math.min(
+    CONTEXT_BAR_CELLS,
+    Math.max(params.percent > 0 ? 1 : 0, Math.round((params.percent / 100) * CONTEXT_BAR_CELLS)),
+  );
+  const bar =
+    style(color === "muted" ? "accent" : color, "▰".repeat(filled)) +
+    style("dim", "▱".repeat(CONTEXT_BAR_CELLS - filled));
+  return `${bar} ${label}`;
+}
+
+/**
+ * Build the styled left side of the stats line.
+ *
+ * Groups (tokens, cache + `stats` contributions, cost, context) and each
+ * `stats-end` contribution are joined with a dim ` · `.
+ */
+export function buildStatsLeft(
+  params: {
+    contextWindow: number;
+    percent: number | null;
+    usage: UsageTotals;
+    useSubscription: boolean;
+    /** Draw a small context bar; disable for ASCII terminals. */
+    contextBar?: boolean;
+    /** Extra parts inserted after CH, before cost and context. */
+    extraParts?: string[];
+    /** Extra parts appended after cost and context. */
+    suffixParts?: string[];
+  },
+  style: FooterStyle = plainStyle,
+): string {
+  const { usage, useSubscription } = params;
+  const groups: string[][] = [
+    tokenGroup(usage, style),
+    [...cacheGroup(usage, style), ...dimParts(params.extraParts, style)],
+  ];
+  if (usage.totalCost || useSubscription) {
+    const sub = useSubscription ? style("dim", " (sub)") : "";
+    groups.push([style("text", `$${usage.totalCost.toFixed(3)}`) + sub]);
   }
-  if (pctVal > 70) {
-    return statsLeft.replace(/\d+\.?\d*%/, (m) => theme.fg("warning", m));
-  }
-  return statsLeft;
+  groups.push([
+    contextGroup(
+      { contextWindow: params.contextWindow, percent: params.percent, bar: !!params.contextBar },
+      style,
+    ),
+  ]);
+
+  const suffix = dimParts(params.suffixParts, style).map((part) => [part]);
+  return [...groups, ...suffix]
+    .filter((group) => group.length > 0)
+    .map((group) => group.join(" "))
+    .join(style("dim", " · "));
+}
+
+/**
+ * Contributions keep the former dim base color; their own styles still apply.
+ * A leading `|` separator from older contributions is dropped because the
+ * footer now owns separators.
+ */
+function dimParts(parts: string[] | undefined, style: FooterStyle): string[] {
+  return (parts ?? [])
+    .map((part) => part.replace(/^\|\s*/, ""))
+    .filter(Boolean)
+    .map((part) => style("dim", part));
 }
 
 // ---- right-side builders ----
@@ -293,20 +324,43 @@ export function layoutRightSide(params: {
 
 // ---- path line ----
 
-/** Build the working-directory line for the footer. */
-export function buildPwdLine(params: {
-  cwd: string;
-  gitBranch: string | null;
-  sessionName: string | undefined;
-}): string {
+/**
+ * Build the working-directory line for the footer.
+ *
+ * Without glyphs (ASCII mode) the branch keeps the `(branch)` format.
+ */
+export function buildPwdLine(
+  params: {
+    cwd: string;
+    gitBranch: string | null;
+    sessionName: string | undefined;
+    /** Pre-styled Git counts appended after the branch. */
+    gitStatus?: string;
+    glyphs?: Pick<FooterGlyphs, "cwd" | "branch" | "session" | "iconGap">;
+  },
+  style: FooterStyle = plainStyle,
+): string {
   const home = process.env.HOME || process.env.USERPROFILE;
-  let pwd = params.cwd;
-  if (home && pwd.startsWith(home)) {
-    pwd = `~${pwd.slice(home.length)}`;
+  let path = params.cwd;
+  if (home && path.startsWith(home)) {
+    path = `~${path.slice(home.length)}`;
   }
-  if (params.gitBranch) pwd = `${pwd} (${params.gitBranch})`;
-  if (params.sessionName) pwd = `${pwd} • ${params.sessionName}`;
-  return pwd;
+  const glyphs = params.glyphs;
+  const gap = glyphs?.iconGap ?? " ";
+  const parts: string[] = [];
+  parts.push((glyphs?.cwd ? style("accent", glyphs.cwd) + gap : "") + style("muted", path));
+  if (params.gitBranch) {
+    const status = params.gitStatus ? ` ${params.gitStatus}` : "";
+    parts.push(
+      glyphs?.branch
+        ? ` ${style("accent", glyphs.branch)} ${style("accent", params.gitBranch)}${status}`
+        : `${style("dim", "(")}${style("accent", params.gitBranch)}${style("dim", ")")}${status}`,
+    );
+  }
+  if (params.sessionName) {
+    parts.push(`${style("dim", glyphs?.session ?? "•")}${gap}${style("text", params.sessionName)}`);
+  }
+  return parts.join(" ");
 }
 
 // ---- thinking level ----

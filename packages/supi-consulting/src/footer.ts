@@ -11,8 +11,7 @@ export function registerConsultingFooterContribution(runtime: ConsultingRuntime)
     placement: "stats-end",
     priority: 110,
     render: () => {
-      const icon = runtime.footerIcon;
-      return icon ? `| ${icon}` : "";
+      return runtime.footerIcon ?? "";
     },
   });
 

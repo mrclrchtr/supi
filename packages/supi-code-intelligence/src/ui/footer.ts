@@ -1,7 +1,7 @@
 /**
  * LSP footer stats-end contribution for code-intelligence.
  *
- * Provides the persistent "| λ lsp • N ✓ • M open files" suffix on the
+ * Provides the persistent "λ lsp • N ✓ • M open files" suffix on the
  * footer stats line, after cost and context info. This was removed during the
  * supi-lsp → supi-code-intelligence migration.
  */
@@ -55,9 +55,7 @@ export function registerLspFooterContribution(
     placement: "stats-end",
     priority: 100,
     render: () => {
-      const text = buildLspStatusText(lspState);
-      if (!text) return "";
-      return `| ${text}`;
+      return buildLspStatusText(lspState) ?? "";
     },
   });
 

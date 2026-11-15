@@ -225,10 +225,10 @@ describe("supi-consulting extension", () => {
       .getByPlacement("stats-end")
       .find((item) => item.key === CONSULTING_FOOTER_KEY);
     expect(contribution).toMatchObject({ placement: "stats-end", priority: 110 });
-    expect(BRAILLE_SPINNER_FRAMES.map((frame) => `| ${frame}`)).toContain(contribution?.render());
+    expect(BRAILLE_SPINNER_FRAMES).toContain(contribution?.render());
 
     const tool = await waitForTool(pi);
-    expect(contribution?.render()).toBe("| ✦");
+    expect(contribution?.render()).toBe("✦");
     expect(tool.name).toBe("consulting_run");
     expect(tool.description).toBe(toolDescription);
     expect(tool.description).toMatch(/external agent.*web research.*design advice/i);

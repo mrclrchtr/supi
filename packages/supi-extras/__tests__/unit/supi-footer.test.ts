@@ -645,7 +645,7 @@ describe("supiFooter extension", () => {
       );
       const lines = renderer.render(200);
       expect(lines).toHaveLength(2);
-      expect(lines[1]).toContain("| λ lsp • 3 ✓ | ✦");
+      expect(lines[1]).toContain("λ lsp • 3 ✓ · ✦");
     });
 
     it("renders TCH from real registry after CH", async () => {

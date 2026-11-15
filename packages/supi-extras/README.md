@@ -102,6 +102,19 @@ While the agent is working, the package animates a spinner in the terminal tab t
 
 The package replaces pi's default footer. It shows the model and thinking level with theme colors.
 
+The path line shows the Git branch with ahead/behind and file counts, for example `main ⇡2 +1 !3 ?1`. Counts refresh after tool runs, at most once per second. The stash count includes only stashes created on the current branch, because all worktrees of a repository share one stash stack.
+
+The stats line groups token totals, cache totals with the session cache-hit rate, cost, and context usage. Cache-hit and context values change color at their thresholds; context usage also shows a small bar unless icons are set to `ascii`.
+
+Configure the footer under `/supi-settings` → **Footer**:
+
+| Setting | Values | Default |
+| --- | --- | --- |
+| `icons` | `auto`, `nerd`, `unicode`, `ascii` | `auto` |
+| `gitStatus` | `true`, `false` | `true` |
+
+`auto` cannot detect the terminal font. It uses Nerd Font icons on a local UTF-8 terminal, Unicode symbols over SSH, and ASCII otherwise. If icons render as boxes, choose `unicode`. `ascii` keeps the former `path (branch)` layout.
+
 ### Headless git safety
 
 The package sets:
