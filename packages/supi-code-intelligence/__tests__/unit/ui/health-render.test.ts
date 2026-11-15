@@ -1,4 +1,5 @@
 import { initTheme } from "@earendil-works/pi-coding-agent";
+import { createMarkedTheme } from "@mrclrchtr/supi-test-utils";
 import { beforeAll, describe, expect, it } from "vitest";
 import { renderHealthResult } from "../../../src/tool/code_health/tui.ts";
 
@@ -519,5 +520,78 @@ describe("code_health TUI projection", () => {
     const expanded = render(details, true);
     expect(expanded).toContain("Capability Warnings");
     expect(expanded).toContain("pyright-langserver not found on PATH");
+  });
+
+  describe("diagnostic tone", () => {
+    const marked = createMarkedTheme();
+    /** Marks add width; render wide so tone tokens are not split across wrapped lines. */
+    const renderMarked = (data: Record<string, unknown>, expanded: boolean) =>
+      renderHealthResult(
+        { content: [{ type: "text", text: "## Code Health" }], details: { type: "health", data } },
+        { expanded, isPartial: false },
+        marked as never,
+        undefined,
+      )
+        .render(1000)
+        .join("\n");
+    /** The compact line joins segments with a dim dot; diagnostics come first. */
+    const compactDiagnostics = (data: Record<string, unknown>) =>
+      renderMarked(data, false).split(" [dim]·[/dim] ")[0] ?? "";
+    /** The expanded diagnostic summary is the line naming diagnostics or issues. */
+    const expandedDiagnostics = (data: Record<string, unknown>) =>
+      renderMarked(data, true)
+        .split("\n")
+        .filter((line) => /diagnostic|issues/i.test(line) && !line.includes("Diagnostics:"))
+        .join("\n");
+    const emptyDiagnostics = (coverage: string, evidence: Record<string, number>) =>
+      makeDetails({
+        sections: [
+          {
+            key: "diagnostics",
+            title: "Diagnostics",
+            status: "complete",
+            confidence: "semantic",
+            provenance: [{ source: "semantic", capability: "LSP" }],
+            itemCount: 0,
+            available: true,
+          },
+        ],
+        diagnosticObservation: {
+          kind: "completed",
+          scope: { kind: "tracked-files", filter: null },
+          entries: [],
+          evidence: { unconfirmed: 0, failed: 0, removed: 0, documents: [], ...evidence },
+        },
+        diagnosticCoverage: coverage,
+      });
+
+    it("renders confirmed clean coverage in success tone", () => {
+      const details = emptyDiagnostics("confirmed", { requested: 2, confirmed: 2 });
+
+      expect(compactDiagnostics(details)).toContain("[dim]diag[/dim] [success][bold]0[/bold]");
+      expect(expandedDiagnostics(details)).toContain("[success]No reported issues");
+    });
+
+    it("never renders zero coverage in success tone", () => {
+      const details = emptyDiagnostics("none", { requested: 0, confirmed: 0 });
+
+      const compact = compactDiagnostics(details);
+      expect(compact).toContain("[muted]none checked (0 tracked files)[/muted]");
+      expect(compact).not.toContain("[success]");
+      const expanded = expandedDiagnostics(details);
+      expect(expanded).toContain("[dim]No source diagnostics checked");
+      expect(expanded).not.toContain("[success]");
+    });
+
+    it("renders incomplete coverage in warning tone, not success", () => {
+      const details = emptyDiagnostics("incomplete", { requested: 2, confirmed: 1, removed: 1 });
+
+      const compact = compactDiagnostics(details);
+      expect(compact).toMatch(/\[warning\]incomplete\[\/warning\]/);
+      expect(compact).not.toContain("[success]");
+      const expanded = expandedDiagnostics(details);
+      expect(expanded).toContain("[warning]Diagnostic evidence incomplete");
+      expect(expanded).not.toContain("[success]");
+    });
   });
 });

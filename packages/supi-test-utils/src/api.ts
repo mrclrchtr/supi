@@ -5,6 +5,8 @@
 //   import { createPiMock } from "@mrclrchtr/supi-test-utils/api";
 
 export { getHandler, getHandlerOrThrow } from "./handler-utils.ts";
+export type { MarkedTheme } from "./marked-theme.ts";
+export { createMarkedTheme } from "./marked-theme.ts";
 export { createPiMock, makeCtx } from "./pi-mock.ts";
 export type { ToolDef } from "./tool-utils.ts";
 export { getTool, getTools } from "./tool-utils.ts";

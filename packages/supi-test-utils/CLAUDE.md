@@ -7,6 +7,7 @@ Shared test utilities for SuPi extension tests. Not a pi extension — imported 
 `createPiMock(options?)` captures extension registrations; `makeCtx(overrides?)` supplies a default handler context. Use accessor helpers for typed access and explicit missing-registration failures:
 
 - `getTools(pi)` / `getTool(pi, name)` — typed tool access; `getTool` throws if not found
+- `createMarkedTheme()` — test theme rendering `fg("success", "0")` as `[success]0[/success]`; use it when render tests must assert tone
 - `getHandler(pi, event)` → `handler | undefined` / `getHandlerOrThrow(pi, event)` → `handler`
 
 ## Usage

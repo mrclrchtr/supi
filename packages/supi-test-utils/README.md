@@ -18,6 +18,7 @@ This is a **workspace-internal** package (`"private": true`). It is meant for te
 - `makeCtx()` — minimal mock handler context with easy overrides
 - `getHandler()` / `getHandlerOrThrow()` — fetch registered `pi.on(...)` handlers from the mock
 - `getTools()` / `getTool()` — inspect registered tools with typed helpers
+- `createMarkedTheme()` — test theme that marks colors and styles in rendered text, so TUI render tests can assert tone
 - `ToolDef` — simple tool type used by the tool helpers
 
 ## `createPiMock()`
@@ -85,6 +86,23 @@ const tool = getTool(pi, "web_docs_search");
 await tool.execute("tc-1", { libraryName: "react" }, undefined, undefined, ctx);
 ```
 
+## `createMarkedTheme()`
+
+Use this when a render test must check tone, not just text. A plain test theme (`fg: (_color, text) => text`) discards the color, so it cannot catch a zero count rendered in success color.
+
+```ts
+import { createMarkedTheme } from "@mrclrchtr/supi-test-utils";
+
+const theme = createMarkedTheme();
+theme.fg("success", theme.bold("0")); // "[success][bold]0[/bold][/success]"
+
+const output = renderResult(result, options, theme as never, undefined).render(200).join("\n");
+expect(output).toContain("[muted]none checked");
+expect(output).not.toContain("[success]");
+```
+
+Keep the plain theme for tests that only assert text. Adopt the marked theme where tone carries meaning, such as diagnostics, status, or errors. Tokens add width, so render at a generous width.
+
 ## Mocking guidance
 
 When mocking `@mrclrchtr/supi-core`, prefer `importOriginal` so new runtime exports do not break older tests:
@@ -110,6 +128,7 @@ src/
   api.ts           # Public API surface
   index.ts         # Package-root re-export surface
   pi-mock.ts       # createPiMock(), makeCtx()
+  marked-theme.ts  # createMarkedTheme()
   handler-utils.ts # getHandler(), getHandlerOrThrow()
   tool-utils.ts    # getTools(), getTool(), ToolDef
 __tests__/
@@ -124,5 +143,6 @@ __tests__/
 - `src/api.ts` — public API surface, re-exports all public functions
 - `src/index.ts` — package-root re-export surface, re-exports from `api.ts`
 - `src/pi-mock.ts` — `createPiMock()` and `makeCtx()`
+- `src/marked-theme.ts` — `createMarkedTheme()`
 - `src/handler-utils.ts` — handler lookup helpers
 - `src/tool-utils.ts` — tool lookup helpers
