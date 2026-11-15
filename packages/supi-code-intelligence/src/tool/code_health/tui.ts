@@ -207,8 +207,9 @@ function formatSectionSummary(
     return `${theme.fg("dim", label)} ${theme.fg("warning", "partial")}${coverageSuffix}`;
   }
 
-  const suffix = section.key === "diagnostics" && !coverage ? " with issues" : "";
-  return `${theme.fg("dim", label)} ${theme.fg("success", theme.bold(`${section.itemCount}`))}${theme.fg("muted", suffix)}${coverageSuffix}`;
+  const suffix =
+    section.key === "diagnostics" && !coverage ? theme.fg("muted", " with issues") : "";
+  return `${theme.fg("dim", label)} ${theme.fg("success", theme.bold(`${section.itemCount}`))}${suffix}${coverageSuffix}`;
 }
 
 function buildStatusBar(data: Record<string, unknown> | null, theme: Theme): Text {

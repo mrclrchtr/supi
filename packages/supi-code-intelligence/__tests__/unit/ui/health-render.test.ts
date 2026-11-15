@@ -593,5 +593,11 @@ describe("code_health TUI projection", () => {
       expect(expanded).toContain("[warning]Diagnostic evidence incomplete");
       expect(expanded).not.toContain("[success]");
     });
+
+    it("renders the server count without an empty styled suffix", () => {
+      const compact = renderMarked(makeDetails(), false);
+
+      expect(compact).toContain("[dim]servers[/dim] [success][bold]1[/bold][/success] [dim]·");
+    });
   });
 });
