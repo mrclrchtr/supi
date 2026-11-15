@@ -40,7 +40,6 @@ async function orient(input: object = {}) {
 
 function capturedDetails(text: string): string | undefined {
   const snapshot = text.match(/Captured details[^`]*`([^`]+)`/)?.[1];
-  if (snapshot) captures.add(dirname(snapshot));
   return snapshot;
 }
 
@@ -88,6 +87,18 @@ describe("workspace Overview captures", () => {
     expect(output.content).not.toContain("Reading it does not refresh the observation");
     expect(snapshot).toBeDefined();
     expect(readFileSync(snapshot as string, "utf8")).toContain('"path": "file-5.txt"');
+  });
+
+  it("reuses one captured file for repeated Overviews of an unchanged workspace", async () => {
+    for (let index = 0; index < 6; index++) put(`file-${index}.txt`, "");
+    const first = capturedDetails((await overview()).content);
+    const second = capturedDetails((await overview()).content);
+
+    expect(first).toBeDefined();
+    expect(second).toBe(first);
+
+    put("file-6.txt", "");
+    expect(capturedDetails((await overview()).content)).not.toBe(first);
   });
 
   it("links omitted descriptions even when no navigation rows are omitted", async () => {
@@ -144,7 +155,6 @@ describe("workspace Orientation output", () => {
     expect(captured).toContain("Data service");
     expect(captured).toContain("units/app");
     expect(captured).not.toMatch(/service.*node-workspace/);
-    rmSync(dirname(snapshot as string), { recursive: true, force: true });
   });
 
   it("defers directory metadata while capturing dependency categories and instructions intact", async () => {
@@ -228,7 +238,6 @@ describe("workspace Orientation output", () => {
     const snapshot = capturedDetails(text);
     expect(snapshot).toBeDefined();
     expect(readFileSync(snapshot as string, "utf8")).toContain("Long description ".repeat(1000));
-    rmSync(dirname(snapshot as string), { recursive: true, force: true });
   });
 
   it("orients a source-only project without requiring Node metadata", async () => {

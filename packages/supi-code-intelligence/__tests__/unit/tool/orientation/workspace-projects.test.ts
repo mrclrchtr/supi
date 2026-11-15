@@ -1,5 +1,4 @@
-import { readFileSync, rmSync } from "node:fs";
-import { dirname } from "node:path";
+import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { observeWorkspace } from "../../../../src/analysis/workspace/observe.ts";
 import {
@@ -20,15 +19,12 @@ import {
 } from "../../analysis/workspace/helpers.ts";
 
 let root: string;
-const snapshots: string[] = [];
 
 beforeEach(() => {
   root = makeWorkspace("workspace-project-output-");
 });
 afterEach(() => {
   cleanupWorkspaces();
-  for (const snapshot of snapshots.splice(0))
-    rmSync(dirname(snapshot), { recursive: true, force: true });
 });
 
 async function facts(): Promise<WorkspaceOrientationFacts> {
@@ -248,7 +244,6 @@ describe("compact workspace project evidence", () => {
       if (surface === "overview") expect(snapshot).toBeUndefined();
       else {
         expect(snapshot).toBeDefined();
-        snapshots.push(snapshot!);
         expect(readFileSync(snapshot!, "utf8")).toContain('"manifestPath": "pnpm-workspace.yaml"');
       }
       expect(output.warning).toBeUndefined();

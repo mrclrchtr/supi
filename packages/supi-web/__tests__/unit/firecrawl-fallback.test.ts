@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
-import { readFile, rm } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { inspect } from "node:util";
 import { DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES } from "@earendil-works/pi-coding-agent";
 import { writeSupiConfig } from "@mrclrchtr/supi-core/config";
@@ -171,12 +171,8 @@ describe("agent-selected Firecrawl retrieval", () => {
       expect(rendered).toContain("Firecrawl");
       expect(JSON.stringify(result)).not.toContain("fixture-key");
       if (data.mode === "file") {
-        try {
-          expect(await readFile(data.filePath, "utf8")).toBe(markdown);
-          expect(data).not.toHaveProperty("markdown");
-        } finally {
-          await rm(dirname(data.filePath), { recursive: true, force: true });
-        }
+        expect(await readFile(data.filePath, "utf8")).toBe(markdown);
+        expect(data).not.toHaveProperty("markdown");
       } else {
         expect(data.markdown).toBe(markdown);
       }
@@ -232,20 +228,16 @@ describe("agent-selected Firecrawl retrieval", () => {
     const data = expectStructuredContent<WebFetchMdOutput>(tool, result);
     expect(data.mode).toBe("file");
     if (data.mode !== "file") throw new Error("Expected file delivery");
-    try {
-      const text = result.content
-        .map((block) => (block.type === "text" ? block.text : ""))
-        .join("\n");
-      expect(Buffer.byteLength(text)).toBeLessThanOrEqual(DEFAULT_MAX_BYTES);
-      expect(text.split("\n").length).toBeLessThanOrEqual(DEFAULT_MAX_LINES);
-      expect(text).toContain(data.filePath);
-      expect(text).toContain("Firecrawl");
-      expect(text).toContain(sourceUrl);
-      expect(data.url).toBe(url);
-      expect(await readFile(data.filePath, "utf8")).toBe(markdown);
-    } finally {
-      await rm(dirname(data.filePath), { recursive: true, force: true });
-    }
+    const text = result.content
+      .map((block) => (block.type === "text" ? block.text : ""))
+      .join("\n");
+    expect(Buffer.byteLength(text)).toBeLessThanOrEqual(DEFAULT_MAX_BYTES);
+    expect(text.split("\n").length).toBeLessThanOrEqual(DEFAULT_MAX_LINES);
+    expect(text).toContain(data.filePath);
+    expect(text).toContain("Firecrawl");
+    expect(text).toContain(sourceUrl);
+    expect(data.url).toBe(url);
+    expect(await readFile(data.filePath, "utf8")).toBe(markdown);
   });
 
   it.each([true, false])(

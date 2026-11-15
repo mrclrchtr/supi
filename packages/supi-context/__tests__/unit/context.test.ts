@@ -1,5 +1,4 @@
-import { readFile, rm } from "node:fs/promises";
-import { dirname } from "node:path";
+import { readFile } from "node:fs/promises";
 import { DEFAULT_MAX_BYTES } from "@earendil-works/pi-coding-agent";
 import type { TSchema } from "typebox";
 import { Value } from "typebox/value";
@@ -377,21 +376,17 @@ describe("supi-context extension surfaces", () => {
       details: unknown;
     };
     const { path, bytes } = result.structuredContent.attributionFile;
-    try {
-      expectNativeResult(pi, result);
-      expect(result.structuredContent).toEqual({
-        ...snapshot,
-        attributionFile: { path: expect.any(String), bytes: expect.any(Number) },
-      });
-      const saved = await readFile(path, "utf8");
-      expect(saved).toBe(JSON.stringify(expected));
-      expect(saved).not.toContain("EXCLUDED_");
-      expect(bytes).toBe(Buffer.byteLength(saved, "utf8"));
-      const { outputSchema } = tool as typeof tool & { outputSchema: TSchema };
-      expect(Value.Check(outputSchema, JSON.parse(saved))).toBe(true);
-      expect(result.details).toEqual({ mode: "full", analysis: oversizedAnalysis });
-    } finally {
-      await rm(dirname(path), { recursive: true, force: true });
-    }
+    expectNativeResult(pi, result);
+    expect(result.structuredContent).toEqual({
+      ...snapshot,
+      attributionFile: { path: expect.any(String), bytes: expect.any(Number) },
+    });
+    const saved = await readFile(path, "utf8");
+    expect(saved).toBe(JSON.stringify(expected));
+    expect(saved).not.toContain("EXCLUDED_");
+    expect(bytes).toBe(Buffer.byteLength(saved, "utf8"));
+    const { outputSchema } = tool as typeof tool & { outputSchema: TSchema };
+    expect(Value.Check(outputSchema, JSON.parse(saved))).toBe(true);
+    expect(result.details).toEqual({ mode: "full", analysis: oversizedAnalysis });
   });
 });

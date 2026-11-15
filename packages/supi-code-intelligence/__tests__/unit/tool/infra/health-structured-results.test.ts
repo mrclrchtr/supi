@@ -1,6 +1,6 @@
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, relative } from "node:path";
+import { join, relative } from "node:path";
 import { setWorkspaceLspRuntimeState, type WorkspaceLspRuntime } from "@mrclrchtr/supi-lsp/api";
 import { createPiMock, getTool, makeCtx } from "@mrclrchtr/supi-test-utils";
 import type { TSchema } from "typebox";
@@ -464,7 +464,6 @@ describe("registered health structured results", () => {
     const spill = (result.details as { truncation?: { fullOutputPath?: string } }).truncation
       ?.fullOutputPath;
     expect(spill).toBeDefined();
-    if (spill) rmSync(dirname(spill), { recursive: true, force: true });
   });
   it("propagates execution failures and cancellation", async () => {
     ready({

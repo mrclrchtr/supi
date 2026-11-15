@@ -1,5 +1,4 @@
-import { readFile, rm } from "node:fs/promises";
-import { dirname } from "node:path";
+import { readFile } from "node:fs/promises";
 import { createPiMock, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { describe, expect, it, vi } from "vitest";
 import type { WebFetchMdOutput } from "../../src/tool/web_fetch_md/result-schema.ts";
@@ -226,18 +225,14 @@ describe("webExtension", () => {
       const data = expectStructuredContent<WebFetchMdOutput>(tool, result);
       expect(data.mode).toBe("file");
       if (data.mode !== "file") throw new Error("Expected file payload");
-      try {
-        expect(data.chars).toBe(markdown.length);
-        expect(await readFile(data.filePath, "utf8")).toBe(markdown);
-        expect(result).toMatchObject({
-          content: [{ text: expect.stringContaining(data.filePath) }],
-          details: { filePath: data.filePath },
-        });
-        expect(renderToolResult(tool, result, false)).toContain("Saved Markdown to");
-        expect(data).not.toHaveProperty("markdown");
-      } finally {
-        await rm(dirname(data.filePath), { recursive: true, force: true });
-      }
+      expect(data.chars).toBe(markdown.length);
+      expect(await readFile(data.filePath, "utf8")).toBe(markdown);
+      expect(result).toMatchObject({
+        content: [{ text: expect.stringContaining(data.filePath) }],
+        details: { filePath: data.filePath },
+      });
+      expect(renderToolResult(tool, result, false)).toContain("Saved Markdown to");
+      expect(data).not.toHaveProperty("markdown");
     } finally {
       vi.unstubAllGlobals();
     }
@@ -285,9 +280,6 @@ describe("webExtension", () => {
       fullOutputPath: result.details?.fullOutputPath,
     });
     expect(renderToolResult(tool, result, false)).toContain("[truncated]");
-    if (data.modelOutput.fullOutputPath) {
-      await rm(dirname(data.modelOutput.fullOutputPath), { recursive: true, force: true });
-    }
 
     vi.unstubAllGlobals();
   });

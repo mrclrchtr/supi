@@ -1,5 +1,4 @@
-import { readFileSync, rmSync } from "node:fs";
-import { dirname } from "node:path";
+import { readFileSync } from "node:fs";
 import { createPiMock, getTool, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { Type } from "typebox";
 import { describe, expect, it } from "vitest";
@@ -83,7 +82,6 @@ describe("registerCodeIntelligenceTools adapter", () => {
       const spillPath = text.match(/Full output saved to: `([^`]+)`/)?.[1];
       expect(spillPath).toBeDefined();
       expect(readFileSync(spillPath as string, "utf8")).toBe(big);
-      rmSync(dirname(spillPath as string), { recursive: true, force: true });
       // details passed through untouched (not truncated)
       expect(res.details).toMatchObject({
         type: "search",

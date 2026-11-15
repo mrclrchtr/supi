@@ -100,7 +100,6 @@ function setup(query: GradleModelQuery = async (selectedRoot) => model(selectedR
 function capture(text: string): string {
   const snapshot = text.match(/Captured details[^`]*`([^`]+)`/)?.[1];
   if (!snapshot) throw new Error("Expected captured details");
-  captures.add(dirname(snapshot));
   return readFileSync(snapshot, "utf8");
 }
 

@@ -1,6 +1,6 @@
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { completedCodeQuery } from "@mrclrchtr/supi-code-runtime/api";
 import { createPiMock, getTool, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -17,7 +17,6 @@ vi.mock("node:fs", async (importOriginal) => {
 
 const theme = { fg: (_color: string, text: string) => text, bold: (text: string) => text } as never;
 let cwd: string;
-const artifacts: string[] = [];
 
 beforeEach(() => {
   cwd = mkdtempSync(join(tmpdir(), "graph-file-display-"));
@@ -40,8 +39,6 @@ beforeEach(() => {
 afterEach(() => {
   vi.restoreAllMocks();
   clearMockRuntime();
-  for (const artifact of artifacts.splice(0))
-    rmSync(dirname(artifact), { recursive: true, force: true });
   rmSync(cwd, { recursive: true, force: true });
 });
 
@@ -61,8 +58,6 @@ async function execute(maxResults: number): Promise<ToolResult> {
     undefined,
     makeCtx({ cwd }),
   );
-  const artifact = result.details?.truncation?.fullOutputPath;
-  if (artifact) artifacts.push(artifact);
   return result;
 }
 

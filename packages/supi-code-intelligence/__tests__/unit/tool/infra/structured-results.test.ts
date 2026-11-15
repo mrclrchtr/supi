@@ -1,6 +1,6 @@
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { completedCodeQuery } from "@mrclrchtr/supi-code-runtime/api";
 import { createPiMock, getTool, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { createTreeSitterSession } from "@mrclrchtr/supi-tree-sitter/api";
@@ -499,18 +499,14 @@ describe("structured navigation results", () => {
     const text = result.content[0].text;
     const snapshot = text.match(/Full output saved to: `([^`]+)`/)?.[1];
     expect(snapshot).toBeDefined();
-    try {
-      expect(text.length).toBeLessThanOrEqual(8000);
-      expect(text).toContain("returned=1, total=1, cap-omitted=0");
-      expect(result.structuredContent).toMatchObject({
-        matches: [{ name }],
-        evidenceLists: [{ shownCount: 1, totalCount: 1 }],
-      });
-      expect(Value.Check(tool.outputSchema, result.structuredContent)).toBe(true);
-      expect(readFileSync(snapshot as string, "utf8")).toContain(name);
-    } finally {
-      if (snapshot) rmSync(dirname(snapshot), { recursive: true, force: true });
-    }
+    expect(text.length).toBeLessThanOrEqual(8000);
+    expect(text).toContain("returned=1, total=1, cap-omitted=0");
+    expect(result.structuredContent).toMatchObject({
+      matches: [{ name }],
+      evidenceLists: [{ shownCount: 1, totalCount: 1 }],
+    });
+    expect(Value.Check(tool.outputSchema, result.structuredContent)).toBe(true);
+    expect(readFileSync(snapshot as string, "utf8")).toContain(name);
   });
 
   it("returns capped semantic matches with their anchor type and exact totals", async () => {

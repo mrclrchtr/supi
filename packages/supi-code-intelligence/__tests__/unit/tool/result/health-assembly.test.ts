@@ -1,5 +1,4 @@
-import { readFileSync, rmSync } from "node:fs";
-import { dirname } from "node:path";
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import type { HealthData } from "../../../../src/session/health-types.ts";
 import { renderHealthResult } from "../../../../src/tool/code_health/markdown.ts";
@@ -366,20 +365,16 @@ describe("code_health result assembly", () => {
     const result = boundCodeToolResult(raw.content, raw.details, { toolName: "code_health" });
     const snapshot = result.details?.truncation?.fullOutputPath;
     expect(snapshot).toBeDefined();
-    try {
-      const text = result.content[0].text;
-      expect(text.length).toBeLessThanOrEqual(8000);
-      expect(text).toContain("Diagnostics: partial; tracked-file snapshot; filter=src");
-      expect(text).toContain("not workspace-wide verification");
-      expect(text).toContain(
-        "Diagnostic coverage: incomplete; requested=1, confirmed=0, unconfirmed=1, failed=0, removed=0",
-      );
-      expect(text).toContain("Fresh diagnostics were not confirmed");
-      expect(text).toContain("Rust language server missing");
-      expect(readFileSync(snapshot as string, "utf8")).toBe(raw.content);
-    } finally {
-      if (snapshot) rmSync(dirname(snapshot), { recursive: true, force: true });
-    }
+    const text = result.content[0].text;
+    expect(text.length).toBeLessThanOrEqual(8000);
+    expect(text).toContain("Diagnostics: partial; tracked-file snapshot; filter=src");
+    expect(text).toContain("not workspace-wide verification");
+    expect(text).toContain(
+      "Diagnostic coverage: incomplete; requested=1, confirmed=0, unconfirmed=1, failed=0, removed=0",
+    );
+    expect(text).toContain("Fresh diagnostics were not confirmed");
+    expect(text).toContain("Rust language server missing");
+    expect(readFileSync(snapshot as string, "utf8")).toBe(raw.content);
   });
 
   it("keeps zero-evidence guidance in an oversized preview", () => {
@@ -398,14 +393,10 @@ describe("code_health result assembly", () => {
     const result = boundCodeToolResult(raw.content, raw.details, { toolName: "code_health" });
     const snapshot = result.details?.truncation?.fullOutputPath;
     expect(snapshot).toBeDefined();
-    try {
-      const text = result.content[0].text;
-      expect(text).toContain("Diagnostic coverage: none; requested=0");
-      expect(text).toContain("No source diagnostics checked; this is not a clean result.");
-      expect(text).toContain("run the project's own typecheck or build");
-    } finally {
-      if (snapshot) rmSync(dirname(snapshot), { recursive: true, force: true });
-    }
+    const text = result.content[0].text;
+    expect(text).toContain("Diagnostic coverage: none; requested=0");
+    expect(text).toContain("No source diagnostics checked; this is not a clean result.");
+    expect(text).toContain("run the project's own typecheck or build");
   });
 
   it("does not duplicate punctuation in a partial diagnostic reason", () => {

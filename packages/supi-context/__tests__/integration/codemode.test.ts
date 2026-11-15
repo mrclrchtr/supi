@@ -1,6 +1,6 @@
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import {
   type AssistantMessage,
   createAssistantMessageEventStream,
@@ -219,7 +219,6 @@ it("routes actual snapshot, attribution, and file metadata through default codem
   } finally {
     session?.dispose();
     clearRegisteredContextProviders();
-    for (const path of spillPaths) await rm(dirname(path), { recursive: true, force: true });
     await rm(directory, { recursive: true, force: true });
   }
 }, 30_000);

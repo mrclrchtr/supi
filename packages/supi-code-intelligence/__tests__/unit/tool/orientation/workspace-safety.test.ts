@@ -51,7 +51,6 @@ async function orient(pi: ReturnType<typeof createPiMock>, input: object = {}) {
     .map((part) => part.text)
     .join("\n");
   const snapshot = text.match(/Captured details[^`]*`([^`]+)`/)?.[1];
-  if (snapshot) captures.add(dirname(snapshot));
   return { result, text, snapshot };
 }
 

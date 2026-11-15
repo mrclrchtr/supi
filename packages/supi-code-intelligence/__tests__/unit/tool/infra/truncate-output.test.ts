@@ -1,5 +1,4 @@
-import { readFileSync, rmSync } from "node:fs";
-import { dirname } from "node:path";
+import { readFileSync } from "node:fs";
 import { completedCodeQuery, unavailableCodeQuery } from "@mrclrchtr/supi-code-runtime/api";
 import { describe, expect, it } from "vitest";
 import { finishInspectResult } from "../../../../src/tool/code_inspect/result.ts";
@@ -44,16 +43,12 @@ describe("model output budget", () => {
     const result = boundCodeToolResult(raw.content, raw.details, { toolName: "code_inspect" });
     const snapshot = result.details?.truncation?.fullOutputPath;
     expect(snapshot).toBeDefined();
-    try {
-      const text = result.content[0].text;
-      expect(text.length).toBeLessThanOrEqual(8000);
-      expect(text).toContain("Diagnostic L2:1");
-      expect(text).toContain("Late diagnostic must stay visible");
-      expect(text).toContain("diagnostics: partial");
-      expect(text).toContain("total=unknown");
-    } finally {
-      if (snapshot) rmSync(dirname(snapshot), { recursive: true, force: true });
-    }
+    const text = result.content[0].text;
+    expect(text.length).toBeLessThanOrEqual(8000);
+    expect(text).toContain("Diagnostic L2:1");
+    expect(text).toContain("Late diagnostic must stay visible");
+    expect(text).toContain("diagnostics: partial");
+    expect(text).toContain("total=unknown");
   });
 
   it("keeps late diagnostics and section limitations ahead of a large hover preview", () => {
@@ -93,21 +88,17 @@ describe("model output budget", () => {
     const text = result.content[0].text;
     const snapshot = result.details?.truncation?.fullOutputPath;
     expect(snapshot).toBeDefined();
-    try {
-      expect(text.length).toBeLessThanOrEqual(8000);
-      expect(text).toContain("src/widget.ts:1:1");
-      expect(text).toContain("Late diagnostic must stay visible");
-      expect(text).toContain("Ambient evidence only");
-      expect(text).toContain("Definition lookup unavailable");
-      expect(text.indexOf("Late diagnostic must stay visible")).toBeLessThan(
-        text.indexOf("Long documentation"),
-      );
-      expect(result.details?.truncation?.truncated).toBe(true);
-      expect(result.details?.data).toEqual(raw.details?.data);
-      expect(readFileSync(snapshot as string, "utf8")).toBe(raw.content);
-    } finally {
-      if (snapshot) rmSync(dirname(snapshot), { recursive: true, force: true });
-    }
+    expect(text.length).toBeLessThanOrEqual(8000);
+    expect(text).toContain("src/widget.ts:1:1");
+    expect(text).toContain("Late diagnostic must stay visible");
+    expect(text).toContain("Ambient evidence only");
+    expect(text).toContain("Definition lookup unavailable");
+    expect(text.indexOf("Late diagnostic must stay visible")).toBeLessThan(
+      text.indexOf("Long documentation"),
+    );
+    expect(result.details?.truncation?.truncated).toBe(true);
+    expect(result.details?.data).toEqual(raw.details?.data);
+    expect(readFileSync(snapshot as string, "utf8")).toBe(raw.content);
   });
 });
 
