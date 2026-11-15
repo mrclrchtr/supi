@@ -506,6 +506,9 @@ export class ClientDiagnostics {
   getOpenDocumentVersion(filePath: string): number | null {
     return this.#openDocs.get(fileToUri(filePath))?.version ?? null;
   }
+  getOpenDocumentContent(filePath: string): string | null {
+    return this.#openDocs.get(fileToUri(filePath))?.content ?? null;
+  }
   getDiagnostics(filePath: string): Diagnostic[] {
     return this.#diagnosticStore.get(fileToUri(filePath))?.diagnostics ?? [];
   }

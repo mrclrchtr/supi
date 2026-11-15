@@ -300,6 +300,10 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
     return this.manager.getOpenDocumentVersion(this.resolveFilePath(filePath));
   }
 
+  getOpenDocumentContent(filePath: string): string | null {
+    return this.manager.getOpenDocumentContent(this.resolveFilePath(filePath));
+  }
+
   async captureCodeActionEdit(
     filePath: string,
     action: CodeAction,

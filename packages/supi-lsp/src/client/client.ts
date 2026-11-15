@@ -1018,6 +1018,11 @@ export class LspClient {
     return this.diagnostics.getOpenDocumentVersion(filePath);
   }
 
+  /** Return the text last synchronized to the server, or null when the document is not open. */
+  getOpenDocumentContent(filePath: string): string | null {
+    return this.diagnostics.getOpenDocumentContent(filePath);
+  }
+
   /** Return stored diagnostics for one file. */
   getDiagnostics(filePath: string): Diagnostic[] {
     return this.diagnostics.getDiagnostics(filePath);

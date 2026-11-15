@@ -75,6 +75,7 @@ describe("LspSemanticProvider", () => {
         staleAssessment: { suspected: false, matchedFiles: [], warning: null },
       }),
       resolveFilePath: vi.fn().mockImplementation((f: string) => f),
+      getOpenDocumentContent: vi.fn().mockReturnValue(null),
     };
   }
 
@@ -351,6 +352,38 @@ describe("LspSemanticProvider", () => {
 
         expect(data[0]?.declarationAnchor).toEqual({ line: 1, character: 1 });
         expect(data[0]?.nameAnchor).toEqual({ line: 1, character: 17 });
+      } finally {
+        rmSync(tmpDir, { recursive: true, force: true });
+      }
+    });
+
+    it("recovers name anchors from the open document text when disk differs", async () => {
+      const tmpDir = mkdtempSync(path.join(os.tmpdir(), "semantic-provider-anchor-"));
+      const file = path.join(tmpDir, "overload.ts");
+      // Disk moved the name; the server analyzed the synchronized open text.
+      writeFileSync(file, "export async function liveOverload(value: number): number;\n");
+      const lsp = createMockLsp({
+        getOpenDocumentContent: vi
+          .fn()
+          .mockReturnValue("export function liveOverload(value: number): number;\n"),
+        documentSymbols: vi.fn().mockResolvedValue([
+          {
+            name: "liveOverload",
+            kind: 12,
+            range: { start: { line: 0, character: 0 }, end: { line: 0, character: 52 } },
+            selectionRange: {
+              start: { line: 0, character: 0 },
+              end: { line: 0, character: 52 },
+            },
+          },
+        ]),
+      });
+
+      try {
+        const result = await createLspSemanticProvider(lsp).documentSymbols(file);
+
+        expect(lsp.getOpenDocumentContent).toHaveBeenCalledWith(file);
+        expect(completedData(result)[0]?.nameAnchor).toEqual({ line: 1, character: 17 });
       } finally {
         rmSync(tmpDir, { recursive: true, force: true });
       }

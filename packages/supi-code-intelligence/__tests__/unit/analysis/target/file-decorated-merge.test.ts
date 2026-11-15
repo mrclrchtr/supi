@@ -62,6 +62,7 @@ afterEach(() => rmSync(cwd, { recursive: true, force: true }));
 describe("file outline provider merge", () => {
   it("merges decorated declarations whose ranges start at different lines", async () => {
     const semantic = createLspSemanticProvider({
+      getOpenDocumentContent: () => null,
       documentSymbols: async () => completedCodeQuery(PYRIGHT_SYMBOLS),
     } as unknown as WorkspaceLspRuntime);
     const treeSitter = createTreeSitterSession(cwd);

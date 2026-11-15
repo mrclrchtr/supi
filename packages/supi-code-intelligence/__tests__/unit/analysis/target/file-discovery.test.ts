@@ -217,6 +217,7 @@ describe("file outline discovery", () => {
       },
     ];
     const semantic = createLspSemanticProvider({
+      getOpenDocumentContent: () => null,
       documentSymbols: async () => completedCodeQuery(documentSymbols),
     } as unknown as WorkspaceLspRuntime);
     const structural = createTreeSitterProvider({
@@ -277,6 +278,7 @@ describe("file outline discovery", () => {
       symbol("run", 12, 4, [symbol("step", 13, 5)]),
     ];
     const semantic = createLspSemanticProvider({
+      getOpenDocumentContent: () => null,
       documentSymbols: async () => completedCodeQuery(documentSymbols),
     } as unknown as WorkspaceLspRuntime);
     const range = (line: number) => ({

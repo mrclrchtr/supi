@@ -582,6 +582,14 @@ export class LspManager {
     );
   }
 
+  /** Return the open document text last synchronized to the server, without starting one. */
+  getOpenDocumentContent(filePath: string): string | null {
+    const resolvedPath = resolveSessionPath(this.cwd, filePath);
+    return (
+      this.getExistingClientForFile(resolvedPath)?.getOpenDocumentContent(resolvedPath) ?? null
+    );
+  }
+
   /**
    * Coverage gap for a project-wide TypeScript request answered by `client`.
    *

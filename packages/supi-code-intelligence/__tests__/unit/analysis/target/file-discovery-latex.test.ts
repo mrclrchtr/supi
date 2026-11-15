@@ -73,6 +73,7 @@ sec:next}`,
 `,
     );
     const semantic = createLspSemanticProvider({
+      getOpenDocumentContent: () => null,
       documentSymbols: async () =>
         completedCodeQuery([
           {
@@ -132,6 +133,7 @@ sec:next}`,
       },
     ];
     const semantic = createLspSemanticProvider({
+      getOpenDocumentContent: () => null,
       documentSymbols: async () => completedCodeQuery(documentSymbols),
     } as unknown as WorkspaceLspRuntime);
     const treeSitter = createTreeSitterSession(cwd);
@@ -208,6 +210,7 @@ sec:next}`,
       },
     ];
     const semantic = createLspSemanticProvider({
+      getOpenDocumentContent: () => null,
       documentSymbols: async () => completedCodeQuery(documentSymbols),
     } as unknown as WorkspaceLspRuntime);
     const treeSitter = createTreeSitterSession(cwd);

@@ -187,6 +187,8 @@ export interface WorkspaceLspRuntime extends WorkspaceLspDiagnosticSurface {
     control?: CodeRequestControl,
   ): Promise<RoutedMutationResponse<CommandEditCaptureResult | null> | null>;
   getOpenDocumentVersion(filePath: string): number | null;
+  /** Text last synchronized to the server for an open document, or null when not open. */
+  getOpenDocumentContent(filePath: string): string | null;
   /**
    * Wait for file readiness; an explicit refresh may make one shared route
    * retry for this call without changing ordinary request recovery limits.

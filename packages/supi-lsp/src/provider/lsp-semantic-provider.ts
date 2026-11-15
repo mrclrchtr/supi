@@ -83,7 +83,12 @@ export function createLspSemanticProvider(lsp: WorkspaceLspRuntime): SemanticPro
         ? await lsp.documentSymbols(filePath, control)
         : await lsp.documentSymbols(filePath);
       if (result.kind === "unavailable") return unavailableCodeQuery(result.reason);
-      const symbols = await mapDocumentSymbols(result.data, filePath);
+      // Anchor names against the text the server analyzed, not possibly newer disk content.
+      const symbols = await mapDocumentSymbols(
+        result.data,
+        filePath,
+        lsp.getOpenDocumentContent(filePath),
+      );
       return result.kind === "partial"
         ? partialCodeQuery(symbols, result.reason)
         : completedCodeQuery(symbols);

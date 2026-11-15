@@ -94,13 +94,19 @@ function symbolKindName(kind: number): string {
   return SYMBOL_KIND_NAMES[kind] ?? "Unknown";
 }
 
-/** Flatten provider symbols while preserving declaration and name anchors. */
+/**
+ * Flatten provider symbols while preserving declaration and name anchors.
+ * Name anchors are recovered from `sourceText` (the synchronized open-document
+ * text) when given; otherwise from disk, or the server `selectionRange` start.
+ */
 export async function mapDocumentSymbols(
   symbols: DocumentSymbol[] | SymbolInformation[],
   filePath: string,
+  sourceText?: string | null,
 ): Promise<DocumentCodeSymbol[]> {
   return flattenDocumentSymbols(symbols, filePath, null, {
-    sourceLines: await readSourceLines(filePath),
+    sourceLines:
+      typeof sourceText === "string" ? splitLines(sourceText) : await readSourceLines(filePath),
     parent: null,
   });
 }
@@ -169,10 +175,14 @@ function isSymbolInformation(
 
 async function readSourceLines(filePath: string): Promise<readonly string[] | null> {
   try {
-    return (await readFile(filePath, "utf-8")).split(/\r?\n/);
+    return splitLines(await readFile(filePath, "utf-8"));
   } catch {
     return null;
   }
+}
+
+function splitLines(text: string): readonly string[] {
+  return text.split(/\r?\n/);
 }
 
 function resolveDocumentSymbolNameStart(
