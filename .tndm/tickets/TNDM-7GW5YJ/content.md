@@ -1,1 +1,0 @@
-Two small defensive improvements to the supi-web package: (2) exclude text/html in isPlainTextContentType to avoid misclassifying minimal HTML as plain text; (3) expand guessLanguage with more file extensions for better code block syntax highlighting.

@@ -1,9 +1,0 @@
-schema_version = 1
-status = "done"
-updated_at = "2026-05-15T16:24:34.998134Z"
-revision = 16
-
-[document_fingerprints]
-archive = "sha256:522ccbd5dcbc26e2a8e1e851dd163459ee9a722fa13a2378880516a3ec3928fd"
-content = "sha256:b69f5efee649255b781b479dbb6087f259cb9189081610c8ddf19dc8982bab2a"
-plan = "sha256:fe05c0c3841c13fc81f31af740e8c4a836ae6c924f3c726625668adf590fd372"

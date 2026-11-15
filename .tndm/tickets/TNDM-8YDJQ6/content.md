@@ -1,1 +1,0 @@
-Verify and consolidate duplicated `createPiMock`, `makeCtx`, and other test fixture factories across all workspace packages into the existing `@mrclrchtr/supi-test-utils` package. Currently every package reinvents its own local test factories, causing type drift and making ExtensionAPI/Context migrations painful.
