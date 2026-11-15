@@ -7,7 +7,7 @@
 //
 // This extension intercepts every bash `tool_call` event and sets a default
 // timeout when the LLM omits one.  The timeout is configurable via
-// /supi-settings or the SuPi config system (default 120s).
+// /supi-settings or the SuPi config system (default 600s).
 
 import { type ExtensionAPI, isToolCallEventType } from "@earendil-works/pi-coding-agent";
 import { loadBashTimeoutConfig } from "./bash-timeout-config.ts";

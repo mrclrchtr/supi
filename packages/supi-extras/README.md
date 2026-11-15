@@ -113,6 +113,6 @@ That prevents git subprocesses from hanging while waiting for an interactive edi
 
 ### Default bash timeout
 
-PI's `bash` tool has no default timeout. When the model calls `bash` without `timeout`, the package fills in a default (120 seconds) so a hung command cannot stall an unattended session. Explicit `timeout` values are kept; other tools are untouched.
+PI's `bash` tool has no default timeout. When the model calls `bash` without `timeout`, the package fills in a default (600 seconds) so a hung command cannot stall an unattended session. The limit is long enough for typical test and check runs; set an explicit `timeout` or lower the default for faster failure. Explicit `timeout` values are kept; other tools are untouched.
 
 Configure it in `/supi-settings` → **Bash Timeout** → **Default Timeout** (seconds), stored in the `bash-timeout` section of `~/.pi/agent/supi/config.json` or `.pi/supi/config.json`. This replaces the former `@mrclrchtr/supi-bash-timeout` package; existing settings keep working.

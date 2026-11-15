@@ -5,7 +5,7 @@ export interface BashTimeoutConfig extends Record<string, unknown> {
 }
 
 export const BASH_TIMEOUT_DEFAULTS: BashTimeoutConfig = {
-  defaultTimeout: 120,
+  defaultTimeout: 600,
 };
 
 function isValidTimeout(value: unknown): value is number {

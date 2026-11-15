@@ -77,7 +77,7 @@ describe("loadBashTimeoutConfig", () => {
     );
 
     const config = loadBashTimeoutConfig(tmpDir, tmpDir);
-    expect(config.defaultTimeout).toBe(120);
+    expect(config.defaultTimeout).toBe(BASH_TIMEOUT_DEFAULTS.defaultTimeout);
   });
 
   it("falls back to default for zero value", () => {
@@ -89,7 +89,7 @@ describe("loadBashTimeoutConfig", () => {
     );
 
     const config = loadBashTimeoutConfig(tmpDir, tmpDir);
-    expect(config.defaultTimeout).toBe(120);
+    expect(config.defaultTimeout).toBe(BASH_TIMEOUT_DEFAULTS.defaultTimeout);
   });
 
   it("falls back to default for negative value", () => {
@@ -101,6 +101,6 @@ describe("loadBashTimeoutConfig", () => {
     );
 
     const config = loadBashTimeoutConfig(tmpDir, tmpDir);
-    expect(config.defaultTimeout).toBe(120);
+    expect(config.defaultTimeout).toBe(BASH_TIMEOUT_DEFAULTS.defaultTimeout);
   });
 });
