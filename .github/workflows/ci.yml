@@ -191,15 +191,11 @@ jobs:
         env:
           SUPI_LANGUAGE_BASELINE_CACHE: ${{ runner.temp }}/supi-language-baseline-cache
         run: node scripts/language-baseline/provision.mjs
-      - name: Verify TypeScript installation selection and lifecycle
-        run: >-
-          pnpm exec vitest run --reporter=agent
-          packages/supi-lsp/__tests__/unit/typescript-launch.test.ts
-          packages/supi-lsp/__tests__/integration/workspace-runtime.integration.typescript-native.test.ts
-          packages/supi-lsp/__tests__/integration/typescript-config-coverage.test.ts
-          packages/supi-lsp/__tests__/integration/workspace-runtime.integration.typescript-launch.test.ts
-          packages/supi-lsp/__tests__/integration/workspace-runtime.integration.typescript.test.ts
-          packages/supi-lsp/__tests__/integration/client.integration.typescript-diagnostics.test.ts
+      - name: Verify TypeScript installation selection
+        run: pnpm exec vitest run --reporter=agent packages/supi-lsp/__tests__/unit/typescript-launch.test.ts
+      # Includes the TypeScript lifecycle tests; suites whose server is not provisioned skip.
+      - name: Run real language-server integration tests
+        run: pnpm exec vitest run --reporter=agent --project servers
       - name: Run required real-server acceptance suite
         run: pnpm test:language-baseline:acceptance
       - name: Remove isolated server installs
