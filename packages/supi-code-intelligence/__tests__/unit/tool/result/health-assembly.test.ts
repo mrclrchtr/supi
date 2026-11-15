@@ -203,7 +203,62 @@ describe("code_health result assembly", () => {
 
     expect(markdown).toContain("No errors or warnings in 2 confirmed tracked files under `src`.");
     expect(markdown).toContain("Untracked files were not checked");
+    expect(markdown).toContain(
+      "reflects the last LSP synchronization; recent edits made outside Pi may not be included. Use `refresh: true`",
+    );
     expect(markdown).not.toContain("No source diagnostics checked");
+  });
+
+  it("omits the passive-snapshot note after a refresh and for exact-file checks", () => {
+    const confirmedEvidence = fileEvidence("confirmed");
+    const refreshed = renderHealthResult(
+      assembleHealthResult(
+        makeHealthData({
+          diagnostics: {
+            kind: "completed",
+            scope: { kind: "tracked-files", filter: null },
+            entries: [],
+            evidence: confirmedEvidence,
+          },
+          refresh: {
+            kind: "completed",
+            attemptedAt: 1,
+            elapsedMs: 1,
+            requestedDiagnosticScope: { kind: "tracked-files", filter: null },
+            operationScope: "workspace-runtime",
+            attemptedActiveClients: 1,
+            restartedClients: 0,
+            processCrashRecovery: emptyProcessCrashRecovery(),
+            diagnosticEvidence: confirmedEvidence,
+            staleAssessment: {
+              scope: "workspace",
+              suspected: false,
+              matchedFileCount: 0,
+              warning: null,
+            },
+          },
+        }),
+      ),
+      "/repo",
+    );
+    const exactFile = renderHealthResult(
+      assembleHealthResult(
+        makeHealthData({
+          diagnostics: {
+            kind: "completed",
+            scope: { kind: "file", path: "/repo/src/a.ts" },
+            entries: [],
+            evidence: confirmedEvidence,
+          },
+        }),
+      ),
+      "/repo",
+    );
+
+    expect(refreshed).toContain("No errors or warnings in 1 confirmed tracked file.");
+    expect(refreshed).not.toContain("last LSP synchronization");
+    expect(exactFile).toContain("No errors or warnings in confirmed file `src/a.ts`.");
+    expect(exactFile).not.toContain("last LSP synchronization");
   });
 
   it("keeps removed-file evidence incomplete instead of reporting a clean snapshot", () => {

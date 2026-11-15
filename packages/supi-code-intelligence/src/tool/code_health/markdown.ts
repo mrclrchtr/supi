@@ -9,7 +9,11 @@ import {
 } from "../../analysis/health/server-status.ts";
 import { classifyDiagnosticCoverage } from "../../diagnostics/coverage.ts";
 import { makeRelative, renderFileScopeStatus } from "./file-scope-markdown.ts";
-import { DIAGNOSTIC_NEXT_ACTION } from "./guidance.ts";
+import {
+  DIAGNOSTIC_NEXT_ACTION,
+  isPassiveTrackedSnapshot,
+  PASSIVE_SNAPSHOT_NOTE,
+} from "./guidance.ts";
 import {
   formatProcessCrashRecovery,
   formatRefreshElapsed,
@@ -300,9 +304,12 @@ function renderDiagnosticObservation(lines: string[], data: HealthData, cwd: str
   }
   if (observation.entries.length === 0) {
     lines.push(confirmedCleanText(observation.scope, observation.evidence.confirmed, cwd));
-    return;
+  } else {
+    renderDiagnosticEntries(lines, data, cwd);
   }
-  renderDiagnosticEntries(lines, data, cwd);
+  if (isPassiveTrackedSnapshot(observation.scope, data.refresh)) {
+    lines.push(`${PASSIVE_SNAPSHOT_NOTE}.`);
+  }
 }
 
 type CollectedObservation = Extract<HealthData["diagnostics"], { kind: "completed" | "partial" }>;

@@ -1,6 +1,11 @@
-import { classifyDiagnosticCoverage } from "../../diagnostics/coverage.ts";
+import { classifyDiagnosticCoverage, type DiagnosticCoverage } from "../../diagnostics/coverage.ts";
+import type { HealthDiagnosticScope } from "../../session/health-types.ts";
 import type { CodeIntelResult } from "../../types/index.ts";
-import { DIAGNOSTIC_NEXT_ACTION } from "../code_health/guidance.ts";
+import {
+  DIAGNOSTIC_NEXT_ACTION,
+  isPassiveTrackedSnapshot,
+  PASSIVE_SNAPSHOT_NOTE,
+} from "../code_health/guidance.ts";
 import { formatSemanticHealthState } from "../code_health/semantic-state.ts";
 import type { HealthDetails, SearchDetails } from "./types.ts";
 
@@ -170,6 +175,21 @@ function searchFacts(data: SearchDetails): string[] {
   return lines;
 }
 
+/** Keep the zero-coverage and passive-snapshot guidance when the full markdown is truncated. */
+function coverageNote(
+  coverage: DiagnosticCoverage,
+  scope: HealthDiagnosticScope,
+  refresh: HealthDetails["refresh"],
+): string | null {
+  if (coverage === "none") {
+    return `No source diagnostics checked; this is not a clean result. Next: ${DIAGNOSTIC_NEXT_ACTION}.`;
+  }
+  if (coverage === "confirmed" && isPassiveTrackedSnapshot(scope, refresh)) {
+    return `${PASSIVE_SNAPSHOT_NOTE}.`;
+  }
+  return null;
+}
+
 function healthFacts(data: HealthDetails): string[] {
   const observation = data.diagnosticObservation;
   const lines = [
@@ -185,10 +205,8 @@ function healthFacts(data: HealthDetails): string[] {
       `Diagnostics: ${observation.kind}; ${scope.kind === "file" ? `file=${scope.path}` : `tracked-file snapshot; filter=${scope.filter ?? "none"}; not workspace-wide verification`}.`,
       `Diagnostic coverage: ${coverage}; requested=${observation.evidence.requested}, confirmed=${observation.evidence.confirmed}, unconfirmed=${observation.evidence.unconfirmed}, failed=${observation.evidence.failed}, removed=${observation.evidence.removed}.`,
     );
-    if (coverage === "none")
-      lines.push(
-        `No source diagnostics checked; this is not a clean result. Next: ${DIAGNOSTIC_NEXT_ACTION}.`,
-      );
+    const note = coverageNote(coverage, scope, data.refresh);
+    if (note) lines.push(note);
     if ("reason" in observation) lines.push(`Diagnostic limitation: ${observation.reason}`);
     if (observation.scopeStatus)
       lines.push(`File scope status: ${JSON.stringify(observation.scopeStatus)}`);
