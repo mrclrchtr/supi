@@ -69,6 +69,7 @@
     "./report": "./src/report.ts",
     "./session": "./src/session.ts",
     "./settings": "./src/settings.ts",
+    "./spill": "./src/spill.ts",
     "./spinner-frames": "./src/spinner-frames.ts",
     "./status-spinner": "./src/status-spinner.ts",
     "./terminal": "./src/terminal.ts",

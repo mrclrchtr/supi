@@ -3,6 +3,7 @@
 ## [13.0.0]
 
 - `web_search` requests about half as much source text per search (a 4,096-token budget instead of the Brave default of about 8,192), so one search uses less of the context window. Results hold fewer sources; search again with a narrower query when the first results are not enough.
+- Web tool output files are now written to one private per-user directory, `$TMPDIR/supi-<uid>/`, instead of a new `supi-*` directory per call. Identical content reuses one file. SuPi never deletes these files; the OS temp purge does ([#597](https://github.com/mrclrchtr/supi/issues/597)).
 
 ## [12.0.0]
 

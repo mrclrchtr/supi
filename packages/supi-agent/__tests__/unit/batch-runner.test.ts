@@ -449,7 +449,7 @@ describe("runDelegationBatch", () => {
 
     // The complete joined per-task Markdown is spilled to a temporary file.
     expect(fullOutputPath).toBeDefined();
-    expect(fullOutputPath).toMatch(/supi-agent-/);
+    expect(fullOutputPath).toMatch(/[/\\]agent[/\\]batch-output-[0-9a-f]+\.md$/);
     const { readFileSync } = await import("node:fs");
     const spill = readFileSync(fullOutputPath!, "utf-8");
     expect(Buffer.byteLength(spill, "utf-8")).toBeGreaterThan(51_200);

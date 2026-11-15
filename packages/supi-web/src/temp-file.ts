@@ -2,21 +2,16 @@
  * Temporary file helpers for the web tools.
  */
 
-import { randomBytes } from "node:crypto";
-import { mkdtemp, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { withFileMutationQueue } from "@earendil-works/pi-coding-agent";
+import { writeSpillFile } from "@mrclrchtr/supi-core/spill";
 
-/** Write content to a unique temporary file and return the absolute path. */
+/**
+ * Persist content as a SuPi spill file and return the absolute path.
+ * Identical content reuses one file; SuPi never deletes it (#597).
+ */
 export async function writeTempFile(
   content: string,
   prefix: string,
   suffix: string,
 ): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), `${prefix}-`));
-  const hash = randomBytes(4).toString("hex");
-  const filePath = join(dir, `${hash}${suffix}`);
-  await withFileMutationQueue(filePath, () => writeFile(filePath, content, "utf8"));
-  return filePath;
+  return writeSpillFile({ owner: "web", name: `${prefix}${suffix}`, content });
 }

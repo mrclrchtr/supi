@@ -60,7 +60,7 @@ describe("boundAggregateOutput", () => {
       expect(output.text).toContain(`## t${i} — completed`);
     }
     // The complete joined Markdown is readable at the spill path.
-    expect(output.fullOutputPath).toMatch(/supi-agent-/);
+    expect(output.fullOutputPath).toMatch(/[/\\]agent[/\\]batch-output-[0-9a-f]+\.md$/);
     const spill = readFileSync(output.fullOutputPath!, "utf-8");
     expect(fits(spill)).toBe(false);
     expect(spill).toContain("x".repeat(16_000));

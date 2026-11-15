@@ -1,12 +1,10 @@
-import { mkdtemp, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import type { AgentToolResult } from "@earendil-works/pi-coding-agent";
 import {
   DEFAULT_MAX_BYTES,
   DEFAULT_MAX_LINES,
   truncateHead,
 } from "@earendil-works/pi-coding-agent";
+import { writeSpillFile } from "@mrclrchtr/supi-core/spill";
 import type { ContextAnalysis } from "../../analysis.ts";
 import { type ContextPressureSnapshot, createContextPressureSnapshot } from "../../capacity.ts";
 import type {
@@ -67,9 +65,11 @@ export async function buildFullResult(
   let text = JSON.stringify(full);
   const size = truncateHead(text, { maxLines: DEFAULT_MAX_LINES, maxBytes: DEFAULT_MAX_BYTES });
   if (size.truncated) {
-    const outputDir = await mkdtemp(join(tmpdir(), "supi-context-"));
-    const path = join(outputDir, "context-usage-report.json");
-    await writeFile(path, text, "utf8");
+    const path = writeSpillFile({
+      owner: "context",
+      name: "context-usage-report.json",
+      content: text,
+    });
     data = { ...snapshot, attributionFile: { path, bytes: Buffer.byteLength(text, "utf8") } };
     text = JSON.stringify(data);
   }

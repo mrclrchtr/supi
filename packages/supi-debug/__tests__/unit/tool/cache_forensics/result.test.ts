@@ -171,7 +171,7 @@ describe("cache_forensics result assembly", () => {
 
     expect(output.truncated).toBe(true);
     expect(output.fullOutputPath).toBeDefined();
-    expect(output.fullOutputPath).toMatch(/supi-cache-/);
+    expect(output.fullOutputPath).toMatch(/[/\\]cache-forensics[/\\]forensics-[0-9a-f]+\.json$/);
 
     const parsed = JSON.parse(output.text) as Record<string, unknown>;
     expect(parsed.truncated).toBe(true);

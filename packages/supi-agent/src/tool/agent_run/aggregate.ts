@@ -9,9 +9,7 @@
 // count. The complete joined Markdown is spilled to a private OS temporary
 // directory and the path is returned in the result.
 
-import { mkdtempSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { writeSpillFile } from "@mrclrchtr/supi-core/spill";
 import { AGGREGATE_MAX_BYTES, AGGREGATE_MAX_LINES } from "./bounds.ts";
 
 /** One ordered task section of the joined parent result. */
@@ -137,9 +135,7 @@ export function boundAggregateOutput(
     return { text: full, truncated: false };
   }
 
-  const dir = mkdtempSync(join(tmpdir(), "supi-agent-"));
-  const fullOutputPath = join(dir, "batch-output.md");
-  writeFileSync(fullOutputPath, full, "utf-8");
+  const fullOutputPath = writeSpillFile({ owner: "agent", name: "batch-output.md", content: full });
   const notice = `\n_Full output saved to: \`${fullOutputPath}\`_`;
 
   // Fixed per-section cost: overhead, the newline before its body, and the

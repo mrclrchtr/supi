@@ -4,6 +4,7 @@
 
 - When a `bash` result shows a BSD sed script error (macOS `sed: 1: ...`), the first one in a session gets a one-line hint: `sed -i` needs a suffix argument, the delimiter must not occur in the pattern, and the edit tool or `gsed` are alternatives. Delegated runs and the parent session both get it.
 - `agent_run` accepts `new: { profile, cwd }` to start a conversation in another worktree of the same Git repository. The child session, its instruction files, and its system-prompt cwd use that directory; project trust is inherited from the parent. Follow-ups keep the directory. Relative paths, missing directories, and directories outside the parent's repository fail preflight before any task starts. The child prompt names the directory and says it overrides any other working directory in the environment, because some providers describe the parent's cwd.
+- Truncated `agent_run` batch outputs are now written to one private per-user directory, `$TMPDIR/supi-<uid>/`, instead of a new `supi-*` directory per call. Identical content reuses one file. SuPi never deletes these files; the OS temp purge does ([#597](https://github.com/mrclrchtr/supi/issues/597)).
 
 ## [12.0.0]
 

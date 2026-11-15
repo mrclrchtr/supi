@@ -48,9 +48,7 @@ export function truncateToolContent(
   return { text: `${result.content}${notice}`, truncated: true };
 }
 
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { writeSpillFile } from "@mrclrchtr/supi-core/spill";
 import type { CodeIntelResult } from "../../types/index.ts";
 import { boundModelContent } from "../result/model-budget.ts";
 import type { ToolOutputTruncationDetails } from "../result/types.ts";
@@ -107,17 +105,5 @@ export function boundCodeToolResult(
 }
 
 function saveFullContent(content: string, toolName: string): string {
-  const dir = mkdtempSync(join(tmpdir(), "supi-ci-"));
-  const spillPath = join(dir, `${toolName}-output.md`);
-  try {
-    writeFileSync(spillPath, content, "utf-8");
-    return spillPath;
-  } catch (error) {
-    try {
-      rmSync(dir, { recursive: true, force: true });
-    } catch {
-      /* Preserve the write error. */
-    }
-    throw error;
-  }
+  return writeSpillFile({ owner: "code-intelligence", name: `${toolName}-output.md`, content });
 }

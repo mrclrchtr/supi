@@ -6,11 +6,9 @@
 // temporary directory and only a summary envelope is returned — never a
 // partial findings array.
 
-import { mkdtempSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import type { AgentToolResult } from "@earendil-works/pi-coding-agent";
 import { DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES } from "@earendil-works/pi-coding-agent";
+import { writeSpillFile } from "@mrclrchtr/supi-core/spill";
 import type { Static } from "typebox";
 import type { ForensicsResult } from "../../cache/forensics/forensics.ts";
 import type { ForensicsCause, ParamShape } from "../../cache/forensics/types.ts";
@@ -70,9 +68,11 @@ export function boundForensicsOutput(
     return { text: full, structuredContent: data, truncated: false };
   }
 
-  const dir = mkdtempSync(join(tmpdir(), "supi-cache-forensics-"));
-  const fullOutputPath = join(dir, ENVELOPE_FILE);
-  writeFileSync(fullOutputPath, full, "utf-8");
+  const fullOutputPath = writeSpillFile({
+    owner: "cache-forensics",
+    name: ENVELOPE_FILE,
+    content: full,
+  });
 
   const envelope = {
     truncated: true,

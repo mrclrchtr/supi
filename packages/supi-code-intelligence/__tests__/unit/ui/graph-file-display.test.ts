@@ -118,7 +118,8 @@ describe("code_graph file display", () => {
     expect(render(result, true)).not.toContain("L1:169");
     // All 25 locations are returned evidence; the view cap hides 5 rows as a Display omission.
     expect(render(result, true)).toContain("25 locations; 5 rows hidden in view");
-    expect(render(result, true)).toContain(file);
+    // Wide enough that the spill path is not wrapped.
+    expect(render(result, true, 400)).toContain(file);
     expect(render(result, true)).toContain("full returned evidence");
     expect(content).not.toContain(file);
   });

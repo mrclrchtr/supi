@@ -33,6 +33,8 @@ export * from "./session.ts";
 // biome-ignore lint/performance/noReExportAll: intentional convenience barrel
 export * from "./settings.ts";
 // biome-ignore lint/performance/noReExportAll: intentional convenience barrel
+export * from "./spill.ts";
+// biome-ignore lint/performance/noReExportAll: intentional convenience barrel
 export * from "./spinner-frames.ts";
 // biome-ignore lint/performance/noReExportAll: intentional convenience barrel
 export * from "./status-spinner.ts";
