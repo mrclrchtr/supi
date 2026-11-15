@@ -12,7 +12,7 @@ Install the recommended stack or pick only the packages you need. You keep promp
 
 **If SuPi helps you, [give the repository a star on GitHub](https://github.com/mrclrchtr/supi/stargazers). Stars help other Pi users find the project.**
 
-> SuPi is pre-release. Packages marked beta are the fastest-moving parts of the stack.
+> Packages marked beta are the fastest-moving parts of the stack and may change between major releases.
 
 ## The key difference: LSP + AST for the agent
 

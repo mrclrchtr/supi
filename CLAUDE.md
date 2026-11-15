@@ -4,7 +4,7 @@ Pi loads SuPi TypeScript extensions from the working tree; no build step. After 
 
 ## Development status
 
-SuPi is pre-release and API-unstable. Breaking changes to APIs, commands, config, and extension behavior are allowed when they improve design; require backwards compatibility only when the task explicitly asks.
+SuPi is released on npm and follows semver with one shared version. Breaking changes to APIs, commands, config, and extension behavior are allowed when they improve design, but each needs a major release, a `BREAKING CHANGE` commit footer, and a migration step in the affected package changelog. Retired packages are removed from the workspace, marked removal-only in the installer catalog, and deprecated on npm (`npm deprecate`).
 
 ## Pi docs-first rule
 
