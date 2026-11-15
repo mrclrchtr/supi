@@ -28,6 +28,14 @@ function isBenignVscodeJsonRpcShutdownNoise(error: unknown): boolean {
   );
 }
 
+// Tests that start real language-server processes. They compete for CPU with the unit suite and
+// time out under full parallel load, so they run in their own project after it finishes.
+const serverTests = [
+  "packages/supi-lsp/__tests__/integration/**/*.test.ts",
+  "packages/supi-code-intelligence/__tests__/integration/substrate/lsp/**/*.test.ts",
+];
+
+// Every option lives here: Vitest runs from the repository root and ignores package-level configs.
 export default defineConfig({
   test: {
     testTimeout: 2000,
@@ -40,5 +48,25 @@ export default defineConfig({
         return false;
       }
     },
+    projects: [
+      {
+        test: {
+          name: "unit",
+          include: ["**/*.test.{ts,mjs}"],
+          exclude: serverTests,
+          sequence: { groupOrder: 0 },
+        },
+      },
+      {
+        test: {
+          name: "servers",
+          include: serverTests,
+          testTimeout: 10_000,
+          hookTimeout: 30_000,
+          maxWorkers: 3,
+          sequence: { groupOrder: 1 },
+        },
+      },
+    ],
   },
 });

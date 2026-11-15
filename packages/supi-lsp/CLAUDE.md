@@ -69,4 +69,4 @@ Thread `ctx.cwd` through manager and formatting code; do not use `process.cwd()`
 
 ## Tests
 
-Required TypeScript integration tests use `typescript-language-server` and `tsserver`. Python and Bash integration tests skip when their binaries are unavailable. All optional suites use `describe.skipIf(!HAS_COMMAND)`.
+Required TypeScript integration tests use `typescript-language-server` and `tsserver`. Python and Bash integration tests skip when their binaries are unavailable. All optional suites use `describe.skipIf(!HAS_COMMAND)`. `__tests__/integration/` runs in the root Vitest project `servers` (after the unit project, limited workers, 10 s test timeout); keep server-free tests out of it.
