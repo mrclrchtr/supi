@@ -208,6 +208,10 @@ Enable **TUI Render Tool** in the **Debug** section of `/supi-settings` (`tuiRen
 
 Renderers come from Pi's own resolution (`pi.registerToolRenderer`), recorded when the TUI draws a tool. After a renderer change, run `/reload`: the next render uses the reloaded code. A tool the TUI has not drawn since this extension loaded, and resolvers of extensions loaded before SuPi Debug, are not seen. `tui_render` needs the interactive TUI and fails in print, JSON, and RPC modes.
 
+Calls a tool made inside another tool, such as `tools.read()` in a `codemode` script, have no stored result of their own. Pi draws them inside the parent row, so `tui_render` names the parent `toolCallId` to render instead.
+
+The model text omits the row's blank edge lines; `structuredContent.lines` keeps the exact row. In the transcript, a collapsed `tui_render` shows a summary and the first rendered lines; expand it for the full text.
+
 ## Prompt-cache history and forensics
 
 Formerly the standalone `@mrclrchtr/supi-cache` package. PI owns live cache statistics and cache-miss notices (enable transcript notices with `showCacheMissNotices`); this package adds two views:

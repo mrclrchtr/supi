@@ -94,6 +94,16 @@ describe("tui_render tool", () => {
     expect(result.details).not.toHaveProperty("lines");
   });
 
+  it("keeps the row's blank padding in lines but not in the model text", async () => {
+    const result = (await setup().run({ target: { tool: { name: "probe" } }, width: 40 })) as {
+      content: Array<{ text: string }>;
+      structuredContent: { lines: string[] };
+    };
+
+    expect(result.structuredContent.lines.slice(0, 2)).toEqual(["", ""]);
+    expect(result.content[0]?.text).toMatch(/shell default \(toolSuccessBg\)\n\n probe\n v1 3$/);
+  });
+
   it("renders with the renderers the TUI resolves now, for example after /reload", async () => {
     let current = countRenderer("v1");
     const { run } = setup(() => current);

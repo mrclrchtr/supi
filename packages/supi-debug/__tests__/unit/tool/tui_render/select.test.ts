@@ -93,6 +93,32 @@ describe("selectToolResult", () => {
     });
   });
 
+  it("points to the parent row for a tool that only ran inside another tool", () => {
+    const parent = result("p1", "codemode", "script");
+    parent.message = {
+      ...parent.message,
+      nestedCalls: {
+        complete: true,
+        calls: [
+          { id: "p1/1", name: "web_search", status: "ok" },
+          { id: "p1/2", name: "web_search", status: "ok" },
+        ],
+      },
+    } as typeof parent.message;
+    const nestedBranch = [...branch, parent];
+
+    expect(selectToolResult(nestedBranch, { tool: { name: "web_search" } })).toEqual({
+      kind: "not-found",
+      message:
+        '"web_search" ran 2 times only inside other tools. Pi stores no results for nested calls; render the parent row instead: target { toolCallId: "p1" } (codemode). Tool results on this branch: code_health (2), codemode (1), read (1).',
+    });
+    expect(selectToolResult(nestedBranch, { toolCallId: "p1/2" })).toEqual({
+      kind: "not-found",
+      message:
+        '"p1/2" is a nested web_search call. Pi stores no results for nested calls; render the parent row instead: target { toolCallId: "p1" } (codemode).',
+    });
+  });
+
   it("falls back to empty arguments when the call is not on the branch", () => {
     const selected = selectToolResult([result("c9", "bash", "out")], { toolCallId: "c9" });
 

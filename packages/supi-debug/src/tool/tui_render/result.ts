@@ -17,8 +17,16 @@ export interface TuiRenderView {
   expanded: boolean;
 }
 
-/** Session-persisted details: the structured facts without the rendered lines. */
-export type TuiRenderDetails = Omit<TuiRenderOutput, "lines">;
+/** Rendered row lines the transcript shows while `tui_render` is collapsed. */
+export const PREVIEW_LINE_COUNT = 3;
+
+/**
+ * Session-persisted details: the structured facts plus a short row preview for the
+ * transcript, instead of all rendered lines.
+ */
+export type TuiRenderDetails = Omit<TuiRenderOutput, "lines"> & {
+  preview: { lines: string[]; omitted: number };
+};
 
 /** Final tool result: bounded model text, native structured data, and persisted details. */
 export type TuiRenderToolResult = AgentToolResult<TuiRenderDetails> & {
@@ -45,7 +53,19 @@ function describeRenderers(capture: CaptureResult, isError: boolean): string {
   return `renderer: call ${renderer.call}, result ${renderer.result} · shell ${frame}${status}`;
 }
 
-/** Assemble model text, native structured data, and details from one captured row. */
+/** Drop leading and trailing blank lines (Pi's row spacer and frame padding) for model text. */
+function trimBlankEdges(lines: readonly string[]): string[] {
+  let start = 0;
+  let end = lines.length;
+  while (start < end && lines[start]?.trim() === "") start++;
+  while (end > start && lines[end - 1]?.trim() === "") end--;
+  return lines.slice(start, end);
+}
+
+/**
+ * Assemble model text, native structured data, and details from one captured row.
+ * Model text omits blank edge lines; `structuredContent.lines` keeps the exact row.
+ */
 export function buildTuiRenderResult(
   selection: SelectedToolResult,
   view: TuiRenderView,
@@ -62,7 +82,8 @@ export function buildTuiRenderResult(
   }
   for (const note of capture.notes) header.push(`Note: ${note}`);
 
-  const truncation = truncateHead(capture.lines.join("\n"), {
+  const rowLines = trimBlankEdges(capture.lines);
+  const truncation = truncateHead(rowLines.join("\n"), {
     maxLines: DEFAULT_MAX_LINES - header.length - 4,
     maxBytes: DEFAULT_MAX_BYTES - 1024,
   });
@@ -71,7 +92,7 @@ export function buildTuiRenderResult(
     text += `\n\n[Rendered output truncated: showing ${truncation.outputLines} of ${truncation.totalLines} lines (${formatSize(truncation.outputBytes)} of ${formatSize(truncation.totalBytes)}). Use a collapsed view or read structuredContent.lines from codemode.]`;
   }
 
-  const details: TuiRenderDetails = {
+  const facts: Omit<TuiRenderOutput, "lines"> = {
     toolName: selection.toolName,
     toolCallId: selection.toolCallId,
     index: selection.index,
@@ -85,7 +106,13 @@ export function buildTuiRenderResult(
   };
   return {
     content: [{ type: "text", text }],
-    details,
-    structuredContent: { ...details, lines: capture.lines },
+    details: {
+      ...facts,
+      preview: {
+        lines: rowLines.slice(0, PREVIEW_LINE_COUNT),
+        omitted: Math.max(0, rowLines.length - PREVIEW_LINE_COUNT),
+      },
+    },
+    structuredContent: { ...facts, lines: capture.lines },
   };
 }

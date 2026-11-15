@@ -4,6 +4,7 @@ import { DEBUG_TOOL_NAMESPACE } from "../namespace.ts";
 import { makeTuiRenderExecute } from "./execute.ts";
 import { promptGuidelines, promptSnippet, toolDescription } from "./guidance.ts";
 import { createToolRendererObserver } from "./observer.ts";
+import { renderTuiRenderCall, renderTuiRenderResult } from "./render.ts";
 import { TUI_RENDER_TOOL_NAME, tuiRenderSpec } from "./spec.ts";
 
 /**
@@ -21,6 +22,8 @@ export function registerTuiRenderTool(pi: ExtensionAPI): void {
     promptSnippet,
     promptGuidelines,
     execute: makeTuiRenderExecute(pi, observer),
+    renderCall: renderTuiRenderCall,
+    renderResult: renderTuiRenderResult,
   });
 }
 
