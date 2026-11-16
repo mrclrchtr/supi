@@ -1,8 +1,6 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
-import { createReadStream } from "node:fs";
-import { readdir, writeFile } from "node:fs/promises";
-import { isAbsolute, join, relative, sep } from "node:path";
+import { writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { recordGather, recordSkipReason, sinceOptions } from "./gather-state.mjs";
@@ -13,6 +11,7 @@ import {
   resolveCommit,
   SINCE_COMMIT_LIMITATION,
 } from "./provenance.mjs";
+import { integer, scanComplete, scanCoverage, scanSessions, sinceTimestamp } from "./sessions.mjs";
 import { displayPage, exportReports, readEvidence, summarize } from "./snapshot.mjs";
 
 const help = `Collect stored Agent Run retrospectives without modifying sessions.
@@ -47,30 +46,6 @@ with explicit textRange offsets. coverage.complete describes the scan, not displ
 Storage precedence: flag, PI_CODING_AGENT_SESSION_DIR, project/global sessionDir,
 then <PI_CODING_AGENT_DIR or ~/.pi/agent>/sessions. Relative paths use cwd.
 `;
-
-function integer(value, name, min, max) {
-  const parsed = Number(value);
-  if (!/^\d+$/.test(value) || !Number.isSafeInteger(parsed) || parsed < min || parsed > max) {
-    throw new Error(`${name} must be an integer from ${min} through ${max}.`);
-  }
-  return parsed;
-}
-
-function sinceTimestamp(value) {
-  if (!value) return null;
-  if (/^\d+d$/.test(value)) {
-    const days = integer(value.slice(0, -1), "--since days", 0, 36500);
-    return Date.now() - days * 86400000;
-  }
-  const parsed = /^\d{4}-\d{2}-\d{2}(?:T.*)?$/.test(value) ? Date.parse(value) : Number.NaN;
-  if (
-    !Number.isFinite(parsed) ||
-    (value.length === 10 && new Date(parsed).toISOString().slice(0, 10) !== value)
-  ) {
-    throw new Error("--since must be an ISO date/time or a duration such as 30d.");
-  }
-  return parsed;
-}
 
 function readOptions(values, display) {
   const collectionFlags = [
@@ -168,61 +143,6 @@ async function options() {
   };
 }
 
-function within(directory, path) {
-  const child = relative(directory, path);
-  return child !== ".." && !child.startsWith(`..${sep}`) && !isAbsolute(child);
-}
-
-function recordFailure(coverage, path, code) {
-  coverage.readFailures++;
-  if (coverage.failures.length < 10) coverage.failures.push({ path, code });
-}
-
-async function directoryEntries(directory, config, coverage) {
-  try {
-    return await readdir(directory, { withFileTypes: true });
-  } catch (error) {
-    if (directory === config.sessionsDir)
-      throw new Error(`Cannot list session storage: ${directory}`, { cause: error });
-    recordFailure(coverage, directory, error.code ?? "READ_FAILED");
-    return [];
-  }
-}
-
-function discoverEntry(entry, directory, state) {
-  const path = join(directory, entry.name);
-  if (entry.isSymbolicLink()) state.coverage.ignoredSymlinks++;
-  else if (entry.isDirectory()) state.pending.push(path);
-  else if (entry.isFile() && entry.name.endsWith(".jsonl")) state.files.push(path);
-}
-
-async function discover(config, coverage) {
-  const files = [];
-  const pending = [config.sessionsDir];
-  while (pending.length) {
-    const directory = pending.pop();
-    const entries = await directoryEntries(directory, config, coverage);
-    entries.sort((a, b) => a.name.localeCompare(b.name));
-    for (const entry of entries) {
-      discoverEntry(entry, directory, { files, pending, coverage });
-      if (files.length > config.maxSessions) {
-        coverage.sessionLimitReached = true;
-        return files.slice(0, config.maxSessions);
-      }
-    }
-  }
-  return files;
-}
-
-function parseEntry(line, coverage) {
-  try {
-    return JSON.parse(line);
-  } catch {
-    coverage.malformedEntries++;
-    return null;
-  }
-}
-
 function assessment(entry) {
   if (entry?.type !== "custom" || entry.customType !== "supi-debug-event") return null;
   const event = entry.data;
@@ -263,28 +183,14 @@ function report(entry, context) {
   return report;
 }
 
-async function readHeader(line, path, state) {
-  const session = parseEntry(line, state.coverage);
-  if (session?.type !== "session" || typeof session.cwd !== "string" || !isAbsolute(session.cwd)) {
-    recordFailure(state.coverage, path, "INVALID_SESSION_HEADER");
-    return null;
-  }
-  const cwd = await canonicalPath(session.cwd);
-  if (state.config.workspace && !within(state.config.workspace, cwd)) return null;
-  state.coverage.scopedSessions++;
-  return session;
-}
-
 function trackProvenance(entry, state) {
   const provenance = provenanceOf(entry);
   if (provenance) state.provenanceContext = { provenance };
   return Boolean(provenance);
 }
 
-function collectLine(line, context, state) {
-  if (!line.trim()) return;
+function collectEntry(entry, context, state) {
   const { config, coverage, reports } = state;
-  const entry = parseEntry(line, coverage);
   if (trackProvenance(entry, state)) return;
   if (
     entry?.type !== "custom" ||
@@ -292,7 +198,8 @@ function collectLine(line, context, state) {
     entry.data?.category !== "agent-run-retrospective"
   )
     return;
-  const item = report(entry, { ...context, ...state.provenanceContext });
+  const { raw: _raw, ...location } = context;
+  const item = report(entry, { ...location, ...state.provenanceContext });
   if (!item) {
     coverage.malformedEntries++;
     return;
@@ -308,68 +215,22 @@ function collectLine(line, context, state) {
   else reports.set(item.ref, item);
 }
 
-/** Split JSONL only on LF; readline also splits valid JSON string content at U+2028/U+2029. */
-async function* jsonLines(input) {
-  let pending = "";
-  for await (const chunk of input) {
-    pending += chunk;
-    let index = pending.indexOf("\n");
-    while (index !== -1) {
-      yield pending.slice(0, index);
-      pending = pending.slice(index + 1);
-      index = pending.indexOf("\n");
-    }
-  }
-  if (pending) yield pending;
-}
-
-async function scanSession(path, state) {
-  const { coverage } = state;
-  coverage.scannedSessions++;
-  const input = createReadStream(path, { encoding: "utf8" });
-  const lines = jsonLines(input);
-  let lineNumber = 0;
-  let session;
-  // Provenance applies to entries after it until the next session_start record.
-  state.provenanceContext = {};
-  try {
-    for await (const line of lines) {
-      lineNumber++;
-      if (lineNumber === 1) {
-        session = await readHeader(line, path, state);
-        if (!session) break;
-        continue;
-      }
-      collectLine(
-        line,
-        { sessionFile: path, sessionId: session.id, cwd: session.cwd, line: lineNumber },
-        state,
-      );
-    }
-    if (lineNumber === 0) recordFailure(coverage, path, "EMPTY_SESSION");
-  } catch (error) {
-    recordFailure(coverage, path, error.code ?? "READ_FAILED");
-  } finally {
-    input.destroy();
-  }
-}
-
 async function collect(config) {
   const coverage = {
-    scannedSessions: 0,
-    scopedSessions: 0,
+    ...scanCoverage(),
     matchingEvents: 0,
     duplicateEvents: 0,
-    malformedEntries: 0,
-    ignoredSymlinks: 0,
-    sessionLimitReached: false,
-    readFailures: 0,
     unknownProvenance: 0,
-    failures: [],
   };
   const reports = new Map();
-  const files = await discover(config, coverage);
-  for (const file of files) await scanSession(file, { config, coverage, reports });
+  const state = { config, coverage, reports, provenanceContext: {} };
+  await scanSessions(config, coverage, {
+    // Provenance applies to entries after it until the next session_start record.
+    startSession: () => {
+      state.provenanceContext = {};
+    },
+    entry: (entry, context) => collectEntry(entry, context, state),
+  });
   const sorted = [...reports.values()].sort(
     (a, b) => b.timestamp - a.timestamp || a.ref.localeCompare(b.ref),
   );
@@ -379,11 +240,7 @@ async function collect(config) {
     filters,
     coverage: {
       ...coverage,
-      complete:
-        !coverage.sessionLimitReached &&
-        coverage.ignoredSymlinks === 0 &&
-        coverage.readFailures === 0 &&
-        coverage.malformedEntries === 0,
+      complete: scanComplete(coverage),
       uniqueReports: sorted.length,
     },
     limitations: [

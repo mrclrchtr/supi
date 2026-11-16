@@ -34,7 +34,7 @@ After install, this package wires the shared debug registry into three user-faci
 - `/supi-settings` integration — configure whether events are captured and how much data is exposed
 - `/supi-cache-history`, `/supi-cache-forensics`, and `cache_forensics` — prompt-cache history and cross-session regression forensics (see [below](#prompt-cache-history-and-forensics))
 
-It also registers a **Debug** provider section for `/supi-context`, ships a `/supi-tooling-retro` prompt template for feedback on the task just completed, and discovers the **`gather-retrospectives` skill** for collecting feedback from past sessions.
+It also registers a **Debug** provider section for `/supi-context`, ships a `/supi-tooling-retro` prompt template for feedback on the task just completed, and discovers two skills over past sessions: **`gather-retrospectives`** collects feedback, and **`session-analytics`** measures tool usage, failures, and debug-log volume.
 
 ### Gather past retrospectives
 
@@ -47,6 +47,12 @@ Ask naturally, for example “gather retrospective feedback about `packages/supi
 The skill uses a bundled Node.js collector to read existing structured Agent Run assessments. It defaults to the current workspace directory tree and all dates, preserves source references, deduplicates cloned runs, and saves paginated evidence in temporary files. Other projects and sibling worktrees require explicit scope. Source filters identify who produced an assessment, not which package it concerns. The collector displays complete assessments within a 16 KB stdout budget; `omittedRefs` identifies assessments that need a targeted read from the full evidence file.
 
 The collector excludes older interactive `/supi-tooling-retro` reports. It does not enable capture, execute new assessments, or verify historical claims. Stored prose may still contain sensitive task details. Run the bundled `skills/gather-retrospectives/scripts/collect.mjs` with `--help` for storage overrides and filters. Node and shell access are required; no extra runtime dependencies are needed.
+
+### Measure past tool usage
+
+Ask, for example, “how often did agents call `code_find` in the last 30 days, and in how many sessions was it available?” or “which bash timeouts happened and what did the agent do next?”, or invoke `/skill:session-analytics`.
+
+The skill runs a bundled Node.js exporter that streams session storage once and writes one JSONL file of tool calls (truncated arguments, result status, size and head, and the next calls), per-session tool availability, or debug-event sizes. The agent then aggregates that file in a script. It uses the same storage discovery and workspace scope as `gather-retrospectives`, never modifies sessions, and reads files linearly, so abandoned branches count too. Run `skills/session-analytics/scripts/export.mjs --help` for all options.
 
 ## Event behavior
 

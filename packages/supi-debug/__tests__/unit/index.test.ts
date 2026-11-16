@@ -268,7 +268,7 @@ describe("supi-debug extension setup", () => {
     expect(mockFns.maybeLogLoadStatus).toHaveBeenCalledWith(pi, "/repo", "resources_discover");
   });
 
-  it("self-registers the tooling-retro prompt and historical gathering skill", async () => {
+  it("self-registers the tooling-retro prompt and the session-history skills", async () => {
     const pi = setup();
     const result = (await pi.handlers.get("resources_discover")?.[0]?.({}, { cwd: "/repo" })) as
       | { promptPaths?: string[]; skillPaths?: string[] }
@@ -283,6 +283,7 @@ describe("supi-debug extension setup", () => {
     expect(skillDir).toMatch(/^\//);
     expect(existsSync(join(skillDir, "gather-retrospectives/SKILL.md"))).toBe(true);
     expect(existsSync(join(skillDir, "gather-retrospectives/scripts/collect.mjs"))).toBe(true);
+    expect(existsSync(join(skillDir, "session-analytics/scripts/export.mjs"))).toBe(true);
   });
 
   it("context provider returns aggregate summary without event payloads", () => {
