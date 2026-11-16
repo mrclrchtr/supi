@@ -1,5 +1,57 @@
 # Changelog
 
+## [13.0.0](https://github.com/mrclrchtr/supi/compare/v12.0.0...v13.0.0) (2026-11-16)
+
+SuPi 13.0.0 retires three small packages into existing ones, makes `code_health` honest about what it actually checked, adds the `tui_render` and `session-analytics` debugging aids, and compacts codemode, agent, and footer rows in the TUI.
+
+### ⚠ BREAKING CHANGES
+
+* `@mrclrchtr/supi-cache`, `@mrclrchtr/supi-bash-timeout`, and `@mrclrchtr/supi-claude-md` are retired. Cache history, `cache_forensics`, and the Cache Forensics settings now ship with `@mrclrchtr/supi-debug`; the default bash timeout ships with `@mrclrchtr/supi-extras`; the `claude-md-improver` and `claude-md-revision` skills move to the root skills catalog. Migration: run `pi remove npm:<name>` for each retired package, install `@mrclrchtr/supi-debug` and `@mrclrchtr/supi-extras`, and install the skills with `npx skills add mrclrchtr/supi --skill claude-md-improver claude-md-revision`. The `cache` and `bash-timeout` config sections are unchanged. SuPi Debug and SuPi Extras warn once per Pi process while a retired package is still declared, with the exact `pi remove` command ([#596](https://github.com/mrclrchtr/supi/issues/596))
+* **code-intelligence:** every `code_*` evidence list in structured details carries `completeness` (`complete`, `capped`, `partial`, or `unbounded`); `code_orientation` source lists and context definitions replace `collectedCount`/`omittedCount` with one `evidence` list. Migration: scripts read `completeness` instead of inferring it from a null `totalCount`, and read counts from `evidence`
+
+### Code Intelligence & LSP
+
+* `code_health` no longer reports a clean result when nothing was checked: zero checked files say so and suggest a `refresh: true` check, a clean result names the confirmed file count, and structured output adds `diagnostics.coverage` ([#465](https://github.com/mrclrchtr/supi/issues/465))
+* `code_health` reports deleted tracked files reliably, even after a passive read or background refresh, and marks the observation `partial` until a refresh ([#602](https://github.com/mrclrchtr/supi/issues/602), [#606](https://github.com/mrclrchtr/supi/issues/606))
+* Passive `code_health` snapshots stop confirming files that changed on disk outside Pi (bash, editor, git) and point to `refresh: true` ([#599](https://github.com/mrclrchtr/supi/issues/599))
+* Workspace Overview and `code_orientation` list Maven projects from `pom.xml` and CMake projects from `CMakeLists.txt`, read statically without running Maven or CMake ([#534](https://github.com/mrclrchtr/supi/issues/534), [#535](https://github.com/mrclrchtr/supi/issues/535))
+* `code_graph`, `code_resolve`, and `code_orientation` report ambiguous targets and symbol-kind mismatches the same way, with handle-first candidate rows and `details.status: "disambiguation"`
+* Symbol name anchors use the text synchronized to the language server instead of the file on disk ([#594](https://github.com/mrclrchtr/supi/issues/594))
+* `code_graph` no longer drops sections when a provider-limited list also excluded invalid locations; truncation wording is the same across markdown and TUI; the compact `code_health` line no longer shows zero coverage as a green count
+* Startup is about 100 ms faster because the TypeScript compiler API loads on first use
+
+### Debug & Insights
+
+* New opt-in `tui_render` tool renders any stored tool result as the TUI shows it (collapsed or expanded, plain, ANSI, or theme-token markers) so agents can check rendering themselves. Enable **TUI Render Tool** in the Debug settings ([#604](https://github.com/mrclrchtr/supi/issues/604))
+* New `/skill:session-analytics` exports tool calls (with failure filtering and the agent's next calls), tool availability, and debug-event sizes from past sessions as JSONL ([#601](https://github.com/mrclrchtr/supi/issues/601))
+* Session files persist only `info`-level Debug events and above by default, which cuts session file growth sharply; set `persistLevel` to `debug` to keep everything ([#591](https://github.com/mrclrchtr/supi/issues/591))
+* `gather-retrospectives` can export full reports as JSONL, adds a classifier-based theme-finding step, and explains why no last-gather marker was recorded
+
+### Agents & Review
+
+* `agent_run` can start a conversation in a sibling worktree of the same repository with `new: { profile, cwd }`; child and reviewer prompts name their working directory so providers no longer mislead them about it
+* Background completion notices, `agent_result`, and live `agent_run` progress use compact one-line task rows with model, turns, tools, tokens, and cost; expand for details
+* Reviews of working trees with many untracked files start much faster (205 files: 0.5 s instead of 4.8 s)
+* After the first BSD `sed` script error on macOS, the session gets a one-line hint about `sed -i` suffixes, delimiters, and alternatives
+
+### TUI & Extras
+
+* The default bash timeout is now 600 seconds instead of 120, so test and check runs are no longer cut off
+* The footer shows Git ahead/behind, file counts, and stashes, with Nerd Font, Unicode, or ASCII icons, and a grouped, colored stats line with a context bar; configure under `/supi-settings` → **Footer**
+* Collapsed `codemode` rows are compact: script first line, nested calls with key arguments (repeats merged, hidden calls summarized by tool), status, and first output line; toggle under **Codemode View**
+
+### Web, Tools & Installer
+
+* `web_search` uses about half the source-text budget per search, so each search takes less context
+* Tool schemas across SuPi are about 1,100 characters shorter per request, with unchanged call shapes
+* Truncated tool outputs and snapshots go to one private per-user directory, `$TMPDIR/supi-<uid>/`, with identical content reusing one file, instead of a new temp directory per call ([#597](https://github.com/mrclrchtr/supi/issues/597))
+* The installer shows copyable `npx skills add mrclrchtr/supi -a pi` commands and names replacements for obsolete packages; `supi-setup` knows the retired packages
+* Consulting warns once when a configuration still contains the ignored `antigravity` section ([#466](https://github.com/mrclrchtr/supi/issues/466))
+
+### Dependencies
+
+* Published runtime dependencies are pinned to exact versions; routine updates include web-tree-sitter 0.27.2 and jsdom 31
+
 ## [12.0.0](https://github.com/mrclrchtr/supi/compare/v11.4.0...v12.0.0) (2026-11-13)
 
 SuPi 12.0.0 reworks `code_refactor_plan` around per-operation scopes and command-captured code actions, aligns tool input names and shapes across packages, groups codemode tools into namespaces with audited permission annotations, and makes structural analysis faster and more accurate.

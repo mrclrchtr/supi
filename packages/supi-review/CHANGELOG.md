@@ -5,6 +5,7 @@
 - Reviews of a working tree with many untracked files start much faster. Their patches now come from one `git diff` instead of several Git processes per file; 205 untracked files took 0.5 s instead of 4.8 s. The repository's object store is not written.
 - When a `bash` result shows a BSD sed script error (macOS `sed: 1: ...`), the first one in a session gets a one-line hint: `sed -i` needs a suffix argument, the delimiter must not occur in the pattern, and the edit tool or `gsed` are alternatives. Reviewers and the parent session both get it.
 - The Reviewer protocol names the frozen Review Workspace path and says it overrides any other working directory in the environment. Providers such as `claude-code` describe the parent worktree as the working directory, so reviewers prefixed every command with `cd`.
+- Reviewer child sessions use the bundled Code Intelligence 13.0.0: `code_*` evidence lists report `completeness`, `code_health` no longer reports a clean result when nothing was checked or files changed on disk, and Maven and CMake projects appear in Workspace Overviews.
 
 ## [12.0.0]
 

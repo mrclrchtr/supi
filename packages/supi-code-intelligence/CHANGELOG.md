@@ -12,6 +12,10 @@
 - The collapsed `code_health` line no longer emits an empty styled span after section counts, so `tui_render` `marked` output reads `[success][bold]3[/bold][/success]` without a trailing `[muted][/muted]`.
 - Truncation wording is the same in markdown, candidate lists, graph summaries, and TUI headers. For example, provider-limited candidate searches now read `1 candidate; 1 collected omitted; more may exist — provider-limited; <reason>` instead of a separate "Search completeness is unknown" sentence.
 - `code_orientation` snapshots and truncated `code_*` output files are now written to one private per-user directory, `$TMPDIR/supi-<uid>/`, instead of a new `supi-*` directory per call. Identical content reuses one file, so repeated Workspace Overviews of an unchanged workspace share one snapshot; captures no longer record the per-call collection deadline. SuPi never deletes these files; the OS temp purge does ([#597](https://github.com/mrclrchtr/supi/issues/597)).
+- Symbol name anchors from document symbols are computed against the text synchronized to the language server instead of the file on disk, so `code_resolve` and file outlines no longer point at the wrong column after unsaved or concurrent edits ([#594](https://github.com/mrclrchtr/supi/issues/594)).
+- `code_graph` no longer drops TUI sections and evidence lines when a provider-limited relation list also excluded invalid provider locations.
+- Starting Code Intelligence is about 100 ms faster: the TypeScript compiler API is loaded only when a tsconfig question is asked.
+- `code_*` tool schemas are shorter (repeated position and default descriptions removed), so every request sends less prompt text. Call shapes and validation are unchanged.
 
 ## [12.0.0]
 

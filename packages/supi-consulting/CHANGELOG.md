@@ -1,6 +1,6 @@
 # Changelog
 
-## [12.1.0]
+## [13.0.0]
 
 - Warns once per session start or reload when the global or project configuration still has the ignored `antigravity` section. The warning names `consulting.agentToolEnabled`, its effective value, and how to keep an old disabled setting ([#466](https://github.com/mrclrchtr/supi/issues/466)).
 
