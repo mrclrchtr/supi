@@ -7,7 +7,7 @@ Private maintenance workspace for the SuPi-compatible skills in the root [`skill
 Users install the committed skills through [skills.sh](https://skills.sh):
 
 ```bash
-npx skills add mrclrchtr/supi --skill code-review commit
+npx skills add mrclrchtr/supi -a pi --skill code-review commit
 ```
 
 This checkout links selected catalog skills into `.pi/skills/`, so local agents use the generated files directly. `pnpm skills:sync` also generates `.claude-plugin/marketplace.json`, which groups the public catalog into Matt Pocock and SuPi skills in the skills.sh installer. It does not need a skills.sh install.

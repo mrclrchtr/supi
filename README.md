@@ -37,7 +37,7 @@ Tree-sitter support is bundled. Full LSP features require the matching language-
 - **Review workflows** — run independent, inspection-only reviews of exact Git targets with [`supi-review`](packages/supi-review/README.md).
 - **Agent Profile policy** — discover explicit `explore` and `general` profiles with bounded resource envelopes through [`supi-agent`](packages/supi-agent/README.md).
 - **Operational awareness** — inspect context pressure, cache history and forensics, and SuPi debug events with `supi-context` and `supi-debug`. PI owns live cache statistics and cache-miss notices.
-- **Repository guidance** — maintain `CLAUDE.md` and `AGENTS.md` files with the `claude-md-improver` and `claude-md-revision` skills: `npx skills add mrclrchtr/supi --skill claude-md-improver claude-md-revision`.
+- **Repository guidance** — maintain `CLAUDE.md` and `AGENTS.md` files with the `claude-md-improver` and `claude-md-revision` skills: `npx skills add mrclrchtr/supi -a pi --skill claude-md-improver claude-md-revision`.
 - **Skills on your terms** — use [`supi-skills`](packages/supi-skills/README.md) to choose, globally or per project, whether Pi can select each skill automatically, whether only you can start it, or whether it is disabled. Type `$` to search and start installed skills without remembering their full command names.
 - **Session polish** — use [`supi-extras`](packages/supi-extras/README.md) to choose session-only tool visibility and, with `supi-skills`, skill visibility. It also adds compact `codemode` rows that summarize nested tool calls, prompt stashing, activity indicators, shortcuts, and a default `bash` timeout.
 
@@ -101,7 +101,7 @@ pi install npm:@mrclrchtr/supi-web
 The root [`skills/`](skills) catalog contains patched SuPi-compatible editions of third-party skills and SuPi-owned skills. Install only the skills you need:
 
 ```bash
-npx skills add mrclrchtr/supi --skill code-review commit
+npx skills add mrclrchtr/supi -a pi --skill code-review commit
 ```
 
 The `claude-md-improver` and `claude-md-revision` skills (formerly `@mrclrchtr/supi-claude-md`) audit and revise `CLAUDE.md` and `AGENTS.md` files.
