@@ -508,6 +508,42 @@ describe("code_health diagnostic observations", () => {
     expect(classifyDiagnosticCoverage(observation)).toBe("incomplete");
   });
 
+  it("reports disk-changed documents as partial and keeps the reason and stale entries", async () => {
+    const evidence = {
+      requested: 2,
+      confirmed: 1,
+      unconfirmed: 1,
+      failed: 0,
+      removed: 0,
+      documents: [
+        { file: "src/a.ts", status: "confirmed" as const },
+        { file: "src/b.ts", status: "unconfirmed" as const, reason: "disk-changed" as const },
+      ],
+    };
+    const observation = await collectDiagnostics({
+      service: service({
+        getWorkspaceDiagnosticSummary: () => ({
+          entries: [{ file: "src/b.ts", errors: 1, warnings: 0 }],
+          current: false,
+          evidence,
+        }),
+      }),
+      included: ["diagnostics"],
+      scope: diagnosticScope(null),
+      cwd,
+      unavailableReason: "not ready",
+    });
+
+    expect(observation).toMatchObject({
+      kind: "partial",
+      entries: [{ file: path.join(cwd, "src/b.ts"), errors: 1 }],
+      evidence: { documents: expect.arrayContaining([evidence.documents[1]]) },
+      reason: expect.stringContaining("Changed on disk after their last diagnosis: `src/b.ts`"),
+    });
+    if (observation.kind === "not-requested") throw new Error("expected a collected observation");
+    expect(classifyDiagnosticCoverage(observation)).toBe("incomplete");
+  });
+
   it("adds removed refresh documents to a final report that already pruned them", async () => {
     const reportEvidence = {
       requested: 1,

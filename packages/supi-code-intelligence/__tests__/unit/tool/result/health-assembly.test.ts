@@ -203,7 +203,7 @@ describe("code_health result assembly", () => {
     expect(markdown).toContain("No errors or warnings in 2 confirmed tracked files under `src`.");
     expect(markdown).toContain("Untracked files were not checked");
     expect(markdown).toContain(
-      "reflects the last LSP synchronization; recent edits made outside Pi may not be included. Use `refresh: true`",
+      "reflects the last LSP synchronization; files changed on disk since then are unconfirmed, but effects of outside edits on other files may not be included. Use `refresh: true`",
     );
     expect(markdown).not.toContain("No source diagnostics checked");
   });

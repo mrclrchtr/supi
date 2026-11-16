@@ -24,6 +24,10 @@ export function isPassiveTrackedSnapshot(
   );
 }
 
-/** A passive tracked-file snapshot reflects the last synchronization, not necessarily disk state. */
+/**
+ * A passive tracked-file snapshot reflects the last synchronization. Files whose disk metadata
+ * changed since then are already reported as unconfirmed; this note covers what a stat cannot
+ * show: effects of those edits on other files and same-size rewrites within one timestamp tick.
+ */
 export const PASSIVE_SNAPSHOT_NOTE =
-  "This tracked-file snapshot reflects the last LSP synchronization; recent edits made outside Pi may not be included. Use `refresh: true` for current evidence";
+  "This tracked-file snapshot reflects the last LSP synchronization; files changed on disk since then are unconfirmed, but effects of outside edits on other files may not be included. Use `refresh: true` for current evidence";

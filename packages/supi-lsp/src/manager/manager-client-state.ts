@@ -9,6 +9,7 @@ import { getDiagnosticFileState } from "../client/client-file-state.ts";
 import {
   type DiagnosticEvidenceDocument,
   type DiagnosticEvidenceSummary,
+  preferEvidenceDocument,
   summarizeDiagnosticEvidence,
 } from "../diagnostics/evidence.ts";
 
@@ -82,23 +83,7 @@ function deduplicateEvidenceDocuments(
 ): DiagnosticEvidenceDocument[] {
   const byFile = new Map<string, DiagnosticEvidenceDocument>();
   for (const document of documents) {
-    const existing = byFile.get(document.file);
-    if (!existing || evidenceStatusRank(document.status) > evidenceStatusRank(existing.status)) {
-      byFile.set(document.file, document);
-    }
+    byFile.set(document.file, preferEvidenceDocument(byFile.get(document.file), document));
   }
   return Array.from(byFile.values()).sort((a, b) => a.file.localeCompare(b.file));
-}
-
-function evidenceStatusRank(status: DiagnosticEvidenceDocument["status"]): number {
-  switch (status) {
-    case "confirmed":
-      return 1;
-    case "unconfirmed":
-      return 2;
-    case "failed":
-      return 3;
-    case "removed":
-      return 4;
-  }
 }

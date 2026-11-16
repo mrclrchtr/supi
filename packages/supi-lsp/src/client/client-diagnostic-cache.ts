@@ -5,9 +5,14 @@ import {
   isTentativePushEntry,
   isValidPublishDiagnosticsParams,
 } from "./client-diagnostic-evidence.ts";
+import { type DiskStamp, sameDiskStamp } from "./client-disk-stamp.ts";
 import type { ClientDiagnosticSnapshot, OpenDocumentState } from "./client-document-state.ts";
 import { hasCurrentDiagnosticEvidence } from "./client-document-state.ts";
-import { getDiagnosticFileState } from "./client-file-state.ts";
+import {
+  type DiagnosticFileState,
+  type DiagnosticFileStatus,
+  getDiagnosticFileStatus,
+} from "./client-file-state.ts";
 
 interface ApplyPushOptions {
   store: Map<string, DiagnosticCacheEntry>;
@@ -119,15 +124,39 @@ function buildPushCacheEntry(
   };
 }
 
-/** Build one client snapshot without dropping empty-cache freshness. */
-export function buildClientDiagnosticSnapshot(options: {
+/** Options for one client diagnostic snapshot. */
+export interface BuildClientDiagnosticSnapshotOptions {
   store: ReadonlyMap<string, DiagnosticCacheEntry>;
   openDocuments: ReadonlyMap<string, OpenDocumentState>;
   failedDocuments: ReadonlySet<string>;
   evidenceRevision: number;
-}): ClientDiagnosticSnapshot {
-  const documents = collectDocumentFreshness(options);
-  const cache = collectCachedDiagnostics(options);
+  /** Stamp of the last verified disk read for one URI, when one exists. */
+  observedDiskStamp?: (uri: string) => DiskStamp | undefined;
+  /** File-status seam; defaults to one stat per URI. */
+  readFileStatus?: (filePath: string) => DiagnosticFileStatus;
+}
+
+/** Per-URI disk facts shared by every projection of one snapshot. */
+interface SnapshotFileFacts {
+  readonly state: DiagnosticFileState;
+  /** The file's disk stamp differs from the last verified read. */
+  readonly diskChanged: boolean;
+}
+
+/**
+ * Build one client snapshot without dropping empty-cache freshness.
+ *
+ * Passive and side-effect free: one stat per URI, no synchronization, request,
+ * or enrollment. A document whose disk stamp differs from its last verified
+ * read is reported unconfirmed with reason `disk-changed`. Metadata can only
+ * withdraw confirmation; a later content read restores it.
+ */
+export function buildClientDiagnosticSnapshot(
+  options: BuildClientDiagnosticSnapshotOptions,
+): ClientDiagnosticSnapshot {
+  const facts = createFileFactsReader(options);
+  const documents = collectDocumentFreshness(options, facts);
+  const cache = collectCachedDiagnostics(options, facts);
   return {
     entries: cache.entries,
     documents,
@@ -135,42 +164,65 @@ export function buildClientDiagnosticSnapshot(options: {
   };
 }
 
-function collectDocumentFreshness(options: {
-  openDocuments: ReadonlyMap<string, OpenDocumentState>;
-  failedDocuments: ReadonlySet<string>;
-  store: ReadonlyMap<string, DiagnosticCacheEntry>;
-  evidenceRevision: number;
-}): ClientDiagnosticSnapshot["documents"] {
-  const open = collectOpenDocumentFreshness(options);
+function createFileFactsReader(
+  options: BuildClientDiagnosticSnapshotOptions,
+): (uri: string) => SnapshotFileFacts {
+  const readFileStatus = options.readFileStatus ?? getDiagnosticFileStatus;
+  const cache = new Map<string, SnapshotFileFacts>();
+  return (uri) => {
+    const cached = cache.get(uri);
+    if (cached) return cached;
+    const status = readFileStatus(uriToFile(uri));
+    const observed = options.observedDiskStamp?.(uri);
+    const facts = {
+      state: status.state,
+      diskChanged:
+        status.state === "present" &&
+        observed !== undefined &&
+        (status.stamp === undefined || !sameDiskStamp(observed, status.stamp)),
+    };
+    cache.set(uri, facts);
+    return facts;
+  };
+}
+
+function collectDocumentFreshness(
+  options: BuildClientDiagnosticSnapshotOptions,
+  facts: (uri: string) => SnapshotFileFacts,
+): ClientDiagnosticSnapshot["documents"] {
+  const open = collectOpenDocumentFreshness(options, facts);
   return [
     ...open.documents,
-    ...collectFailedDocumentFreshness(options.failedDocuments, open.uris),
-    ...collectUntrackedCacheFreshness(options.store, open.uris, options.failedDocuments),
+    ...collectFailedDocumentFreshness(options.failedDocuments, open.uris, facts),
+    ...collectUntrackedCacheFreshness(options.store, open.uris, options.failedDocuments, facts),
   ];
 }
 
-function collectOpenDocumentFreshness(options: {
-  openDocuments: ReadonlyMap<string, OpenDocumentState>;
-  failedDocuments: ReadonlySet<string>;
-  store: ReadonlyMap<string, DiagnosticCacheEntry>;
-  evidenceRevision: number;
-}): { documents: ClientDiagnosticSnapshot["documents"]; uris: ReadonlySet<string> } {
+function collectOpenDocumentFreshness(
+  options: BuildClientDiagnosticSnapshotOptions,
+  facts: (uri: string) => SnapshotFileFacts,
+): { documents: ClientDiagnosticSnapshot["documents"]; uris: ReadonlySet<string> } {
   const documents: ClientDiagnosticSnapshot["documents"] = [];
   const uris = new Set<string>();
   for (const [uri, document] of options.openDocuments) {
     uris.add(uri);
     const entry = options.store.get(uri);
-    const fileState = getDiagnosticFileState(uriToFile(uri));
+    const { state: fileState, diskChanged } = facts(uri);
     const current = hasCurrentDiagnosticEvidence(document, entry, options.evidenceRevision);
     const failed = options.failedDocuments.has(uri);
     // A current tentative push maps to unconfirmed, not to a new public
     // status: it matches the synchronization but cannot confirm it yet, so
     // it must not claim current snapshot or document state (issue #351).
     const tentative = current && isTentativePushEntry(entry);
+    const status = statusForDocument(fileState, current && !diskChanged, failed, tentative);
     documents.push({
       uri,
-      current: fileState === "present" && current && !failed && !tentative,
-      status: statusForDocument(fileState, current, failed, tentative),
+      current: fileState === "present" && current && !failed && !tentative && !diskChanged,
+      status,
+      // Name the cause only where it alone withdrew confirmation.
+      ...(diskChanged && status === "unconfirmed" && current && !tentative
+        ? { reason: "disk-changed" as const }
+        : {}),
     });
   }
   return { documents, uris };
@@ -179,16 +231,14 @@ function collectOpenDocumentFreshness(options: {
 function collectFailedDocumentFreshness(
   failedDocuments: ReadonlySet<string>,
   openUris: ReadonlySet<string>,
+  facts: (uri: string) => SnapshotFileFacts,
 ): ClientDiagnosticSnapshot["documents"] {
   return Array.from(failedDocuments)
     .filter((uri) => !openUris.has(uri))
     .map((uri) => ({
       uri,
       current: false,
-      status:
-        getDiagnosticFileState(uriToFile(uri)) === "removed"
-          ? ("removed" as const)
-          : ("failed" as const),
+      status: facts(uri).state === "removed" ? ("removed" as const) : ("failed" as const),
     }));
 }
 
@@ -196,23 +246,27 @@ function collectUntrackedCacheFreshness(
   store: ReadonlyMap<string, DiagnosticCacheEntry>,
   openUris: ReadonlySet<string>,
   failedDocuments: ReadonlySet<string>,
+  facts: (uri: string) => SnapshotFileFacts,
 ): ClientDiagnosticSnapshot["documents"] {
   return Array.from(store.keys())
     .filter((uri) => !openUris.has(uri) && !failedDocuments.has(uri))
-    .map((uri) => ({
-      uri,
-      current: false,
-      status:
-        getDiagnosticFileState(uriToFile(uri)) === "removed"
-          ? ("removed" as const)
-          : getDiagnosticFileState(uriToFile(uri)) === "unreadable"
-            ? ("failed" as const)
-            : ("unconfirmed" as const),
-    }));
+    .map((uri) => {
+      const state = facts(uri).state;
+      return {
+        uri,
+        current: false,
+        status:
+          state === "removed"
+            ? ("removed" as const)
+            : state === "unreadable"
+              ? ("failed" as const)
+              : ("unconfirmed" as const),
+      };
+    });
 }
 
 function statusForDocument(
-  fileState: ReturnType<typeof getDiagnosticFileState>,
+  fileState: DiagnosticFileState,
   current: boolean,
   failed: boolean,
   tentative: boolean,
@@ -223,27 +277,28 @@ function statusForDocument(
   return "confirmed";
 }
 
-function collectCachedDiagnostics(options: {
-  store: ReadonlyMap<string, DiagnosticCacheEntry>;
-  openDocuments: ReadonlyMap<string, OpenDocumentState>;
-  evidenceRevision: number;
-}): {
+function collectCachedDiagnostics(
+  options: BuildClientDiagnosticSnapshotOptions,
+  facts: (uri: string) => SnapshotFileFacts,
+): {
   entries: ClientDiagnosticSnapshot["entries"];
   current: boolean;
 } {
   const entries: ClientDiagnosticSnapshot["entries"] = [];
   let current = true;
   for (const [uri, entry] of options.store) {
-    if (getDiagnosticFileState(uriToFile(uri)) === "removed") continue;
+    const fileFacts = facts(uri);
+    if (fileFacts.state === "removed") continue;
     const entryCurrent = hasCurrentDiagnosticEvidence(
       options.openDocuments.get(uri),
       entry,
       options.evidenceRevision,
     );
     // A current tentative error is useful partial evidence. Keep its entry
-    // non-current so it cannot establish a clean or settled result.
+    // non-current so it cannot establish a clean or settled result. The same
+    // applies to diagnostics of content that changed on disk since.
     const tentative = entryCurrent && isTentativePushEntry(entry);
-    const confirmed = entryCurrent && !tentative;
+    const confirmed = entryCurrent && !tentative && !fileFacts.diskChanged;
     current &&= confirmed;
     if (entry.diagnostics.length > 0) {
       entries.push({ uri, diagnostics: entry.diagnostics, current: confirmed });

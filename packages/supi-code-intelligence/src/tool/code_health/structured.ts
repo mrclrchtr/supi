@@ -20,7 +20,11 @@ function copyEvidence(value: DiagnosticEvidenceSummary) {
     unconfirmed: value.unconfirmed,
     failed: value.failed,
     removed: value.removed,
-    documents: value.documents.map(({ file, status }) => ({ file, status })),
+    documents: value.documents.map(({ file, status, reason }) => ({
+      file,
+      status,
+      ...(reason === undefined ? {} : { reason }),
+    })),
   };
 }
 function copyScope(value: HealthDiagnosticScope) {

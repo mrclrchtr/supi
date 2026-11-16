@@ -256,6 +256,32 @@ describe("registered health structured results", () => {
     expect(result.content[0].text).toContain(reason);
   });
 
+  it("exposes the disk-changed reason in structured evidence and the partial reason", async () => {
+    const evidence = {
+      requested: 1,
+      confirmed: 0,
+      unconfirmed: 1,
+      failed: 0,
+      removed: 0,
+      documents: [{ file: "src/a.ts", status: "unconfirmed", reason: "disk-changed" }],
+    };
+    ready({
+      getWorkspaceDiagnosticSummary: () => ({ entries: [], current: false, evidence }),
+    });
+    const result = await call(tool(), {});
+    expect(result.structuredContent).toMatchObject({
+      diagnostics: {
+        kind: "partial",
+        coverage: "incomplete",
+        evidence: {
+          documents: [{ file: "src/a.ts", status: "unconfirmed", reason: "disk-changed" }],
+        },
+      },
+    });
+    const { reason } = result.structuredContent.diagnostics as { reason: string };
+    expect(reason).toContain("Changed on disk after their last diagnosis: `src/a.ts`");
+  });
+
   it("retains partial evidence independently of server scope and exposes rich server capabilities", async () => {
     const evidence = {
       requested: 1,

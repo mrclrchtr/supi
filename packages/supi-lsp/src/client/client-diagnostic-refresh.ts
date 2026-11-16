@@ -29,6 +29,7 @@ import type {
 import { isDiagnosticRequestInvalidated } from "./client-diagnostic-request.ts";
 import { DiagnosticObserver, isDiagnosticTimeout } from "./client-diagnostic-timing.ts";
 import type { DiagnosticWaitRegistry } from "./client-diagnostic-waiters.ts";
+import { type DiskStamp, statDiskStampSync } from "./client-disk-stamp.ts";
 import {
   fingerprintDocumentContent,
   hasConfirmedDiagnosticEvidence,
@@ -238,18 +239,23 @@ function classifyReusableDocuments(options: {
   diagnosticStore: ReadonlyMap<string, DiagnosticCacheEntry>;
   evidenceRevision: number;
   failedFiles: ReadonlySet<string>;
+  /** Record the pre-read stamp of a document whose content equals the read. */
+  recordDiskStamp: (uri: string, content: string, stamp: DiskStamp | undefined) => void;
 }): {
   reusableUris: Set<string>;
   retainedUris: Set<string>;
   preloadedContent: Map<string, string>;
+  preloadedStamps: Map<string, DiskStamp>;
 } {
   const reusableUris = new Set<string>();
   const retainedUris = new Set<string>();
   const preloadedContent = new Map<string, string>();
+  const preloadedStamps = new Map<string, DiskStamp>();
   for (const [uri, document] of options.openDocuments) {
     const filePath = uriToFile(uri);
     if (options.failedFiles.has(filePath)) continue;
     let content: string;
+    const stamp = statDiskStampSync(filePath);
     try {
       content = readFileSync(filePath, "utf-8");
     } catch {
@@ -258,8 +264,11 @@ function classifyReusableDocuments(options: {
     }
     if (fingerprintDocumentContent(content) !== document.contentFingerprint) {
       preloadedContent.set(uri, content);
+      if (stamp) preloadedStamps.set(uri, stamp);
       continue;
     }
+    // Unchanged content: the read verifies the document, so its stamp is current.
+    options.recordDiskStamp(uri, content, stamp);
     if (
       hasConfirmedDiagnosticEvidence(
         document,
@@ -272,7 +281,7 @@ function classifyReusableDocuments(options: {
       retainedUris.add(uri);
     }
   }
-  return { reusableUris, retainedUris, preloadedContent };
+  return { reusableUris, retainedUris, preloadedContent, preloadedStamps };
 }
 
 interface ClientDiagnosticRefreshOptions {
@@ -290,6 +299,8 @@ interface ClientDiagnosticRefreshOptions {
   readonly noteInputContentChange: () => number;
   /** Keep the shared semantic barrier's verified disk observation current. */
   readonly observeDiskContent: (uri: string, content: string) => boolean;
+  /** Record a pre-read disk stamp when the document now equals that read. */
+  readonly recordDiskStamp: (uri: string, content: string, stamp: DiskStamp | undefined) => void;
   /** Send one save for an externally observed disk change. */
   readonly noteExternalDiskChange: (uri: string, content: string) => void;
   readonly clearFile: (uri: string) => void;
@@ -332,6 +343,7 @@ function prepareRefreshDocuments(
     diagnosticStore: options.diagnosticStore,
     evidenceRevision,
     failedFiles: options.failedFiles(),
+    recordDiskStamp: options.recordDiskStamp,
   });
   const { reusableUris, retainedUris } = classification;
   const documentsToResynchronize = new Map(
@@ -348,10 +360,12 @@ function prepareRefreshDocuments(
     documentSync: options.host.documentSync(),
     noteInputContentChange: options.noteInputContentChange,
     observeDiskContent: options.observeDiskContent,
+    recordDiskStamp: options.recordDiskStamp,
     noteExternalDiskChange: options.noteExternalDiskChange,
     sendNotification: (method, params) => options.host.sendNotification(method, params),
     uriToFile,
     preloadedContent: classification.preloadedContent,
+    preloadedStamps: classification.preloadedStamps,
     clearFile: options.clearFile,
     invalidateEvidence: options.invalidateEvidence,
     markUnversionedSyncMoment: options.markUnversionedSyncMoment,

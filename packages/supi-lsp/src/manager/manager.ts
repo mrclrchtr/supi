@@ -60,6 +60,7 @@ import {
 import {
   type DiagnosticEvidenceDocument,
   type DiagnosticEvidenceSummary,
+  preferEvidenceDocument,
   summarizeDiagnosticEvidence,
 } from "../diagnostics/evidence.ts";
 import {
@@ -2798,6 +2799,7 @@ export class LspManager {
         snapshot.documents.map((document) => ({
           file: relativeFilePathFromUri(document.uri, this.cwd),
           status: document.status,
+          ...(document.reason ? { reason: document.reason } : {}),
         })),
       ),
     );
@@ -2852,6 +2854,7 @@ export class LspManager {
         evidenceDocuments.push({
           file: relativeFilePathFromUri(document.uri, this.cwd),
           status: document.status,
+          ...(document.reason ? { reason: document.reason } : {}),
         });
       }
       for (const entry of snapshot.entries) {
@@ -2929,6 +2932,7 @@ export class LspManager {
       snapshot.documents.map((document) => ({
         file: relativeFilePathFromUri(document.uri, this.cwd),
         status: document.status,
+        ...(document.reason ? { reason: document.reason } : {}),
       })),
     );
     const evidence = this.toWorkspaceDiagnosticEvidence(evidenceDocuments);
@@ -2987,10 +2991,7 @@ export class LspManager {
     for (const document of documents) {
       const file = path.relative(this.cwd, path.resolve(this.cwd, document.file));
       if (!this.isAutomaticScopePath(file)) continue;
-      const existing = byFile.get(file);
-      if (!existing || evidenceStatusRank(document.status) > evidenceStatusRank(existing.status)) {
-        byFile.set(file, { file, status: document.status });
-      }
+      byFile.set(file, preferEvidenceDocument(byFile.get(file), { ...document, file }));
     }
     return summarizeDiagnosticEvidence(
       Array.from(byFile.values()).sort((a, b) => a.file.localeCompare(b.file)),
@@ -3551,6 +3552,7 @@ function collectClientDiagnosticEvidenceDocuments(
     snapshot.documents.map((document) => ({
       file: relativeFilePathFromUri(document.uri, cwd),
       status: document.status,
+      ...(document.reason ? { reason: document.reason } : {}),
     })),
   );
 }
@@ -3579,17 +3581,4 @@ function collectOutstandingDiagnosticSummaryEntries(
       b.hints - a.hints ||
       a.file.localeCompare(b.file),
   );
-}
-
-function evidenceStatusRank(status: DiagnosticEvidenceDocument["status"]): number {
-  switch (status) {
-    case "confirmed":
-      return 1;
-    case "unconfirmed":
-      return 2;
-    case "failed":
-      return 3;
-    case "removed":
-      return 4;
-  }
 }

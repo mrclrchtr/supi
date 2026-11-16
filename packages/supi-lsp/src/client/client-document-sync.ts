@@ -5,6 +5,7 @@ import {
 } from "vscode-languageserver-protocol";
 import type { DiagnosticSynchronization } from "./client-diagnostic-evidence.ts";
 import type { DiagnosticWaitRegistry } from "./client-diagnostic-waiters.ts";
+import { type DiskStamp, statDiskStampSync } from "./client-disk-stamp.ts";
 import { fingerprintDocumentContent, type OpenDocumentState } from "./client-document-state.ts";
 import { getDiagnosticFileState } from "./client-file-state.ts";
 
@@ -194,12 +195,16 @@ interface ResynchronizeDocumentsOptions {
   noteInputContentChange(): number;
   /** Record the verified disk content and report whether its baseline changed. */
   observeDiskContent(uri: string, content: string): boolean;
+  /** Record a pre-read disk stamp when the document now equals that read. */
+  recordDiskStamp(uri: string, content: string, stamp: DiskStamp | undefined): void;
   /** Send one save for an externally observed disk change. */
   noteExternalDiskChange(uri: string, content: string): void;
   sendNotification: NotificationSender;
   uriToFile(uri: string): string;
   /** Disk content already read by classification; avoids a second read. */
   preloadedContent?: ReadonlyMap<string, string>;
+  /** Stamps taken before the preloaded reads. */
+  preloadedStamps?: ReadonlyMap<string, DiskStamp>;
   clearFile(uri: string): void;
   invalidateEvidence(uri: string): void;
   markUnversionedSyncMoment(uri: string): void;
@@ -229,6 +234,20 @@ function noteObservedDiskChange(
   }
 }
 
+/** Read one document, or reuse its preloaded read; the stamp precedes the read. */
+function readDocumentForResynchronization(
+  options: Pick<ResynchronizeDocumentsOptions, "preloadedContent" | "preloadedStamps">,
+  uri: string,
+  filePath: string,
+): { content: string; stamp: DiskStamp | undefined } {
+  const preloaded = options.preloadedContent?.get(uri);
+  if (preloaded !== undefined) {
+    return { content: preloaded, stamp: options.preloadedStamps?.get(uri) };
+  }
+  const stamp = statDiskStampSync(filePath);
+  return { content: readFileSync(filePath, "utf-8"), stamp };
+}
+
 /** Re-read and synchronize every existing open document. */
 export function resynchronizeOpenDocuments(
   options: ResynchronizeDocumentsOptions,
@@ -243,7 +262,7 @@ export function resynchronizeOpenDocuments(
     const filePath = options.uriToFile(uri);
     try {
       options.markUnversionedSyncMoment(uri);
-      const content = options.preloadedContent?.get(uri) ?? readFileSync(filePath, "utf-8");
+      const { content, stamp } = readDocumentForResynchronization(options, uri, filePath);
       const contentChanged = fingerprintDocumentContent(content) !== document.contentFingerprint;
       if (contentChanged) {
         if (!inputChangeNoted) {
@@ -273,6 +292,7 @@ export function resynchronizeOpenDocuments(
         });
       }
       noteObservedDiskChange(options, uri, content);
+      options.recordDiskStamp(uri, content, stamp);
       options.clearFailedFile(uri);
       synchronizedUris.add(uri);
       if (contentChanged) resynchronizedUris.add(uri);

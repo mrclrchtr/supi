@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import type { Diagnostic } from "../config/types.ts";
+import type { DiagnosticEvidenceReason } from "../diagnostics/evidence.ts";
 import { type DiagnosticCacheEntry, isTentativePushEntry } from "./client-diagnostic-evidence.ts";
 
 /** One file's stored diagnostics as consumed by manager-level collection. */
@@ -14,6 +15,8 @@ export interface ClientDiagnosticDocument {
   uri: string;
   current: boolean;
   status: "confirmed" | "unconfirmed" | "failed" | "removed";
+  /** Why an otherwise current document is unconfirmed. */
+  reason?: DiagnosticEvidenceReason;
 }
 
 /** One client's diagnostic snapshot, including empty cache freshness. */

@@ -15,12 +15,20 @@ export function mergeDiagnosticEvidence(
   const byFile = new Map<string, DiagnosticEvidenceDocument>();
   for (const document of [...previous.documents, ...latest.documents]) {
     const file = cwd ? path.relative(cwd, path.resolve(cwd, document.file)) : document.file;
-    const next = { file, status: document.status };
+    const next: DiagnosticEvidenceDocument = {
+      file,
+      status: document.status,
+      ...(document.reason ? { reason: document.reason } : {}),
+    };
     const previousDocument = byFile.get(file);
     if (
       !previousDocument ||
       policy === "latest" ||
-      evidenceStatusRank(next.status) > evidenceStatusRank(previousDocument.status)
+      evidenceStatusRank(next.status) > evidenceStatusRank(previousDocument.status) ||
+      // Equal rank: keep a known cause instead of a reason-less duplicate.
+      (next.status === previousDocument.status &&
+        previousDocument.reason === undefined &&
+        next.reason !== undefined)
     ) {
       byFile.set(file, next);
     }

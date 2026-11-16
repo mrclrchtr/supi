@@ -18,6 +18,13 @@ const evidence = object({
     object({
       file: Type.String(),
       status: Type.Enum(["confirmed", "unconfirmed", "failed", "removed"], { type: "string" }),
+      reason: Type.Optional(
+        Type.Enum(["disk-changed"], {
+          type: "string",
+          description:
+            "Known cause of a non-confirmed status. disk-changed = the file changed on disk after its last diagnosis.",
+        }),
+      ),
     }),
   ),
 });

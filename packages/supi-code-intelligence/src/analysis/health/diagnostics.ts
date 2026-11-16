@@ -19,6 +19,7 @@ import type {
   HealthDiagnosticScope,
   HealthSection,
 } from "../../session/health-types.ts";
+import { diagnosticEvidenceReason } from "./evidence-reason.ts";
 import {
   collectScopedFileDiagnostics,
   fileScopeStatus,
@@ -365,32 +366,6 @@ function evidenceIsComplete(
   if (!snapshotCurrent && evidence.requested === 0) return false;
   if (evidence.requested === 0) return !hasDiagnosticEntries;
   return allRequestedFilesConfirmed(evidence);
-}
-
-const REMOVED_FILE_NAME_LIMIT = 3;
-
-function diagnosticEvidenceReason(evidence: DiagnosticEvidenceSummary): string {
-  if (evidence.requested === 0) {
-    return "No document-level diagnostic evidence was collected for this scope. An empty result does not establish that the scope is clean. Request diagnostics for an exact file.";
-  }
-  let reason = `Diagnostic evidence is partial: ${evidence.requested} requested, ${evidence.confirmed} confirmed, ${evidence.unconfirmed} unconfirmed, ${evidence.failed} failed, ${evidence.removed} removed.`;
-  if (evidence.unconfirmed > 0) {
-    reason += " Unconfirmed documents have no request-based confirmation.";
-  }
-  if (evidence.removed > 0) {
-    reason += ` Removed since last tracked: ${removedFileList(evidence)}. Files that imported them may not be re-checked yet; run code_health again with refresh: true to confirm the remaining files.`;
-  }
-  return reason;
-}
-
-function removedFileList(evidence: DiagnosticEvidenceSummary): string {
-  const files = evidence.documents
-    .filter((document) => document.status === "removed")
-    .map((document) => `\`${document.file}\``);
-  if (files.length === 0) return `${evidence.removed} file${evidence.removed === 1 ? "" : "s"}`;
-  const shown = files.slice(0, REMOVED_FILE_NAME_LIMIT).join(", ");
-  const more = files.length - REMOVED_FILE_NAME_LIMIT;
-  return more > 0 ? `${shown} (+${more} more)` : shown;
 }
 
 export function isDirectory(filePath: string): boolean {

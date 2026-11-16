@@ -88,4 +88,45 @@ describe.skipIf(!HAS_TS_LSP)("public WorkspaceLspRuntime semantic input barrier"
     expect(result).toMatchObject({ kind: "completed" });
     if (result.kind === "completed") expect(hasTypeError(result.data)).toBe(true);
   }, 25_000);
+
+  it("withdraws passive confirmation after an external edit until a refresh (#599)", async () => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "workspace-runtime-disk-stamp-"));
+    fs.writeFileSync(
+      path.join(tmpDir, "tsconfig.json"),
+      JSON.stringify({
+        compilerOptions: { strict: true, noEmit: true, target: "ES2022", module: "ESNext" },
+        include: ["*.ts"],
+      }),
+    );
+    const file = path.join(tmpDir, "broken.ts");
+    fs.writeFileSync(file, "export const value: number = 1;\n");
+
+    const owner = createWorkspaceLspRuntimeOwner(new LspManager(TS_CONFIG, tmpDir));
+    shutdown = owner.shutdown;
+    const runtime = owner.runtime;
+    await expect(runtime.fileDiagnostics(file)).resolves.toMatchObject({
+      kind: "completed",
+      data: [],
+    });
+    expect(runtime.getWorkspaceDiagnosticSummary().evidence.documents).toEqual([
+      { file: "broken.ts", status: "confirmed" },
+    ]);
+
+    // Edit outside Pi: no write/edit notification reaches the runtime.
+    fs.writeFileSync(file, 'export const value: number = "broken";\n');
+
+    const passive = runtime.getWorkspaceDiagnosticSummary();
+    expect(passive.current).toBe(false);
+    expect(passive.evidence).toMatchObject({
+      confirmed: 0,
+      unconfirmed: 1,
+      documents: [{ file: "broken.ts", status: "unconfirmed", reason: "disk-changed" }],
+    });
+
+    await runtime.refreshOpenDiagnostics({ maxWaitMs: 5_000, quietMs: 50 });
+
+    const refreshed = runtime.getWorkspaceDiagnosticSummary();
+    expect(refreshed.evidence.documents).toEqual([{ file: "broken.ts", status: "confirmed" }]);
+    expect(refreshed.entries).toEqual([{ file: "broken.ts", errors: 1, warnings: 0 }]);
+  }, 25_000);
 });

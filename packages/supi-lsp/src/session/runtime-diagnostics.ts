@@ -3,6 +3,7 @@ import type { DiagnosticEvidenceSummary } from "../diagnostics/evidence.ts";
 
 export type {
   DiagnosticEvidenceDocument,
+  DiagnosticEvidenceReason,
   DiagnosticEvidenceStatus,
   DiagnosticEvidenceSummary,
 } from "../diagnostics/evidence.ts";

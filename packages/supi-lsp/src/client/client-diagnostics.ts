@@ -38,6 +38,7 @@ import {
 } from "./client-diagnostic-request.ts";
 import { DiagnosticObserver } from "./client-diagnostic-timing.ts";
 import { DiagnosticWaitRegistry } from "./client-diagnostic-waiters.ts";
+import { type DiskStamp, statDiskStampSync } from "./client-disk-stamp.ts";
 import {
   type ClientDiagnosticSnapshot,
   type DiagnosticEntry,
@@ -136,18 +137,36 @@ export class ClientDiagnostics {
     return this.#inputAdmission.request(run, control, uri);
   }
 
-  /** Read content only after admission; tracked-document changes never wait. */
-  async openDocument(
+  /**
+   * Read content only after admission; tracked-document changes never wait.
+   *
+   * `readContent` reads the file from disk. The disk stamp taken directly
+   * before that read is recorded when the document then holds that content.
+   */
+  openDocument(
     filePath: string,
     readContent: () => string,
     control?: CodeRequestControl,
     protectInputs = false,
   ): Promise<void> {
+    return this.#openDocument(filePath, readContent, control, { protectInputs, readsDisk: true });
+  }
+
+  async #openDocument(
+    filePath: string,
+    readContent: () => string,
+    control: CodeRequestControl | undefined,
+    { protectInputs, readsDisk }: { readonly protectInputs: boolean; readonly readsDisk: boolean },
+  ): Promise<void> {
     throwIfCodeRequestInterrupted(control);
     const open = () => {
       throwIfCodeRequestInterrupted(control);
       if (!this.host.isOperational()) throw new Error("LSP client is not running.");
-      this.didOpen(filePath, readContent());
+      // Stat inside the admitted closure, directly before the read.
+      const stamp = readsDisk ? statDiskStampSync(filePath) : undefined;
+      const content = readContent();
+      this.didOpen(filePath, content);
+      this.#recordDiskStampIfCurrent(fileToUri(filePath), content, stamp);
     };
     if (this.#openDocs.has(fileToUri(filePath))) {
       open();
@@ -274,6 +293,13 @@ export class ClientDiagnostics {
     this.#inputBarrier.forgetDocumentContent(uri);
   }
 
+  /** Record a pre-read stamp when the open document now holds exactly that read. */
+  #recordDiskStampIfCurrent(uri: string, content: string, stamp: DiskStamp | undefined): void {
+    if (!stamp) return;
+    if (this.#openDocs.get(uri)?.contentFingerprint !== fingerprintDocumentContent(content)) return;
+    this.#inputBarrier.recordDiskStamp(uri, stamp);
+  }
+
   async #ensureExplicitDocumentContent(
     filePath: string,
     content: string,
@@ -285,10 +311,12 @@ export class ClientDiagnostics {
     if (!document) {
       // A manager read can predate admission. Re-read disk after the wait;
       // explicit authoritative content retains its existing override semantics.
-      await this.openDocument(
+      await this.#openDocument(
         filePath,
         () => (contentIsAuthoritative ? content : readFileSync(filePath, "utf-8")),
         control,
+        // Authoritative content is not a disk read and must not record a stamp.
+        { protectInputs: false, readsDisk: !contentIsAuthoritative },
       );
       return;
     }
@@ -434,6 +462,7 @@ export class ClientDiagnostics {
     if (!document) return;
 
     let content: string;
+    const stamp = statDiskStampSync(filePath);
     try {
       content = readFileSync(filePath, "utf-8");
     } catch {
@@ -443,6 +472,7 @@ export class ClientDiagnostics {
     if (document.contentFingerprint !== fingerprintDocumentContent(content)) {
       this.didChange(filePath, content);
     }
+    this.#recordDiskStampIfCurrent(uri, content, stamp);
     if (diskChanged) this.#noteExternalDiskChange(filePath, content);
   }
 
@@ -523,6 +553,7 @@ export class ClientDiagnostics {
       openDocuments: this.#openDocs,
       failedDocuments: this.#failedUris,
       evidenceRevision: this.#evidenceRevision,
+      observedDiskStamp: (uri) => this.#inputBarrier.getObservedDiskStamp(uri),
     });
   }
   getAllDiagnostics(): DiagnosticEntry[] {
@@ -650,6 +681,7 @@ export class ClientDiagnostics {
       nextSynchronizationId: () => ++this.#nextSynchronizationId,
       noteInputContentChange: () => this.#noteInputContentChange(),
       observeDiskContent: (uri, content) => this.#inputBarrier.observeDiskContent(uri, content),
+      recordDiskStamp: (uri, content, stamp) => this.#recordDiskStampIfCurrent(uri, content, stamp),
       noteExternalDiskChange: (uri, content) =>
         this.#noteExternalDiskChange(uriToFile(uri), content),
       invalidateEvidence: (uri) => {

@@ -4,6 +4,7 @@ import {
   throwIfCodeRequestInterrupted,
 } from "@mrclrchtr/supi-code-runtime/api";
 import { raceRequestControl } from "../session/readiness.ts";
+import { type DiskStamp, statDiskStampSync } from "./client-disk-stamp.ts";
 import { fingerprintDocumentContent } from "./client-document-state.ts";
 import {
   type SemanticInputChangeKind,
@@ -51,10 +52,16 @@ export interface SemanticInputBarrierHost {
   markUnreadableDocument(filePath: string): void;
 }
 
-/** Optional read bound and test seam for one input barrier. */
+/** Optional read bound and test seams for one input barrier. */
 export interface SemanticInputBarrierOptions {
   readonly maxConcurrentReads?: number;
   readonly readFile?: SemanticInputFileReader;
+  /**
+   * Synchronous stat taken directly before each read. A failure returns
+   * undefined and keeps the previous stamp. Synchronous so the stat adds no
+   * I/O turn to the shared read pass.
+   */
+  readonly statFile?: (filePath: string) => DiskStamp | undefined;
 }
 
 /** Revision token used to check one semantic input generation. */
@@ -70,7 +77,7 @@ export interface SemanticInputSnapshot extends SemanticInputRevision {
 interface OpenDocumentRead {
   readonly document: SemanticInputDocument;
   readonly result:
-    | { readonly kind: "content"; readonly content: string }
+    | { readonly kind: "content"; readonly content: string; readonly stamp?: DiskStamp }
     | { readonly kind: "error"; readonly error: unknown };
 }
 
@@ -78,6 +85,8 @@ interface SynchronizationPlan {
   readonly updates: SemanticInputUpdate[];
   readonly externalDiskChanges: Array<{ readonly filePath: string; readonly content: string }>;
   readonly observedDiskFingerprints: Map<string, string | undefined>;
+  /** Stamps whose read matched the resulting document content. */
+  readonly observedDiskStamps: Map<string, DiskStamp>;
 }
 
 interface PendingSynchronization {
@@ -102,8 +111,14 @@ export class SemanticInputBarrier {
   readonly #host: SemanticInputBarrierHost;
   readonly #maxConcurrentReads: number;
   readonly #readFile: SemanticInputFileReader;
+  readonly #statFile: (filePath: string) => DiskStamp | undefined;
   /** Last verified disk fingerprint for each URI; undefined means observed missing. */
   readonly #observedDiskFingerprints = new Map<string, string | undefined>();
+  /**
+   * Disk stamp of the last read whose content equaled the document content.
+   * Passive snapshots compare it with a fresh stat; only a content read writes it.
+   */
+  readonly #observedDiskStamps = new Map<string, DiskStamp>();
   #revision = 0;
   /** Latest non-enrollment change, used to classify stale snapshots. */
   #lastNonEnrollmentChange:
@@ -118,6 +133,7 @@ export class SemanticInputBarrier {
       Math.floor(options.maxConcurrentReads ?? DEFAULT_MAX_CONCURRENT_READS),
     );
     this.#readFile = options.readFile ?? defaultSemanticInputFileReader;
+    this.#statFile = options.statFile ?? statDiskStampSync;
   }
 
   /** Read and apply all open inputs, sharing work for one input generation. */
@@ -218,6 +234,21 @@ export class SemanticInputBarrier {
   /** Seed the initial disk baseline from the content used to open a document. */
   initializeDocumentContent(uri: string, content: string): void {
     this.#observedDiskFingerprints.set(uri, fingerprintDocumentContent(content));
+    // A new open starts without a stamp; the opener records one only for a disk read.
+    this.#observedDiskStamps.delete(uri);
+  }
+
+  /**
+   * Record the stamp of a disk read whose content now equals the document.
+   * The stat must precede that read. An undefined stamp keeps the previous one.
+   */
+  recordDiskStamp(uri: string, stamp: DiskStamp | undefined): void {
+    if (stamp) this.#observedDiskStamps.set(uri, stamp);
+  }
+
+  /** Return the stamp of the last verified disk read, when one exists. */
+  getObservedDiskStamp(uri: string): DiskStamp | undefined {
+    return this.#observedDiskStamps.get(uri);
   }
 
   /** Record content read from disk and report a changed known baseline. */
@@ -232,11 +263,13 @@ export class SemanticInputBarrier {
   /** Forget a document's last observed disk content. */
   forgetDocumentContent(uri: string): void {
     this.#observedDiskFingerprints.delete(uri);
+    this.#observedDiskStamps.delete(uri);
   }
 
   /** Stop pending work and discard observed input fingerprints. */
   clear(): void {
     this.#observedDiskFingerprints.clear();
+    this.#observedDiskStamps.clear();
     this.noteInputChange("lifecycle");
   }
 
@@ -363,13 +396,17 @@ export class SemanticInputBarrier {
     const updates: SemanticInputUpdate[] = [];
     const externalDiskChanges: Array<{ readonly filePath: string; readonly content: string }> = [];
     const observedDiskFingerprints = new Map<string, string | undefined>();
+    const observedDiskStamps = new Map<string, DiskStamp>();
     for (const read of reads) {
       const planned = this.#planDocumentRead(pending, read);
       observedDiskFingerprints.set(read.document.uri, planned.observedDiskFingerprint);
+      if (planned.observedDiskStamp) {
+        observedDiskStamps.set(read.document.uri, planned.observedDiskStamp);
+      }
       if (planned.update) updates.push(planned.update);
       if (planned.externalDiskChange) externalDiskChanges.push(planned.externalDiskChange);
     }
-    return { updates, externalDiskChanges, observedDiskFingerprints };
+    return { updates, externalDiskChanges, observedDiskFingerprints, observedDiskStamps };
   }
 
   #planDocumentRead(
@@ -377,6 +414,7 @@ export class SemanticInputBarrier {
     read: OpenDocumentRead,
   ): {
     observedDiskFingerprint: string | undefined;
+    observedDiskStamp?: DiskStamp;
     update?: SemanticInputUpdate;
     externalDiskChange?: { readonly filePath: string; readonly content: string };
   } {
@@ -401,8 +439,12 @@ export class SemanticInputBarrier {
         ? read.document.content
         : read.result.content);
     const contentFingerprint = fingerprintDocumentContent(content);
+    // Record the stamp only when the resulting document equals the disk read.
+    // A kept document or an override that differs from disk stays unstamped.
+    const stamp = contentFingerprint === diskFingerprint ? read.result.stamp : undefined;
     return {
       observedDiskFingerprint: diskFingerprint,
+      ...(stamp ? { observedDiskStamp: stamp } : {}),
       ...(externalDiskChange ? { externalDiskChange } : {}),
       ...(read.document.contentFingerprint !== contentFingerprint
         ? { update: { document: read.document, content } }
@@ -437,6 +479,7 @@ export class SemanticInputBarrier {
       this.#advanceRevision("content");
     }
     this.#rememberObservedDiskFingerprints(plan.observedDiskFingerprints);
+    for (const [uri, stamp] of plan.observedDiskStamps) this.#observedDiskStamps.set(uri, stamp);
     for (const change of plan.externalDiskChanges) {
       this.#host.noteExternalDiskChange?.(change.filePath, change.content);
     }
@@ -475,8 +518,14 @@ export class SemanticInputBarrier {
         const document = documents[index];
         if (!document) return;
         try {
+          // Stat before the read: a change between both leaves an older stamp,
+          // so the next passive comparison fails closed.
+          const stamp = this.#statFile(document.filePath);
           const content = await this.#readFile(document.filePath, signal);
-          reads[index] = { document, result: { kind: "content", content } };
+          reads[index] = {
+            document,
+            result: stamp ? { kind: "content", content, stamp } : { kind: "content", content },
+          };
         } catch (error) {
           reads[index] = { document, result: { kind: "error", error } };
         }

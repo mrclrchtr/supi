@@ -81,6 +81,7 @@ export type {
   BulkTrackFileOutcome,
   BulkTrackFilesResult,
   DiagnosticEvidenceDocument,
+  DiagnosticEvidenceReason,
   DiagnosticEvidenceStatus,
   DiagnosticEvidenceSummary,
   OutstandingDiagnosticSummaryEntry,

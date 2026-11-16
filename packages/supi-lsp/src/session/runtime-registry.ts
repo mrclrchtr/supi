@@ -73,6 +73,7 @@ export type {
 } from "./runtime-diagnostic-surface.ts";
 export {
   type DiagnosticEvidenceDocument,
+  type DiagnosticEvidenceReason,
   type DiagnosticEvidenceStatus,
   type DiagnosticEvidenceSummary,
   emptyProcessCrashRecoveryReport,

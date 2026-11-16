@@ -22,7 +22,10 @@ import {
   scanWorkspaceSources,
   syncWorkspaceSentinelSnapshot,
 } from "@mrclrchtr/supi-lsp/api";
-import { refreshLspMaintenance } from "../../../../src/substrate/lsp/maintenance.ts";
+import {
+  refreshFileLspMaintenance,
+  refreshLspMaintenance,
+} from "../../../../src/substrate/lsp/maintenance.ts";
 import type { LspMaintenanceState } from "../../../../src/substrate/lsp/source-tracking.ts";
 
 let tmpDir = "";
@@ -144,6 +147,54 @@ describe("refreshLspMaintenance diagnostic evidence", () => {
     expect(runtime.closeFile).not.toHaveBeenCalled();
     expect(runtime.trackFile).not.toHaveBeenCalled();
     expect(runtime.refreshOpenDiagnostics).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("refreshFileLspMaintenance stale-module detection", () => {
+  it("does not reopen a file whose module error predates an external disk change", async () => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "supi-maint-disk-changed-"));
+    const file = path.join(tmpDir, "src", "a.ts");
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, "export {};\n");
+    const evidence = {
+      requested: 1,
+      confirmed: 0,
+      unconfirmed: 1,
+      failed: 0,
+      removed: 0,
+      documents: [{ file: "src/a.ts", status: "unconfirmed" as const, reason: "disk-changed" }],
+    };
+    const runtime = makeRuntime({
+      getOutstandingDiagnostics: vi.fn().mockReturnValue({
+        entries: [
+          {
+            file: "src/a.ts",
+            diagnostics: [
+              {
+                severity: 1,
+                message: "Cannot find module 'pending'",
+                range: { start: { line: 0, character: 0 }, end: { line: 0, character: 1 } },
+              },
+            ],
+          },
+        ],
+        current: false,
+        evidence,
+      }),
+    });
+
+    const result = await refreshFileLspMaintenance({
+      runtime: runtime as never,
+      cwd: tmpDir,
+      maintenanceState: createMaintenanceState(),
+      filePath: file,
+    });
+
+    // The exact-file request synchronizes the changed file itself; the old
+    // error is no longer confirmed evidence for a close/reopen.
+    expect(result.matchedStaleFileCount).toBe(0);
+    expect(runtime.closeFile).not.toHaveBeenCalled();
+    expect(runtime.trackFile).not.toHaveBeenCalled();
   });
 });
 
