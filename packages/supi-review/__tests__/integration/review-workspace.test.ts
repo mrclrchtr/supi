@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { resolveReviewSnapshot } from "../../src/git.ts";
 import { materializeReviewWorkspace } from "../../src/workspace/review-workspace.ts";
+import { useRepositoryTemplate } from "../helpers/repository-template.ts";
 
 vi.setConfig({ testTimeout: 20_000 });
 
@@ -12,7 +13,7 @@ function git(cwd: string, ...args: string[]): string {
   return execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
 }
 
-function initializeRepository(cwd: string): void {
+const initializeRepository = useRepositoryTemplate((cwd) => {
   git(cwd, "init");
   git(cwd, "config", "user.email", "test@example.com");
   git(cwd, "config", "user.name", "Test");
@@ -21,7 +22,7 @@ function initializeRepository(cwd: string): void {
   writeFileSync(join(cwd, "tracked.txt"), "base\n");
   git(cwd, "add", ".");
   git(cwd, "commit", "-m", "base");
-}
+});
 
 describe("Review Workspace materialization", () => {
   let cwd: string;

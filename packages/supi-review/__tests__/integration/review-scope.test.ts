@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { useRepositoryTemplate } from "../helpers/repository-template.ts";
 
 const mocks = vi.hoisted(() => ({ runReviewer: vi.fn() }));
 vi.mock("../../src/tool/review_run/runner.ts", () => ({ runReviewer: mocks.runReviewer }));
@@ -21,7 +22,7 @@ function git(cwd: string, ...args: string[]): string {
   return execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
 }
 
-function initializeRepository(cwd: string): void {
+const initializeRepository = useRepositoryTemplate((cwd) => {
   git(cwd, "init");
   git(cwd, "config", "user.email", "test@example.com");
   git(cwd, "config", "user.name", "Test");
@@ -31,7 +32,7 @@ function initializeRepository(cwd: string): void {
   writeFileSync(join(cwd, "tracked.txt"), "base\n");
   git(cwd, "add", ".");
   git(cwd, "commit", "-m", "base");
-}
+});
 
 const model = { canonicalId: "provider/reviewer", model: {} } as ReviewModelSelection;
 const stateTask: ReviewTask = { id: "state", instructions: "Review the state.", mode: "state" };

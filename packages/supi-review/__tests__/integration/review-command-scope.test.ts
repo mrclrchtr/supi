@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, unlinkSync, writeFileSync } from "node:
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { useRepositoryTemplate } from "../helpers/repository-template.ts";
 
 const mocks = vi.hoisted(() => ({ runReviewer: vi.fn() }));
 vi.mock("@earendil-works/pi-coding-agent", async (original) => {
@@ -32,7 +33,7 @@ function git(cwd: string, ...args: string[]): string {
   return execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
 }
 
-function initializeRepository(cwd: string): void {
+const initializeRepository = useRepositoryTemplate((cwd) => {
   git(cwd, "init");
   git(cwd, "config", "user.email", "test@example.com");
   git(cwd, "config", "user.name", "Test");
@@ -50,7 +51,7 @@ function initializeRepository(cwd: string): void {
   git(cwd, "commit", "-m", "root");
   writeFileSync(join(cwd, "tracked.txt"), "feature\n");
   git(cwd, "commit", "-am", "feature");
-}
+});
 
 interface Script {
   editors: Array<string | undefined>;

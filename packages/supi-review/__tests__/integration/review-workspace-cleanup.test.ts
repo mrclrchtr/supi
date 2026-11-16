@@ -9,6 +9,7 @@ import {
   listReviewWorkspaces,
   removeReviewWorkspace,
 } from "../../src/workspace/review-workspace-cleanup.ts";
+import { useRepositoryTemplate } from "../helpers/repository-template.ts";
 
 // The global 2s timeout is too tight for tests spawning real git.
 vi.setConfig({ testTimeout: 20000 });
@@ -17,7 +18,7 @@ function git(cwd: string, ...args: string[]): string {
   return execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
 }
 
-function initializeRepository(cwd: string): void {
+const initializeRepository = useRepositoryTemplate((cwd) => {
   git(cwd, "init");
   git(cwd, "config", "user.email", "test@example.com");
   git(cwd, "config", "user.name", "Test");
@@ -26,7 +27,7 @@ function initializeRepository(cwd: string): void {
   writeFileSync(join(cwd, "tracked.txt"), "base\n");
   git(cwd, "add", ".");
   git(cwd, "commit", "-m", "base");
-}
+});
 
 describe("Review Workspace cleanup", () => {
   let cwd: string;

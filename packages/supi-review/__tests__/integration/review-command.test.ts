@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, unlinkSync, writeFileSync } from "node:
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { useRepositoryTemplate } from "../helpers/repository-template.ts";
 
 const mocks = vi.hoisted(() => ({ runPlanner: vi.fn(), runReviewer: vi.fn() }));
 vi.mock("@earendil-works/pi-coding-agent", async (original) => {
@@ -40,7 +41,7 @@ interface Repository {
   tip: string;
 }
 
-function initializeRepository(cwd: string): Repository {
+const copyRepository = useRepositoryTemplate((cwd) => {
   git(cwd, "init");
   git(cwd, "config", "user.email", "test@example.com");
   git(cwd, "config", "user.name", "Test");
@@ -60,7 +61,11 @@ function initializeRepository(cwd: string): Repository {
   git(cwd, "branch", "base", root);
   writeFileSync(join(cwd, "tracked.txt"), "feature\n");
   git(cwd, "commit", "-am", "feature");
-  return { base: root, cwd, root, tip: git(cwd, "rev-parse", "HEAD") };
+  return { base: root, root, tip: git(cwd, "rev-parse", "HEAD") };
+});
+
+function initializeRepository(cwd: string): Repository {
+  return { ...copyRepository(cwd), cwd };
 }
 
 interface Script {
