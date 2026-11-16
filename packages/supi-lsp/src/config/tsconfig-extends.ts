@@ -1,6 +1,6 @@
 import * as path from "node:path";
-import ts from "typescript";
 import { normalizeTsconfigPath as normalizePath } from "./tsconfig-path.ts";
+import { getTypeScript } from "./typescript-module.ts";
 
 /**
  * Collect recognized local project configs declared by `extends`, including
@@ -15,6 +15,7 @@ export function collectExtendedProjectConfigs(configPath: string): Set<string> {
     if (visited.has(normalizedConfigPath)) return;
     visited.add(normalizedConfigPath);
 
+    const ts = getTypeScript();
     const config = ts.readConfigFile(currentConfigPath, ts.sys.readFile).config;
     if (!config || typeof config !== "object") return;
 

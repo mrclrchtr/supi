@@ -1,5 +1,6 @@
 import * as fs from "node:fs";
-import ts from "typescript";
+import type ts from "typescript";
+import { getTypeScript } from "../config/typescript-module.ts";
 
 /**
  * Whether the identifier at `position` names a top-level declaration that only
@@ -22,6 +23,7 @@ export function isFileLocalTopLevelDeclaration(
   } catch {
     return false;
   }
+  const ts = getTypeScript();
   const sourceFile = ts.createSourceFile(filePath, text, ts.ScriptTarget.Latest, true);
   if (!ts.isExternalModule(sourceFile)) return false;
   let offset: number;
@@ -44,6 +46,7 @@ function topLevelDeclarationNameAt(
   offset: number,
   sourceFile: ts.SourceFile,
 ): string | null {
+  const ts = getTypeScript();
   const names: ts.Identifier[] = [];
   if (
     ts.isFunctionDeclaration(statement) ||
@@ -63,6 +66,7 @@ function topLevelDeclarationNameAt(
 }
 
 function hasExportModifier(statement: ts.Statement): boolean {
+  const ts = getTypeScript();
   return (
     ts.canHaveModifiers(statement) &&
     (ts.getModifiers(statement) ?? []).some(
@@ -75,6 +79,7 @@ function hasExportModifier(statement: ts.Statement): boolean {
 
 /** `export { name }`, `export default name`, or `export = name` in this file. */
 function exportedByName(sourceFile: ts.SourceFile, name: string): boolean {
+  const ts = getTypeScript();
   return sourceFile.statements.some((statement) => {
     if (ts.isExportAssignment(statement)) {
       return ts.isIdentifier(statement.expression) && statement.expression.text === name;

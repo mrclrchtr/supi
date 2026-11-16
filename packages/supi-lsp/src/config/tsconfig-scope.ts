@@ -6,9 +6,10 @@
 // to suppress LSP errors on files that TypeScript itself would not include.
 
 import * as path from "node:path";
-import ts from "typescript";
+import type ts from "typescript";
 import { collectExtendedProjectConfigs } from "./tsconfig-extends.ts";
 import { normalizeTsconfigPath as normalizePath } from "./tsconfig-path.ts";
+import { getTypeScript } from "./typescript-module.ts";
 
 export { isProjectConfigFileName } from "./tsconfig-extends.ts";
 
@@ -74,7 +75,7 @@ export function isTsconfigApplicableFile(filePath: string): boolean {
 const nearestConfigCache = new Map<string, string | null>();
 const parsedConfigCache = new Map<string, ParsedProjectConfigCacheEntry>();
 
-const tsInternal = ts as typeof ts & {
+type TypeScriptInternal = typeof ts & {
   getFileMatcherPatterns?: (
     configDir: string,
     excludes: readonly string[] | undefined,
@@ -90,6 +91,10 @@ const tsInternal = ts as typeof ts & {
     extraFileExtensions?: unknown,
   ) => ReadonlyArray<ReadonlyArray<string>>;
 };
+
+function getTypeScriptInternal(): TypeScriptInternal {
+  return getTypeScript() as TypeScriptInternal;
+}
 
 /**
  * Check whether a file is excluded by its nearest tsconfig.json or jsconfig.json.
@@ -122,7 +127,7 @@ export function isFileExcludedByTsconfig(filePath: string, cwd: string): boolean
  * project config without re-deriving the scope logic.
  */
 export function getFileScopeDecision(filePath: string, cwd: string): FileScopeDecision {
-  const caseSensitiveFileNames = ts.sys.useCaseSensitiveFileNames;
+  const caseSensitiveFileNames = getTypeScript().sys.useCaseSensitiveFileNames;
   const absolutePath = path.resolve(cwd, filePath);
   if (isOutOfTree(cwd, absolutePath)) {
     return {
@@ -212,6 +217,7 @@ function findNearestProjectConfig(startDir: string, rootDir: string): string | n
 }
 
 function getLocalProjectConfig(directory: string): string | null {
+  const ts = getTypeScript();
   const tsconfigPath = path.join(directory, "tsconfig.json");
   if (ts.sys.fileExists(tsconfigPath)) return tsconfigPath;
 
@@ -230,6 +236,7 @@ function parseProjectConfig(configPath: string): ParsedProjectConfig | null {
     parsed: null,
     dependencies: collectExtendedProjectConfigs(configPath),
   };
+  const ts = getTypeScript();
   const parsed = ts.getParsedCommandLineOfConfigFile(configPath, {}, createParseConfigHost());
   if (!parsed) {
     parsedConfigCache.set(normalizedConfigPath, cacheEntry);
@@ -343,6 +350,7 @@ function decideFileScope(
 }
 
 function getSupportedExtensions(options: ts.CompilerOptions): string[] {
+  const tsInternal = getTypeScriptInternal();
   return tsInternal.getSupportedExtensions
     ? [...tsInternal.getSupportedExtensions(options, undefined).flat()]
     : [".ts", ".tsx", ".d.ts", ".cts", ".d.cts", ".mts", ".d.mts"];
@@ -353,12 +361,13 @@ function getFileMatcherPatterns(
   excludeSpecs: readonly string[] | undefined,
   includeSpecs: readonly string[] | undefined,
 ): { includeFilePattern?: string; excludePattern?: string } {
+  const tsInternal = getTypeScriptInternal();
   return tsInternal.getFileMatcherPatterns
     ? tsInternal.getFileMatcherPatterns(
         configDir,
         excludeSpecs,
         includeSpecs,
-        ts.sys.useCaseSensitiveFileNames,
+        tsInternal.sys.useCaseSensitiveFileNames,
         path.parse(configDir).root,
       )
     : {};
@@ -366,7 +375,7 @@ function getFileMatcherPatterns(
 
 function createParseConfigHost(): ts.ParseConfigFileHost {
   return {
-    ...ts.sys,
+    ...getTypeScript().sys,
     onUnRecoverableConfigFileDiagnostic: () => {
       // Treat invalid configs as unsupported rather than surfacing a secondary
       // filter failure to the agent.

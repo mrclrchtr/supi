@@ -11,7 +11,6 @@ import {
   unavailableCodeQuery,
 } from "@mrclrchtr/supi-code-runtime/api";
 import * as projectRoots from "@mrclrchtr/supi-core/project";
-import * as ts from "typescript";
 import {
   LspClient,
   type LspClientLifecycleTransitionKind,
@@ -50,6 +49,7 @@ import type {
 } from "../config/types.ts";
 import { FileChangeType } from "../config/types.ts";
 import { inspectTypeScriptLaunch } from "../config/typescript-launch.ts";
+import { getTypeScript } from "../config/typescript-module.ts";
 import { boundCwd } from "../debug-telemetry.ts";
 import {
   accumulateOutstandingDiagnostics,
@@ -2973,7 +2973,7 @@ export class LspManager {
     }
 
     return {
-      caseSensitiveFileNames: ts.sys.useCaseSensitiveFileNames,
+      caseSensitiveFileNames: getTypeScript().sys.useCaseSensitiveFileNames,
       counts: accumulator.counts,
       basisCounts: accumulator.basisCounts,
       entries: accumulator.entries,
