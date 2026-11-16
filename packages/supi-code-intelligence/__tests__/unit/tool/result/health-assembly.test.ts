@@ -208,6 +208,27 @@ describe("code_health result assembly", () => {
     expect(markdown).not.toContain("No source diagnostics checked");
   });
 
+  it("keeps the passive-snapshot note out of the last diagnostic list item", () => {
+    const markdown = renderHealthResult(
+      assembleHealthResult(
+        makeHealthData({
+          diagnostics: {
+            kind: "completed",
+            scope: { kind: "tracked-files", filter: null },
+            entries: [{ file: "/repo/src/a.ts", errors: 1, warnings: 0 }],
+            evidence: fileEvidence("confirmed"),
+          },
+        }),
+      ),
+      "/repo",
+    );
+
+    // Without a blank line, Markdown renders the note as a continuation of the list item.
+    expect(markdown).toMatch(
+      /\n\nThis tracked-file snapshot reflects the last LSP synchronization/,
+    );
+  });
+
   it("omits the passive-snapshot note after a refresh and for exact-file checks", () => {
     const confirmedEvidence = fileEvidence("confirmed");
     const refreshed = renderHealthResult(

@@ -308,7 +308,8 @@ function renderDiagnosticObservation(lines: string[], data: HealthData, cwd: str
     renderDiagnosticEntries(lines, data, cwd);
   }
   if (isPassiveTrackedSnapshot(observation.scope, data.refresh)) {
-    lines.push(`${PASSIVE_SNAPSHOT_NOTE}.`);
+    // A blank line keeps the note out of the preceding diagnostic list item.
+    lines.push("", `${PASSIVE_SNAPSHOT_NOTE}.`);
   }
 }
 
