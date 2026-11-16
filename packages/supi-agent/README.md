@@ -14,10 +14,16 @@ This package is the policy layer for `@mrclrchtr/supi-agent-runtime`. It discove
 
 Built-in profiles:
 
-- `explore` — read, grep, find, ls, headless Code Intelligence tools, codemode, and Web tools when available, no instruction files, read-only.
+- `explore` — read, grep, find, ls, git, headless Code Intelligence tools, codemode, and Web tools when available, no instruction files, read-only.
 - `general` — read, grep, find, ls, bash, edit, write, headless Code Intelligence tools, codemode, and Web tools when available, global/project instruction files, mutation-capable.
 
 Profile sources overlay fields by ID with project → global → package precedence. A partial user manifest can pin only `model` or `thinking`; package tools and prompts continue to flow through. An invalid source falls through with a bounded diagnostic. Profiles are context-isolated, not permission- or filesystem-sandboxed.
+
+## Git queries
+
+The package-owned `git` capability runs one Git query per call without a shell, for example `{ "args": ["diff", "main...HEAD", "--stat"] }`. Only `diff`, `log`, `show`, `blame`, `status`, `rev-parse`, and `ls-files` are admitted. The tool rejects `--output`, `--ext-diff`, `--textconv` (including abbreviations), verbose `status`, and global options before the subcommand. It always adds `--no-pager`, `--no-optional-locks`, `core.fsmonitor=false`, and, for diff output, `--no-ext-diff` and `--no-textconv`. Output follows Pi's standard truncation limits.
+
+`git` counts as read-only for batch admission, so `explore` keeps running in parallel and in the background. The allowlist limits what the model chooses; repository configuration such as aliases or hooks is trusted like the user's own Git.
 
 ## Codemode opt-in
 

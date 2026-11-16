@@ -37,6 +37,7 @@ export type AgentCapabilityId =
   | "find"
   | "ls"
   | "bash"
+  | "git"
   | "edit"
   | "write"
   | "code_resolve"

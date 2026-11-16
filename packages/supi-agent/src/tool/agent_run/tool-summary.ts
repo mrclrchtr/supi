@@ -81,10 +81,28 @@ const summarizers: Record<string, ToolSummarizer> = {
       return { toolName: name, summary: label ? `${name} ${label}` : name, bashPreview: undefined };
     },
   },
+  git: {
+    summarize: (args, name) => {
+      const argv = Array.isArray(args.args)
+        ? args.args.filter((arg: unknown): arg is string => typeof arg === "string")
+        : [];
+      // Quote shell-significant arguments so one argument never reads as a shell command.
+      const preview = firstLineBashPreview(argv.map(quoteGitArg).join(" "));
+      return {
+        toolName: name,
+        summary: preview ? `${name} ${preview}` : name,
+        bashPreview: undefined,
+      };
+    },
+  },
   code_health: {
     summarize: (_args, name) => ({ toolName: name, summary: name, bashPreview: undefined }),
   },
 };
+
+function quoteGitArg(arg: string): string {
+  return /^[\w./:@^~=+,-]+$/u.test(arg) ? arg : `'${arg.replaceAll("'", "'\\''")}'`;
+}
 
 /** Return an allowlisted tool summary for a known tool, or name-only for unknown tools. */
 export function summarizeToolCall(toolName: string, args: unknown): AgentToolSummary {

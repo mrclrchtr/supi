@@ -84,7 +84,7 @@ describe("buildAgentRunSchema", () => {
 
   it("describes custom profiles and their capabilities in catalogue order", () => {
     const catalogue = makeCatalogue([
-      makeProfile("trace", "Trace repository calls without changing files."),
+      makeProfile("trace", "Trace repository calls without changing files.", ["read", "git"]),
       makeProfile("fix", "Implement a focused code change.", ["bash", "edit", "write"]),
       makeProfile("research", "Research external docs.", ["read", "web_search", "web_docs_fetch"]),
     ]);
@@ -98,7 +98,7 @@ describe("buildAgentRunSchema", () => {
       ),
       "fix: Implement a focused code change. [shell; edit]",
       "research: Research external docs. [read-only; no shell; web when available: web_search, web_docs_fetch]",
-      "trace: Trace repository calls without changing files. [read-only; no shell]",
+      "trace: Trace repository calls without changing files. [read-only; no shell; git queries]",
     ]);
     expect(JSON.stringify(schema)).not.toContain("/profiles/");
   });

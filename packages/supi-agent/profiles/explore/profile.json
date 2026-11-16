@@ -5,6 +5,7 @@
     "grep",
     "find",
     "ls",
+    "git",
     "code_resolve",
     "code_inspect",
     "code_orientation",

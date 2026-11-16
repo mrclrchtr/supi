@@ -16,6 +16,8 @@ const capabilityList: readonly AgentCapability[] = [
   { id: "find", toolName: "find", mutationCapable: false, label: "Find files" },
   { id: "ls", toolName: "ls", mutationCapable: false, label: "List directory contents" },
   { id: "bash", toolName: "bash", mutationCapable: true, label: "Run shell commands" },
+  // Package-owned: allowlisted read subcommands without a shell (see src/tool/git/).
+  { id: "git", toolName: "git", mutationCapable: false, label: "Query Git history" },
   { id: "edit", toolName: "edit", mutationCapable: true, label: "Edit files" },
   { id: "write", toolName: "write", mutationCapable: true, label: "Write files" },
   {

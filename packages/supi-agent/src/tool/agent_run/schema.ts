@@ -117,6 +117,8 @@ export function buildAgentRunSchema(catalogue: ProfileCatalogue): TSchema {
 function summarizeCapabilities(tools: readonly AgentCapabilityId[]): string {
   const tags = isReadOnlyCapabilitySet(tools) ? ["read-only"] : [];
   tags.push(tools.includes("bash") ? "shell" : "no shell");
+  // A shell already covers Git; name the query tool only where it is the sole Git access.
+  if (tools.includes("git") && !tools.includes("bash")) tags.push("git queries");
   if (tools.includes("edit") || tools.includes("write")) tags.push("edit");
   const web = selectedWebCapabilities(tools);
   if (web.length > 0) tags.push(`web when available: ${web.join(", ")}`);

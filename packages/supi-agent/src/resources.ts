@@ -18,6 +18,7 @@ import {
   usesHeadlessInspection,
 } from "./capabilities.ts";
 import { realpathOrResolve } from "./path.ts";
+import { registerGitTool } from "./tool/git/register.ts";
 import type { AgentProfile, AgentSessionInputOptions, AgentSystemPrompt } from "./types.ts";
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -42,6 +43,9 @@ export function createAgentSessionInputs(options: AgentSessionInputOptions): Age
     { name: "supi-shell-hints", factory: registerShellHints },
     ...(usesHeadlessInspection(options.profile.manifest.tools)
       ? [{ name: "supi-code-intelligence-headless", factory: headlessInspectionProfile }]
+      : []),
+    ...(options.profile.manifest.tools.includes("git")
+      ? [{ name: "supi-agent-git", factory: registerGitTool }]
       : []),
     ...(options.profile.manifest.tools.includes("codemode")
       ? [createCodemodeExtension({ models: true, mode: "on" })]

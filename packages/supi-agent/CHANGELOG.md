@@ -1,5 +1,9 @@
 # Changelog
 
+## [13.1.0]
+
+- The `explore` profile gets a read-only `git` tool for diffs, history, and blame, for example `{ "args": ["diff", "main...HEAD", "--stat"] }`. It runs without a shell, admits only `diff`, `log`, `show`, `blame`, `status`, `rev-parse`, and `ls-files`, and rejects options that write files or run configured diff programs. Explorers stay read-only, so they still run in parallel and in the background. Custom profiles can add `git` to their `tools` list.
+
 ## [13.0.0]
 
 - Background completion notices now render as a compact status line per task (`✓ edge-mail (explore) · done`) instead of the raw `[supi-agent-completion]` message with batch UUID and model instructions. Expand the notice to see each task's final message and the batch ID. The text sent to the model is unchanged.

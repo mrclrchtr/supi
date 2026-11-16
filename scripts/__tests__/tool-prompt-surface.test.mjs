@@ -23,6 +23,8 @@ async function collectPromptSurfaces() {
   add("debug", module);
   module = await import(`${PACKAGES}/supi-agent/src/tool/agent_run/guidance.ts`);
   add("agent_run", module);
+  module = await import(`${PACKAGES}/supi-agent/src/tool/git/guidance.ts`);
+  add("git", module);
   module = await import(`${PACKAGES}/supi-consulting/src/tool/consulting_run/guidance.ts`);
   add("consulting_run", module);
 

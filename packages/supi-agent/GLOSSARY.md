@@ -29,7 +29,7 @@ A bounded configuration error for one unavailable Profile Directory source or in
 _Avoid_: Profile warning, fallback notice, Agent Run failure
 
 **Agent Capability Set**:
-The fixed package-owned set of tools that Agent Profiles may select for Agent Runs. It includes PI built-ins and explicitly supported child-capable extensions, never ambient extensions.
+The fixed package-owned set of tools that Agent Profiles may select for Agent Runs. It includes PI built-ins, explicitly supported child-capable extensions, and package-owned tools, never ambient extensions.
 _Avoid_: Inherited tools, parent tool set, extension allowlist
 
 **Conditional Capability**:

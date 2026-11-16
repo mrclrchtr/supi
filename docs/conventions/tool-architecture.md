@@ -207,6 +207,7 @@ Audit the effects, not the name:
 | `submit_review`, `decline_review_recovery`, `submit_planner_draft` | – | – | – | – | Child-only. Each records one in-memory result and ends its child session; a second call conflicts or overwrites. |
 | `agent_run` | – | ✓ | – | ✓ | Starts child sessions. Depending on the profile, they get shell, edit, and Web tools. |
 | `agent_list` | ✓ | – | ✓ | – | Lists saved conversations. |
+| `git` | ✓ | – | ✓ | – | Child-only. Runs allowlisted read subcommands without a shell, pager, optional locks, or configured diff programs. |
 | `agent_result` | – | – | ✓ | – | Stores collected results, checkpoints, and Usage in the session once; repeated collection adds nothing. |
 | `agent_cancel` | – | – | ✓ | – | Stops background child work; repeated requests are harmless. |
 | `ask_user` | ✓ | – | ✓ | – | Shows a form to the user. It records only form metadata outside the model context. |

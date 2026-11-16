@@ -37,6 +37,8 @@ async function collectTools() {
   add("supi-agent", "agent_result", m.agentResultSpec);
   m = await import(`${PACKAGES}/supi-agent/src/tool/agent_cancel/spec.ts`);
   add("supi-agent", "agent_cancel", m.agentCancelSpec);
+  m = await import(`${PACKAGES}/supi-agent/src/tool/git/spec.ts`);
+  add("supi-agent", "git", m.gitSpec);
   m = await import(`${PACKAGES}/supi-web/src/tool/web_fetch_md/spec.ts`);
   add("supi-web", "web_fetch_md", m.webFetchMdSpec);
   m = await import(`${PACKAGES}/supi-web/src/tool/web_docs_search/spec.ts`);

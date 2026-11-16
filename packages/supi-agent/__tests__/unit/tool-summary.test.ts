@@ -34,6 +34,16 @@ describe("summarizeToolCall", () => {
     expect(result.bashPreview).toBe("ls -la");
   });
 
+  it("quotes git arguments that would read as shell syntax", () => {
+    expect(
+      summarizeToolCall("git", { args: ["diff", "main...HEAD", "--stat", "--", "src/a b.ts"] })
+        .summary,
+    ).toBe("git diff main...HEAD --stat -- 'src/a b.ts'");
+    expect(summarizeToolCall("git", { args: ["diff", "HEAD; touch /tmp/x"] }).summary).toBe(
+      "git diff 'HEAD; touch /tmp/x'",
+    );
+  });
+
   it("summarizes code_* tools with query/file info", () => {
     expect(
       summarizeToolCall("code_inspect", { anchor: { file: "/src/app.ts", line: 1, character: 1 } })
