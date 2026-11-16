@@ -185,14 +185,15 @@ describe("session-analytics export CLI", () => {
       { command: "pnpm test", timeout: 60 },
       { command: "sleep 999", timeout: 5 },
     ]);
+    // Each next call carries its own outcome, so a retry's success is visible.
     expect(records[0].next).toEqual([
-      { tool: "read", args: { path: "log.txt" } },
-      { tool: "bash", args: { command: "pnpm vitest run x" } },
+      { tool: "read", args: { path: "log.txt" }, isError: false, resultHead: "contents" },
+      { tool: "bash", args: { command: "pnpm vitest run x" }, isError: false, resultHead: "ok" },
     ]);
     // Next calls stop at the session end rather than borrowing from another session.
     expect(records[1].next).toEqual([
-      { tool: "bash", args: { command: "echo done" } },
-      { tool: "read", args: { path: "x" } },
+      { tool: "bash", args: { command: "echo done" }, isError: false, resultHead: "done" },
+      { tool: "read", args: { path: "x" }, isError: false, resultHead: "x" },
     ]);
   });
 
@@ -282,7 +283,11 @@ describe("session-analytics export CLI", () => {
     const { records } = await exportKind("tool-calls", ["--tool", "bash"]);
 
     expect(records.map((r) => [r.args.command, r.isError, r.next])).toEqual([
-      ["slow", true, [{ tool: "bash", args: { command: "retry" } }]],
+      [
+        "slow",
+        true,
+        [{ tool: "bash", args: { command: "retry" }, isError: null, resultHead: null }],
+      ],
       ["retry", null, []],
     ]);
   });

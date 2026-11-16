@@ -13,10 +13,9 @@ import {
   scanSessions,
   sinceTimestamp,
 } from "../../gather-retrospectives/scripts/sessions.mjs";
+import { boundedArgs, head, LIMITS } from "./truncate.mjs";
 
 const KINDS = ["tool-calls", "tool-availability", "debug-events"];
-/** Truncation bounds; documented in SKILL.md. */
-const LIMITS = { string: 300, array: 10, depth: 4, resultHead: 500 };
 
 const help = `Export normalized Pi session data as JSONL without modifying sessions.
 Usage: node export.mjs <kind> --output <new-file.jsonl> [options]
@@ -101,33 +100,6 @@ function pattern(source) {
   }
 }
 
-/** Bound strings, arrays, and nesting so arguments stay parseable but small. */
-function bounded(value, state, depth = 0) {
-  if (typeof value === "string") {
-    if (value.length <= LIMITS.string) return value;
-    state.truncated = true;
-    return `${value.slice(0, LIMITS.string)}…`;
-  }
-  if (value === null || typeof value !== "object") return value;
-  if (depth >= LIMITS.depth) {
-    state.truncated = true;
-    return Array.isArray(value) ? "[…]" : "{…}";
-  }
-  if (Array.isArray(value)) {
-    if (value.length > LIMITS.array) state.truncated = true;
-    return value.slice(0, LIMITS.array).map((item) => bounded(item, state, depth + 1));
-  }
-  return Object.fromEntries(
-    Object.entries(value).map(([key, item]) => [key, bounded(item, state, depth + 1)]),
-  );
-}
-
-function boundedArgs(args) {
-  const state = { truncated: false };
-  const value = bounded(args ?? null, state);
-  return state.truncated ? { args: value, argsTruncated: true } : { args: value };
-}
-
 function entryTime(entry, fallback) {
   const parsed = typeof entry.timestamp === "string" ? Date.parse(entry.timestamp) : Number.NaN;
   if (Number.isFinite(parsed)) return parsed;
@@ -179,17 +151,25 @@ function callRecord(block, entry, context, ms) {
     resultBytes: null,
     resultHead: null,
     next: [],
-    state: { callId: block.id, resolved: false, text: null },
+    state: { callId: block.id, resolved: false, text: null, openNext: 0 },
   };
 }
 
-/** One record per call; a record is written once its result and `--next` calls are known. */
+/**
+ * One record per call; a record is written once its result, its `--next` calls, and their
+ * results are known, or at the session end. Each `next` entry carries its own `isError` and
+ * a short `resultHead`, so a retry's outcome is visible without a second lookup.
+ */
 function toolCallExporter(config, write) {
   let pending = [];
   const byCallId = new Map();
+  /** Next entries waiting for the result of their call, keyed by call id. */
+  const waitingNext = new Map();
 
   function ready(record) {
-    return record.state.resolved && record.next.length >= config.next;
+    return (
+      record.state.resolved && record.next.length >= config.next && record.state.openNext === 0
+    );
   }
 
   function flush(all) {
@@ -206,11 +186,25 @@ function toolCallExporter(config, write) {
     pending = keep;
   }
 
+  function addNext(record, block) {
+    const next = {
+      tool: block.name,
+      ...boundedArgs(block.arguments),
+      isError: null,
+      resultHead: null,
+    };
+    record.next.push(next);
+    if (typeof block.id !== "string") return;
+    record.state.openNext++;
+    const waiting = waitingNext.get(block.id) ?? [];
+    waiting.push({ next, record });
+    waitingNext.set(block.id, waiting);
+  }
+
   function addCall(block, entry, context) {
     for (const record of pending) {
       // Calls from the same assistant message ran in parallel, not in reaction to the result.
-      if (record.line !== context.line && record.next.length < config.next)
-        record.next.push({ tool: block.name, ...boundedArgs(block.arguments) });
+      if (record.line !== context.line && record.next.length < config.next) addNext(record, block);
     }
     const ms = entryTime(entry, entry.message.timestamp);
     if ((config.tool && block.name !== config.tool) || !inWindow(ms, config)) return;
@@ -220,13 +214,18 @@ function toolCallExporter(config, write) {
   }
 
   function addResult(message) {
+    const text = resultText(message.content);
+    for (const { next, record } of waitingNext.get(message.toolCallId) ?? []) {
+      next.isError = message.isError === true;
+      next.resultHead = head(text, LIMITS.nextHead);
+      record.state.openNext--;
+    }
+    waitingNext.delete(message.toolCallId);
     const record = byCallId.get(message.toolCallId);
     if (!record) return;
-    const text = resultText(message.content);
     record.isError = message.isError === true;
     record.resultBytes = Buffer.byteLength(text);
-    record.resultHead =
-      text.length > LIMITS.resultHead ? `${text.slice(0, LIMITS.resultHead)}…` : text;
+    record.resultHead = head(text, LIMITS.resultHead);
     record.state.resolved = true;
     record.state.text = text;
   }
@@ -242,6 +241,7 @@ function toolCallExporter(config, write) {
     endSession() {
       flush(true);
       byCallId.clear();
+      waitingNext.clear();
     },
   };
 }
@@ -390,7 +390,7 @@ async function exportSessions(config) {
     limitations: [
       "Files are read linearly: abandoned branches and forked copies are included.",
       "Lines without the record's marker text are skipped unparsed and not checked for malformed JSON.",
-      `Strings in arguments are cut at ${LIMITS.string} characters, arrays at ${LIMITS.array} items, and nesting at depth ${LIMITS.depth}; result heads at ${LIMITS.resultHead} characters.`,
+      `Strings in arguments are cut at ${LIMITS.string} characters, arrays at ${LIMITS.array} items, and nesting at depth ${LIMITS.depth}; result heads at ${LIMITS.resultHead} characters (${LIMITS.nextHead} in next calls).`,
       "Exported arguments and result heads can contain sensitive task details; the file is private (0600).",
     ],
   };

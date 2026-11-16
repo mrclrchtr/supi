@@ -41,19 +41,19 @@ Read the JSONL inside a codemode script with `tools.bash` (`cat`), not `tools.re
 
 Record fields:
 
-- `tool-calls`: `sessionId`, `sessionFile`, `line`, `cwd`, `timestamp`, `model`, `tool`, `callId`, `args` (truncated; `argsTruncated: true` when cut), `isError` (`null` if no result was recorded), `resultBytes` (UTF-8 bytes of the result text), `resultHead`, and `next`: up to `--next` (default 3) later calls in the same session as `{ tool, args }`. Parallel calls from the same assistant message are not in `next`.
+- `tool-calls`: `sessionId`, `sessionFile`, `line`, `cwd`, `timestamp`, `model`, `tool`, `callId`, `args` (truncated; `argsTruncated: true` when cut), `isError` (`null` if no result was recorded), `resultBytes` (UTF-8 bytes of the result text), `resultHead`, and `next`: up to `--next` (default 3) later calls in the same session as `{ tool, args, isError, resultHead }`, so you can see whether a retry worked. Parallel calls from the same assistant message are not in `next`.
 - `tool-availability`: one line per session with `available` (every tool added by a system message or compaction checkpoint, so available at some point), `called` (`{ tool: count }`), and `loadoutKnown` (false when the session recorded no system message). With `--since`, only sessions with assistant messages or loadout changes in the window are exported, only calls in the window are counted, and `available` still covers the whole session.
 - `debug-events`: `source`, `level`, `category`, `timestamp`, and `bytes` (the size of the stored line). Payloads are never exported.
 
-Truncation: argument strings at 300 characters, arrays at 10 items, nesting at depth 4; result heads at 500 characters.
+Truncation: argument strings at 300 characters, arrays at 10 items, nesting at depth 4; result heads at 500 characters (200 in `next`).
 
 ## Judge failures with care
 
-For failure follow-ups, classify what `next` shows: a retry with a longer timeout, a narrower command, reading a log, switching tools, or giving up. Treat these as correlations; a session file cannot show whether the agent's reaction was correct.
+For failure follow-ups, classify what `next` shows: a retry with a longer timeout, a narrower command, reading a log, switching tools, or giving up. Say whether the reaction succeeded, using each next call's `isError` and `resultHead`. Treat these as correlations; a session file cannot show whether the agent's reaction was correct.
 
 ## Report
 
-Lead with the numbers that answer the question, then the scope (workspace, dates, kind) in one sentence. Cite examples as `sessionFile:line`. Disclose when `coverage.complete` is false, and name the limitation that matters for the claim:
+Lead with the numbers that answer the question, then the scope (workspace, dates, kind) in one sentence. Name the unit when it is not obvious, for example that debug `bytes` are the stored JSONL line size. Cite examples as `sessionFile:line`. Disclose when `coverage.complete` is false, and name the limitation that matters for the claim:
 
 - Files are read linearly, so abandoned branches and forked session copies count too; forks can double-count early calls.
 - Only stored sessions count; deleted or never-persisted sessions are absent.

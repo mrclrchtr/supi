@@ -1,0 +1,60 @@
+{
+  "skill_name": "session-analytics",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Using the Pi session storage at the supplied session directory (not my real one), tell me how often each tool was called in the /example/widget workspace (including subdirectories), and which tools were available to the agent but never called. Keep it short. Treat the session directory as read-only and save any outputs in the supplied output directory.",
+      "expected_output": "bash 5, read 2, edit 1, web_fetch_md 1, code_find 1 (10 calls in 2 sessions); /example/other excluded. Available but never called: web_search and write (write was removed again in one session).",
+      "files": ["evals/files/sessions"],
+      "expectations": [
+        "Reports exactly bash 5, read 2, edit 1, web_fetch_md 1, code_find 1 (10 calls total).",
+        "Excludes the /example/other session and includes the /example/widget/pkg session in a directory with spaces.",
+        "Names web_search and write as available but never called, and no called tool as unused.",
+        "Does not count tool-call JSON quoted inside a tool result as a call.",
+        "Leaves the session files unchanged.",
+        "Answer stays within 150 words."
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "In the supplied session directory, find every bash call in the /example/widget workspace tree whose result said it timed out after N seconds. For each, show the command and timeout, and what the agent did next. Did the timeouts help or hurt? Session files are read-only; put any outputs in the supplied output directory.",
+      "expected_output": "Two timeouts: `pnpm test` (60 s) and `sleep 30 && pnpm build` (5 s). After the first, the agent read the log and reran a narrower vitest command with timeout 300, then edited. After the second, it reran `pnpm build` with timeout 180, which succeeded. The parallel read of package.json is not a reaction. The quoted '999 seconds' text in a read result and the /example/other timeouts are excluded.",
+      "files": ["evals/files/sessions"],
+      "expectations": [
+        "Reports exactly two matching bash timeouts in scope: pnpm test with timeout 60 and sleep 30 && pnpm build with timeout 5.",
+        "Excludes the '999 seconds' text inside a read result and the two timeouts in /example/other.",
+        "Describes the follow-up of the 60 s timeout: reading /tmp/test-output.log, then a narrower vitest run with a longer timeout.",
+        "Describes the follow-up of the 5 s timeout as a retry of pnpm build with timeout 180 that succeeded, and does not present the parallel package.json read as the reaction.",
+        "Gives a judgement on helped/hurt that is framed as an inference from the follow-up calls.",
+        "Leaves the session files unchanged."
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Our session files keep growing. Using the supplied session directory, which debug event sources and categories take the most space in the /example/widget workspace? Give bytes and counts per source/level/category. Don't modify the sessions; save any outputs in the supplied output directory.",
+      "expected_output": "tree-sitter/debug/structural.parse.timing 2 events 3472 bytes; lsp/debug/request.timing 5 events 3048 bytes; lsp/info/runtime.transition 1 event 517 bytes; supi-agent/info/agent-run-retrospective 1 event 434 bytes. /example/other is excluded.",
+      "files": ["evals/files/sessions"],
+      "expectations": [
+        "Ranks tree-sitter/debug/structural.parse.timing first with 2 events and about 3472 bytes.",
+        "Reports lsp/debug/request.timing with 5 events and about 3048 bytes.",
+        "Reports lsp/info/runtime.transition (1 event) and supi-agent/info/agent-run-retrospective (1 event).",
+        "Excludes the /example/other session (its two large tree-sitter events).",
+        "States how bytes were measured (stored line size or similar).",
+        "Leaves the session files unchanged."
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "Using the supplied session directory (about 400 sessions), give me per tool the number of calls and the error rate for sessions in /example/monorepo and its subdirectories since 2026-10-01, and list tools that were available in those sessions but never called. Session files are read-only; save outputs in the supplied output directory.",
+      "expected_output": "Generated with evals/files/generate-large.mjs (seeded); expected totals printed by the generator. 146 sessions in scope. Calls: bash 1128, read 699, edit 251, code_find 153, write 88, web_fetch_md 85. Errors: bash 214 (19.0%), read 33 (4.7%), edit 12 (4.8%), code_find 49 (32.0%), write 0, web_fetch_md 46 (54.1%). Available but never called: web_search.",
+      "files": ["evals/files/generate-large.mjs"],
+      "expectations": [
+        "Reports exactly bash 1128, read 699, edit 251, code_find 153, write 88, web_fetch_md 85 calls.",
+        "Reports error counts or rates matching bash 214, read 33, edit 12, code_find 49, write 0, web_fetch_md 46 (rates within 0.5 percentage points).",
+        "Names web_search as the only tool available but never called.",
+        "Applies the 2026-10-01 start and excludes /example/elsewhere (146 sessions in scope, if a session count is given).",
+        "Leaves the session files unchanged."
+      ]
+    }
+  ]
+}
