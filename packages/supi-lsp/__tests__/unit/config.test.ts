@@ -12,20 +12,6 @@ function makeTmpDir(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), "lsp-config-test-"));
 }
 
-function withHomeDir<T>(homeDir: string, run: () => T): T {
-  const prevHome = process.env.HOME;
-  process.env.HOME = homeDir;
-  try {
-    return run();
-  } finally {
-    if (prevHome === undefined) {
-      delete process.env.HOME;
-    } else {
-      process.env.HOME = prevHome;
-    }
-  }
-}
-
 describe("loadConfig", () => {
   it("loads defaults when no project config exists", () => {
     const config = loadConfig(os.tmpdir());
@@ -117,7 +103,7 @@ describe("loadConfig", () => {
     );
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
 
-    const config = withHomeDir(tmpDir, () => loadConfig(tmpDir));
+    const config = loadConfig(tmpDir, { homeDir: tmpDir });
 
     expect(config.servers.typescript?.args).toEqual(["--stdio"]);
     expect(config.servers.typescript?.env).toBeUndefined();
@@ -187,7 +173,7 @@ describe("loadConfig", () => {
     );
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
 
-    const config = withHomeDir(tmpDir, () => loadConfig(tmpDir));
+    const config = loadConfig(tmpDir, { homeDir: tmpDir });
 
     expect(config.servers.zig).toBeUndefined();
     expect(warn).toHaveBeenCalledTimes(1);
@@ -218,23 +204,21 @@ describe("loadConfig", () => {
   it("merges global config per language key", () => {
     const tmpDir = makeTmpDir();
 
-    withHomeDir(tmpDir, () => {
-      fs.mkdirSync(path.join(tmpDir, ".pi", "agent", "supi"), { recursive: true });
-      fs.writeFileSync(
-        path.join(tmpDir, ".pi", "agent", "supi", "config.json"),
-        JSON.stringify({
-          lsp: {
-            servers: {
-              python: { command: "pylsp" },
-            },
+    fs.mkdirSync(path.join(tmpDir, ".pi", "agent", "supi"), { recursive: true });
+    fs.writeFileSync(
+      path.join(tmpDir, ".pi", "agent", "supi", "config.json"),
+      JSON.stringify({
+        lsp: {
+          servers: {
+            python: { command: "pylsp" },
           },
-        }),
-      );
+        },
+      }),
+    );
 
-      const config = loadConfig(tmpDir);
-      expect(config.servers.python?.command).toBe("pylsp");
-      expect(config.servers.python?.fileTypes).toContain("py");
-    });
+    const config = loadConfig(tmpDir, { homeDir: tmpDir });
+    expect(config.servers.python?.command).toBe("pylsp");
+    expect(config.servers.python?.fileTypes).toContain("py");
 
     fs.rmSync(tmpDir, { recursive: true });
   });
@@ -242,36 +226,34 @@ describe("loadConfig", () => {
   it("project overrides take precedence over global for same key", () => {
     const tmpDir = makeTmpDir();
 
-    withHomeDir(tmpDir, () => {
-      fs.mkdirSync(path.join(tmpDir, ".pi", "agent", "supi"), { recursive: true });
-      fs.writeFileSync(
-        path.join(tmpDir, ".pi", "agent", "supi", "config.json"),
-        JSON.stringify({
-          lsp: {
-            servers: {
-              typescript: { command: "global-ts-lsp", args: ["--global"] },
-            },
+    fs.mkdirSync(path.join(tmpDir, ".pi", "agent", "supi"), { recursive: true });
+    fs.writeFileSync(
+      path.join(tmpDir, ".pi", "agent", "supi", "config.json"),
+      JSON.stringify({
+        lsp: {
+          servers: {
+            typescript: { command: "global-ts-lsp", args: ["--global"] },
           },
-        }),
-      );
+        },
+      }),
+    );
 
-      fs.mkdirSync(path.join(tmpDir, ".pi", "supi"), { recursive: true });
-      fs.writeFileSync(
-        path.join(tmpDir, ".pi", "supi", "config.json"),
-        JSON.stringify({
-          lsp: {
-            servers: {
-              typescript: { command: "project-ts-lsp" },
-            },
+    fs.mkdirSync(path.join(tmpDir, ".pi", "supi"), { recursive: true });
+    fs.writeFileSync(
+      path.join(tmpDir, ".pi", "supi", "config.json"),
+      JSON.stringify({
+        lsp: {
+          servers: {
+            typescript: { command: "project-ts-lsp" },
           },
-        }),
-      );
+        },
+      }),
+    );
 
-      const config = loadConfig(tmpDir);
-      expect(config.servers.typescript?.command).toBe("project-ts-lsp");
-      // args was not overridden by project, so it should come from global
-      expect(config.servers.typescript?.args).toEqual(["--global"]);
-    });
+    const config = loadConfig(tmpDir, { homeDir: tmpDir });
+    expect(config.servers.typescript?.command).toBe("project-ts-lsp");
+    // args was not overridden by project, so it should come from global
+    expect(config.servers.typescript?.args).toEqual(["--global"]);
 
     fs.rmSync(tmpDir, { recursive: true });
   });
@@ -279,35 +261,33 @@ describe("loadConfig", () => {
   it("project config can re-enable a server disabled globally", () => {
     const tmpDir = makeTmpDir();
 
-    withHomeDir(tmpDir, () => {
-      fs.mkdirSync(path.join(tmpDir, ".pi", "agent", "supi"), { recursive: true });
-      fs.writeFileSync(
-        path.join(tmpDir, ".pi", "agent", "supi", "config.json"),
-        JSON.stringify({
-          lsp: {
-            servers: {
-              typescript: { enabled: false },
-            },
+    fs.mkdirSync(path.join(tmpDir, ".pi", "agent", "supi"), { recursive: true });
+    fs.writeFileSync(
+      path.join(tmpDir, ".pi", "agent", "supi", "config.json"),
+      JSON.stringify({
+        lsp: {
+          servers: {
+            typescript: { enabled: false },
           },
-        }),
-      );
+        },
+      }),
+    );
 
-      fs.mkdirSync(path.join(tmpDir, ".pi", "supi"), { recursive: true });
-      fs.writeFileSync(
-        path.join(tmpDir, ".pi", "supi", "config.json"),
-        JSON.stringify({
-          lsp: {
-            servers: {
-              typescript: { enabled: true, command: "vtsls" },
-            },
+    fs.mkdirSync(path.join(tmpDir, ".pi", "supi"), { recursive: true });
+    fs.writeFileSync(
+      path.join(tmpDir, ".pi", "supi", "config.json"),
+      JSON.stringify({
+        lsp: {
+          servers: {
+            typescript: { enabled: true, command: "vtsls" },
           },
-        }),
-      );
+        },
+      }),
+    );
 
-      const config = loadConfig(tmpDir);
-      expect(config.servers.typescript).toBeDefined();
-      expect(config.servers.typescript?.command).toBe("vtsls");
-    });
+    const config = loadConfig(tmpDir, { homeDir: tmpDir });
+    expect(config.servers.typescript).toBeDefined();
+    expect(config.servers.typescript?.command).toBe("vtsls");
 
     fs.rmSync(tmpDir, { recursive: true });
   });
@@ -336,42 +316,40 @@ describe("loadConfig", () => {
   it("replaces inherited server settings as one JSON object", () => {
     const tmpDir = makeTmpDir();
     const homeDir = makeTmpDir();
-    withHomeDir(homeDir, () => {
-      fs.mkdirSync(path.join(homeDir, ".pi/agent/supi"), { recursive: true });
-      fs.writeFileSync(
-        path.join(homeDir, ".pi/agent/supi/config.json"),
-        JSON.stringify({
-          lsp: {
-            servers: {
-              typescript: {
-                settings: { typescript: { strict: true }, inherited: true },
-                initializationOptions: { from: "global" },
-              },
+    fs.mkdirSync(path.join(homeDir, ".pi/agent/supi"), { recursive: true });
+    fs.writeFileSync(
+      path.join(homeDir, ".pi/agent/supi/config.json"),
+      JSON.stringify({
+        lsp: {
+          servers: {
+            typescript: {
+              settings: { typescript: { strict: true }, inherited: true },
+              initializationOptions: { from: "global" },
             },
           },
-        }),
-      );
-      fs.mkdirSync(path.join(tmpDir, ".pi/supi"), { recursive: true });
-      fs.writeFileSync(
-        path.join(tmpDir, ".pi/supi/config.json"),
-        JSON.stringify({
-          lsp: {
-            servers: {
-              typescript: {
-                settings: { typescript: { analysis: { typeCheckingMode: "strict" } } },
-                initializationOptions: { from: "project" },
-              },
+        },
+      }),
+    );
+    fs.mkdirSync(path.join(tmpDir, ".pi/supi"), { recursive: true });
+    fs.writeFileSync(
+      path.join(tmpDir, ".pi/supi/config.json"),
+      JSON.stringify({
+        lsp: {
+          servers: {
+            typescript: {
+              settings: { typescript: { analysis: { typeCheckingMode: "strict" } } },
+              initializationOptions: { from: "project" },
             },
           },
-        }),
-      );
+        },
+      }),
+    );
 
-      const config = loadConfig(tmpDir, { homeDir });
-      expect(config.servers.typescript?.settings).toEqual({
-        typescript: { analysis: { typeCheckingMode: "strict" } },
-      });
-      expect(config.servers.typescript?.initializationOptions).toEqual({ from: "project" });
+    const config = loadConfig(tmpDir, { homeDir });
+    expect(config.servers.typescript?.settings).toEqual({
+      typescript: { analysis: { typeCheckingMode: "strict" } },
     });
+    expect(config.servers.typescript?.initializationOptions).toEqual({ from: "project" });
     fs.rmSync(tmpDir, { recursive: true });
     fs.rmSync(homeDir, { recursive: true });
   });
@@ -379,22 +357,20 @@ describe("loadConfig", () => {
   it("accepts an explicit empty settings object to clear inheritance", () => {
     const tmpDir = makeTmpDir();
     const homeDir = makeTmpDir();
-    withHomeDir(homeDir, () => {
-      fs.mkdirSync(path.join(homeDir, ".pi/agent/supi"), { recursive: true });
-      fs.writeFileSync(
-        path.join(homeDir, ".pi/agent/supi/config.json"),
-        JSON.stringify({
-          lsp: { servers: { typescript: { settings: { python: { analysis: {} } } } } },
-        }),
-      );
-      fs.mkdirSync(path.join(tmpDir, ".pi/supi"), { recursive: true });
-      fs.writeFileSync(
-        path.join(tmpDir, ".pi/supi/config.json"),
-        JSON.stringify({ lsp: { servers: { typescript: { settings: {} } } } }),
-      );
+    fs.mkdirSync(path.join(homeDir, ".pi/agent/supi"), { recursive: true });
+    fs.writeFileSync(
+      path.join(homeDir, ".pi/agent/supi/config.json"),
+      JSON.stringify({
+        lsp: { servers: { typescript: { settings: { python: { analysis: {} } } } } },
+      }),
+    );
+    fs.mkdirSync(path.join(tmpDir, ".pi/supi"), { recursive: true });
+    fs.writeFileSync(
+      path.join(tmpDir, ".pi/supi/config.json"),
+      JSON.stringify({ lsp: { servers: { typescript: { settings: {} } } } }),
+    );
 
-      expect(loadConfig(tmpDir, { homeDir }).servers.typescript?.settings).toEqual({});
-    });
+    expect(loadConfig(tmpDir, { homeDir }).servers.typescript?.settings).toEqual({});
     fs.rmSync(tmpDir, { recursive: true });
     fs.rmSync(homeDir, { recursive: true });
   });
@@ -493,36 +469,34 @@ describe("loadConfig", () => {
   it("project re-enable overrides global per-language disable", () => {
     const tmpDir = makeTmpDir();
 
-    withHomeDir(tmpDir, () => {
-      fs.mkdirSync(path.join(tmpDir, ".pi", "agent", "supi"), { recursive: true });
-      fs.writeFileSync(
-        path.join(tmpDir, ".pi", "agent", "supi", "config.json"),
-        JSON.stringify({
-          lsp: {
-            servers: {
-              typescript: { enabled: false },
-            },
+    fs.mkdirSync(path.join(tmpDir, ".pi", "agent", "supi"), { recursive: true });
+    fs.writeFileSync(
+      path.join(tmpDir, ".pi", "agent", "supi", "config.json"),
+      JSON.stringify({
+        lsp: {
+          servers: {
+            typescript: { enabled: false },
           },
-        }),
-      );
+        },
+      }),
+    );
 
-      // Project explicitly re-enables
-      fs.mkdirSync(path.join(tmpDir, ".pi", "supi"), { recursive: true });
-      fs.writeFileSync(
-        path.join(tmpDir, ".pi", "supi", "config.json"),
-        JSON.stringify({
-          lsp: {
-            servers: {
-              typescript: { enabled: true, command: "vtsls" },
-            },
+    // Project explicitly re-enables
+    fs.mkdirSync(path.join(tmpDir, ".pi", "supi"), { recursive: true });
+    fs.writeFileSync(
+      path.join(tmpDir, ".pi", "supi", "config.json"),
+      JSON.stringify({
+        lsp: {
+          servers: {
+            typescript: { enabled: true, command: "vtsls" },
           },
-        }),
-      );
+        },
+      }),
+    );
 
-      const config = loadConfig(tmpDir);
-      expect(config.servers.typescript).toBeDefined();
-      expect(config.servers.typescript?.command).toBe("vtsls");
-    });
+    const config = loadConfig(tmpDir, { homeDir: tmpDir });
+    expect(config.servers.typescript).toBeDefined();
+    expect(config.servers.typescript?.command).toBe("vtsls");
 
     fs.rmSync(tmpDir, { recursive: true });
   });

@@ -127,7 +127,10 @@ describe("runReview batch Review Scope", () => {
     expect(mocks.runReviewer).not.toHaveBeenCalled();
   });
 
-  it("excludes ignored recreated baseline-only content from the workspace and Review Scope", async () => {
+  // Several real Git processes; the default timeout is too tight under full parallel load.
+  it("excludes ignored recreated baseline-only content from the workspace and Review Scope", {
+    timeout: 10_000,
+  }, async () => {
     writeFileSync(join(cwd, "baseline-only.txt"), "baseline\n");
     writeFileSync(join(cwd, "visible-baseline.txt"), "baseline\n");
     git(cwd, "add", "baseline-only.txt", "visible-baseline.txt");

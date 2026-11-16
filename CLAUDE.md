@@ -28,6 +28,7 @@ SuPi is released on npm and follows semver with one shared version. Breaking cha
 - Choose validation by impact, not file type. Use the smallest checks that cover the change and its affected consumers.
 - For localized code/test changes, run focused tests and affected package typechecks. For docs/specs/skills or automation-policy-only changes (e.g. Renovate grouping), use relevant content, syntax, or config validation instead of `pnpm verify:ai`.
 - Run `pnpm verify:ai` for workspace-wide impact: shared APIs or cross-package behavior, dependency/lockfile updates, packaging/publishing, or shared build/test configuration. Also run it when impact cannot be safely bounded or the user requests it.
+- `pnpm test:ai` runs every Vitest project except `servers`. Real language-server tests are the `servers` project: run `pnpm test:servers:ai` after changing `supi-lsp` or the Code Intelligence LSP substrate. `pnpm verify:ai` and `pnpm test:all:ai` run both.
 - Report checks run, failures, and validation skipped.
 
 ## Architecture

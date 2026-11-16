@@ -35,10 +35,22 @@ const serverTests = [
   "packages/supi-code-intelligence/__tests__/integration/substrate/lsp/**/*.test.ts",
 ];
 
+// Tests that run Pi's codemode. Pi locates its codemode worker and QuickJS WASM relative to its own
+// module files, so these tests need the installed package rather than the pre-bundled copy.
+const piRuntimeTests = [
+  "packages/*/__tests__/integration/*codemode*.test.ts",
+  "packages/supi-agent-runtime/__tests__/integration/auxiliary-model-authority.test.ts",
+  "packages/supi-review/__tests__/integration/discovery-tools.test.ts",
+];
+
+// Worker threads start faster than forks. They cannot call process.chdir(), and their process.env
+// changes do not reach os.homedir(): pass cwd and homeDir explicitly.
+const unitPool = "threads";
+
 // Every option lives here: Vitest runs from the repository root and ignores package-level configs.
 export default defineConfig({
   test: {
-    testTimeout: 2000,
+    testTimeout: 5000,
     hookTimeout: 5000,
     fsModuleCache: true,
     env: { TMPDIR: testTmpDir, TMP: testTmpDir, TEMP: testTmpDir },
@@ -53,7 +65,32 @@ export default defineConfig({
         test: {
           name: "unit",
           include: ["**/*.test.{ts,mjs}"],
-          exclude: serverTests,
+          exclude: [...serverTests, ...piRuntimeTests],
+          pool: unitPool,
+          // Each test file re-imports its dependencies. Pi alone is about 1,700 modules, so
+          // pre-bundle it and TypeBox into single files (cached in node_modules/.vite).
+          deps: {
+            optimizer: {
+              ssr: {
+                enabled: true,
+                include: [
+                  "@earendil-works/pi-coding-agent",
+                  "@earendil-works/pi-ai",
+                  "@earendil-works/pi-tui",
+                  "typebox",
+                  "typebox/value",
+                ],
+              },
+            },
+          },
+          sequence: { groupOrder: 0 },
+        },
+      },
+      {
+        test: {
+          name: "pi-runtime",
+          include: piRuntimeTests,
+          pool: unitPool,
           sequence: { groupOrder: 0 },
         },
       },

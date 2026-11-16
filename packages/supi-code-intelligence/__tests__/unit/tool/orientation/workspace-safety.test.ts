@@ -176,7 +176,8 @@ describe("public workspace output safety", () => {
     expect(explicit.text).toContain("hidden/package.json");
   });
 
-  it("keeps the total navigation cap when maxResults is large", async () => {
+  // Writes 150 manifests and orients twice; the default timeout is too tight under full parallel load.
+  it("keeps the total navigation cap when maxResults is large", { timeout: 10_000 }, async () => {
     for (let index = 0; index < 150; index++) {
       put(
         `units/p${String(index).padStart(3, "0")}/package.json`,

@@ -149,7 +149,7 @@ jobs:
       - name: Install ripgrep
         run: sudo apt-get install -y ripgrep
       - name: Run complete test suite
-        run: pnpm test:ai
+        run: pnpm test:all:ai
 
   language-baseline:
     needs: ci-plan

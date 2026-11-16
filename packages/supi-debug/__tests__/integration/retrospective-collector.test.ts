@@ -382,7 +382,10 @@ describe("retrospective collector CLI", () => {
     expect(preview.records[1]).not.toHaveProperty("promptRevision");
   });
 
-  it("filters by recorded runtime provenance with --since-commit and counts unknown sessions", async () => {
+  // Several real Git processes; the default timeout is too tight under full parallel load.
+  it("filters by recorded runtime provenance with --since-commit and counts unknown sessions", {
+    timeout: 10_000,
+  }, async () => {
     const gitArgs = ["-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false"];
     const commitAt = async (date: string) => {
       const env = { ...process.env, GIT_COMMITTER_DATE: date, GIT_AUTHOR_DATE: date };

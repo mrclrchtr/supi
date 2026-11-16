@@ -38,9 +38,13 @@
     "format:check": "biome format .",
     "typecheck": "node node_modules/@typescript/native/bin/tsc -b packages/*/tsconfig.json packages/*/__tests__/tsconfig.json",
     "typecheck:ai": "node node_modules/@typescript/native/bin/tsc -b --pretty false packages/*/tsconfig.json packages/*/__tests__/tsconfig.json",
-    "test": "vitest run",
+    "test": "vitest run --project=!servers",
+    "test:servers": "vitest run --project servers",
+    "test:all": "vitest run",
     "test:watch": "vitest",
-    "test:ai": "vitest run --reporter=agent",
+    "test:ai": "vitest run --project=!servers --reporter=agent",
+    "test:servers:ai": "vitest run --project servers --reporter=agent",
+    "test:all:ai": "vitest run --reporter=agent",
     "bench:code-intelligence": "jiti packages/supi-code-intelligence/__tests__/bench/run.ts",
     "test:language-baseline:acceptance": "node scripts/language-baseline/verify-prerequisites.mjs && vitest run --config packages/supi-code-intelligence/vitest.acceptance.config.ts --reporter=agent",
     "skills:check": "pnpm --filter @mrclrchtr/supi-skill-patches check",
@@ -54,8 +58,8 @@
     "check": "pnpm biome && pnpm typecheck && pnpm skills:check && pnpm test",
     "check:ai": "pnpm biome:ai && pnpm typecheck:ai && pnpm skills:check && pnpm test:ai",
     "check:fix": "pnpm biome:fix",
-    "verify": "pnpm --filter @mrclrchtr/supi-tree-sitter check:all-wasm && pnpm check && pnpm pack:verify",
-    "verify:ai": "pnpm --filter @mrclrchtr/supi-tree-sitter check:all-wasm && pnpm check:ai && pnpm pack:verify"
+    "verify": "pnpm --filter @mrclrchtr/supi-tree-sitter check:all-wasm && pnpm check && pnpm test:servers && pnpm pack:verify",
+    "verify:ai": "pnpm --filter @mrclrchtr/supi-tree-sitter check:all-wasm && pnpm check:ai && pnpm test:servers:ai && pnpm pack:verify"
   },
   "peerDependencies": {
     "@earendil-works/pi-ai": "*",
