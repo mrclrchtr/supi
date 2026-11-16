@@ -7,21 +7,21 @@ import { createReleaseFixture } from "./release-fixture.mjs";
 /** Real Git/workflow scripts with only the remote GitHub API replaced by a recording CLI.
  * HEAD is the Release Commit `chore: release 6.3.1`. */
 export function createCiFixture() {
-  const fixture = createReleaseFixture();
-  const repository = "mrclrchtr/supi";
-  writeFileSync(
-    join(fixture.cwd, "CHANGELOG.md"),
-    "# Changelog\n\n## [6.3.1](https://example.test) (2026-01-01)\n\n### Fixes\n\n* A release fix\n\n## 6.3.0\n\n* Previous fix\n",
-  );
-  fixture.git(["add", "CHANGELOG.md"]);
-  fixture.git(["commit", "-qm", "chore: release 6.3.1"]);
-  const sha = fixture.git(["rev-parse", "HEAD"]);
-  fixture.git(["update-ref", "refs/remotes/origin/main", sha]);
-  const log = join(fixture.cwd, "github-calls.jsonl");
-  const gh = join(fixture.cwd, "test-bin", "gh");
-  writeFileSync(
-    gh,
-    `#!/usr/bin/env node
+  const fixture = createReleaseFixture({
+    template: {
+      key: "ci",
+      extend({ cwd, git }) {
+        writeFileSync(
+          join(cwd, "CHANGELOG.md"),
+          "# Changelog\n\n## [6.3.1](https://example.test) (2026-01-01)\n\n### Fixes\n\n* A release fix\n\n## 6.3.0\n\n* Previous fix\n",
+        );
+        git(["add", "CHANGELOG.md"]);
+        git(["commit", "-qm", "chore: release 6.3.1"]);
+        const sha = git(["rev-parse", "HEAD"]);
+        git(["update-ref", "refs/remotes/origin/main", sha]);
+        writeFileSync(
+          join(cwd, "test-bin", "gh"),
+          `#!/usr/bin/env node
 import { appendFileSync, readFileSync } from "node:fs";
 const args = process.argv.slice(2);
 const endpoint = args[1];
@@ -36,8 +36,15 @@ if (!response || response.status) {
 }
 if (response.body !== undefined) console.log(JSON.stringify(response.body));
 `,
-  );
-  chmodSync(gh, 0o755);
+        );
+        chmodSync(join(cwd, "test-bin", "gh"), 0o755);
+        return sha;
+      },
+    },
+  });
+  const repository = "mrclrchtr/supi";
+  const sha = fixture.sha;
+  const log = join(fixture.cwd, "github-calls.jsonl");
   const output = join(fixture.cwd, "workflow-output");
   const eventPath = join(fixture.cwd, "event.json");
   const env = {

@@ -9,15 +9,28 @@ const script = fileURLToPath(new URL("../release-prepare.mjs", import.meta.url))
 const gitCliff = fileURLToPath(new URL("../../node_modules/.bin/git-cliff", import.meta.url));
 
 let repo;
+// Shared starting point: the tagged Release Commit 6.3.1, with main matching origin/main.
+const releasedTemplate = {
+  key: "released",
+  extend({ cwd, git }) {
+    copyFileSync(new URL("../../cliff.toml", import.meta.url), join(cwd, "cliff.toml"));
+    const manifestPath = join(cwd, "packages/a-app/package.json");
+    const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+    writeFileSync(
+      manifestPath,
+      `${JSON.stringify({ ...manifest, pi: { extensions: ["./extension.ts"] } })}\n`,
+    );
+    writeFileSync(join(cwd, "CHANGELOG.md"), "# Changelog\n\n## 6.3.1\n\n* Previous\n");
+    git(["add", "-A"]);
+    git(["commit", "-qm", "chore: release 6.3.1"]);
+    git(["-c", "tag.gpgsign=false", "tag", "v6.3.1"]);
+    git(["update-ref", "refs/remotes/origin/main", "HEAD"]);
+    return git(["rev-parse", "HEAD"]);
+  },
+};
+
 beforeEach(() => {
-  repo = createReleaseFixture();
-  copyFileSync(new URL("../../cliff.toml", import.meta.url), join(repo.cwd, "cliff.toml"));
-  repo.updateJson("packages/a-app/package.json", { pi: { extensions: ["./extension.ts"] } });
-  writeFileSync(join(repo.cwd, "CHANGELOG.md"), "# Changelog\n\n## 6.3.1\n\n* Previous\n");
-  repo.git(["add", "-A"]);
-  repo.git(["commit", "-qm", "chore: release 6.3.1"]);
-  repo.git(["-c", "tag.gpgsign=false", "tag", "v6.3.1"]);
-  syncOrigin();
+  repo = createReleaseFixture({ template: releasedTemplate });
 });
 
 /** Preparation requires main to match origin/main, as after a pull. */
