@@ -1,7 +1,15 @@
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, Theme } from "@earendil-works/pi-coding-agent";
+import { Box, Text } from "@earendil-works/pi-tui";
 import { ReviewWorkspaceCleanupPicker } from "../ui/review-workspace-cleanup-picker.ts";
 import type { ReviewWorkspaceCleanupCandidate } from "./review-workspace-cleanup.ts";
 import { listReviewWorkspaces, removeReviewWorkspace } from "./review-workspace-cleanup.ts";
+
+const CLEANUP_MESSAGE_TYPE = "supi-review-cleanup";
+
+/** TUI details for one cleanup report; `content` keeps the same facts as Markdown. */
+interface CleanupMessageDetails {
+  results: { workspacePath: string; removed: boolean; message?: string }[];
+}
 
 type CommandContext = Parameters<Parameters<ExtensionAPI["registerCommand"]>[1]["handler"]>[1];
 
@@ -70,14 +78,47 @@ async function runCleanupCommand(pi: ExtensionAPI, ctx: CommandContext): Promise
   const results = [];
   for (const candidate of selected) results.push(await removeReviewWorkspace(ctx.cwd, candidate));
   pi.sendMessage({
-    customType: "supi-review-cleanup",
+    customType: CLEANUP_MESSAGE_TYPE,
     content: formatCleanupResults(results),
     display: true,
+    details: {
+      results: results.map((result) =>
+        result.removed
+          ? { workspacePath: result.workspacePath, removed: true }
+          : { workspacePath: result.workspacePath, removed: false, message: result.message },
+      ),
+    } satisfies CleanupMessageDetails,
   });
+}
+
+/** One status row per workspace; falls back to the stored text for reports without details. */
+export function renderCleanupMessage(
+  message: { content: unknown; details?: unknown },
+  theme: Theme,
+): Text {
+  const results = (message.details as Partial<CleanupMessageDetails> | undefined)?.results;
+  if (!results) {
+    return new Text(typeof message.content === "string" ? message.content : "", 0, 0);
+  }
+  const removed = results.filter((result) => result.removed).length;
+  const lines = [
+    `${theme.fg("toolTitle", "Review Workspace Cleanup")} ${theme.fg("dim", `· ${removed} of ${results.length} removed`)}`,
+    ...results.map((result) =>
+      result.removed
+        ? `${theme.fg("success", "✓")} ${theme.fg("dim", result.workspacePath)}`
+        : `${theme.fg("error", "✗")} ${result.workspacePath} ${theme.fg("warning", `— ${result.message ?? "failed"}`)}`,
+    ),
+  ];
+  return new Text(lines.join("\n"), 0, 0);
 }
 
 /** Register explicit recovery for marked Review Workspaces left by interruption or failed cleanup. */
 export function registerReviewWorkspaceCleanupCommand(pi: ExtensionAPI): void {
+  pi.registerMessageRenderer(CLEANUP_MESSAGE_TYPE, (message, options, theme) => {
+    const box = new Box(options.outputPad, 0, undefined);
+    box.addChild(renderCleanupMessage(message, theme));
+    return box;
+  });
   pi.registerCommand("supi-review-cleanup", {
     description: "Select and remove marked Review Workspaces left by interrupted reviews",
     handler: async (_args, ctx) => runCleanupCommand(pi, ctx),

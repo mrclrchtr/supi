@@ -27,7 +27,7 @@ A tool may open a temporary form with `ctx.ui.custom()`. The tool still needs a 
 - `packages/supi-ask-user/src/ui/form.ts` opens the temporary form.
 - `packages/supi-ask-user/src/render/transcript.ts` renders the completed tool result.
 
-Custom messages and durable custom entries use different APIs. Use `registerMessageRenderer()` for `pi.sendMessage()` messages and `registerEntryRenderer()` for `pi.appendEntry()` entries. Build their chrome from `message.details` or `entry.data`; do not recover structured facts from message text.
+Every custom message sent with `display: true` needs a `registerMessageRenderer()` in the same package; Pi's fallback shows the raw `[customType]` header and model-facing `content`. `scripts/__tests__/message-renderers.test.mjs` enforces this; record intentional exceptions in its `FALLBACK_ALLOWED` list with a reason. Custom messages and durable custom entries use different APIs. Use `registerMessageRenderer()` for `pi.sendMessage()` messages and `registerEntryRenderer()` for `pi.appendEntry()` entries. Build their chrome from `message.details` or `entry.data`; do not recover structured facts from message text.
 
 ## Renderer registration
 

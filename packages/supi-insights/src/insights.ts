@@ -31,10 +31,10 @@ import {
   hasValidDates,
   parseSessionFile,
 } from "./parser.ts";
+import { REPORT_TYPE, renderReportMessage } from "./render.ts";
 import { scanAllSessions } from "./scanner.ts";
 import type { AggregatedData, InsightResults, SessionFacets, SessionMeta } from "./types.ts";
 
-const REPORT_TYPE = "supi-insights-report";
 const MAX_SESSIONS_TO_ANALYZE = 200;
 const MAX_FACET_EXTRACTIONS = 50;
 const META_BATCH_SIZE = 50;
@@ -109,6 +109,8 @@ export default function insightsExtension(pi: ExtensionAPI) {
       ],
     }),
   );
+
+  pi.registerMessageRenderer(REPORT_TYPE, renderReportMessage);
 
   // ── /supi-insights command ──────────────────────────────────
 
