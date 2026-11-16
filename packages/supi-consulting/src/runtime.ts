@@ -9,6 +9,7 @@ import type {
 import { loadConsultingConfig } from "./config.ts";
 import { ConversationHandleStore } from "./conversation/handles.ts";
 import { CONSULTING_FOOTER_KEY, CONSULTING_READY_ICON } from "./footer-constants.ts";
+import { checkLegacyAntigravityConfig } from "./legacy-config.ts";
 import { registerConsultingRunTool } from "./tool/consulting_run/register.ts";
 import { CONSULTING_RUN_TOOL_NAME } from "./tool/consulting_run/spec.ts";
 
@@ -34,6 +35,7 @@ export class ConsultingRuntime {
   #spinnerTimer: ReturnType<typeof setInterval> | undefined;
   #spinnerFrame = 0;
   #toolRegistered = false;
+  #legacyConfigWarning: string | undefined;
 
   constructor(options: { pi: ExtensionAPI; adapter: ConsultingAgentAdapter; homeDir?: string }) {
     this.#pi = options.pi;
@@ -86,7 +88,9 @@ export class ConsultingRuntime {
     if (context) this.#statusUi = context.ui;
     this.#stopSpinner();
     this.#setFooterState("idle");
-    const config = loadConsultingConfig(cwd, this.#homeDir, context?.isProjectTrusted?.() ?? true);
+    const projectTrusted = context?.isProjectTrusted?.() ?? true;
+    this.#warnAboutLegacyConfig(cwd, projectTrusted, context);
+    const config = loadConsultingConfig(cwd, this.#homeDir, projectTrusted);
     if (!config.agentToolEnabled) {
       this.#deactivateTool();
       return;
@@ -131,8 +135,29 @@ export class ConsultingRuntime {
     this.#setFooterState("idle");
     this.#deactivateTool();
     this.#statusUi = undefined;
+    this.#legacyConfigWarning = undefined;
     this.handles.clear();
     await Promise.resolve();
+  }
+
+  /** Warn once per distinct finding set; refreshes with unchanged configuration stay quiet. */
+  #warnAboutLegacyConfig(
+    cwd: string,
+    projectTrusted: boolean,
+    context: ConsultingRefreshContext | undefined,
+  ): void {
+    // Without a UI, keep the warning pending for the next refresh that can show it.
+    if (!context) return;
+    let warning: string | undefined;
+    try {
+      warning = checkLegacyAntigravityConfig({ cwd, homeDir: this.#homeDir, projectTrusted });
+    } catch {
+      // Legacy detection is advisory and must not block availability discovery.
+      return;
+    }
+    if (warning === this.#legacyConfigWarning) return;
+    this.#legacyConfigWarning = warning;
+    if (warning) notifyRefreshWarning(context, warning);
   }
 
   #activateTool(availability: ConsultingAgentAvailability): void {

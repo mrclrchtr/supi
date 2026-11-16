@@ -10,7 +10,7 @@
 - Keep each Model Catalogue immutable until the next session start or reload. Register `consulting_run` only after agent discovery succeeds.
 - Require explicit agent, model, and Workspace Access for a new Consultation. Keep `new` and `continue` exact-one; follow-ups inherit all selections and their working directory.
 - Acquire a handle before process work. Report process start, including hook probes, through the adapter interface. Reject overlap before startup; retire after a started follow-up fails or is canceled, or when the adapter rejects incompatible continuation state (which can never succeed).
-- Keep raw conversation IDs opaque to shared policy. Persist only new consulting handle records and results; old Antigravity state has no migration or legacy read path.
+- Keep raw conversation IDs opaque to shared policy. Persist only new consulting handle records and results; old Antigravity state has no migration or legacy read path. The old `antigravity` config section is only detected for a migration warning; it never affects behavior.
 - Use `<PI agent dir>/supi/consulting/antigravity/` for Antigravity state. Leave the old `supi/antigravity/` tree untouched.
 - Use the Isolated Antigravity Home for every `agy` process. On macOS, create and unlock its private keychain, exposed as the login keychain, before startup. Do not copy the normal profile, credentials, or PI provider environment.
 - Spawn `agy` directly with an argument array. Keep raw stdout, stderr, tool parameters, tool output, and transcripts out of PI state.

@@ -265,6 +265,41 @@ describe("Consulting runtime activation", () => {
     expect(runtime.isReady).toBe(false);
     expect(context.ui.setStatus).toHaveBeenLastCalledWith(CONSULTING_FOOTER_KEY, undefined);
   });
+
+  it("warns once about an ignored legacy section until its findings change", async () => {
+    const root = roots[0] as string;
+    const cwd = join(root, "repo");
+    await mkdir(cwd, { recursive: true });
+    writeSupiConfig(
+      { section: "antigravity", scope: "global", cwd },
+      { agentToolEnabled: false },
+      { homeDir: root },
+    );
+    const runtime = new ConsultingRuntime({
+      pi: createPiMock() as never,
+      adapter: makeAdapter(),
+      homeDir: root,
+    });
+    const context = makeCtx({ cwd });
+    const legacyWarnings = () =>
+      vi
+        .mocked(context.ui.notify)
+        .mock.calls.filter(([message]) => String(message).includes('"antigravity"'));
+
+    await runtime.refresh(cwd, { ui: context.ui });
+    await runtime.refresh(cwd, { ui: context.ui });
+    expect(legacyWarnings()).toHaveLength(1);
+    expect(legacyWarnings()[0]?.[1]).toBe("warning");
+
+    writeSupiConfig(
+      { section: "consulting", scope: "global", cwd },
+      { agentToolEnabled: false },
+      { homeDir: root },
+    );
+    await runtime.refresh(cwd, { ui: context.ui });
+    expect(legacyWarnings()).toHaveLength(2);
+    expect(legacyWarnings()[1]?.[0]).toContain("consulting_run is disabled");
+  });
 });
 
 function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {

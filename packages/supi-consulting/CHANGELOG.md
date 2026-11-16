@@ -1,5 +1,9 @@
 # Changelog
 
+## [12.1.0]
+
+- Warns once per session start or reload when the global or project configuration still has the ignored `antigravity` section. The warning names `consulting.agentToolEnabled`, its effective value, and how to keep an old disabled setting ([#466](https://github.com/mrclrchtr/supi/issues/466)).
+
 ## [12.0.0]
 
 - `consulting_run` now declares tool annotations that mark it as open-world and not read-only, for permission extensions that read `pi.getAllTools()` ([#582](https://github.com/mrclrchtr/supi/issues/582)).

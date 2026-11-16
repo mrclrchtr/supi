@@ -22,7 +22,7 @@ pi install npm:@mrclrchtr/supi-consulting
 Use the same personal or project scope as the original install. Update local extension paths to `packages/supi-consulting/src/extension.ts`, then reload Pi.
 
 - `antigravity_run` has no alias. Use `consulting_run` and supply `new.agent`.
-- The setting is now `consulting.agentToolEnabled`. The old `antigravity` section is ignored, including an old disabled value. The new setting defaults to `true`; set it to `false` before reload if you want to skip discovery.
+- The setting is now `consulting.agentToolEnabled`. The old `antigravity` section is ignored, including an old disabled value. The new setting defaults to `true`; set it to `false` before reload if you want to skip discovery. While an `antigravity` section remains in the global or project configuration, Pi shows one warning per session start or reload. It names both keys and the effective value. SuPi does not rewrite the configuration.
 - Old Conversation Handles and tool results are not restored as consulting state. Start a new Consultation.
 - The isolated home has moved to a new namespace. Sign in again. The package does not read, move, copy, or delete the old `<PI agent dir>/supi/antigravity/` data.
 
