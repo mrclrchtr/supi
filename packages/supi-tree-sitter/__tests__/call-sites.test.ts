@@ -6,41 +6,27 @@
  * instead of just a leaf identifier.
  */
 
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import * as os from "node:os";
+import { writeFileSync } from "node:fs";
 import * as path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { createTreeSitterSession } from "../src/session/session.ts";
+import { describe, expect, it } from "vitest";
+import { useSharedTreeSitterSession } from "./helpers/shared-session.ts";
 
-let tmpDir: string;
-
-beforeEach(() => {
-  tmpDir = mkdtempSync(path.join(os.tmpdir(), "call-sites-"));
-});
-
-afterEach(() => {
-  rmSync(tmpDir, { recursive: true, force: true });
-});
+const workspace = useSharedTreeSitterSession("call-sites-");
 
 describe("TypeScript call-site extraction (full-expression)", () => {
   it("retains same-line calls by exact source range and excludes JSX tags", async () => {
     writeFileSync(
-      path.join(tmpDir, "same-line.tsx"),
+      path.join(workspace.cwd, "same-line.tsx"),
       "function invoke() {}\ninvoke(); invoke(); const view = <Widget />;\n",
     );
-    const session = createTreeSitterSession(tmpDir);
-    try {
-      const result = await session.callSites("same-line.tsx");
-      expect(result.kind).toBe("success");
-      if (result.kind !== "success") return;
-      const calls = result.data.filter((entry) => entry.name === "invoke");
-      expect(calls).toHaveLength(2);
-      expect(calls[0]).toMatchObject({ startLine: 2, startCharacter: 1, endLine: 2 });
-      expect(calls[1]?.startCharacter).toBeGreaterThan(calls[0]?.startCharacter ?? 0);
-      expect(result.data.some((entry) => entry.name === "Widget")).toBe(false);
-    } finally {
-      await session.dispose();
-    }
+    const result = await workspace.session.callSites("same-line.tsx");
+    expect(result.kind).toBe("success");
+    if (result.kind !== "success") return;
+    const calls = result.data.filter((entry) => entry.name === "invoke");
+    expect(calls).toHaveLength(2);
+    expect(calls[0]).toMatchObject({ startLine: 2, startCharacter: 1, endLine: 2 });
+    expect(calls[1]?.startCharacter).toBeGreaterThan(calls[0]?.startCharacter ?? 0);
+    expect(result.data.some((entry) => entry.name === "Widget")).toBe(false);
   });
 
   it.each(["ts", "tsx"])(
@@ -48,7 +34,7 @@ describe("TypeScript call-site extraction (full-expression)", () => {
     async (extension) => {
       const file = `type-imports.${extension}`;
       writeFileSync(
-        path.join(tmpDir, file),
+        path.join(workspace.cwd, file),
         `type Value = import("types").Value;
 type Module = typeof import("types");
 function run() {
@@ -71,53 +57,43 @@ function assertValue(value: unknown): asserts value is import("types").Value {
   check();
 }`,
       );
-      const session = createTreeSitterSession(tmpDir);
-      try {
-        const result = await session.callSites(file);
-        expect(result.kind).toBe("success");
-        if (result.kind !== "success") return;
-        expect(result.data.map(({ name, startLine }) => ({ name, line: startLine }))).toEqual([
-          { name: "read", line: 4 },
-          { name: "read", line: 5 },
-          { name: "read", line: 6 },
-          { name: "import", line: 7 },
-          { name: "provide", line: 8 },
-          { name: "provide", line: 9 },
-          { name: "import", line: 10 },
-          { name: "import", line: 11 },
-          { name: "import", line: 12 },
-          { name: "check", line: 16 },
-          { name: "check", line: 20 },
-        ]);
-      } finally {
-        await session.dispose();
-      }
+      const result = await workspace.session.callSites(file);
+      expect(result.kind).toBe("success");
+      if (result.kind !== "success") return;
+      expect(result.data.map(({ name, startLine }) => ({ name, line: startLine }))).toEqual([
+        { name: "read", line: 4 },
+        { name: "read", line: 5 },
+        { name: "read", line: 6 },
+        { name: "import", line: 7 },
+        { name: "provide", line: 8 },
+        { name: "provide", line: 9 },
+        { name: "import", line: 10 },
+        { name: "import", line: 11 },
+        { name: "import", line: 12 },
+        { name: "check", line: 16 },
+        { name: "check", line: 20 },
+      ]);
     },
   );
 
   it("preserves syntax-recovery evidence after excluding type-only imports", async () => {
     writeFileSync(
-      path.join(tmpDir, "broken.ts"),
+      path.join(workspace.cwd, "broken.ts"),
       `type Value = import("types").Value;
 read<import("types").Value>();
 import("runtime");
 export type *;`,
     );
-    const session = createTreeSitterSession(tmpDir);
-    try {
-      const result = await session.callSites("broken.ts");
-      expect(result.kind).toBe("partial");
-      if (result.kind !== "partial") return;
-      expect(result.errorRanges.length).toBeGreaterThan(0);
-      expect(result.data.map(({ name }) => name)).toEqual(["read", "import"]);
-    } finally {
-      await session.dispose();
-    }
+    const result = await workspace.session.callSites("broken.ts");
+    expect(result.kind).toBe("partial");
+    if (result.kind !== "partial") return;
+    expect(result.errorRanges.length).toBeGreaterThan(0);
+    expect(result.data.map(({ name }) => name)).toEqual(["read", "import"]);
   });
 
   it("returns full member expression for params.query.trim()", async () => {
     writeFileSync(
-      path.join(tmpDir, "sample.ts"),
+      path.join(workspace.cwd, "sample.ts"),
       [
         "interface Query { trim(): string }",
         "interface Params { query: Query }",
@@ -129,64 +105,49 @@ export type *;`,
       ].join("\n"),
     );
 
-    const session = createTreeSitterSession(tmpDir);
-    try {
-      const result = await session.callSites("sample.ts");
+    const result = await workspace.session.callSites("sample.ts");
 
-      expect(result.kind).toBe("success");
-      if (result.kind !== "success") return;
+    expect(result.kind).toBe("success");
+    if (result.kind !== "success") return;
 
-      const names = result.data.map((entry) => entry.name);
-      expect(names).toContain("params.query.trim");
-    } finally {
-      await session.dispose();
-    }
+    const names = result.data.map((entry) => entry.name);
+    expect(names).toContain("params.query.trim");
   });
 
   it("returns constructor name for new Thing()", async () => {
     writeFileSync(
-      path.join(tmpDir, "sample.ts"),
+      path.join(workspace.cwd, "sample.ts"),
       ["class Thing {}", "const t = new Thing();", ""].join("\n"),
     );
 
-    const session = createTreeSitterSession(tmpDir);
-    try {
-      const result = await session.callSites("sample.ts");
+    const result = await workspace.session.callSites("sample.ts");
 
-      expect(result.kind).toBe("success");
-      if (result.kind !== "success") return;
+    expect(result.kind).toBe("success");
+    if (result.kind !== "success") return;
 
-      const names = result.data.map((entry) => entry.name);
-      expect(names).toContain("Thing");
-    } finally {
-      await session.dispose();
-    }
+    const names = result.data.map((entry) => entry.name);
+    expect(names).toContain("Thing");
   });
 
   it("returns outer call in factory()()", async () => {
     writeFileSync(
-      path.join(tmpDir, "sample.ts"),
+      path.join(workspace.cwd, "sample.ts"),
       ["function factory() { return () => 42; }", "const result = factory()();", ""].join("\n"),
     );
 
-    const session = createTreeSitterSession(tmpDir);
-    try {
-      const result = await session.callSites("sample.ts");
+    const result = await workspace.session.callSites("sample.ts");
 
-      expect(result.kind).toBe("success");
-      if (result.kind !== "success") return;
+    expect(result.kind).toBe("success");
+    if (result.kind !== "success") return;
 
-      const names = result.data.map((entry) => entry.name);
-      // The outer call expression's callee is `factory()`
-      expect(names).toContain("factory()");
-    } finally {
-      await session.dispose();
-    }
+    const names = result.data.map((entry) => entry.name);
+    // The outer call expression's callee is `factory()`
+    expect(names).toContain("factory()");
   });
 
   it("returns tag name for tagged template", async () => {
     writeFileSync(
-      path.join(tmpDir, "sample.ts"),
+      path.join(workspace.cwd, "sample.ts"),
       [
         'function tagged(strings: TemplateStringsArray, ...values: unknown[]) { return ""; }',
         "const result = tagged`x`;",
@@ -194,25 +155,20 @@ export type *;`,
       ].join("\n"),
     );
 
-    const session = createTreeSitterSession(tmpDir);
-    try {
-      const result = await session.callSites("sample.ts");
+    const result = await workspace.session.callSites("sample.ts");
 
-      expect(result.kind).toBe("success");
-      if (result.kind !== "success") return;
+    expect(result.kind).toBe("success");
+    if (result.kind !== "success") return;
 
-      const names = result.data.map((entry) => entry.name);
-      expect(names).toContain("tagged");
-    } finally {
-      await session.dispose();
-    }
+    const names = result.data.map((entry) => entry.name);
+    expect(names).toContain("tagged");
   });
 });
 
 describe("JSX/TSX call-site extraction (full-expression)", () => {
   it("returns full member expression in TSX", async () => {
     writeFileSync(
-      path.join(tmpDir, "sample.tsx"),
+      path.join(workspace.cwd, "sample.tsx"),
       [
         'import { render } from "preact";',
         "const api = { call: (x: string) => x };",
@@ -222,17 +178,12 @@ describe("JSX/TSX call-site extraction (full-expression)", () => {
       ].join("\n"),
     );
 
-    const session = createTreeSitterSession(tmpDir);
-    try {
-      const result = await session.callSites("sample.tsx");
+    const result = await workspace.session.callSites("sample.tsx");
 
-      expect(result.kind).toBe("success");
-      if (result.kind !== "success") return;
+    expect(result.kind).toBe("success");
+    if (result.kind !== "success") return;
 
-      const names = result.data.map((entry) => entry.name);
-      expect(names).toContain("api.call");
-    } finally {
-      await session.dispose();
-    }
+    const names = result.data.map((entry) => entry.name);
+    expect(names).toContain("api.call");
   });
 });

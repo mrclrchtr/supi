@@ -1,27 +1,16 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { createTreeSitterSession, type OutlineItem } from "../src/api.ts";
+import { describe, expect, it } from "vitest";
+import type { OutlineItem } from "../src/api.ts";
+import { useSharedTreeSitterSession } from "./helpers/shared-session.ts";
 
-let cwd: string;
-
-beforeEach(() => {
-  cwd = mkdtempSync(join(tmpdir(), "supi-outline-nested-"));
-});
-
-afterEach(() => rmSync(cwd, { recursive: true, force: true }));
+const workspace = useSharedTreeSitterSession("supi-outline-nested-");
 
 async function outline(file: string, source: string): Promise<OutlineItem[]> {
-  writeFileSync(join(cwd, file), source);
-  const session = createTreeSitterSession(cwd);
-  try {
-    const result = await session.outline(file);
-    expect(result.kind).toBe("success");
-    return result.kind === "success" ? result.data : [];
-  } finally {
-    await session.dispose();
-  }
+  writeFileSync(join(workspace.cwd, file), source);
+  const result = await workspace.session.outline(file);
+  expect(result.kind).toBe("success");
+  return result.kind === "success" ? result.data : [];
 }
 
 function nestedNames(items: readonly OutlineItem[]): string[] {

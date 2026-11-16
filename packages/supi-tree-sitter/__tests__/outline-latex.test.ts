@@ -1,27 +1,16 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { createTreeSitterSession, type OutlineItem } from "../src/api.ts";
+import { describe, expect, it } from "vitest";
+import type { OutlineItem } from "../src/api.ts";
+import { useSharedTreeSitterSession } from "./helpers/shared-session.ts";
 
-let cwd: string;
-
-beforeEach(() => {
-  cwd = mkdtempSync(join(tmpdir(), "supi-outline-latex-"));
-});
-
-afterEach(() => rmSync(cwd, { recursive: true, force: true }));
+const workspace = useSharedTreeSitterSession("supi-outline-latex-");
 
 async function outline(source: string): Promise<OutlineItem[]> {
-  writeFileSync(join(cwd, "paper.tex"), source);
-  const session = createTreeSitterSession(cwd);
-  try {
-    const result = await session.outline("paper.tex");
-    expect(result.kind).toBe("success");
-    return result.kind === "success" ? result.data : [];
-  } finally {
-    await session.dispose();
-  }
+  writeFileSync(join(workspace.cwd, "paper.tex"), source);
+  const result = await workspace.session.outline("paper.tex");
+  expect(result.kind).toBe("success");
+  return result.kind === "success" ? result.data : [];
 }
 
 function flatten(items: readonly OutlineItem[]): OutlineItem[] {
@@ -162,54 +151,47 @@ split}`),
 
   it("parses complete underscore keys in label definitions and references", async () => {
     writeFileSync(
-      join(cwd, "paper.tex"),
+      join(workspace.cwd, "paper.tex"),
       String.raw`\label{sec:live_verified}
 \ref{sec:live_verified}`,
     );
-    const session = createTreeSitterSession(cwd);
-    try {
-      const definition = await session.query(
-        "paper.tex",
-        "(label_definition name: (curly_group_label label: (label) @key))",
-      );
-      const reference = await session.query(
-        "paper.tex",
-        "(label_reference names: (curly_group_label_list label: (label) @key))",
-      );
-      const errors = await session.query("paper.tex", "(ERROR) @error");
+    const definition = await workspace.session.query(
+      "paper.tex",
+      "(label_definition name: (curly_group_label label: (label) @key))",
+    );
+    const reference = await workspace.session.query(
+      "paper.tex",
+      "(label_reference names: (curly_group_label_list label: (label) @key))",
+    );
+    const errors = await workspace.session.query("paper.tex", "(ERROR) @error");
 
-      expect(definition).toMatchObject({
-        kind: "success",
-        data: [{ nodeType: "label", text: "sec:live_verified" }],
-      });
-      expect(reference).toMatchObject({
-        kind: "success",
-        data: [{ nodeType: "label", text: "sec:live_verified" }],
-      });
-      expect(errors).toEqual({ kind: "success", data: [] });
-      await expect(session.nodeAt("paper.tex", 1, 16)).resolves.toMatchObject({
-        kind: "success",
-        data: {
-          type: "label",
-          text: "sec:live_verified",
-          ancestry: expect.arrayContaining([
-            expect.objectContaining({ type: "curly_group_label" }),
-          ]),
-        },
-      });
-      await expect(session.nodeAt("paper.tex", 2, 14)).resolves.toMatchObject({
-        kind: "success",
-        data: {
-          type: "label",
-          text: "sec:live_verified",
-          ancestry: expect.arrayContaining([
-            expect.objectContaining({ type: "curly_group_label_list" }),
-          ]),
-        },
-      });
-    } finally {
-      await session.dispose();
-    }
+    expect(definition).toMatchObject({
+      kind: "success",
+      data: [{ nodeType: "label", text: "sec:live_verified" }],
+    });
+    expect(reference).toMatchObject({
+      kind: "success",
+      data: [{ nodeType: "label", text: "sec:live_verified" }],
+    });
+    expect(errors).toEqual({ kind: "success", data: [] });
+    await expect(workspace.session.nodeAt("paper.tex", 1, 16)).resolves.toMatchObject({
+      kind: "success",
+      data: {
+        type: "label",
+        text: "sec:live_verified",
+        ancestry: expect.arrayContaining([expect.objectContaining({ type: "curly_group_label" })]),
+      },
+    });
+    await expect(workspace.session.nodeAt("paper.tex", 2, 14)).resolves.toMatchObject({
+      kind: "success",
+      data: {
+        type: "label",
+        text: "sec:live_verified",
+        ancestry: expect.arrayContaining([
+          expect.objectContaining({ type: "curly_group_label_list" }),
+        ]),
+      },
+    });
   });
 
   it("keeps labels in sectionless list items", async () => {

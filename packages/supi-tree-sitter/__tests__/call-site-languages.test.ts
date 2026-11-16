@@ -1,8 +1,7 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import * as os from "node:os";
+import { writeFileSync } from "node:fs";
 import * as path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { createTreeSitterSession } from "../src/session/session.ts";
+import { describe, expect, it } from "vitest";
+import { useSharedTreeSitterSession } from "./helpers/shared-session.ts";
 
 const CALL_LANGUAGE_CASES = [
   { file: "sample.js", source: "foo();\n" },
@@ -20,32 +19,18 @@ const CALL_LANGUAGE_CASES = [
   { file: "sample.r", source: "foo()\n" },
 ] as const;
 
-let tmpDir: string;
-
-beforeEach(() => {
-  tmpDir = mkdtempSync(path.join(os.tmpdir(), "call-site-languages-"));
-});
-
-afterEach(() => {
-  rmSync(tmpDir, { recursive: true, force: true });
-});
+const workspace = useSharedTreeSitterSession("call-site-languages-");
 
 describe("declared call-site language support", () => {
   it.each(CALL_LANGUAGE_CASES)(
     "executes the registered query for $file",
     async ({ file, source }) => {
-      writeFileSync(path.join(tmpDir, file), source);
-      const session = createTreeSitterSession(tmpDir);
-
-      try {
-        const result = await session.callSites(file);
-        expect(result).toMatchObject({
-          kind: "success",
-          data: [expect.objectContaining({ name: "foo" })],
-        });
-      } finally {
-        await session.dispose();
-      }
+      writeFileSync(path.join(workspace.cwd, file), source);
+      const result = await workspace.session.callSites(file);
+      expect(result).toMatchObject({
+        kind: "success",
+        data: [expect.objectContaining({ name: "foo" })],
+      });
     },
   );
 
@@ -53,15 +38,9 @@ describe("declared call-site language support", () => {
     { file: "sample.html", source: "<button>foo</button>\n" },
     { file: "sample.sql", source: "SELECT foo();\n" },
   ])("rejects $file because no call-site query is registered", async ({ file, source }) => {
-    writeFileSync(path.join(tmpDir, file), source);
-    const session = createTreeSitterSession(tmpDir);
-
-    try {
-      await expect(session.callSites(file)).resolves.toMatchObject({
-        kind: "unsupported-language",
-      });
-    } finally {
-      await session.dispose();
-    }
+    writeFileSync(path.join(workspace.cwd, file), source);
+    await expect(workspace.session.callSites(file)).resolves.toMatchObject({
+      kind: "unsupported-language",
+    });
   });
 });

@@ -1,27 +1,16 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { createTreeSitterSession, type OutlineItem } from "../src/api.ts";
+import { describe, expect, it } from "vitest";
+import type { OutlineItem } from "../src/api.ts";
+import { useSharedTreeSitterSession } from "./helpers/shared-session.ts";
 
-let cwd: string;
-
-beforeEach(() => {
-  cwd = mkdtempSync(join(tmpdir(), "supi-outline-polyglot-"));
-});
-
-afterEach(() => rmSync(cwd, { recursive: true, force: true }));
+const workspace = useSharedTreeSitterSession("supi-outline-polyglot-");
 
 async function outline(file: string, source: string): Promise<OutlineItem[]> {
-  writeFileSync(join(cwd, file), source);
-  const session = createTreeSitterSession(cwd);
-  try {
-    const result = await session.outline(file);
-    expect(result.kind).toBe("success");
-    return result.kind === "success" ? result.data : [];
-  } finally {
-    await session.dispose();
-  }
+  writeFileSync(join(workspace.cwd, file), source);
+  const result = await workspace.session.outline(file);
+  expect(result.kind).toBe("success");
+  return result.kind === "success" ? result.data : [];
 }
 
 function flattenOutline(items: readonly OutlineItem[]): OutlineItem[] {
@@ -31,33 +20,28 @@ function flattenOutline(items: readonly OutlineItem[]): OutlineItem[] {
 describe("polyglot outline extraction", () => {
   it("indexes nested named JavaScript declarations without local bindings", async () => {
     writeFileSync(
-      join(cwd, "nested.tsx"),
+      join(workspace.cwd, "nested.tsx"),
       "function outer() { const local = 1; function inner() { const hidden = 2; } class Local { run() {} } }\n",
     );
-    const session = createTreeSitterSession(cwd);
-    try {
-      const result = await session.outline("nested.tsx");
-      expect(result.kind).toBe("success");
-      if (result.kind !== "success") return;
-      expect(result.data).toEqual([
-        expect.objectContaining({
-          name: "outer",
-          kind: "function",
-          children: expect.arrayContaining([
-            expect.objectContaining({ name: "inner", kind: "function" }),
-            expect.objectContaining({
-              name: "Local",
-              kind: "class",
-              children: [expect.objectContaining({ name: "run", kind: "method" })],
-            }),
-          ]),
-        }),
-      ]);
-      expect(JSON.stringify(result.data)).not.toContain("hidden");
-      expect(JSON.stringify(result.data)).not.toContain("local");
-    } finally {
-      await session.dispose();
-    }
+    const result = await workspace.session.outline("nested.tsx");
+    expect(result.kind).toBe("success");
+    if (result.kind !== "success") return;
+    expect(result.data).toEqual([
+      expect.objectContaining({
+        name: "outer",
+        kind: "function",
+        children: expect.arrayContaining([
+          expect.objectContaining({ name: "inner", kind: "function" }),
+          expect.objectContaining({
+            name: "Local",
+            kind: "class",
+            children: [expect.objectContaining({ name: "run", kind: "method" })],
+          }),
+        ]),
+      }),
+    ]);
+    expect(JSON.stringify(result.data)).not.toContain("hidden");
+    expect(JSON.stringify(result.data)).not.toContain("local");
   });
 
   it("indexes nested named declarations across the selected native grammars", async () => {
@@ -119,21 +103,19 @@ describe("polyglot outline extraction", () => {
   }, 15_000);
 
   it("returns recovered declarations as partial evidence with file and error ranges", async () => {
-    writeFileSync(join(cwd, "recovered.ts"), "function kept() {}\nconst unfinished = call(\n");
-    const session = createTreeSitterSession(cwd);
-    try {
-      const result = await session.outline("recovered.ts");
-      expect(result.kind).toBe("partial");
-      if (result.kind !== "partial") return;
-      expect(result.file).toBe("recovered.ts");
-      expect(result.data).toEqual([expect.objectContaining({ name: "kept", kind: "function" })]);
-      expect(result.reason).toContain("recovered");
-      expect(result.errorRanges.length).toBeGreaterThan(0);
-      expect(result.errorRanges[0]).toMatchObject({ startLine: 2 });
-      expect((await session.canParse("recovered.ts")).kind).toBe("success");
-    } finally {
-      await session.dispose();
-    }
+    writeFileSync(
+      join(workspace.cwd, "recovered.ts"),
+      "function kept() {}\nconst unfinished = call(\n",
+    );
+    const result = await workspace.session.outline("recovered.ts");
+    expect(result.kind).toBe("partial");
+    if (result.kind !== "partial") return;
+    expect(result.file).toBe("recovered.ts");
+    expect(result.data).toEqual([expect.objectContaining({ name: "kept", kind: "function" })]);
+    expect(result.reason).toContain("recovered");
+    expect(result.errorRanges.length).toBeGreaterThan(0);
+    expect(result.errorRanges[0]).toMatchObject({ startLine: 2 });
+    expect((await workspace.session.canParse("recovered.ts")).kind).toBe("success");
   });
 
   it("extracts Python declarations and class methods without local declarations", async () => {

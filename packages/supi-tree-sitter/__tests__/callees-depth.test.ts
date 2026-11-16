@@ -1,21 +1,12 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import * as os from "node:os";
+import { writeFileSync } from "node:fs";
 import * as path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { createTreeSitterSession } from "../src/session/session.ts";
+import { describe, expect, it } from "vitest";
+import { useSharedTreeSitterSession } from "./helpers/shared-session.ts";
 
-let tmpDir: string;
-
-beforeEach(() => {
-  tmpDir = mkdtempSync(path.join(os.tmpdir(), "supi-callees-depth-"));
-});
-
-afterEach(() => {
-  rmSync(tmpDir, { recursive: true, force: true });
-});
+const workspace = useSharedTreeSitterSession("supi-callees-depth-");
 
 function writeSource(fileName: string, source: string): void {
-  writeFileSync(path.join(tmpDir, fileName), source, "utf-8");
+  writeFileSync(path.join(workspace.cwd, fileName), source, "utf-8");
 }
 
 describe("calleesAt depth filtering", () => {
@@ -41,27 +32,24 @@ describe("calleesAt depth filtering", () => {
 function isValue(value: unknown): value is import("types").Value { check(); return true; }
 function assertValue(value: unknown): asserts value is import("types").Value { check(); }`,
       );
-      const session = createTreeSitterSession(tmpDir);
-      try {
-        const direct = await session.calleesAt(file, 1, 10, { depth: "direct" });
-        expect(direct.kind).toBe("success");
-        if (direct.kind !== "success") return;
-        expect(
-          direct.data.callees.map(({ name, range }) => ({ name, line: range.startLine })),
-        ).toEqual([
-          { name: "read", line: 3 },
-          { name: "read", line: 4 },
-          { name: "read", line: 5 },
-          { name: "import", line: 6 },
-          { name: "provide", line: 7 },
-          { name: "provide", line: 8 },
-        ]);
-        const deep = await session.calleesAt(file, 1, 10, { depth: "deep" });
-        expect(deep.kind).toBe("success");
-        if (deep.kind !== "success") return;
-        expect(
-          deep.data.callees.map(({ name, range }) => ({ name, line: range.startLine })),
-        ).toEqual([
+      const direct = await workspace.session.calleesAt(file, 1, 10, { depth: "direct" });
+      expect(direct.kind).toBe("success");
+      if (direct.kind !== "success") return;
+      expect(
+        direct.data.callees.map(({ name, range }) => ({ name, line: range.startLine })),
+      ).toEqual([
+        { name: "read", line: 3 },
+        { name: "read", line: 4 },
+        { name: "read", line: 5 },
+        { name: "import", line: 6 },
+        { name: "provide", line: 7 },
+        { name: "provide", line: 8 },
+      ]);
+      const deep = await workspace.session.calleesAt(file, 1, 10, { depth: "deep" });
+      expect(deep.kind).toBe("success");
+      if (deep.kind !== "success") return;
+      expect(deep.data.callees.map(({ name, range }) => ({ name, line: range.startLine }))).toEqual(
+        [
           { name: "read", line: 3 },
           { name: "read", line: 4 },
           { name: "read", line: 5 },
@@ -70,15 +58,13 @@ function assertValue(value: unknown): asserts value is import("types").Value { c
           { name: "provide", line: 8 },
           { name: "read", line: 10 },
           { name: "import", line: 11 },
-        ]);
-        for (const line of [14, 15]) {
-          const predicate = await session.calleesAt(file, line, 10, { depth: "direct" });
-          expect(predicate.kind).toBe("success");
-          if (predicate.kind !== "success") continue;
-          expect(predicate.data.callees.map(({ name }) => name)).toEqual(["check"]);
-        }
-      } finally {
-        await session.dispose();
+        ],
+      );
+      for (const line of [14, 15]) {
+        const predicate = await workspace.session.calleesAt(file, line, 10, { depth: "direct" });
+        expect(predicate.kind).toBe("success");
+        if (predicate.kind !== "success") continue;
+        expect(predicate.data.callees.map(({ name }) => name)).toEqual(["check"]);
       }
     },
   );
@@ -89,21 +75,16 @@ function assertValue(value: unknown): asserts value is import("types").Value { c
       ["def outer():", "    before()", "    callback = lambda: nested()", "    after()"].join("\n"),
     );
 
-    const session = createTreeSitterSession(tmpDir);
-    try {
-      const direct = await session.calleesAt("lambda.py", 1, 5, { depth: "direct" });
-      expect(direct.kind).toBe("success");
-      if (direct.kind === "success") {
-        expect(direct.data.callees.map(({ name }) => name)).toEqual(["before", "after"]);
-      }
+    const direct = await workspace.session.calleesAt("lambda.py", 1, 5, { depth: "direct" });
+    expect(direct.kind).toBe("success");
+    if (direct.kind === "success") {
+      expect(direct.data.callees.map(({ name }) => name)).toEqual(["before", "after"]);
+    }
 
-      const deep = await session.calleesAt("lambda.py", 1, 5, { depth: "deep" });
-      expect(deep.kind).toBe("success");
-      if (deep.kind === "success") {
-        expect(deep.data.callees.map(({ name }) => name)).toEqual(["before", "nested", "after"]);
-      }
-    } finally {
-      await session.dispose();
+    const deep = await workspace.session.calleesAt("lambda.py", 1, 5, { depth: "deep" });
+    expect(deep.kind).toBe("success");
+    if (deep.kind === "success") {
+      expect(deep.data.callees.map(({ name }) => name)).toEqual(["before", "nested", "after"]);
     }
   });
 
@@ -115,21 +96,16 @@ function assertValue(value: unknown): asserts value is import("types").Value { c
       ),
     );
 
-    const session = createTreeSitterSession(tmpDir);
-    try {
-      const direct = await session.calleesAt("closure.rs", 1, 5, { depth: "direct" });
-      expect(direct.kind).toBe("success");
-      if (direct.kind === "success") {
-        expect(direct.data.callees.map(({ name }) => name)).toEqual(["before", "after"]);
-      }
+    const direct = await workspace.session.calleesAt("closure.rs", 1, 5, { depth: "direct" });
+    expect(direct.kind).toBe("success");
+    if (direct.kind === "success") {
+      expect(direct.data.callees.map(({ name }) => name)).toEqual(["before", "after"]);
+    }
 
-      const deep = await session.calleesAt("closure.rs", 1, 5, { depth: "deep" });
-      expect(deep.kind).toBe("success");
-      if (deep.kind === "success") {
-        expect(deep.data.callees.map(({ name }) => name)).toEqual(["before", "nested", "after"]);
-      }
-    } finally {
-      await session.dispose();
+    const deep = await workspace.session.calleesAt("closure.rs", 1, 5, { depth: "deep" });
+    expect(deep.kind).toBe("success");
+    if (deep.kind === "success") {
+      expect(deep.data.callees.map(({ name }) => name)).toEqual(["before", "nested", "after"]);
     }
   });
 
@@ -146,21 +122,16 @@ function assertValue(value: unknown): asserts value is import("types").Value { c
       ].join("\n"),
     );
 
-    const session = createTreeSitterSession(tmpDir);
-    try {
-      const direct = await session.calleesAt("literal.go", 2, 5, { depth: "direct" });
-      expect(direct.kind).toBe("success");
-      if (direct.kind === "success") {
-        expect(direct.data.callees.map(({ name }) => name)).toEqual(["before", "after"]);
-      }
+    const direct = await workspace.session.calleesAt("literal.go", 2, 5, { depth: "direct" });
+    expect(direct.kind).toBe("success");
+    if (direct.kind === "success") {
+      expect(direct.data.callees.map(({ name }) => name)).toEqual(["before", "after"]);
+    }
 
-      const deep = await session.calleesAt("literal.go", 2, 5, { depth: "deep" });
-      expect(deep.kind).toBe("success");
-      if (deep.kind === "success") {
-        expect(deep.data.callees.map(({ name }) => name)).toEqual(["before", "nested", "after"]);
-      }
-    } finally {
-      await session.dispose();
+    const deep = await workspace.session.calleesAt("literal.go", 2, 5, { depth: "deep" });
+    expect(deep.kind).toBe("success");
+    if (deep.kind === "success") {
+      expect(deep.data.callees.map(({ name }) => name)).toEqual(["before", "nested", "after"]);
     }
   });
 
@@ -178,21 +149,16 @@ function assertValue(value: unknown): asserts value is import("types").Value { c
       ].join("\n"),
     );
 
-    const session = createTreeSitterSession(tmpDir);
-    try {
-      const direct = await session.calleesAt("lambda.java", 2, 8, { depth: "direct" });
-      expect(direct.kind).toBe("success");
-      if (direct.kind === "success") {
-        expect(direct.data.callees.map(({ name }) => name)).toEqual(["before", "after"]);
-      }
+    const direct = await workspace.session.calleesAt("lambda.java", 2, 8, { depth: "direct" });
+    expect(direct.kind).toBe("success");
+    if (direct.kind === "success") {
+      expect(direct.data.callees.map(({ name }) => name)).toEqual(["before", "after"]);
+    }
 
-      const deep = await session.calleesAt("lambda.java", 2, 8, { depth: "deep" });
-      expect(deep.kind).toBe("success");
-      if (deep.kind === "success") {
-        expect(deep.data.callees.map(({ name }) => name)).toEqual(["before", "callback", "after"]);
-      }
-    } finally {
-      await session.dispose();
+    const deep = await workspace.session.calleesAt("lambda.java", 2, 8, { depth: "deep" });
+    expect(deep.kind).toBe("success");
+    if (deep.kind === "success") {
+      expect(deep.data.callees.map(({ name }) => name)).toEqual(["before", "callback", "after"]);
     }
   });
 
@@ -210,30 +176,25 @@ function assertValue(value: unknown): asserts value is import("types").Value { c
       ].join("\n"),
     );
 
-    const session = createTreeSitterSession(tmpDir);
-    try {
-      const direct = await session.calleesAt("block.rb", 1, 5, { depth: "direct" });
-      expect(direct.kind).toBe("success");
-      if (direct.kind === "success") {
-        expect(direct.data.callees.map(({ name }) => name)).toEqual([
-          "before",
-          "items.each",
-          "after",
-        ]);
-      }
+    const direct = await workspace.session.calleesAt("block.rb", 1, 5, { depth: "direct" });
+    expect(direct.kind).toBe("success");
+    if (direct.kind === "success") {
+      expect(direct.data.callees.map(({ name }) => name)).toEqual([
+        "before",
+        "items.each",
+        "after",
+      ]);
+    }
 
-      const deep = await session.calleesAt("block.rb", 1, 5, { depth: "deep" });
-      expect(deep.kind).toBe("success");
-      if (deep.kind === "success") {
-        expect(deep.data.callees.map(({ name }) => name)).toEqual([
-          "before",
-          "items.each",
-          "nested",
-          "after",
-        ]);
-      }
-    } finally {
-      await session.dispose();
+    const deep = await workspace.session.calleesAt("block.rb", 1, 5, { depth: "deep" });
+    expect(deep.kind).toBe("success");
+    if (deep.kind === "success") {
+      expect(deep.data.callees.map(({ name }) => name)).toEqual([
+        "before",
+        "items.each",
+        "nested",
+        "after",
+      ]);
     }
   });
 
@@ -249,21 +210,16 @@ function assertValue(value: unknown): asserts value is import("types").Value { c
       ].join("\n"),
     );
 
-    const session = createTreeSitterSession(tmpDir);
-    try {
-      const direct = await session.calleesAt("lambda.cpp", 1, 5, { depth: "direct" });
-      expect(direct.kind).toBe("success");
-      if (direct.kind === "success") {
-        expect(direct.data.callees.map(({ name }) => name)).toEqual(["before", "after"]);
-      }
+    const direct = await workspace.session.calleesAt("lambda.cpp", 1, 5, { depth: "direct" });
+    expect(direct.kind).toBe("success");
+    if (direct.kind === "success") {
+      expect(direct.data.callees.map(({ name }) => name)).toEqual(["before", "after"]);
+    }
 
-      const deep = await session.calleesAt("lambda.cpp", 1, 5, { depth: "deep" });
-      expect(deep.kind).toBe("success");
-      if (deep.kind === "success") {
-        expect(deep.data.callees.map(({ name }) => name)).toEqual(["before", "nested", "after"]);
-      }
-    } finally {
-      await session.dispose();
+    const deep = await workspace.session.calleesAt("lambda.cpp", 1, 5, { depth: "deep" });
+    expect(deep.kind).toBe("success");
+    if (deep.kind === "success") {
+      expect(deep.data.callees.map(({ name }) => name)).toEqual(["before", "nested", "after"]);
     }
   });
 
@@ -280,26 +236,21 @@ function assertValue(value: unknown): asserts value is import("types").Value { c
       ].join("\n"),
     );
 
-    const session = createTreeSitterSession(tmpDir);
-    try {
-      const direct = await session.calleesAt("lambda.kt", 1, 5, { depth: "direct" });
-      expect(direct.kind).toBe("success");
-      if (direct.kind === "success") {
-        expect(direct.data.callees.map(({ name }) => name)).toEqual(["before", "after"]);
-      }
+    const direct = await workspace.session.calleesAt("lambda.kt", 1, 5, { depth: "direct" });
+    expect(direct.kind).toBe("success");
+    if (direct.kind === "success") {
+      expect(direct.data.callees.map(({ name }) => name)).toEqual(["before", "after"]);
+    }
 
-      const deep = await session.calleesAt("lambda.kt", 1, 5, { depth: "deep" });
-      expect(deep.kind).toBe("success");
-      if (deep.kind === "success") {
-        expect(deep.data.callees.map(({ name }) => name)).toEqual([
-          "before",
-          "nested",
-          "anonymousNested",
-          "after",
-        ]);
-      }
-    } finally {
-      await session.dispose();
+    const deep = await workspace.session.calleesAt("lambda.kt", 1, 5, { depth: "deep" });
+    expect(deep.kind).toBe("success");
+    if (deep.kind === "success") {
+      expect(deep.data.callees.map(({ name }) => name)).toEqual([
+        "before",
+        "nested",
+        "anonymousNested",
+        "after",
+      ]);
     }
   });
 
@@ -316,18 +267,13 @@ function assertValue(value: unknown): asserts value is import("types").Value { c
       ].join("\n"),
     );
 
-    const session = createTreeSitterSession(tmpDir);
-    try {
-      const result = await session.calleesAt("nested.ts", 2, 3);
-      expect(result.kind).toBe("success");
-      if (result.kind === "success") {
-        expect(result.data.enclosingScope.name).toBe("outer");
-        const names = result.data.callees.map(({ name }) => name);
-        expect(names).toContain("inner");
-        expect(names).not.toContain("deeplyNested");
-      }
-    } finally {
-      await session.dispose();
+    const result = await workspace.session.calleesAt("nested.ts", 2, 3);
+    expect(result.kind).toBe("success");
+    if (result.kind === "success") {
+      expect(result.data.enclosingScope.name).toBe("outer");
+      const names = result.data.callees.map(({ name }) => name);
+      expect(names).toContain("inner");
+      expect(names).not.toContain("deeplyNested");
     }
   });
 
@@ -337,21 +283,16 @@ function assertValue(value: unknown): asserts value is import("types").Value { c
       "function outer() { before(); const inner = () => nested(); after(); }\n",
     );
 
-    const session = createTreeSitterSession(tmpDir);
-    try {
-      const direct = await session.calleesAt("same-line.ts", 1, 10, { depth: "direct" });
-      expect(direct.kind).toBe("success");
-      if (direct.kind === "success") {
-        expect(direct.data.callees.map(({ name }) => name)).toEqual(["before", "after"]);
-      }
+    const direct = await workspace.session.calleesAt("same-line.ts", 1, 10, { depth: "direct" });
+    expect(direct.kind).toBe("success");
+    if (direct.kind === "success") {
+      expect(direct.data.callees.map(({ name }) => name)).toEqual(["before", "after"]);
+    }
 
-      const deep = await session.calleesAt("same-line.ts", 1, 10, { depth: "deep" });
-      expect(deep.kind).toBe("success");
-      if (deep.kind === "success") {
-        expect(deep.data.callees.map(({ name }) => name)).toEqual(["before", "nested", "after"]);
-      }
-    } finally {
-      await session.dispose();
+    const deep = await workspace.session.calleesAt("same-line.ts", 1, 10, { depth: "deep" });
+    expect(deep.kind).toBe("success");
+    if (deep.kind === "success") {
+      expect(deep.data.callees.map(({ name }) => name)).toEqual(["before", "nested", "after"]);
     }
   });
 });
