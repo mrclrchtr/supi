@@ -25,6 +25,8 @@ export interface CatalogItem {
   labels: string[];
   recommended: boolean;
   obsolete?: boolean;
+  /** Short user hint for the successor of an obsolete declaration. */
+  replacement?: string;
 }
 /** A row retains the source entry separately from the draft selections. */
 export interface MatrixRow {

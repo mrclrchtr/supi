@@ -1,4 +1,16 @@
+import { catalog } from "./catalog.mjs";
+import { skillsHint } from "./skills.mjs";
 import { sourceOf } from "./sources.mjs";
+
+/** Successor hints for obsolete declarations removed by these operations. @param {import('./types.ts').Operation[]} operations */
+function replacementLines(operations) {
+  const names = new Set(
+    operations.filter((operation) => operation.action === "remove").map(({ name }) => name),
+  );
+  return catalog
+    .filter((item) => item.replacement && names.has(item.name))
+    .map((item) => `  ${item.name}: ${item.replacement}`);
+}
 
 /** Keep settings and child output from sending terminal control sequences. @param {string} text */
 export function cleanLine(text) {
@@ -47,12 +59,18 @@ export function formatReview(matrix, operations) {
       (operation) => `${operation.action.toUpperCase()} ${operation.scope}: ${operation.source}`,
     ),
     ...(operations.length === 0 ? ["No changes. No package commands will run."] : []),
+    ...withHeading("Replacements for removed obsolete declarations:", replacementLines(operations)),
     "",
     "Clearing Project can expose a global declaration.",
     "Removal retains user data. Bundled behavior can remain available.",
     "Commands are independent. A failed destination install does NOT prevent source removal.",
     "A failed scope move can leave neither declaration. There is no automatic rollback.",
   ].map(cleanLine);
+}
+
+/** Prefix nonempty sections with a blank line and heading. @param {string} heading @param {string[]} lines */
+function withHeading(heading, lines) {
+  return lines.length === 0 ? [] : ["", heading, ...lines];
 }
 
 /** @param {import('./types.ts').ExecutionReport} report */
@@ -76,5 +94,12 @@ export function formatReport(report) {
   else lines.push("Final declarations could not be read. Inspect them with PI before retrying.");
   if (report.results.some((result) => result.status !== "unattempted"))
     lines.push("", "Run /reload or restart PI after package changes.");
+  const removed = report.results
+    .filter((result) => result.status === "success")
+    .map((result) => result.operation);
+  lines.push(
+    ...withHeading("Replacements for removed obsolete declarations:", replacementLines(removed)),
+  );
+  if (report.ok) lines.push("", ...skillsHint());
   return lines.map(cleanLine).join("\n");
 }

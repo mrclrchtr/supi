@@ -5,6 +5,7 @@ import { cleanLine, formatInventory, formatReport } from "./format.mjs";
 import { createContext, readInventory } from "./inventory.mjs";
 import { createMatrix } from "./matrix.mjs";
 import { createPiRunner, requirePi } from "./process.mjs";
+import { skillsHint } from "./skills.mjs";
 import { runTerminal } from "./ui/terminal.mjs";
 
 const HELP = `Usage: supi-installer [--project <path>] [--dry-run]
@@ -22,6 +23,8 @@ Open PI in that directory and use /trust before starting the installer.
 Arrows: select row/scope. Space: toggle. r/a/c: Recommended/All/Clear column.
 Enter: review. y: confirm in review. Escape: cancel.
 No unattended package changes are supported.
+
+${skillsHint().join("\n")}
 `;
 
 /** CLI boundary shared by the executable and terminal tests. @param {string[]} args @param {{input?: NodeJS.ReadStream, output?: NodeJS.WriteStream, error?: NodeJS.WriteStream, runner?: import('./types.ts').Runner, signal?: AbortSignal}} [options] */
@@ -62,7 +65,7 @@ export async function runCli(args, options = {}) {
       createPiRunner({ env: { ...process.env, PI_CODING_AGENT_DIR: context.agentDir } });
     await requirePi(runner, context.project, options.signal);
     if (values["dry-run"]) {
-      output.write(`${formatInventory(inventory).join("\n")}\n`);
+      output.write(`${[...formatInventory(inventory), "", ...skillsHint()].join("\n")}\n`);
       return 0;
     }
     return await runInteractive(inventory, { input, output, runner, signal: options.signal });
@@ -91,7 +94,7 @@ async function runInteractive(inventory, options) {
     return options.signal?.aborted ? 130 : 0;
   }
   if (plan.length === 0) {
-    output.write("No changes. No package commands ran.\n");
+    output.write(`No changes. No package commands ran.\n\n${skillsHint().join("\n")}\n`);
     return 0;
   }
   const report = await executePlan(inventory, plan, {

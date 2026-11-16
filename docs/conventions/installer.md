@@ -7,6 +7,7 @@ Status: implemented. See the [CLI README](../../packages/supi-installer/README.m
 - Provide a separate Node CLI, not a PI extension or a runtime meta-package.
 - Manage direct package declarations through PI package commands.
 - Do not manage effective resource activation, standalone skills, or user-data cleanup.
+- Point to SuPi-owned skills.sh skills with copyable `npx skills add mrclrchtr/supi -a pi [-g] --skill …` commands in `--help`, `--dry-run`, no-change exits, and successful reports. Do not run the skills CLI or detect installed skills. A unit test keeps the shipped skill names aligned with the `supi-skills` group in `.claude-plugin/marketplace.json`.
 - Use the terms [Installation Matrix and Installation Preset](../../GLOSSARY.md).
 - Keep declarations separate from activation; see [ADR 0025](../adr/0025-installation-matrix-declarations.md).
 
@@ -154,6 +155,7 @@ Infrastructure Packages are not new-install choices.
 - Treat `@mrclrchtr/supi` as a legacy root conflict, not a new-install or removal-only preset member.
 - Known obsolete standalone declarations include `@mrclrchtr/supi-agents`, `@mrclrchtr/supi-rtk`, `@mrclrchtr/supi-lsp`, `@mrclrchtr/supi-tree-sitter`, `@mrclrchtr/supi-bash-timeout` (merged into `supi-extras`), `@mrclrchtr/supi-cache` (merged into `supi-debug`), and `@mrclrchtr/supi-claude-md` (skills moved to the skills.sh catalog).
 - LSP and Tree-sitter remain current Infrastructure Packages. Only their obsolete direct installation declarations are cleanup choices; do not target bundled dependencies.
+- Each obsolete declaration names its replacement when one exists. The review lists replacements for planned removals; the report lists them for successful removals.
 - A removal-only cell is editable only where the declaration existed at startup. Users can clear it and undo that draft removal; they cannot add it to another scope.
 
 ## Plan, confirmation, and execution

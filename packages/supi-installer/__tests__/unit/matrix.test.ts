@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { catalog } from "../../src/catalog.mjs";
 import { createContext, readInventory } from "../../src/inventory.mjs";
 import { applyPreset, createMatrix, getPlan, toggleCell } from "../../src/matrix.mjs";
+import { supiSkills } from "../../src/skills.mjs";
 import { fixture, writeJson } from "../helpers/fixture.js";
 
 const CURRENT_PACKAGE_COUNT = catalog.filter((item) => !item.obsolete).length;
@@ -124,5 +125,20 @@ describe("Installation Matrix", () => {
         .sort((a, b) => a.localeCompare(b)),
     ).toEqual(names);
     expect(catalog.find((item) => item.name === "supi-core")).toBeUndefined();
+  });
+
+  it("ships the SuPi skill names from the skills.sh marketplace", () => {
+    const marketplace = JSON.parse(
+      readFileSync(new URL("../../../../.claude-plugin/marketplace.json", import.meta.url), "utf8"),
+    );
+    const plugin = marketplace.plugins.find(
+      (entry: { name: string }) => entry.name === "supi-skills",
+    );
+    const names = plugin.skills.map((path: string) => {
+      const skill = readFileSync(new URL(`../../../../${path}/SKILL.md`, import.meta.url), "utf8");
+      return /^name:\s*(\S+)/m.exec(skill)?.[1];
+    });
+    expect(supiSkills).toEqual(expect.arrayContaining(names));
+    expect(supiSkills).toHaveLength(names.length);
   });
 });

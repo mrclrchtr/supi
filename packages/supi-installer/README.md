@@ -65,6 +65,17 @@ Recommended contains the eight release-stack packages. All also includes beta pa
 
 Run `/reload` or restart PI after package changes.
 
+## Agent skills
+
+SuPi also publishes agent skills through [skills.sh](https://skills.sh). The installer does not manage them; it prints these commands in `--help`, `--dry-run`, and after a successful run:
+
+```sh
+npx skills add mrclrchtr/supi -a pi --skill claude-md-improver claude-md-revision commit     # Project
+npx skills add mrclrchtr/supi -a pi -g --skill claude-md-improver claude-md-revision commit  # Global
+```
+
+Use `supi-skills` to control installed skills. When the review removes an obsolete declaration, it names its replacement, for example the skills that replaced `supi-claude-md`.
+
 ## Read-only inventory
 
 ```sh
