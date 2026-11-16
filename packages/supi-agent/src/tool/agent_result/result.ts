@@ -56,6 +56,19 @@ export interface CompletionNoticeDetails {
   tasks: CompletionNoticeTask[];
 }
 
+/**
+ * Read the fields that context filtering needs from stored notice details. Returns `undefined`
+ * for malformed or foreign details, which the caller treats as a stale notice.
+ */
+export function readCompletionNoticeTarget(
+  details: unknown,
+): Pick<CompletionNoticeDetails, "batchId" | "taskIds"> | undefined {
+  if (!details || typeof details !== "object") return undefined;
+  const { batchId, taskIds } = details as Partial<Record<keyof CompletionNoticeDetails, unknown>>;
+  if (typeof batchId !== "string" || !Array.isArray(taskIds)) return undefined;
+  return { batchId, taskIds: taskIds.filter((id): id is string => typeof id === "string") };
+}
+
 /** Build a completion notice whose model-facing content excludes task output and Usage. */
 export function buildCompletionNotice(batchId: string, tasks: readonly BatchTaskResult[]) {
   const details: CompletionNoticeDetails = {

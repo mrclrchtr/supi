@@ -5,6 +5,7 @@ import type { AgentRunRegistry } from "@mrclrchtr/supi-agent-runtime/api";
 import { recordDebugEvent } from "@mrclrchtr/supi-core/debug";
 import { isReadOnlyCapabilitySet } from "../capabilities.ts";
 import { loadAgentConfig } from "../config.ts";
+import { readCompletionNoticeTarget } from "../tool/agent_result/result.ts";
 import { preflightDelegationBatch } from "../tool/agent_run/batch-preflight.ts";
 import { startDelegationBatchWithAuxiliaryModels } from "../tool/agent_run/batch-runner.ts";
 import type {
@@ -237,9 +238,9 @@ export class DelegationController {
 
   /** Omit stale notices at delivery, using successful collections on the raw active branch. */
   noticeVisible(details: unknown, ctx: ExtensionContext): boolean {
-    if (this.#closed || !details || typeof details !== "object") return false;
-    const { batchId, taskIds } = details as { batchId?: unknown; taskIds?: unknown };
-    if (typeof batchId !== "string" || !Array.isArray(taskIds)) return false;
+    const target = this.#closed ? undefined : readCompletionNoticeTarget(details);
+    if (!target) return false;
+    const { batchId, taskIds } = target;
     this.#manager = ctx.sessionManager;
     const batch = this.#batches.get(batchId);
     if (!batch || !this.#onBranch(batch)) return false;
