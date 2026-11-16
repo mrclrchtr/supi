@@ -1,6 +1,7 @@
 ---
 name: session-analytics
-description: Measure tool usage, tool failures, and persisted debug-log volume across past Pi session files. Use when the user asks how often a tool was called or available, which tools go unused, how agents react after a failing call (timeouts, errors), or which debug sources bloat session files, instead of writing ad-hoc scripts or grep pipelines over session JSONL. Not for retrospective assessments (use gather-retrospectives) or the current session's debug events (use the debug tool).
+description: Measure tool usage, tool failures with their follow-up calls, and persisted debug-log volume across past Pi session files by exporting normalized JSONL and aggregating it in a script.
+disable-model-invocation: true
 compatibility: Requires Node.js and shell access to local Pi session files.
 ---
 
