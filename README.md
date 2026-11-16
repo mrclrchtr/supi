@@ -39,7 +39,7 @@ Tree-sitter support is bundled. Full LSP features require the matching language-
 - **Operational awareness** — inspect context pressure, cache history and forensics, and SuPi debug events with `supi-context` and `supi-debug`. PI owns live cache statistics and cache-miss notices.
 - **Repository guidance** — maintain `CLAUDE.md` and `AGENTS.md` files with the `claude-md-improver` and `claude-md-revision` skills: `npx skills add mrclrchtr/supi --skill claude-md-improver claude-md-revision`.
 - **Skills on your terms** — use [`supi-skills`](packages/supi-skills/README.md) to choose, globally or per project, whether Pi can select each skill automatically, whether only you can start it, or whether it is disabled. Type `$` to search and start installed skills without remembering their full command names.
-- **Session polish** — use [`supi-extras`](packages/supi-extras/README.md) to choose session-only tool visibility and, with `supi-skills`, skill visibility. It also adds prompt stashing, activity indicators, shortcuts, and a default `bash` timeout.
+- **Session polish** — use [`supi-extras`](packages/supi-extras/README.md) to choose session-only tool visibility and, with `supi-skills`, skill visibility. It also adds compact `codemode` rows that list every nested tool call, prompt stashing, activity indicators, shortcuts, and a default `bash` timeout.
 
 ## Install
 
@@ -93,7 +93,7 @@ pi install npm:@mrclrchtr/supi-web
 | [`supi-context`](packages/supi-context/README.md) | Context-pressure snapshots and detailed TUI usage reports | `pi install npm:@mrclrchtr/supi-context` |
 | [`supi-settings`](packages/supi-settings/README.md) | One project/global settings UI for SuPi packages | `pi install npm:@mrclrchtr/supi-settings` |
 | [`supi-skills`](packages/supi-skills/README.md) | Scoped skill controls and `$skill-name` input shortcuts | `pi install npm:@mrclrchtr/supi-skills` |
-| [`supi-extras`](packages/supi-extras/README.md) | Session capability controls, prompt stash, shortcuts, activity indicators, and default bash timeouts | `pi install npm:@mrclrchtr/supi-extras` |
+| [`supi-extras`](packages/supi-extras/README.md) | Compact codemode rows, session capability controls, prompt stash, shortcuts, activity indicators, and default bash timeouts | `pi install npm:@mrclrchtr/supi-extras` |
 | [`supi-prompt-suggestions`](packages/supi-prompt-suggestions/README.md) | Advisory ghost-text suggestions from a model you choose | `pi install npm:@mrclrchtr/supi-prompt-suggestions` |
 
 ### Adapted skills

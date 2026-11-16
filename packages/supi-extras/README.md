@@ -10,6 +10,12 @@
 
 Adds a bundle of small quality-of-life features to the [pi coding agent](https://github.com/earendil-works/pi).
 
+- **Compact codemode rows** — see every nested tool call of a `codemode` script at a glance instead of a wall of code.
+- **Session capabilities** — choose extension tools and model-visible skills per session, with reusable profiles.
+- **Prompt stash** — save, restore, and copy prompt drafts across restarts.
+- **Footer and activity** — Git status, cache-hit rate, context usage, and a tab-title spinner.
+- **Safe defaults** — headless git editors and a default `bash` timeout.
+
 ## Install
 
 ```bash
@@ -116,6 +122,10 @@ Configure the footer under `/supi-settings` → **Footer**:
 `auto` cannot detect the terminal font. It uses Nerd Font icons on a local UTF-8 terminal, Unicode symbols over SSH, and ASCII otherwise. If icons render as boxes, choose `unicode`. `ascii` keeps the former `path (branch)` layout.
 
 ### Compact codemode rows
+
+![Compact codemode row with nested calls](https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-extras-codemode.png)
+
+One codemode script can chain many tool calls. The compact row shows what the script did, not just its source: in the example above, a 23-line health check ran 8 calls in 1.7 s. Each `code_health`, `code_resolve`, and `bash` call has its own line with its status and duration, followed by the script's one-line result.
 
 Pi's `codemode` tool (including wrappers that keep its `code` input) shows a compact row while collapsed: the script's first line, every nested call, a status line with duration, call count, failures, and model cost, and the first output line. Expand tool output (`ctrl+o` by default) to see Pi's full view with the script and output. Nested calls show their key argument (for example a path, command, or code-intelligence query), the error of failed calls, and durations of 100 ms or more.
 
