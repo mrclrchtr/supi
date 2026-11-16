@@ -10,7 +10,7 @@
 
 Adds a bundle of small quality-of-life features to the [pi coding agent](https://github.com/earendil-works/pi).
 
-- **Compact codemode rows** — see every nested tool call of a `codemode` script at a glance instead of a wall of code.
+- **Compact codemode rows** — see the nested tool calls of a `codemode` script at a glance instead of a wall of code.
 - **Session capabilities** — choose extension tools and model-visible skills per session, with reusable profiles.
 - **Prompt stash** — save, restore, and copy prompt drafts across restarts.
 - **Footer and activity** — Git status, cache-hit rate, context usage, and a tab-title spinner.
@@ -125,9 +125,9 @@ Configure the footer under `/supi-settings` → **Footer**:
 
 ![Compact codemode row with nested calls](https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-extras-codemode.png)
 
-One codemode script can chain many tool calls. The compact row shows what the script did, not just its source: in the example above, a 23-line health check ran 8 calls in 1.7 s. Each `code_health`, `code_resolve`, and `bash` call has its own line with its status and duration, followed by the script's one-line result.
+One codemode script can chain many tool calls. The compact row shows what the script did, not just its source: in the example above, a 13-line health check ran 7 calls in 1.3 s. Its leading comment becomes the headline, each `code_health`, `code_resolve`, and `bash` call has its own line with its key argument, status, and duration, and the script's one-line result closes the row.
 
-Pi's `codemode` tool (including wrappers that keep its `code` input) shows a compact row while collapsed: the script's first line, every nested call, a status line with duration, call count, failures, and model cost, and the first output line. Expand tool output (`ctrl+o` by default) to see Pi's full view with the script and output. Nested calls show their key argument (for example a path, command, or code-intelligence query), the error of failed calls, and durations of 100 ms or more.
+Pi's `codemode` tool (including wrappers that keep its `code` input) shows a compact row while collapsed: the script's first line (a leading `//` comment appears as plain text, so start scripts with one that states their purpose), its nested calls, a status line with duration, call count, failures, and model cost, and the first output line. Expand tool output (`ctrl+o` by default) to see Pi's full view with the script and output. Nested calls show their key argument (for example a path, command, or code-intelligence query), the error of failed calls, and durations of 100 ms or more. Consecutive identical calls merge into one row with a count (`×5`) and their summed duration. Long scripts show at most 8 call rows: running and failed calls stay visible, the latest other calls fill the rest, and one `… N more calls` row stands in for the hidden ones.
 
 Turn compact rows off under `/supi-settings` → **Codemode View**; the change applies to new rows and to rows rebuilt on `/reload`.
 

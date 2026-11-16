@@ -1,10 +1,8 @@
 import type { ToolRenderers } from "@earendil-works/pi-coding-agent";
 import { createMarkedTheme, createPiMock } from "@mrclrchtr/supi-test-utils";
 import { describe, expect, it, vi } from "vitest";
-import codemodeCompact, {
-  callDetail,
-  createCodemodeCompactRenderers,
-} from "../../src/codemode-compact.ts";
+import { callDetail } from "../../src/codemode-call-detail.ts";
+import codemodeCompact, { createCodemodeCompactRenderers } from "../../src/codemode-compact.ts";
 
 type RenderResult = NonNullable<ToolRenderers["renderResult"]>;
 type RenderContext = Parameters<RenderResult>[3];
@@ -73,6 +71,16 @@ describe("codemode compact renderer", () => {
     ]);
   });
 
+  it("shows a leading comment as the script's purpose without comment markers", () => {
+    const { renderers } = setup();
+    const render = (code: string) => renderers.renderCall?.({ code }, theme, context()).render(200);
+    expect(render("// Check diagnostics\nreturn 1;")).toEqual([
+      "[toolTitle][bold]codemode[/bold][/toolTitle][dim] · 2 lines[/dim]  [text]Check diagnostics[/text]",
+    ]);
+    expect(render("/** Outline files */\nreturn 1;")?.[0]).toContain("[text]Outline files[/text]");
+    expect(render("//\nreturn 1;")?.[0]).toContain("[muted]//[/muted]");
+  });
+
   it("lists every call, the status, and the first output line", () => {
     const { renderers } = setup();
     const lines = renderers
@@ -85,6 +93,38 @@ describe("codemode compact renderer", () => {
       "  [success]✓[/success] [toolTitle]read[/toolTitle] [muted]b.ts[/muted]",
       "[warning]Done[/warning][dim] · 2.4s · 4 calls · 1 failed · $0.0040[/dim]",
       "  [toolOutput]first line[/toolOutput][dim] (+1 line, ctrl+o)[/dim]",
+    ]);
+  });
+
+  it("merges repeated calls and caps long call lists, keeping failures", () => {
+    const { renderers } = setup();
+    const sleep = { name: "bash", args: '{"command":"sleep 1"}', status: "ok", durationMs: 1000 };
+    const many = [
+      { name: "read", args: '{"path":"fail.ts"}', status: "error", error: "missing" },
+      ...Array.from({ length: 12 }, (_, i) => [
+        { name: "read", args: `{"path":"f${i}.ts"}`, status: "ok" },
+        sleep,
+        sleep,
+      ]).flat(),
+    ];
+    const lines = renderers
+      .renderResult?.(
+        { content: [], details: { calls: many } } as never,
+        { expanded: false, isPartial: false },
+        theme,
+        context(),
+      )
+      .render(200);
+    expect(lines).toEqual([
+      "  [error]✗[/error] [toolTitle]read[/toolTitle] [muted]fail.ts[/muted] [error]missing[/error]",
+      "  [dim]… 27 more calls (ctrl+o)[/dim]",
+      "  [success]✓[/success] [toolTitle]read[/toolTitle] [muted]f9.ts[/muted]",
+      "  [success]✓[/success] [toolTitle]bash[/toolTitle] [muted]sleep 1[/muted][dim] ×2[/dim][dim] 2.0s[/dim]",
+      "  [success]✓[/success] [toolTitle]read[/toolTitle] [muted]f10.ts[/muted]",
+      "  [success]✓[/success] [toolTitle]bash[/toolTitle] [muted]sleep 1[/muted][dim] ×2[/dim][dim] 2.0s[/dim]",
+      "  [success]✓[/success] [toolTitle]read[/toolTitle] [muted]f11.ts[/muted]",
+      "  [success]✓[/success] [toolTitle]bash[/toolTitle] [muted]sleep 1[/muted][dim] ×2[/dim][dim] 2.0s[/dim]",
+      "[warning]Done[/warning][dim] · 2.4s · 37 calls · 1 failed[/dim]",
     ]);
   });
 
@@ -134,6 +174,8 @@ describe("callDetail", () => {
     expect(callDetail('{"anchor":{"file":"a.ts","line":4,"character":2}}', "code_inspect")).toBe(
       "a.ts:4",
     );
+    expect(callDetail('{"scope":"src","refresh":true}', "code_health")).toBe("src");
+    expect(callDetail('{"include":["servers"]}', "code_health")).toBe("workspace");
   });
 
   it("falls back to raw args when the JSON was truncated", () => {

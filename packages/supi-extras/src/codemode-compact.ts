@@ -1,8 +1,9 @@
 /**
  * Compact rows for Pi's `codemode` tool.
  *
- * Collapsed rows show one script summary line, every nested call, one
- * status line, and the first output line. Expanded rows (app.tools.expand)
+ * Collapsed rows show one script summary line, up to `MAX_CALL_ROWS` nested
+ * call rows (repeats merged, failures kept), one status line, and the first
+ * output line. Expanded rows (app.tools.expand)
  * hand off to Pi's own renderer so nothing is hidden. Only a `codemode` tool
  * with Pi's `{ code: string }` input is affected; other tools keep their renderer.
  */
@@ -13,6 +14,7 @@ import type {
   ToolRenderers,
 } from "@earendil-works/pi-coding-agent";
 import { type Component, truncateToWidth } from "@earendil-works/pi-tui";
+import { callDetail, text } from "./codemode-call-detail.ts";
 import {
   CODEMODE_VIEW_DEFAULTS,
   loadCodemodeViewConfig,
@@ -48,7 +50,8 @@ interface CompactState {
 
 /** Shorter nested calls omit their duration to keep rows calm. */
 const MIN_SHOWN_CALL_MS = 100;
-const ARG_KEYS = ["path", "file", "command", "query", "pattern", "url"] as const;
+/** Collapsed rows show at most this many call lines, including the hidden-calls line. */
+const MAX_CALL_ROWS = 8;
 const SCRIPT_HEADER = /^Script (?:completed|failed)\r?\nWall time [\d.]+ seconds\r?\nOutput:\r?\n$/;
 const OUTPUT_MARKER = /^(?:==> text \d+\/\d+ <==|<\/?console_output>)$/;
 
@@ -137,7 +140,7 @@ export function createCodemodeCompactRenderers(native: ToolRenderers): ToolRende
       const calls = nestedCalls(result.details);
       const elapsed = elapsedText(state, partial, context);
       return new Lines(() => [
-        ...callRows(calls, theme, context.cwd),
+        ...callRows(calls, theme, context.cwd, context.keyText("app.tools.expand")),
         statusLine({ calls, partial, isError: context.isError, elapsed }, theme),
         ...(partial ? [] : outputLine(result, context, theme)),
       ]);
@@ -152,7 +155,17 @@ function scriptLine(code: string, theme: Theme): string {
   const lines = code.replace(/\r/g, "").trimEnd().split("\n");
   const first = lines.find((line) => line.trim() && !line.trim().startsWith("// @options"));
   const count = code.trim() ? theme.fg("dim", ` · ${lines.length} lines`) : "";
-  return first ? `${title}${count}  ${theme.fg("muted", first.trim())}` : title + count;
+  if (!first) return title + count;
+  const purpose = commentText(first);
+  // A leading comment states the script's purpose; show it as prose, not code.
+  const summary = purpose ? theme.fg("text", purpose) : theme.fg("muted", first.trim());
+  return `${title}${count}  ${summary}`;
+}
+
+/** Text of a `//`, `/*`, or `/**` comment line without its markers; undefined for code. */
+function commentText(line: string): string | undefined {
+  const match = /^\s*(?:\/\/+|\/\*+)\s*(.*?)\s*(?:\*+\/)?\s*$/.exec(line);
+  return match?.[1] || undefined;
 }
 
 // ---- nested calls ----
@@ -171,76 +184,6 @@ export function nestedCalls(details: unknown): NestedCall[] {
   );
 }
 
-type Args = Record<string, unknown>;
-
-const text = (value: unknown): string | undefined =>
-  typeof value === "string" && value ? value.split("\n")[0] : undefined;
-
-/** `file:line` for a code-intelligence anchor. */
-const anchor = (value: unknown): string | undefined => {
-  const { file, line } = (value ?? {}) as Args;
-  return text(file) && (typeof line === "number" ? `${file}:${line}` : text(file));
-};
-
-/** Code-intelligence target: anchor, symbol query, file, or handle. */
-const target = (value: unknown): string | undefined => {
-  const t = (value ?? {}) as Args;
-  return (
-    anchor(t.anchor) ??
-    text((t.symbol as Args | undefined)?.query) ??
-    text(t.file) ??
-    text(t.handle)
-  );
-};
-
-/** Detail extractors for tools whose key argument is nested or ambiguous. */
-const TOOL_DETAILS: Record<string, (args: Args) => string | undefined> = {
-  code_resolve: (args) => target(args.target),
-  code_graph: (args) => target(args.target),
-  code_inspect: (args) => anchor(args.anchor),
-  code_orientation: (args) => {
-    const focus = (args.focus ?? {}) as Args;
-    return text(focus.path) ?? text(focus.module) ?? target(focus.target);
-  },
-  code_find: (args) => {
-    const search = (args.search ?? {}) as Args;
-    return (
-      text((search.semantic as Args | undefined)?.query) ??
-      text((search.ast as Args | undefined)?.query)
-    );
-  },
-};
-
-/** The most telling argument: a path, command, or query; otherwise the raw JSON. */
-export function callDetail(args: string, toolName = ""): string {
-  try {
-    const parsed: unknown = JSON.parse(args);
-    if (typeof parsed === "object" && parsed !== null) {
-      const found = TOOL_DETAILS[toolName]?.(parsed as Args) ?? findDetail(parsed, 3);
-      if (found) return found;
-    }
-  } catch {
-    // Pi truncates long argument JSON for display.
-  }
-  return args;
-}
-
-/** First known key with a string value, searching nested objects up to `depth` levels. */
-function findDetail(value: unknown, depth: number): string | undefined {
-  if (typeof value !== "object" || value === null) return undefined;
-  const record = value as Args;
-  for (const key of ARG_KEYS) {
-    const found = text(record[key]);
-    if (found) return found;
-  }
-  if (depth <= 1) return undefined;
-  for (const nested of Object.values(record)) {
-    const found = findDetail(nested, depth - 1);
-    if (found) return found;
-  }
-  return undefined;
-}
-
 const STATUS_ICON: Record<NestedStatus, [ThemeColor, string]> = {
   running: ["warning", "…"],
   ok: ["success", "✓"],
@@ -253,17 +196,88 @@ function relativeError(error: string | undefined, cwd: string): string | undefin
   return cwd ? error?.split(`${cwd}/`).join("") : error;
 }
 
-function callRows(calls: NestedCall[], theme: Theme, cwd: string): string[] {
-  return calls.map((call) => {
-    const [color, icon] = STATUS_ICON[call.status];
-    const duration =
-      call.durationMs === undefined || call.durationMs < MIN_SHOWN_CALL_MS
-        ? ""
-        : theme.fg("dim", ` ${formatDuration(call.durationMs)}`);
+/** Consecutive calls with the same tool, detail, status, and error, shown as one row. */
+export interface CallGroup {
+  name: string;
+  detail: string;
+  status: NestedStatus;
+  error?: string;
+  count: number;
+  durationMs?: number;
+}
+
+/** Merge consecutive identical calls; order is preserved and durations are summed. */
+export function groupCalls(calls: NestedCall[], cwd = ""): CallGroup[] {
+  const groups: CallGroup[] = [];
+  for (const call of calls) {
+    const detail = callDetail(call.args, call.name);
     const error = call.status === "error" ? relativeError(text(call.error), cwd) : undefined;
-    const row = `  ${theme.fg(color, icon)} ${theme.fg("toolTitle", call.name)} ${theme.fg("muted", callDetail(call.args, call.name))}${duration}`;
-    return error ? `${row} ${theme.fg("error", error)}` : row;
+    const last = groups.at(-1);
+    if (
+      last &&
+      last.name === call.name &&
+      last.detail === detail &&
+      last.status === call.status &&
+      last.error === error
+    ) {
+      last.count += 1;
+      if (call.durationMs !== undefined) last.durationMs = (last.durationMs ?? 0) + call.durationMs;
+      continue;
+    }
+    groups.push({
+      name: call.name,
+      detail,
+      status: call.status,
+      error,
+      count: 1,
+      durationMs: call.durationMs,
+    });
+  }
+  return groups;
+}
+
+/**
+ * Choose which groups fit in `MAX_CALL_ROWS`, reserving one row for the
+ * hidden-calls line. Running groups win first, then failed and cancelled ones;
+ * the remaining rows go to the latest successful groups.
+ */
+export function visibleGroups(groups: CallGroup[]): Set<number> {
+  const all = groups.map((_, index) => index);
+  if (groups.length <= MAX_CALL_ROWS) return new Set(all);
+  const budget = MAX_CALL_ROWS - 1;
+  const withStatus = (match: (status: NestedStatus) => boolean) =>
+    all.filter((index) => match((groups[index] as CallGroup).status));
+  const notable = [
+    ...withStatus((status) => status === "running"),
+    ...withStatus((status) => status === "error" || status === "cancelled"),
+  ].slice(0, budget);
+  const remaining = budget - notable.length;
+  const ok = withStatus((status) => status === "ok");
+  return new Set([...notable, ...(remaining > 0 ? ok.slice(-remaining) : [])]);
+}
+
+function callRows(calls: NestedCall[], theme: Theme, cwd: string, expandKey: string): string[] {
+  const groups = groupCalls(calls, cwd);
+  const kept = visibleGroups(groups);
+  const hidden = groups.reduce((sum, group, index) => sum + (kept.has(index) ? 0 : group.count), 0);
+  const marker = `  ${theme.fg("dim", `… ${hidden} more ${hidden === 1 ? "call" : "calls"} (${expandKey})`)}`;
+  // One marker in place of the first hidden group keeps the shown calls in order.
+  const firstHidden = groups.findIndex((_, index) => !kept.has(index));
+  return groups.flatMap((group, index) => {
+    if (kept.has(index)) return [groupRow(group, theme)];
+    return index === firstHidden ? [marker] : [];
   });
+}
+
+function groupRow(group: CallGroup, theme: Theme): string {
+  const [color, icon] = STATUS_ICON[group.status];
+  const count = group.count > 1 ? theme.fg("dim", ` ×${group.count}`) : "";
+  const duration =
+    group.durationMs === undefined || group.durationMs < MIN_SHOWN_CALL_MS
+      ? ""
+      : theme.fg("dim", ` ${formatDuration(group.durationMs)}`);
+  const row = `  ${theme.fg(color, icon)} ${theme.fg("toolTitle", group.name)} ${theme.fg("muted", group.detail)}${count}${duration}`;
+  return group.error ? `${row} ${theme.fg("error", group.error)}` : row;
 }
 
 // ---- status line ----
