@@ -110,7 +110,12 @@ function collectTrackedFileDiagnostics(
     const sourceEvidence = refreshReport
       ? withRefreshRemovals(snapshot.evidence, refreshEvidence, cwd)
       : mergeEvidence(refreshEvidence, snapshot.evidence, cwd);
-    const scopedEvidence = selectTrackedFileEvidence(sourceEvidence, scope.filter, cwd);
+    const retainedEvidence = withRetainedRemovals(
+      sourceEvidence,
+      service.peekRemovedTrackedFiles(scope.filter),
+      cwd,
+    );
+    const scopedEvidence = selectTrackedFileEvidence(retainedEvidence, scope.filter, cwd);
     const evidence = ensureEvidenceCoversEntries(scopedEvidence, snapshot.entries, cwd);
     return evidenceIsComplete(evidence, snapshot.entries.length > 0, snapshot.current)
       ? { kind: "completed", scope, entries: snapshot.entries, evidence }
@@ -274,6 +279,37 @@ function withRefreshRemovals(
     removed: reportEvidence.removed + added.length,
     documents: [...reportEvidence.documents, ...added],
   };
+}
+
+/**
+ * Add tracked files that the runtime retained as removed since a report last showed them.
+ *
+ * Passive reads and background server refreshes clear deleted files from the live snapshot, so
+ * the retained record is what keeps a removal visible until a report delivers it (#606).
+ */
+function withRetainedRemovals(
+  evidence: DiagnosticEvidenceSummary,
+  removedFiles: readonly string[],
+  cwd: string,
+): DiagnosticEvidenceSummary {
+  if (removedFiles.length === 0) return evidence;
+  const reported = new Set(evidence.documents.map((document) => resolve(cwd, document.file)));
+  const added = removedFiles
+    .filter((file) => !reported.has(resolve(cwd, file)))
+    .map((file) => ({ file: relative(cwd, resolve(cwd, file)), status: "removed" as const }));
+  if (added.length === 0) return evidence;
+  return summarizeEvidence([...evidence.documents, ...added]);
+}
+
+/** Return absolute paths of files an observation reported as removed. */
+export function reportedRemovedFiles(
+  observation: HealthDiagnosticObservation,
+  cwd: string,
+): string[] {
+  if (observation.kind === "not-requested") return [];
+  return observation.evidence.documents
+    .filter((document) => document.status === "removed")
+    .map((document) => resolve(cwd, document.file));
 }
 
 function selectTrackedFileEvidence(

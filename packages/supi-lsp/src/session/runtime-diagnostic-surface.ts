@@ -40,6 +40,17 @@ export interface WorkspaceLspDiagnosticSurface {
   getOutstandingDiagnosticSummary(
     maxSeverity?: number,
   ): WorkspaceDiagnosticSnapshot<OutstandingDiagnosticSummaryEntry>;
+  /**
+   * Return absolute paths of tracked files removed from disk within `scope`
+   * since a report last showed them.
+   *
+   * The read does not consume removals. Passive snapshots and background
+   * refreshes leave them in place, so a later report can still show them
+   * regardless of timing. Recreated files are dropped.
+   */
+  peekRemovedTrackedFiles(scope?: string | null): readonly string[];
+  /** Forget removals after a delivered diagnostic report has shown them. */
+  acknowledgeRemovedTrackedFiles(files: readonly string[]): void;
   /** Run best-effort recovery and retain final diagnostic evidence, including failures. */
   recoverDiagnostics(options?: {
     restartIfStillStale?: boolean;

@@ -59,6 +59,8 @@ function mockReadyLsp(
     getProjectServers: ReturnType<typeof vi.fn>;
     waitUntilReadyForFile: ReturnType<typeof vi.fn>;
     getWorkspaceDiagnosticSummary: ReturnType<typeof vi.fn>;
+    peekRemovedTrackedFiles: () => readonly string[];
+    acknowledgeRemovedTrackedFiles: (files: readonly string[]) => void;
     fileDiagnostics: ReturnType<typeof vi.fn>;
     recoverDiagnostics: ReturnType<typeof vi.fn>;
     pruneMissingFiles: ReturnType<typeof vi.fn>;
@@ -73,6 +75,8 @@ function mockReadyLsp(
   }> = {},
 ) {
   const runtime = {
+    peekRemovedTrackedFiles: () => [],
+    acknowledgeRemovedTrackedFiles: () => {},
     getOutstandingDiagnostics: vi.fn().mockReturnValue({
       entries: [],
       current: true,
@@ -508,6 +512,64 @@ describe("code_health tool", () => {
     expect(result.content[0].text).toContain("src/new.ts");
     expect(result.content[0].text).toContain("2 requested, 2 confirmed");
     expect(runtime.getWorkspaceDiagnosticSummary).not.toHaveBeenCalled();
+  });
+
+  it("reports a retained tracked-file removal until a refresh delivers it once", async () => {
+    // Regression for #606: a passive read or background server refresh had
+    // already cleared the deleted file, so the refresh reported clean.
+    registerMockProvider(tmpDir);
+    mkdirSync(path.join(tmpDir, "src"));
+    const removed = new Set([path.join(tmpDir, "src", "gone.ts")]);
+    const evidence = {
+      requested: 1,
+      confirmed: 1,
+      unconfirmed: 0,
+      failed: 0,
+      removed: 0,
+      documents: [{ file: "src/keep.ts", status: "confirmed" as const }],
+    };
+    const report = {
+      summary: { entries: [], current: true, evidence },
+      outstanding: { entries: [], current: true, evidence },
+    };
+    const runtime = mockReadyLsp({
+      getWorkspaceDiagnosticSummary: vi.fn().mockReturnValue(report.summary),
+      refreshOpenDiagnostics: vi.fn().mockResolvedValue(evidence),
+      recoverDiagnostics: vi.fn().mockResolvedValue({
+        attemptedClients: 1,
+        restartedClients: 0,
+        diagnosticEvidence: evidence,
+        diagnosticReport: report,
+        staleAssessment: { suspected: false, matchedFiles: [], warning: null },
+      }),
+      peekRemovedTrackedFiles: () => [...removed],
+      acknowledgeRemovedTrackedFiles: (files) => {
+        for (const file of files) removed.delete(file);
+      },
+    });
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const run = async (refresh: boolean) =>
+      (
+        (await getTool(pi, "code_health").execute(
+          "test-retained-removal",
+          { include: ["diagnostics"], scope: "src", refresh },
+          undefined,
+          undefined,
+          makeCtx({ cwd: tmpDir }),
+        )) as { content: Array<{ text: string }> }
+      ).content[0].text;
+
+    // A passive call shows the removal but does not consume it.
+    expect(await run(false)).toContain("Removed since last tracked: `src/gone.ts`");
+    const refreshed = await run(true);
+    expect(refreshed).toContain("2 requested, 1 confirmed, 0 unconfirmed, 0 failed, 1 removed");
+    expect(refreshed).toContain("Removed since last tracked: `src/gone.ts`");
+    expect(runtime.recoverDiagnostics).toHaveBeenCalled();
+
+    const next = await run(true);
+    expect(next).not.toContain("Removed since last tracked");
+    expect(next).toContain("No errors or warnings in 1 confirmed tracked file");
   });
 
   it("preserves an explicitly empty include list instead of applying defaults", async () => {

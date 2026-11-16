@@ -576,6 +576,8 @@ export class LspClient {
     readonly cwd?: string,
     /** Immutable workspace association snapshot for document language IDs. */
     fileAssociations?: CFamilyFileAssociationResolver,
+    /** Observer for tracked files cleared because they no longer exist. */
+    onTrackedFileRemoved?: (filePath: string) => void,
   ) {
     this.name = name;
     this.root = root;
@@ -618,6 +620,7 @@ export class LspClient {
         if (!this.shouldSendDocumentNotification(method)) return;
         if (this.rpc) void this.rpc.sendNotification(method, params);
       },
+      onTrackedFileRemoved,
     });
   }
 

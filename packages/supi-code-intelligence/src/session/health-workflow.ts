@@ -18,6 +18,7 @@ import {
   collectDiagnostics,
   diagnosticScope,
   isScopedFile,
+  reportedRemovedFiles,
 } from "../analysis/health/diagnostics.ts";
 import { describeStructuralState } from "../analysis/health/recovery.ts";
 import { deriveWorkspaceSemanticHealthState } from "../analysis/health/semantic-state.ts";
@@ -143,6 +144,11 @@ export async function runHealthWorkflow(
   };
 
   throwIfAborted(control);
+  // A refresh report delivers retained removals once; passive reads keep them
+  // so a later refresh still reports them.
+  if (request.refresh === true && runtime) {
+    runtime.acknowledgeRemovedTrackedFiles(reportedRemovedFiles(diagnostics, deps.cwd));
+  }
   return { kind: "completed", data };
 }
 function healthNeedsSemantic(included: readonly HealthSection[]): boolean {

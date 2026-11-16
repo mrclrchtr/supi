@@ -120,6 +120,7 @@ import {
   type StartupRetryRouteResult,
 } from "./manager-process-crash-report.ts";
 import { buildProjectServerInfo } from "./manager-project-info.ts";
+import { RemovedTrackedFileLedger } from "./manager-removal-ledger.ts";
 import type {
   ActiveCoverageSummaryEntry,
   CoverageSummaryEntry,
@@ -400,6 +401,8 @@ export class LspManager {
   private retiredRoutes = new Set<string>();
   /** Runtime-owned cleanup for clients removed by route retirement. */
   private retiredClientShutdowns = new Set<Promise<void>>();
+  /** Tracked files removed from disk until a diagnostic report shows them. */
+  private readonly removedTrackedFiles = new RemovedTrackedFileLedger();
   /** Shared diagnostic-recovery restart for each replaceable client route. */
   private pendingRestarts = new Map<string, Promise<{ files: string[]; restarted: boolean }>>();
   /** Monotonic ownership generation for each replaceable client route. */
@@ -740,6 +743,7 @@ export class LspManager {
       },
       this.cwd,
       this.fileAssociations,
+      (filePath) => this.removedTrackedFiles.record(filePath),
     );
     return client;
   }
@@ -2316,6 +2320,24 @@ export class LspManager {
   closeFile(filePath: string): void {
     closeFileAcrossClients(this.clients.values(), resolveSessionPath(this.cwd, filePath));
   }
+  /**
+   * Return tracked files removed from disk since a report last showed them.
+   *
+   * The read does not consume the removals; call
+   * {@link acknowledgeRemovedTrackedFiles} after a report delivered them.
+   */
+  peekRemovedTrackedFiles(scope: string | null = null): string[] {
+    this.pruneMissingFiles();
+    return this.removedTrackedFiles.peek(
+      scope === null ? null : resolveSessionPath(this.cwd, scope),
+    );
+  }
+
+  /** Forget removals that a delivered diagnostic report has shown. */
+  acknowledgeRemovedTrackedFiles(files: readonly string[]): void {
+    this.removedTrackedFiles.acknowledge(files.map((file) => resolveSessionPath(this.cwd, file)));
+  }
+
   /** Remove any missing files from open-document and diagnostic state. */
   pruneMissingFiles(): string[] {
     const removed = pruneMissingFilesFromClients(this.clients.values());
@@ -2635,6 +2657,7 @@ export class LspManager {
     const shutdowns = clients.map((client) => client.shutdown().catch(() => {}));
     await Promise.all([...shutdowns, ...this.retiredClientShutdowns]);
     this.retiredClientShutdowns.clear();
+    this.removedTrackedFiles.clear();
     // Dispose every client so pending or active progress tokens and
     // readiness promises cannot outlive the manager.
     for (const client of clients) client.dispose();

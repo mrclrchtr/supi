@@ -35,6 +35,8 @@ async function call(t: Tool, params: unknown, signal?: AbortSignal) {
 function ready(overrides: Record<string, unknown> = {}) {
   const summary = { entries: [], current: true, evidence: empty };
   const runtime = {
+    peekRemovedTrackedFiles: () => [],
+    acknowledgeRemovedTrackedFiles: () => {},
     getProjectServers: () => [
       { name: "ts", root: cwd, fileTypes: ["ts"], status: "running", ready: true },
     ],

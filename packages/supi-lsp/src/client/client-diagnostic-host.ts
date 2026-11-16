@@ -15,4 +15,12 @@ export interface ClientDiagnosticsHost {
   diagnosticRequestAdapter: DiagnosticRequestAdapter;
   documentSync(): NormalizedDocumentSync;
   sendNotification(method: string, params: unknown): void;
+  /**
+   * Observe one tracked file whose state was cleared because it no longer exists.
+   *
+   * Every clear path reports here (passive prune, semantic input barrier, and
+   * refresh resynchronization), so the owner can retain the removal until a
+   * diagnostic report shows it.
+   */
+  onTrackedFileRemoved?(filePath: string): void;
 }

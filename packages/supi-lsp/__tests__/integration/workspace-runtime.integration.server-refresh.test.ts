@@ -123,6 +123,37 @@ describe("public WorkspaceLspRuntime server-requested diagnostic refresh", () =>
     expect(diagnosticEnds(logPath)).toHaveLength(1);
   });
 
+  it("retains a removed tracked file after a server-requested refresh and passive reads clear it", async () => {
+    // Regression for #606: a background server refresh classified the deleted
+    // file once and cleared it, so the next explicit refresh reported clean.
+    workspace = createWorkspace();
+    const { file, controlPath, logPath, owner } = workspace;
+    const removedFile = path.join(workspace.cwd, "removed.test");
+    fs.writeFileSync(removedFile, "removed-v1\n");
+    await expect(owner.runtime.trackFile(file)).resolves.toBe(true);
+    await expect(owner.runtime.trackFile(removedFile)).resolves.toBe(true);
+
+    fs.rmSync(removedFile);
+    fs.writeFileSync(logPath, "");
+    fs.writeFileSync(controlPath, "refresh-1");
+    await waitForRefresh(logPath, 1);
+    await waitFor(
+      async () => readLog(logPath),
+      (entries) => entries.some((entry) => entry.method === "textDocument/didClose"),
+      { timeoutMs: 5_000, retryDelayMs: 5, label: "removed document close" },
+    );
+    // A passive read prunes nothing further but must not consume the removal.
+    expect(owner.runtime.getWorkspaceDiagnosticSummary().evidence.removed).toBe(0);
+
+    const refreshed = await owner.runtime.refreshOpenDiagnostics();
+    expect(refreshed.removed).toBe(0);
+    expect(owner.runtime.peekRemovedTrackedFiles(workspace.cwd)).toEqual([removedFile]);
+    expect(owner.runtime.peekRemovedTrackedFiles(path.join(workspace.cwd, "other"))).toEqual([]);
+
+    owner.runtime.acknowledgeRemovedTrackedFiles([removedFile]);
+    expect(owner.runtime.peekRemovedTrackedFiles()).toEqual([]);
+  });
+
   it("coalesces a burst during an active pull and keeps the newest evidence", async () => {
     workspace = createWorkspace(250);
     const { file, controlPath, logPath, owner } = workspace;

@@ -93,6 +93,8 @@ function healthOutcome(
 
 function readyRuntime() {
   const runtime = {
+    peekRemovedTrackedFiles: () => [],
+    acknowledgeRemovedTrackedFiles: () => {},
     getProjectServers: vi.fn(() => [
       {
         name: "typescript",

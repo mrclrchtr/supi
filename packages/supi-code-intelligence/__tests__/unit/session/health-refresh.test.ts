@@ -42,6 +42,8 @@ afterEach(() => rmSync(cwd, { recursive: true, force: true }));
 
 function readyRuntime(overrides: Record<string, unknown> = {}): WorkspaceLspRuntime {
   return {
+    peekRemovedTrackedFiles: () => [],
+    acknowledgeRemovedTrackedFiles: () => {},
     getProjectServers: () => [
       {
         name: "typescript",

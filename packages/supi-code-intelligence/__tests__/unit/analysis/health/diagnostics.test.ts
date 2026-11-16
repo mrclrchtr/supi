@@ -35,6 +35,8 @@ afterEach(() => rmSync(cwd, { recursive: true, force: true }));
 
 function service(overrides: Record<string, unknown>): WorkspaceLspRuntime {
   return {
+    peekRemovedTrackedFiles: () => [],
+    acknowledgeRemovedTrackedFiles: () => {},
     fileDiagnostics: async () => ({ kind: "completed", data: [] }),
     getWorkspaceDiagnosticSummary: () => ({
       entries: [],

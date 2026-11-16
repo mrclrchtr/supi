@@ -466,6 +466,10 @@ export class ClientDiagnostics {
     if (wasOpen && this.host.isOperational()) {
       sendDidCloseNotification(this.host, uri);
     }
+    // An intentional close of an existing file is not a removal.
+    if (hadState && getDiagnosticFileState(filePath) === "removed") {
+      this.host.onTrackedFileRemoved?.(filePath);
+    }
   }
 
   pruneMissingFiles(): string[] {
@@ -490,6 +494,7 @@ export class ClientDiagnostics {
       clearTrackedDocumentState(this.#openDocs, this.#diagnosticStore, this.#waiters, uri);
       removedFiles.push(filePath);
       if (wasOpen && this.host.isOperational()) sendDidCloseNotification(this.host, uri);
+      this.host.onTrackedFileRemoved?.(filePath);
     }
 
     return removedFiles;
@@ -666,6 +671,8 @@ export class ClientDiagnostics {
         this.#unversionedPushSyncMoments.delete(uri);
         this.#closedVersionedBarrier.add(uri);
         clearTrackedDocumentState(this.#openDocs, this.#diagnosticStore, this.#waiters, uri);
+        // Resynchronization clears only documents whose files were removed.
+        this.host.onTrackedFileRemoved?.(uriToFile(uri));
       },
       markUnversionedSyncMoment: (uri) => {
         this.#cancelDiagnosticRequest(uri);

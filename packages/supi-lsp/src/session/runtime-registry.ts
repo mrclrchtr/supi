@@ -579,6 +579,16 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
     return this.manager.getOutstandingDiagnosticSummarySnapshot(maxSeverity);
   }
 
+  /** Return retained tracked-file removals without consuming them. */
+  peekRemovedTrackedFiles(scope: string | null = null): readonly string[] {
+    return this.manager.peekRemovedTrackedFiles(scope);
+  }
+
+  /** Forget retained removals that a delivered report has shown. */
+  acknowledgeRemovedTrackedFiles(files: readonly string[]): void {
+    this.manager.acknowledgeRemovedTrackedFiles(files);
+  }
+
   /** Retry failed routes and run a workspace-wide diagnostic recovery pass. */
   async recoverDiagnostics(options?: {
     restartIfStillStale?: boolean;

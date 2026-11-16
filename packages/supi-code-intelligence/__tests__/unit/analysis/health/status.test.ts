@@ -5,6 +5,8 @@ import { observeWorkspaceStatus } from "../../../../src/analysis/health/status.t
 
 function runtime() {
   return {
+    peekRemovedTrackedFiles: () => [],
+    acknowledgeRemovedTrackedFiles: () => {},
     getProjectServers: vi.fn(() => [
       {
         name: "typescript",
