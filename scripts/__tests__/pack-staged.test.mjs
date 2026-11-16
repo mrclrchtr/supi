@@ -71,6 +71,7 @@ const CORE_EXPORTS = {
   "./package.json": "./package.json",
   "./path": "./src/path.ts",
   "./report": "./src/report.ts",
+  "./retired-packages": "./src/retired-packages.ts",
   "./project": "./src/project.ts",
   "./prompt-surface": "./src/prompt-surface.ts",
   "./session": "./src/session.ts",

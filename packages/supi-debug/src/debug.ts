@@ -21,6 +21,7 @@ import {
 } from "./config.ts";
 import { collectRuntimeProvenance, RUNTIME_PROVENANCE_CATEGORY } from "./provenance.ts";
 import { registerDebugMessageRenderer } from "./renderer.ts";
+import { registerRetiredPackageWarnings } from "./retired-packages.ts";
 import { DEBUG_EVENT_ENTRY_TYPE } from "./session-events.ts";
 import { maybeLogLoadStatus } from "./status-log.ts";
 import { registerDebugTool } from "./tool/debug/register.ts";
@@ -159,4 +160,5 @@ export default function debugExtension(pi: ExtensionAPI) {
   registerDebugTool(pi);
   registerTuiRenderTool(pi);
   registerCacheSurfaces(pi);
+  registerRetiredPackageWarnings(pi);
 }

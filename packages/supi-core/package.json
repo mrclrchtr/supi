@@ -67,6 +67,7 @@
     "./project": "./src/project.ts",
     "./prompt-surface": "./src/prompt-surface.ts",
     "./report": "./src/report.ts",
+    "./retired-packages": "./src/retired-packages.ts",
     "./session": "./src/session.ts",
     "./settings": "./src/settings.ts",
     "./spill": "./src/spill.ts",
