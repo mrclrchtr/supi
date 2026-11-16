@@ -2,7 +2,10 @@ import type { ToolRenderers } from "@earendil-works/pi-coding-agent";
 import { createMarkedTheme, createPiMock } from "@mrclrchtr/supi-test-utils";
 import { describe, expect, it, vi } from "vitest";
 import { callDetail } from "../../src/codemode-call-detail.ts";
-import codemodeCompact, { createCodemodeCompactRenderers } from "../../src/codemode-compact.ts";
+import codemodeCompact, {
+  createCodemodeCompactRenderers,
+  hiddenSummary,
+} from "../../src/codemode-compact.ts";
 
 type RenderResult = NonNullable<ToolRenderers["renderResult"]>;
 type RenderContext = Parameters<RenderResult>[3];
@@ -117,7 +120,7 @@ describe("codemode compact renderer", () => {
       .render(200);
     expect(lines).toEqual([
       "  [error]✗[/error] [toolTitle]read[/toolTitle] [muted]fail.ts[/muted] [error]missing[/error]",
-      "  [dim]… 27 more calls (ctrl+o)[/dim]",
+      "  [dim]… 27 more calls: bash ×18, read ×9 (ctrl+o)[/dim]",
       "  [success]✓[/success] [toolTitle]read[/toolTitle] [muted]f9.ts[/muted]",
       "  [success]✓[/success] [toolTitle]bash[/toolTitle] [muted]sleep 1[/muted][dim] ×2[/dim][dim] 2.0s[/dim]",
       "  [success]✓[/success] [toolTitle]read[/toolTitle] [muted]f10.ts[/muted]",
@@ -160,6 +163,30 @@ describe("codemode compact renderer", () => {
     renderers.renderCall?.({ code: "x" }, theme, ctx);
     const second = native.renderCall.mock.calls[1] as unknown as [unknown, unknown, RenderContext];
     expect(second[2].lastComponent).toBe(nativeComponent);
+  });
+});
+
+describe("hiddenSummary", () => {
+  const group = (name: string, count: number) => ({
+    name,
+    detail: "",
+    status: "ok" as const,
+    count,
+  });
+
+  it("lists at most three tools, most frequent first", () => {
+    const hidden = [
+      group("read", 1),
+      group("bash", 3),
+      group("grep", 1),
+      group("read", 1),
+      group("web_search", 1),
+    ];
+    expect(hiddenSummary(hidden)).toBe("… 7 more calls: bash ×3, read ×2, grep, …");
+  });
+
+  it("uses the singular for one hidden call", () => {
+    expect(hiddenSummary([group("read", 1)])).toBe("… 1 more call: read");
   });
 });
 

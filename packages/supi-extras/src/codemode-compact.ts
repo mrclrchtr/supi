@@ -259,14 +259,31 @@ export function visibleGroups(groups: CallGroup[]): Set<number> {
 function callRows(calls: NestedCall[], theme: Theme, cwd: string, expandKey: string): string[] {
   const groups = groupCalls(calls, cwd);
   const kept = visibleGroups(groups);
-  const hidden = groups.reduce((sum, group, index) => sum + (kept.has(index) ? 0 : group.count), 0);
-  const marker = `  ${theme.fg("dim", `… ${hidden} more ${hidden === 1 ? "call" : "calls"} (${expandKey})`)}`;
+  const hiddenGroups = groups.filter((_, index) => !kept.has(index));
+  const marker = `  ${theme.fg("dim", `${hiddenSummary(hiddenGroups)} (${expandKey})`)}`;
   // One marker in place of the first hidden group keeps the shown calls in order.
   const firstHidden = groups.findIndex((_, index) => !kept.has(index));
   return groups.flatMap((group, index) => {
     if (kept.has(index)) return [groupRow(group, theme)];
     return index === firstHidden ? [marker] : [];
   });
+}
+
+/** Tool names listed in the hidden-calls row; the rest collapse into `…`. */
+const MAX_HIDDEN_TOOLS = 3;
+
+/** `… 8 more calls: bash ×4, read ×4`, most frequent tools first. */
+export function hiddenSummary(hidden: CallGroup[]): string {
+  const perTool = new Map<string, number>();
+  for (const group of hidden) perTool.set(group.name, (perTool.get(group.name) ?? 0) + group.count);
+  const total = [...perTool.values()].reduce((sum, count) => sum + count, 0);
+  // Stable sort keeps first-seen order among equal counts.
+  const tools = [...perTool].sort((a, b) => b[1] - a[1]);
+  const names = tools
+    .slice(0, MAX_HIDDEN_TOOLS)
+    .map(([name, count]) => (count > 1 ? `${name} ×${count}` : name));
+  if (tools.length > MAX_HIDDEN_TOOLS) names.push("…");
+  return `… ${total} more ${total === 1 ? "call" : "calls"}: ${names.join(", ")}`;
 }
 
 function groupRow(group: CallGroup, theme: Theme): string {
