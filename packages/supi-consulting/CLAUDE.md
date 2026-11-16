@@ -20,4 +20,4 @@
 
 ## Verification
 
-Use focused tests and source/test typechecking during changes. Run `pnpm verify:ai` before completion. The live probe requires separate approval and `SUPI_CONSULTING_LIVE=1`; it must not run in normal tests or CI.
+The live probe requires separate approval and `SUPI_CONSULTING_LIVE=1`; it must not run in normal tests or CI.
