@@ -1,5 +1,9 @@
 import type { AgentToolResult } from "@earendil-works/pi-coding-agent";
-import type { BatchTaskResult, DelegationBatchHandle } from "../agent_run/batch-types.ts";
+import type {
+  BatchTaskResult,
+  BatchTaskStatus,
+  DelegationBatchHandle,
+} from "../agent_run/batch-types.ts";
 import { buildAgentRunResult } from "../agent_run/result.ts";
 import { AGENT_COMPLETION_MESSAGE_TYPE } from "../names.ts";
 
@@ -31,12 +35,47 @@ export function buildCollectedResult(
   };
 }
 
-/** Build a small completion notice without task output or Usage. */
+/**
+ * TUI-only task summary carried by a completion notice. Custom message `details` never reach
+ * the model, so the human-capped final text can be shown here without leaking output or Usage.
+ */
+export interface CompletionNoticeTask {
+  taskId: string;
+  profileId: string;
+  status: BatchTaskStatus;
+  failureCode?: string;
+  failureSummary?: string;
+  /** Human-capped final assistant text of the child, shown when the notice is expanded. */
+  finalText?: string;
+}
+
+/** Completion notice details: `taskIds` drives context filtering, `tasks` drives rendering. */
+export interface CompletionNoticeDetails {
+  batchId: string;
+  taskIds: string[];
+  tasks: CompletionNoticeTask[];
+}
+
+/** Build a completion notice whose model-facing content excludes task output and Usage. */
 export function buildCompletionNotice(batchId: string, tasks: readonly BatchTaskResult[]) {
+  const details: CompletionNoticeDetails = {
+    batchId,
+    taskIds: tasks.map((task) => task.taskId),
+    tasks: tasks.map(
+      ({ taskId, profileId, status, failureCode, failureSummary, finalTextFull }) => ({
+        taskId,
+        profileId,
+        status,
+        ...(failureCode ? { failureCode } : {}),
+        ...(failureSummary ? { failureSummary } : {}),
+        ...(finalTextFull?.trim() ? { finalText: finalTextFull } : {}),
+      }),
+    ),
+  };
   return {
     customType: AGENT_COMPLETION_MESSAGE_TYPE,
     content: `Background batch ${batchId}: ${tasks.map((task) => `${JSON.stringify(task.taskId)} ${task.status}`).join(", ")}. Collect available results and Usage with agent_result.`,
     display: true,
-    details: { batchId, taskIds: tasks.map((task) => task.taskId) },
+    details,
   };
 }

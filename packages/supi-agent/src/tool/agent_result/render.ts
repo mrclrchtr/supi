@@ -1,16 +1,52 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import { type Container, Text } from "@earendil-works/pi-tui";
-import type { BatchProgressState, BatchTaskResult } from "../agent_run/batch-types.ts";
-import { renderPartial } from "../agent_run/render.ts";
+import { Container, Text } from "@earendil-works/pi-tui";
+import type { BatchProgressState, BatchTaskProgress } from "../agent_run/batch-types.ts";
+import { renderFinal } from "../agent_run/render.ts";
+import { statusColor, statusLabel } from "../agent_run/render-format.ts";
+import { renderPartial } from "../agent_run/render-live.ts";
 import type { AgentRunResultDetails } from "../agent_run/result.ts";
 import { renderBatchCall, renderBatchError } from "../background-render.ts";
+import type { CompletionNoticeDetails } from "./result.ts";
+
+/**
+ * Render a background completion notice for humans: one status line per task.
+ * Expanded, it adds each task's final assistant text and the batch ID.
+ */
+export function renderCompletionNotice(
+  message: { content: unknown; details?: unknown },
+  options: { expanded: boolean },
+  theme: Theme,
+): Text {
+  const details = message.details as Partial<CompletionNoticeDetails> | undefined;
+  const tasks = details?.tasks;
+  // Notices persisted before `tasks` existed fall back to the model-facing text.
+  if (!tasks?.length) {
+    const text = typeof message.content === "string" ? message.content : "Agent batch finished.";
+    return new Text(theme.fg("dim", text), 0, 0);
+  }
+  const lines = [theme.fg("toolTitle", "Agent finished")];
+  for (const task of tasks) {
+    lines.push(
+      `${statusColor(task.status, theme)} ${theme.fg("accent", task.taskId)} ${theme.fg("dim", `(${task.profileId})`)} · ${statusLabel(task.status, task.failureCode)}`,
+    );
+    if (!options.expanded) continue;
+    if (task.failureSummary) lines.push(theme.fg("warning", task.failureSummary));
+    if (task.finalText) lines.push(task.finalText, "");
+  }
+  if (options.expanded && details?.batchId)
+    lines.push(theme.fg("dim", `Batch ${details.batchId} · results collected with agent_result`));
+  return new Text(lines.join("\n"), 0, 0);
+}
 
 /** Render the collection handle without task instructions. */
 export function renderCall(args: unknown, theme: Theme): Text {
   return renderBatchCall("Agent Result", args, theme);
 }
 
-/** Keep result counts separate from output, and show bounded output only when expanded. */
+/**
+ * Waiting shows live task rows. Collected results reuse the Agent Run final layout (status and
+ * output preview collapsed, full output expanded); still-pending tasks follow as status rows.
+ */
 export function renderResult(
   result: { details?: unknown; content?: { type: string; text?: string }[] },
   options: { expanded: boolean; isPartial: boolean },
@@ -20,48 +56,34 @@ export function renderResult(
   if (context.isError) return renderBatchError(result, theme);
   if (options.isPartial) {
     const progress = result.details as Partial<BatchProgressState> | undefined;
-    if (!progress?.tasks) return new Text(theme.fg("dim", "Waiting for Agent Run results…"), 0, 0);
+    if (!progress?.tasks) return new Text(theme.fg("dim", "Waiting for agents…"), 0, 0);
     return renderPartial(
       progress as BatchProgressState,
       options.expanded,
       theme,
-      "Waiting for Agent Run",
+      "Waiting for agents",
     );
   }
   const details = result.details as
     | (AgentRunResultDetails & {
-        complete?: boolean;
         alreadyCollected?: boolean;
-        pending?: { taskId: string; status: string }[];
+        pending?: Pick<BatchTaskProgress, "taskId" | "profileId" | "status">[];
       })
     | undefined;
-  const tasks = details?.tasks ?? [];
   const pending = details?.pending ?? [];
-  const lines = [
-    theme.fg("accent", `Agent results · ${tasks.length} ready · ${pending.length} pending`),
-  ];
-  if (details?.alreadyCollected) lines.push(theme.fg("dim", "Already collected; no new Usage."));
-  if (options.expanded) {
-    for (const task of tasks) lines.push(...renderTaskLines(task, theme));
-    for (const task of pending) lines.push(theme.fg("dim", `${task.taskId} · ${task.status}`));
-    if (details?.fullOutputPath)
-      lines.push(theme.fg("dim", `Full output: ${details.fullOutputPath}`));
+  const footer: string[] = pending.map(
+    (task) =>
+      `${statusColor(task.status, theme)} ${theme.fg("accent", task.taskId)} ${theme.fg("dim", `(${task.profileId}) · ${statusLabel(task.status)}`)}`,
+  );
+  if (details?.alreadyCollected) footer.push(theme.fg("dim", "Already collected; no new Usage."));
+  if (!details?.tasks?.length) {
+    const header = theme.fg("accent", `Agent results · ${pending.length} pending`);
+    return new Text([header, ...footer].join("\n"), 0, 0);
   }
-  return new Text(lines.join("\n"), 0, 0);
-}
-
-function renderTaskLines(task: BatchTaskResult, theme: Theme): string[] {
-  const lines = [theme.fg("accent", `${task.taskId} (${task.profileId}) · ${task.status}`)];
-  if (task.modelId)
-    lines.push(
-      theme.fg(
-        "dim",
-        `model: ${task.modelId}${task.thinkingLevel ? ` · thinking: ${task.thinkingLevel}` : ""}`,
-      ),
-    );
-  if (task.failureCode) lines.push(theme.fg("warning", task.failureCode));
-  if (task.failureSummary) lines.push(theme.fg("warning", task.failureSummary));
-  if (task.finalTextFull) lines.push(task.finalTextFull);
-  if (task.humanTruncated || task.modelTruncated) lines.push(theme.fg("dim", "Output truncated."));
-  return lines;
+  const body = renderFinal(details, options.expanded, theme, "Agent results");
+  if (!footer.length) return body;
+  const container = new Container();
+  container.addChild(body);
+  container.addChild(new Text(footer.join("\n"), options.expanded ? 1 : 0, 0));
+  return container;
 }

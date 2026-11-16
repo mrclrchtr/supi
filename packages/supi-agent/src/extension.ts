@@ -1,4 +1,5 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { Box } from "@earendil-works/pi-tui";
 import { clearAgentsProfilePages, registerAgentsCommand } from "@mrclrchtr/supi-agent-runtime/api";
 import { registerShellHints } from "@mrclrchtr/supi-core/session";
 import { registerAgentSettings, syncAgentRunTool } from "./config.ts";
@@ -9,6 +10,7 @@ import { agentProfileCatalogueStore } from "./session.ts";
 import { registerAgentCancelTool } from "./tool/agent_cancel/register.ts";
 import { registerAgentListTool } from "./tool/agent_list/register.ts";
 import { registerAgentResultTool } from "./tool/agent_result/register.ts";
+import { renderCompletionNotice } from "./tool/agent_result/render.ts";
 import { buildCompletionNotice } from "./tool/agent_result/result.ts";
 import { registerAgentRunTool } from "./tool/agent_run/register.ts";
 import { AGENT_COMPLETION_MESSAGE_TYPE } from "./tool/names.ts";
@@ -78,6 +80,11 @@ export default function agentExtension(pi: ExtensionAPI): void {
     agentProfileCatalogueStore.clear();
   });
 
+  pi.registerMessageRenderer(AGENT_COMPLETION_MESSAGE_TYPE, (message, options, theme) => {
+    const box = new Box(options.outputPad, 0, undefined);
+    box.addChild(renderCompletionNotice(message, options, theme));
+    return box;
+  });
   registerAgentSettings(pi);
   registerAgentsCommand(pi, { profilePages: agentProfilePages });
 }

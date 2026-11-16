@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { renderResult as renderAgentResult } from "../../src/tool/agent_result/render.ts";
+import {
+  renderResult as renderAgentResult,
+  renderCompletionNotice,
+} from "../../src/tool/agent_result/render.ts";
 import { renderCall, renderResult } from "../../src/tool/agent_run/render.ts";
 
 const mockTheme = {
@@ -38,7 +41,7 @@ describe("renderResult", () => {
     expect(result).toBeDefined();
   });
 
-  it("renders the effective model and thinking level for a live task", () => {
+  it("renders the effective model, thinking level, and conversation for an expanded live task", () => {
     const result = renderResult(
       {
         details: {
@@ -46,6 +49,7 @@ describe("renderResult", () => {
             {
               taskId: "t1",
               profileId: "explore",
+              conversationId: "c1",
               status: "running",
               turns: 2,
               toolUses: 2,
@@ -57,14 +61,13 @@ describe("renderResult", () => {
           totalCount: 1,
         },
       },
-      { expanded: false, isPartial: true },
+      { expanded: true, isPartial: true },
       mockTheme as never,
     );
     const text = result.render(240).join("\n");
 
-    expect(text).toContain(
-      "model: anthropic/claude-sonnet-4-5 · thinking: high · 2 turns · 2 tools",
-    );
+    expect(text).toContain("anthropic/claude-sonnet-4-5 (high) · 2 turns · 2 tools");
+    expect(text).toContain("conversation c1");
   });
 
   it("renders collapsed final with task status, progress, and an output preview", () => {
@@ -96,11 +99,11 @@ describe("renderResult", () => {
 
     expect(text).toContain("Agent Run finished");
     expect(text).toContain("1 completed");
-    expect(text).toContain("1,000 tokens");
+    expect(text).toContain("1.0k tokens");
     expect(text).toContain("Found the caller.");
-    expect(text).toContain(
-      "model: anthropic/claude-sonnet-4-5 · thinking: high · 5 turns · 3 tools",
-    );
+    expect(text).toContain("done · anthropic/claude-sonnet-4-5 (high) · 5 turns · 3 tools");
+    // Collapsed rows keep the conversation ID for the expanded view only.
+    expect(text).not.toContain("conversation");
   });
 
   it("renders the model alone when the thinking level is unavailable", () => {
@@ -127,8 +130,8 @@ describe("renderResult", () => {
     );
     const text = result.render(240).join("\n");
 
-    expect(text).toContain("model: anthropic/claude-sonnet-4-5 · 5 turns · 3 tools");
-    expect(text).not.toContain("thinking:");
+    expect(text).toContain("anthropic/claude-sonnet-4-5 · 5 turns · 3 tools");
+    expect(text).not.toContain("(high)");
   });
 
   it("omits the thinking segment when the model is unavailable", () => {
@@ -273,8 +276,107 @@ describe("agent_result wait rendering", () => {
     );
     const text = result.render(240).join("\n");
 
-    expect(text).toContain("Waiting for Agent Run · 0 of 1 tasks finished");
-    expect(text).toContain("audit (explore) · running");
-    expect(text).toContain("activity: read src/a.ts");
+    expect(text).toContain("Waiting for agents · 0/1 done");
+    expect(text).toContain("[accent]audit[/accent] [dim](explore) · running · 3 turns · 5 tools");
+    expect(text).toContain("↳ read src/a.ts");
+    // Collapsed rows omit conversation IDs; they appear only when expanded.
+    expect(text).not.toContain("conversation c1");
+  });
+});
+
+describe("renderCompletionNotice", () => {
+  const message = {
+    content:
+      'Background batch batch-uuid: "edge-mail" completed. Collect available results and Usage with agent_result.',
+    details: {
+      batchId: "batch-uuid",
+      taskIds: ["edge-mail", "research"],
+      tasks: [
+        {
+          taskId: "edge-mail",
+          profileId: "explore",
+          status: "completed",
+          finalText: "Final report from edge-mail",
+        },
+        { taskId: "research", profileId: "general", status: "failed", failureCode: "timeout" },
+      ],
+    },
+  };
+
+  it("shows one status line per task without model-facing instructions when collapsed", () => {
+    const text = renderCompletionNotice(message, { expanded: false }, mockTheme as never)
+      .render(120)
+      .join("\n");
+    expect(text).toContain("[success]✓[/success] [accent]edge-mail[/accent]");
+    expect(text).toContain("[error]✗[/error] [accent]research[/accent]");
+    expect(text).toContain("failed (timeout)");
+    expect(text).not.toContain("batch-uuid");
+    expect(text).not.toContain("Collect available results");
+    expect(text).not.toContain("Final report");
+  });
+
+  it("shows the final task text and batch ID only when expanded", () => {
+    const text = renderCompletionNotice(message, { expanded: true }, mockTheme as never)
+      .render(120)
+      .join("\n");
+    expect(text).toContain("batch-uuid");
+    expect(text).toContain("Final report from edge-mail");
+  });
+
+  it("falls back to the stored text for notices without task summaries", () => {
+    const text = renderCompletionNotice(
+      { content: message.content, details: { batchId: "batch-uuid", taskIds: ["edge-mail"] } },
+      { expanded: false },
+      mockTheme as never,
+    )
+      .render(200)
+      .join("\n");
+    expect(text).toContain("edge-mail");
+  });
+});
+
+describe("agent_result collected rendering", () => {
+  const finished = {
+    taskId: "audit",
+    profileId: "explore",
+    conversationId: "c1",
+    status: "completed",
+    turns: 3,
+    toolUses: 5,
+    finalTextFull: "Found two callers.\nDetails follow.",
+    humanTruncated: false,
+    modelTruncated: false,
+  };
+
+  it("shows per-task output previews and still-pending tasks when collapsed", () => {
+    const text = renderAgentResult(
+      {
+        details: {
+          tasks: [finished],
+          pending: [{ taskId: "slow", profileId: "general", status: "running" }],
+        },
+      },
+      { expanded: false, isPartial: false },
+      mockTheme as never,
+    )
+      .render(240)
+      .join("\n");
+
+    expect(text).toContain("Agent results · 1 task · 1 completed");
+    expect(text).toContain("↳ Found two callers.");
+    expect(text).not.toContain("Details follow.");
+    expect(text).toContain("[accent]slow[/accent] [dim](general) · running");
+  });
+
+  it("shows the full output when expanded", () => {
+    const text = renderAgentResult(
+      { details: { tasks: [finished], pending: [] } },
+      { expanded: true, isPartial: false },
+      mockTheme as never,
+    )
+      .render(240)
+      .join("\n");
+
+    expect(text).toContain("Details follow.");
   });
 });

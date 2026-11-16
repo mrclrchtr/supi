@@ -4,145 +4,20 @@
  * Dual-surface: chrome built from details, markdown body excluded.
  */
 
-import type { ModelThinkingLevel, Usage } from "@earendil-works/pi-ai";
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { Container, Spacer, Text } from "@earendil-works/pi-tui";
-import type {
-  BatchProgressState,
-  BatchTaskProgress,
-  BatchTaskResult,
-  BatchTaskStatus,
-} from "./batch-types.ts";
+import type { BatchProgressState, BatchTaskResult } from "./batch-types.ts";
 import type { AgentConversationView, ConversationEntry } from "./conversation-view.ts";
+import {
+  batchSummary,
+  compactTaskRow,
+  errorMessage,
+  firstLinePreview,
+  formatTaskMetrics,
+  taskHeading,
+} from "./render-format.ts";
+import { formatLiveTask, renderPartial } from "./render-live.ts";
 import type { AgentRunResultDetails } from "./result.ts";
-
-// ── Helpers ──────────────────────────────────────────────────────
-
-function statusLabel(status: BatchTaskStatus, failureCode?: string): string {
-  switch (status) {
-    case "starting":
-      return "starting";
-    case "running":
-      return "running";
-    case "stopping":
-      return "stopping";
-    case "completed":
-      return "done";
-    case "failed":
-      return failureCode ? `failed (${failureCode})` : "failed";
-    case "canceled":
-      return "canceled";
-    case "timeout":
-      return "timeout";
-  }
-}
-
-function statusColor(status: BatchTaskStatus, theme: Theme): string {
-  switch (status) {
-    case "starting":
-      return theme.fg("accent", "○");
-    case "running":
-      return theme.fg("accent", "●");
-    case "stopping":
-      return theme.fg("warning", "◐");
-    case "completed":
-      return theme.fg("success", "✓");
-    case "failed":
-      return theme.fg("error", "✗");
-    case "canceled":
-      return theme.fg("warning", "×");
-    case "timeout":
-      return theme.fg("warning", "⌛");
-  }
-}
-
-const MAX_COLLAPSED_OUTPUT_PREVIEW_CHARS = 140;
-const MAX_EXPANDED_ERROR_CHARS = 2_000;
-const SUMMARY_STATUSES = ["completed", "failed", "canceled", "timeout"] as const;
-
-function formatUsage(usage: Usage | undefined): string {
-  if (!usage) return "";
-  const parts = [`${usage.totalTokens.toLocaleString("en-US")} tokens`];
-  if (typeof usage.input === "number" && typeof usage.output === "number") {
-    parts.push(
-      `${usage.input.toLocaleString("en-US")} in`,
-      `${usage.output.toLocaleString("en-US")} out`,
-    );
-  }
-  if (typeof usage.cost?.total === "number") parts.push(`$${usage.cost.total.toFixed(4)}`);
-  return parts.join(" · ");
-}
-
-function firstLinePreview(text: string | undefined): string | undefined {
-  if (!text) return undefined;
-  const line = text
-    .split(/\r?\n/)
-    .map((candidate) => candidate.trim())
-    .find(Boolean);
-  if (!line) return undefined;
-  const collapsed = line.replace(/\s+/g, " ");
-  return collapsed.length <= MAX_COLLAPSED_OUTPUT_PREVIEW_CHARS
-    ? collapsed
-    : `${collapsed.slice(0, MAX_COLLAPSED_OUTPUT_PREVIEW_CHARS - 1)}…`;
-}
-
-function batchSummary(tasks: readonly BatchTaskResult[], usage: Usage | undefined): string {
-  const counts = new Map<BatchTaskStatus, number>();
-  for (const task of tasks) counts.set(task.status, (counts.get(task.status) ?? 0) + 1);
-  const statusParts = SUMMARY_STATUSES.flatMap((status) => {
-    const count = counts.get(status) ?? 0;
-    return count > 0 ? [`${count} ${status}`] : [];
-  });
-  const parts = [
-    "Agent Run finished",
-    `${tasks.length} task${tasks.length === 1 ? "" : "s"}`,
-    ...statusParts,
-  ];
-  const usageLabel = formatUsage(usage);
-  if (usageLabel) parts.push(usageLabel);
-  return parts.join(" · ");
-}
-
-function taskHeading(
-  task: Pick<BatchTaskResult, "taskId" | "profileId" | "status" | "failureCode" | "conversationId">,
-  theme: Theme,
-): string {
-  return `${statusColor(task.status, theme)} ${theme.fg("accent", task.taskId)} (${task.profileId}) — ${statusLabel(task.status, task.failureCode)} · conversation ${task.conversationId}`;
-}
-
-function formatTaskMetrics(
-  task: Pick<BatchTaskProgress, "turns" | "toolUses" | "usage" | "modelId" | "thinkingLevel">,
-): string {
-  const parts: string[] = [];
-  const model = formatModelSegment(task.modelId, task.thinkingLevel);
-  if (model) parts.push(model);
-  parts.push(`${task.turns} turns`, `${task.toolUses} tools`);
-  const usage = formatUsage(task.usage);
-  if (usage) parts.push(usage);
-  return parts.join(" · ");
-}
-
-/**
- * Human-facing label for the effective model and thinking level. Absent data
- * stays absent so the metric list never gains an empty segment. Do not add
- * color codes here: the expanded and live rows color the complete metric text.
- */
-function formatModelSegment(
-  modelId: string | undefined,
-  thinkingLevel: ModelThinkingLevel | undefined,
-): string | undefined {
-  if (!modelId) return undefined;
-  return thinkingLevel ? `model: ${modelId} · thinking: ${thinkingLevel}` : `model: ${modelId}`;
-}
-
-function errorMessage(text: string | undefined, expanded: boolean): string | undefined {
-  const trimmed = text?.trim();
-  if (!trimmed) return undefined;
-  if (!expanded) return firstLinePreview(trimmed);
-  return trimmed.length <= MAX_EXPANDED_ERROR_CHARS
-    ? trimmed
-    : `${trimmed.slice(0, MAX_EXPANDED_ERROR_CHARS - 1)}…`;
-}
 
 // ── renderCall ───────────────────────────────────────────────────
 
@@ -210,7 +85,7 @@ export function renderResult(
     return new Text(
       [
         theme.fg("accent", `Agent Run started in background · ${background.batchId ?? ""}`),
-        ...background.tasks.map((task) => formatLiveTask(task, theme, options.expanded)),
+        ...background.tasks.flatMap((task) => formatLiveTask(task, theme, options.expanded)),
       ].join("\n"),
       0,
       0,
@@ -218,47 +93,6 @@ export function renderResult(
   }
   return renderFinal(result.details as BatchDetails | undefined, options.expanded, theme);
 }
-
-// ── Partial ──────────────────────────────────────────────────────
-
-function formatLiveTask(task: BatchTaskProgress, theme: Theme, expanded: boolean): string {
-  const parts = [
-    statusLabel(task.status),
-    formatTaskMetrics(task),
-    `conversation ${task.conversationId}`,
-  ];
-  const activity = expanded ? task.recentActivity?.join(" · ") : task.recentActivity?.at(-1);
-  if (activity) parts.push(`activity: ${activity}`);
-  const detail = `${task.taskId} (${task.profileId}) · ${parts.join(" · ")}`;
-  return `${statusColor(task.status, theme)} ${theme.fg("dim", detail)}`;
-}
-
-/** Render live per-task batch progress; `title` names the waiting surface. */
-export function renderPartial(
-  details: BatchProgressState | undefined,
-  expanded: boolean,
-  theme: Theme,
-  title = "Agent Run",
-): Container | Text {
-  const completed = details?.completedCount ?? 0;
-  const total = details?.totalCount ?? 0;
-  const label = total > 0 ? `${title} · ${completed} of ${total} tasks finished` : title;
-  const tasks = details?.tasks ?? [];
-  const header = theme.fg("warning", `● ${label}`);
-
-  if (!expanded) {
-    const lines = [header, ...tasks.map((task) => formatLiveTask(task, theme, false))];
-    return new Text(lines.join("\n"), 0, 0);
-  }
-
-  const container = new Container();
-  container.addChild(new Text(header, 0, 0));
-  for (const task of tasks) {
-    container.addChild(new Text(formatLiveTask(task, theme, true), 1, 0));
-  }
-  return container;
-}
-
 // ── Final result ─────────────────────────────────────────────────
 
 type BatchDetails = Pick<
@@ -266,27 +100,34 @@ type BatchDetails = Pick<
   "tasks" | "sharedContext" | "aggregateUsage" | "conversationViews" | "fullOutputPath"
 >;
 
-function renderFinal(
+/**
+ * Render finished task results: collapsed shows status and a one-line output preview per task,
+ * expanded shows full output and conversation views. `title` replaces the summary label.
+ */
+export function renderFinal(
   details: BatchDetails | undefined,
   expanded: boolean,
   theme: Theme,
+  title?: string,
 ): Container | Text {
   if (!details?.tasks?.length) {
     return new Text(theme.fg("dim", "No results."), 0, 0);
   }
 
   if (!expanded) {
-    return renderCollapsed(details, theme);
+    return renderCollapsed(details, theme, title);
   }
-  return renderExpanded(details, theme);
+  return renderExpanded(details, theme, title);
 }
 
-function renderCollapsed(details: BatchDetails, theme: Theme): Text {
+function renderCollapsed(details: BatchDetails, theme: Theme, title?: string): Text {
   const tasks = details.tasks ?? [];
-  const lines = [theme.fg("accent", theme.bold(batchSummary(tasks, details.aggregateUsage)))];
+  const lines = [
+    theme.fg("accent", theme.bold(batchSummary(tasks, details.aggregateUsage, title))),
+  ];
   for (const task of tasks) {
     const truncation = task.humanTruncated || task.modelTruncated ? " · [truncated]" : "";
-    lines.push(`${taskHeading(task, theme)} · ${formatTaskMetrics(task)}${truncation}`);
+    lines.push(`${compactTaskRow(task, theme)}${theme.fg("dim", truncation)}`);
     const preview = task.status === "completed" ? firstLinePreview(task.finalTextFull) : undefined;
     if (preview) lines.push(theme.fg("dim", `  ↳ ${preview}`));
   }
@@ -329,11 +170,15 @@ function renderConversationView(
   }
 }
 
-function renderExpanded(details: BatchDetails, theme: Theme): Container {
+function renderExpanded(details: BatchDetails, theme: Theme, title?: string): Container {
   const container = new Container();
   const tasks = details.tasks ?? [];
   container.addChild(
-    new Text(theme.fg("accent", theme.bold(batchSummary(tasks, details.aggregateUsage))), 1, 0),
+    new Text(
+      theme.fg("accent", theme.bold(batchSummary(tasks, details.aggregateUsage, title))),
+      1,
+      0,
+    ),
   );
 
   if (details.fullOutputPath) {

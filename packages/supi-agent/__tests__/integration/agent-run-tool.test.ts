@@ -169,7 +169,7 @@ describe("registered agent_run boundary", () => {
     expect(text).toContain("stopping");
     expect(text).toContain("2 turns");
     expect(text).toContain("3 tools");
-    expect(text).toContain("1,234 tokens");
+    expect(text).toContain("1.2k tokens");
     expect(text).toContain("read src/app.ts");
   });
 });

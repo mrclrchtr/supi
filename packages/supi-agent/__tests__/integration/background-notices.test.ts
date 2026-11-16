@@ -64,7 +64,19 @@ describe("queued background completion notices", () => {
     await vi.waitFor(() => expect(harness?.queued).toHaveLength(1));
     expect(await harness.deliverQueued()).toEqual([
       expect.objectContaining({
-        details: { batchId: start.details.batchId, taskIds: ["slow"] },
+        // Child output stays in TUI-only details, never in model-facing content.
+        content: expect.not.stringContaining("Uncollected output"),
+        details: expect.objectContaining({
+          batchId: start.details.batchId,
+          taskIds: ["slow"],
+          tasks: [
+            expect.objectContaining({
+              taskId: "slow",
+              status: "completed",
+              finalText: "Uncollected output",
+            }),
+          ],
+        }),
       }),
     ]);
   });
