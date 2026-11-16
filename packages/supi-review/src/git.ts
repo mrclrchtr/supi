@@ -8,7 +8,7 @@ import { resolveReviewPath } from "./review-path.ts";
 import {
   assertFullDiffBytes,
   DIFF_FLAGS,
-  diffUntrackedFile,
+  diffUntrackedFiles,
   joinDiffParts,
   parseNullList,
 } from "./target/diff.ts";
@@ -54,15 +54,9 @@ async function readFilesystemDiff(
           signal,
         ),
       ]);
-      const parts = [tracked];
-      let totalBytes = tracked.length;
-      for (const untrackedPath of parseNullList(untrackedText)) {
-        signal?.throwIfAborted();
-        const patch = await diffUntrackedFile(root, untrackedPath);
-        totalBytes += patch.length;
-        assertFullDiffBytes(totalBytes);
-        parts.push(patch);
-      }
+      const untracked = await diffUntrackedFiles(root, parseNullList(untrackedText), signal);
+      const parts = [tracked, ...untracked.values()];
+      assertFullDiffBytes(parts.reduce((total, part) => total + part.length, 0));
       return joinDiffParts(parts);
     },
     signal,

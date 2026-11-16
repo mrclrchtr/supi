@@ -11,7 +11,7 @@ import {
   createDiffAccumulator,
   untrackedPatchChange,
 } from "./change-metadata.ts";
-import { DIFF_FLAGS, diffUntrackedFile, parseNullList } from "./diff.ts";
+import { DIFF_FLAGS, diffUntrackedFiles, parseNullList } from "./diff.ts";
 import { normalizeReviewTarget, reviewTargetEndpoints } from "./input.ts";
 
 function normalizedEndpoint(value: string | undefined, name: "from" | "to"): string | undefined {
@@ -126,9 +126,12 @@ async function filesystemSnapshot(
       const changes = buildReviewChanges(nameStatus, numstat);
       const diff = createDiffAccumulator();
       diff.append(trackedDiff);
-      for (const path of parseNullList(untrackedText)) {
-        signal?.throwIfAborted();
-        const patch = await diffUntrackedFile(repositoryRoot, path);
+      const untracked = await diffUntrackedFiles(
+        repositoryRoot,
+        parseNullList(untrackedText),
+        signal,
+      );
+      for (const [path, patch] of untracked) {
         diff.append(patch);
         changes.push(untrackedPatchChange(path, patch));
       }

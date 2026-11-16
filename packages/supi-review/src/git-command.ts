@@ -8,10 +8,19 @@ import { promisify } from "node:util";
 const execFileAsync = promisify(execFile);
 const GIT_TIMEOUT_MS = 30_000;
 
-function gitOptions(cwd: string, indexFile?: string, signal?: AbortSignal) {
+/** Empty temporary index whose object writes go to a private directory, never the repository. */
+export interface ScratchIndex {
+  env: Record<string, string>;
+}
+
+/** Index file path for a Git call, or a scratch index (see `scratch-index.ts`). */
+export type GitIndex = string | ScratchIndex;
+
+function gitOptions(cwd: string, index?: GitIndex, signal?: AbortSignal) {
   const env = { ...process.env };
   for (const key of Object.keys(env)) if (key.startsWith("GIT_")) delete env[key];
-  if (indexFile) env.GIT_INDEX_FILE = indexFile;
+  if (typeof index === "string") env.GIT_INDEX_FILE = index;
+  else if (index) Object.assign(env, index.env);
   return {
     cwd,
     env,
@@ -25,7 +34,7 @@ function gitOptions(cwd: string, indexFile?: string, signal?: AbortSignal) {
 export async function runGit(
   cwd: string,
   args: string[],
-  indexFile?: string,
+  indexFile?: GitIndex,
   signal?: AbortSignal,
 ): Promise<string> {
   return (await execFileAsync("git", args, gitOptions(cwd, indexFile, signal))).stdout;
@@ -35,7 +44,7 @@ export async function runGit(
 export async function runGitBuffer(
   cwd: string,
   args: string[],
-  indexFile?: string,
+  indexFile?: GitIndex,
   signal?: AbortSignal,
 ): Promise<Buffer> {
   const result = await execFileAsync("git", args, {
@@ -50,7 +59,7 @@ export function runGitWithInput(
   cwd: string,
   args: string[],
   input: string,
-  options: { indexFile?: string; signal?: AbortSignal } = {},
+  options: { indexFile?: GitIndex; signal?: AbortSignal } = {},
 ): Promise<string> {
   return new Promise((resolveOutput, rejectOutput) => {
     const child = execFile(
@@ -98,34 +107,12 @@ export function expectedGitExitOutput(error: unknown, allowedCodes: number[]): s
   return "";
 }
 
-/** Return exact Git output bytes only when an execution error has an allowed exit code. */
-export function expectedGitExitBuffer(error: unknown, allowedCodes: number[]): Buffer | undefined {
-  if (!error || typeof error !== "object") return undefined;
-  const failure = error as {
-    code?: unknown;
-    killed?: unknown;
-    signal?: unknown;
-    stdout?: unknown;
-  };
-  if (
-    typeof failure.code !== "number" ||
-    !allowedCodes.includes(failure.code) ||
-    failure.killed === true ||
-    failure.signal
-  ) {
-    return undefined;
-  }
-  if (Buffer.isBuffer(failure.stdout)) return failure.stdout;
-  if (typeof failure.stdout === "string") return Buffer.from(failure.stdout);
-  return Buffer.alloc(0);
-}
-
 /** Allow only documented non-zero Git outcomes while preserving operational failures. */
 export async function runGitAllowExit(
   cwd: string,
   args: string[],
   allowedCodes: number[],
-  options: { indexFile?: string; signal?: AbortSignal } = {},
+  options: { indexFile?: GitIndex; signal?: AbortSignal } = {},
 ): Promise<string> {
   try {
     return await runGit(cwd, args, options.indexFile, options.signal);
@@ -136,28 +123,12 @@ export async function runGitAllowExit(
   }
 }
 
-/** Preserve output bytes for allowed non-zero Git outcomes. */
-export async function runGitBufferAllowExit(
-  cwd: string,
-  args: string[],
-  allowedCodes: number[],
-  options: { indexFile?: string; signal?: AbortSignal } = {},
-): Promise<Buffer> {
-  try {
-    return await runGitBuffer(cwd, args, options.indexFile, options.signal);
-  } catch (error) {
-    const stdout = expectedGitExitBuffer(error, allowedCodes);
-    if (stdout !== undefined) return stdout;
-    throw error;
-  }
-}
-
 /** Run Git with standard input and allow only documented non-zero outcomes. */
 export async function runGitWithInputAllowExit(
   cwd: string,
   args: string[],
   input: string,
-  options: { allowedCodes: number[]; indexFile?: string; signal?: AbortSignal },
+  options: { allowedCodes: number[]; indexFile?: GitIndex; signal?: AbortSignal },
 ): Promise<string> {
   try {
     return await runGitWithInput(cwd, args, input, options);
