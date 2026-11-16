@@ -35,5 +35,8 @@
         }
       }
     }
+  },
+  "debug": {
+    "tuiRenderTool": true
   }
 }
