@@ -143,8 +143,8 @@ describe("profile resource policy", () => {
     expect(registeredTools).toContain("codemode");
     expect(registeredTools).toContain("code_find");
     expect(registeredTools).toContain("code_resolve");
-    // Headless Code Intelligence, codemode, and the tool-free shell hints.
-    expect(extensions).toHaveLength(3);
+    // Headless Code Intelligence, codemode, and the tool-free shell hints and tool rules.
+    expect(extensions).toHaveLength(4);
     expect(extensions.some((extension) => extension.path.includes("supi-shell-hints"))).toBe(true);
   });
 

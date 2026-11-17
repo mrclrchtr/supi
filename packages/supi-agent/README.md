@@ -19,6 +19,10 @@ Built-in profiles:
 
 Profile sources overlay fields by ID with project → global → package precedence. A partial user manifest can pin only `model` or `thinking`; package tools and prompts continue to flow through. An invalid source falls through with a bounded diagnostic. Profiles are context-isolated, not permission- or filesystem-sandboxed.
 
+## Prompts and instruction files
+
+Profiles with a package-owned or custom prompt also get a generated `<tool_rules>` section with the usage rules (`promptGuidelines`) of their active tools. Profiles with `systemPrompt: "native"` keep PI's own rules section.
+
 ## Git queries
 
 The package-owned `git` capability runs one Git query per call without a shell, for example `{ "args": ["diff", "main...HEAD", "--stat"] }`. Only `diff`, `log`, `show`, `blame`, `status`, `rev-parse`, and `ls-files` are admitted. The tool rejects `--output`, `--ext-diff`, `--textconv` (including abbreviations), verbose `status`, and global options before the subcommand. It always adds `--no-pager`, `--no-optional-locks`, `core.fsmonitor=false`, and, for diff output, `--no-ext-diff` and `--no-textconv`. Output follows Pi's standard truncation limits.

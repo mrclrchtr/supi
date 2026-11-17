@@ -3,6 +3,7 @@
 ## [13.1.0]
 
 - The `explore` profile gets a read-only `git` tool for diffs, history, and blame, for example `{ "args": ["diff", "main...HEAD", "--stat"] }`. It runs without a shell, admits only `diff`, `log`, `show`, `blame`, `status`, `rev-parse`, and `ls-files`, and rejects options that write files or run configured diff programs. Explorers stay read-only, so they still run in parallel and in the background. Custom profiles can add `git` to their `tools` list.
+- Agent Runs with a package-owned or custom system prompt now receive the usage rules of their active tools in a `<tool_rules>` section. Before, those rules reached only profiles with `systemPrompt: "native"`.
 
 ## [13.0.0]
 

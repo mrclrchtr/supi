@@ -19,6 +19,7 @@ import {
 } from "./capabilities.ts";
 import { realpathOrResolve } from "./path.ts";
 import { registerGitTool } from "./tool/git/register.ts";
+import { registerToolRules } from "./tool-rules.ts";
 import type { AgentProfile, AgentSessionInputOptions, AgentSystemPrompt } from "./types.ts";
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -41,6 +42,7 @@ export function createAgentSessionInputs(options: AgentSessionInputOptions): Age
   const tools = effectiveCapabilities(options.profile.manifest.tools, webTools);
   const extensionFactories = [
     { name: "supi-shell-hints", factory: registerShellHints },
+    { name: "supi-agent-tool-rules", factory: registerToolRules },
     ...(usesHeadlessInspection(options.profile.manifest.tools)
       ? [{ name: "supi-code-intelligence-headless", factory: headlessInspectionProfile }]
       : []),
