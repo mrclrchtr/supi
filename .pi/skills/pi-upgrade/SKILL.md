@@ -8,6 +8,7 @@ description: >
   migrate off the deprecated `@mariozechner/*` packages.
 metadata:
   internal: true
+disable-model-invocation: true
 ---
 
 # PI Upgrade Advisor

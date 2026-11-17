@@ -2,6 +2,7 @@
 name: gather-retrospectives
 description: Gather retrospective feedback from past Pi sessions about a package, tool, or workflow. Use for historical retros and recurring friction, not assessment of only the current session.
 compatibility: Requires Node.js and shell access to local Pi session files.
+disable-model-invocation: true
 ---
 
 # Gather retrospectives

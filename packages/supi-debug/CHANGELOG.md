@@ -1,5 +1,9 @@
 # Changelog
 
+## [13.1.0]
+
+- The `gather-retrospectives` skill is now user-invoked only (`/skill:gather-retrospectives`); the agent no longer loads it on its own, because it reads many past sessions.
+
 ## [13.0.0]
 
 - New `session-analytics` skill, invoked with `/skill:session-analytics`: exports tool calls (with failure-pattern filtering and the agent's next calls), per-session tool availability, or debug-event sizes from past sessions as JSONL for scripted aggregation, replacing ad-hoc grep pipelines over session storage ([#601](https://github.com/mrclrchtr/supi/issues/601)).
