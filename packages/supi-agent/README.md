@@ -21,6 +21,8 @@ Profile sources overlay fields by ID with project → global → package precede
 
 ## Prompts and instruction files
 
+The built-in profiles use package-owned system prompts written for a delegated run: the reader is the calling agent, only the final message reaches it, and nobody can answer questions during the run.
+
 Profiles with a package-owned or custom prompt also get a generated `<tool_rules>` section with the usage rules (`promptGuidelines`) of their active tools. Profiles with `systemPrompt: "native"` keep PI's own rules section.
 
 ## Git queries
