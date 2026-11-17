@@ -23,12 +23,17 @@ The installer does not find a Git root, install PI, or grant project trust. With
 ## Installation Matrix
 
 ```text
-Package                         Project   Global
-supi-code-intelligence           [ ]       [x]
-supi-web                         [x]       [ ]
+  Package                          Project  Global
+  supi-code-intelligence ★         [x]      [-]
+› supi-web ★                       [ ]     >[+]
+  Obsolete · removal only
+  supi-claude-md                   [x]      ( )
 ```
 
 - A checkbox represents a direct declaration in that scope, not effective capability availability.
+- `[x]` keeps a declaration, `[+]` adds one, `[-]` removes one, and `( )` marks a cell that cannot change. The status line counts pending changes.
+- `★` marks Recommended packages. Beta and opt-in packages are tagged next to their name.
+- Colors follow the terminal's color support and honor `NO_COLOR`.
 - Project uses `<project>/.pi/settings.json`. Global uses PI's agent settings.
 - The matrix starts from current declarations, not a preset.
 - Clearing Project does not disable a global declaration. Filters and bundled extensions can also affect which capabilities load.

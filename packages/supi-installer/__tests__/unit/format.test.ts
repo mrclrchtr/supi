@@ -37,7 +37,9 @@ function report(status: "success" | "failed"): ExecutionReport {
 
 describe("skills hints", () => {
   it("names the replacement for an obsolete removal before confirmation", () => {
-    const lines = formatReview(createMatrix(inventory()), [removeClaudeMd]).join("\n");
+    const lines = formatReview(createMatrix(inventory()), [removeClaudeMd])
+      .map(({ text }) => text)
+      .join("\n");
     expect(lines).toContain(
       "supi-claude-md: Skills moved to skills.sh: npx skills add mrclrchtr/supi -a pi --skill claude-md-improver claude-md-revision",
     );

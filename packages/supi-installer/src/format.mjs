@@ -49,23 +49,42 @@ function formatScope(inventory, scope) {
   return lines;
 }
 
-/** Show exact scoped sources and the accepted independent-failure policy. @param {import('./matrix.mjs').Matrix} matrix @param {import('./types.ts').Operation[]} operations */
+/** @typedef {'heading' | 'install' | 'remove' | 'warning' | 'muted'} Tone */
+/** @typedef {{text: string, tone?: Tone}} ReviewLine */
+
+/** @param {string} text @param {Tone} [tone] @returns {ReviewLine} */
+const reviewLine = (text, tone) => ({ text: cleanLine(text), ...(tone ? { tone } : {}) });
+
+/** Show planned changes first, then the accepted independent-failure policy and current declarations. Tones are presentation hints. @param {import('./matrix.mjs').Matrix} matrix @param {import('./types.ts').Operation[]} operations @returns {ReviewLine[]} */
 export function formatReview(matrix, operations) {
+  const replacements = withHeading(
+    "Replacements for removed obsolete declarations:",
+    replacementLines(operations),
+  );
   return [
-    ...formatInventory(matrix.inventory),
-    "",
-    "Planned changes:",
-    ...operations.map(
-      (operation) => `${operation.action.toUpperCase()} ${operation.scope}: ${operation.source}`,
+    reviewLine("Planned changes:", "heading"),
+    ...operations.map((operation) =>
+      reviewLine(
+        `${operation.action.toUpperCase()} ${operation.scope}: ${operation.source}`,
+        operation.action,
+      ),
     ),
-    ...(operations.length === 0 ? ["No changes. No package commands will run."] : []),
-    ...withHeading("Replacements for removed obsolete declarations:", replacementLines(operations)),
-    "",
-    "Clearing Project can expose a global declaration.",
-    "Removal retains user data. Bundled behavior can remain available.",
-    "Commands are independent. A failed destination install does NOT prevent source removal.",
-    "A failed scope move can leave neither declaration. There is no automatic rollback.",
-  ].map(cleanLine);
+    ...(operations.length === 0
+      ? [reviewLine("No changes. No package commands will run.", "muted")]
+      : []),
+    ...replacements.map((text, index) => reviewLine(text, index === 1 ? "heading" : undefined)),
+    reviewLine(""),
+    ...[
+      "Clearing Project can expose a global declaration.",
+      "Removal retains user data. Bundled behavior can remain available.",
+      "Commands are independent. A failed destination install does NOT prevent source removal.",
+      "A failed scope move can leave neither declaration. There is no automatic rollback.",
+    ].map((text) => reviewLine(text, "warning")),
+    reviewLine(""),
+    ...formatInventory(matrix.inventory).map((text, index) =>
+      reviewLine(text, index === 0 ? "heading" : undefined),
+    ),
+  ];
 }
 
 /** Prefix nonempty sections with a blank line and heading. @param {string} heading @param {string[]} lines */

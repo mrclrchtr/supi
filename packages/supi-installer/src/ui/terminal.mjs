@@ -7,7 +7,15 @@ import { renderView } from "./view.mjs";
 export function runTerminal(matrix, { input, output, signal }) {
   return new Promise((resolve, reject) => {
     /** @type {import('./view.mjs').View} */
-    const view = { matrix, index: 0, scope: "project", review: false, offset: 0 };
+    const view = {
+      matrix,
+      index: 0,
+      scope: "project",
+      review: false,
+      offset: 0,
+      // hasColors() honors NO_COLOR, FORCE_COLOR, and TERM.
+      color: typeof output.hasColors === "function" && output.hasColors(),
+    };
     const wasRaw = Boolean(input.isRaw);
     const wasFlowing = input.readableFlowing;
     let settled = false;
