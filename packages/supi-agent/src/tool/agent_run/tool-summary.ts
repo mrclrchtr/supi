@@ -101,7 +101,7 @@ const summarizers: Record<string, ToolSummarizer> = {
 };
 
 function quoteGitArg(arg: string): string {
-  return /^[\w./:@^~=+,-]+$/u.test(arg) ? arg : `'${arg.replaceAll("'", "'\\''")}'`;
+  return /^[\w./:@^~=+,%-]+$/u.test(arg) ? arg : `'${arg.replaceAll("'", "'\\''")}'`;
 }
 
 /** Return an allowlisted tool summary for a known tool, or name-only for unknown tools. */

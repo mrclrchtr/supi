@@ -44,6 +44,15 @@ describe("summarizeToolCall", () => {
     );
   });
 
+  it("does not quote git arguments only for containing a percent sign", () => {
+    expect(summarizeToolCall("git", { args: ["log", "-1", "--format=%h"] }).summary).toBe(
+      "git log -1 --format=%h",
+    );
+    expect(summarizeToolCall("git", { args: ["log", "--format=%h %s"] }).summary).toBe(
+      "git log '--format=%h %s'",
+    );
+  });
+
   it("summarizes code_* tools with query/file info", () => {
     expect(
       summarizeToolCall("code_inspect", { anchor: { file: "/src/app.ts", line: 1, character: 1 } })
