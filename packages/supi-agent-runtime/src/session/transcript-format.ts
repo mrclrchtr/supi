@@ -85,7 +85,9 @@ export function parseTranscript(
       case "header":
         metadata = record.metadata;
         systemPrompt = record.systemPrompt;
-        systemPromptHistory = [{ occurredAt: record.occurredAt, text: record.systemPrompt }];
+        systemPromptHistory = record.systemPrompt
+          ? [{ occurredAt: record.occurredAt, text: record.systemPrompt }]
+          : [];
         break;
       case "message":
         messages.push(record.message);

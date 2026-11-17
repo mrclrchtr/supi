@@ -102,6 +102,7 @@ export class AgentRunTranscriptCapture implements AgentRunTranscriptSource {
   #initialSystemPrompt: string;
   #systemPrompt: string;
   #systemPromptHistory: Array<{ occurredAt: number; text: string }>;
+  #agentActive = false;
   #toolRenderers: AgentRunToolRenderer[];
   #filePath: string | undefined;
   #writeQueue: Promise<void>;
@@ -121,7 +122,9 @@ export class AgentRunTranscriptCapture implements AgentRunTranscriptSource {
     this.onChange = onChange;
     this.#initialSystemPrompt = systemPrompt;
     this.#systemPrompt = systemPrompt;
-    this.#systemPromptHistory = [{ occurredAt: Date.now(), text: systemPrompt }];
+    this.#systemPromptHistory = systemPrompt
+      ? [{ occurredAt: Date.now(), text: systemPrompt }]
+      : [];
     this.#toolRenderers = toolRenderers.map(copyToolRenderer);
     this.#writeQueue = this.#createFile(getDirectory);
   }
@@ -142,25 +145,29 @@ export class AgentRunTranscriptCapture implements AgentRunTranscriptSource {
     });
   }
 
-  /** Update the effective prompt and render-only tool definitions. */
-  updateSession(systemPrompt: string, toolRenderers: readonly AgentRunToolRenderer[]): void {
+  /** Update the render-only tool definitions. */
+  updateToolRenderers(toolRenderers: readonly AgentRunToolRenderer[]): void {
     if (this.#status !== "capturing") return;
     this.#updateToolRenderers(toolRenderers);
-    if (systemPrompt === this.#systemPrompt) return;
-    this.#systemPrompt = systemPrompt;
-    const occurredAt = Date.now();
-    this.#systemPromptHistory.push({ occurredAt, text: systemPrompt });
-    void this.#enqueue({ kind: "system-prompt", text: systemPrompt, occurredAt });
   }
 
-  /** Record finalized messages and allowlisted lifecycle details only. */
+  /**
+   * Record finalized messages and allowlisted lifecycle details only.
+   *
+   * The system prompt is recorded only from `agent_start` through `agent_end`. Outside that
+   * span the session reports its base prompt, without the changes `before_agent_start`
+   * handlers make for a run, and no model request uses that text.
+   */
   observe(
     event: AgentSessionEvent,
     systemPrompt: string,
     toolRenderers: readonly AgentRunToolRenderer[],
   ): void {
     if (this.#status !== "capturing") return;
-    this.updateSession(systemPrompt, toolRenderers);
+    this.#updateToolRenderers(toolRenderers);
+    if (event.type === "agent_start") this.#agentActive = true;
+    if (this.#agentActive) this.#recordSystemPrompt(systemPrompt);
+    if (event.type === "agent_end") this.#agentActive = false;
     if (event.type === "message_end") {
       void this.#enqueue({ kind: "message", message: sanitizeMessage(event.message) });
     }
@@ -237,6 +244,14 @@ export class AgentRunTranscriptCapture implements AgentRunTranscriptSource {
       })
       .catch(() => this.#markIncomplete());
     return this.#writeQueue;
+  }
+
+  #recordSystemPrompt(systemPrompt: string): void {
+    if (systemPrompt === this.#systemPrompt) return;
+    this.#systemPrompt = systemPrompt;
+    const occurredAt = Date.now();
+    this.#systemPromptHistory.push({ occurredAt, text: systemPrompt });
+    void this.#enqueue({ kind: "system-prompt", text: systemPrompt, occurredAt });
   }
 
   #updateToolRenderers(toolRenderers: readonly AgentRunToolRenderer[]): void {

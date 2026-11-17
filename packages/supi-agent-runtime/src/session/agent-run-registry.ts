@@ -145,7 +145,7 @@ export class AgentRunRegistry {
     const live = run.live;
     if (!live) return () => undefined;
     const transcript = run.transcript;
-    transcript?.updateSession(session.systemPrompt, session.getToolRenderers());
+    transcript?.updateToolRenderers(session.getToolRenderers());
     const unsubscribe = session.subscribe((event) => {
       if (!this.#isCurrent(run)) return;
       transcript?.observe(event, session.systemPrompt, session.getToolRenderers());

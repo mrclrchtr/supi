@@ -46,6 +46,21 @@ describe("AgentRunTranscriptStore", () => {
     expect(onChange).toHaveBeenCalled();
   });
 
+  it("records only the system prompts in effect while the agent runs", async () => {
+    const capture = createStore().createCapture(metadata(), "", []);
+    // Outside agent_start..agent_end the session reports its base prompt, which no request uses.
+    capture.observe({ type: "entry_appended" } as never, "Base prompt", []);
+    capture.observe({ type: "agent_start" } as never, "Run prompt", []);
+    capture.observe({ type: "agent_end" } as never, "Run prompt", []);
+    capture.observe({ type: "agent_settled" } as never, "Base prompt", []);
+    await capture.finish();
+
+    const document = await capture.load();
+
+    expect(document.systemPrompt).toBe("Run prompt");
+    expect(document.systemPromptHistory.map(({ text }) => text)).toEqual(["Run prompt"]);
+  });
+
   it("stores every finalized message and only allowlisted lifecycle metadata", async () => {
     const execute = vi.fn();
     const renderCall = vi.fn();
@@ -67,6 +82,9 @@ describe("AgentRunTranscriptStore", () => {
       isError: false,
       timestamp: 2,
     };
+    capture.observe({ type: "agent_start" } as never, "Child system prompt", [
+      { name: "read", execute, renderCall } as never,
+    ]);
     capture.observe(
       {
         type: "tool_execution_start",
@@ -118,6 +136,7 @@ describe("AgentRunTranscriptStore", () => {
     expect(document.messages[1]).not.toHaveProperty("providerAuth");
     expect(document.messages[1]).not.toHaveProperty("details.authorization");
     expect(document.operations).toEqual([
+      expect.objectContaining({ type: "agent_start" }),
       expect.objectContaining({
         type: "tool_execution_start",
         toolName: "read",

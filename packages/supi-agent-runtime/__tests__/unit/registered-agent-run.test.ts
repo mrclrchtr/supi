@@ -120,6 +120,7 @@ it("waits for the finalized transcript before resolving the registered result", 
   session.systemPrompt = "Child system prompt";
   session.prompt.mockImplementationOnce(async (_prompt, options) => {
     options?.preflightResult?.("started");
+    session.emit({ type: "agent_start" });
     session.emit({
       type: "message_end",
       message: {
