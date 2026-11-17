@@ -10,7 +10,7 @@
 
 Profile catalogue, field-level profile settings, and resource policy for background and foreground Agent Runs in Pi.
 
-This package is the policy layer for `@mrclrchtr/supi-agent-runtime`. It discovers Profile Directory sources from package defaults, `~/.pi/agent/supi/agents/`, and trusted project `.pi/supi/agents/` directories. It also contributes per-profile Enabled, Model, and Thinking rows to `/supi-settings`.
+This package is the policy layer for `@mrclrchtr/supi-agent-runtime`. It discovers Profile Directory sources from package defaults, `~/.pi/agent/supi/agents/`, and trusted project `.pi/supi/agents/` directories. It also contributes per-profile Enabled, Model, Thinking, and Instructions rows to `/supi-settings`.
 
 Built-in profiles:
 
@@ -24,6 +24,14 @@ Profile sources overlay fields by ID with project → global → package precede
 The built-in profiles use package-owned system prompts written for a delegated run: the reader is the calling agent, only the final message reaches it, and nobody can answer questions during the run.
 
 Profiles with a package-owned or custom prompt also get a generated `<tool_rules>` section with the usage rules (`promptGuidelines`) of their active tools. Profiles with `systemPrompt: "native"` keep PI's own rules section.
+
+`instructionScopes` selects which AGENTS.md or CLAUDE.md files a profile's runs load: `[]`, `["project"]`, `["global"]`, or `["global", "project"]`. Change it with the profile's **Instructions** row in `/supi-settings`, or in its `profile.json`. For example, keep your global instruction file out of `general` runs with `~/.pi/agent/supi/agents/general/profile.json`:
+
+```json
+{ "instructionScopes": ["project"] }
+```
+
+Run `/reload` after a change. Global instruction files are often written for a conversation with a person, such as a reply language; a run that loads them applies those rules to its report as well.
 
 ## Git queries
 

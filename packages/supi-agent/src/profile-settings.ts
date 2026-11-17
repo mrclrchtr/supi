@@ -1,12 +1,3 @@
-import {
-  existsSync,
-  mkdirSync,
-  readdirSync,
-  readFileSync,
-  rmdirSync,
-  unlinkSync,
-  writeFileSync,
-} from "node:fs";
 import { join } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import {
@@ -21,8 +12,10 @@ import {
   SUPI_SETTINGS_COLLECT_EVENT,
 } from "@mrclrchtr/supi-core/settings";
 import { readCurrentProfileSources, resolveProfileDefinition } from "./profile-catalogue.ts";
+import { removeProfileField, updateProfileJson } from "./profile-json.ts";
 import { isCanonicalModel, type ProfileCandidate } from "./profile-validation.ts";
 import type {
+  AgentInstructionScope,
   AgentThinkingLevel,
   ProfileCatalogue,
   ProfileCatalogueEntry,
@@ -41,7 +34,15 @@ export const PROFILE_THINKING_LEVELS: readonly AgentThinkingLevel[] = [
   "max",
 ];
 
-type ProfileSettingField = "enabled" | "model" | "thinking";
+type ProfileSettingField = "enabled" | "model" | "thinking" | "instructionScopes";
+
+/** Instruction row choices and the `instructionScopes` list each one persists. */
+const INSTRUCTION_CHOICES: Readonly<Record<string, readonly AgentInstructionScope[]>> = {
+  none: [],
+  project: ["project"],
+  global: ["global"],
+  "global+project": ["global", "project"],
+};
 
 const ENABLED_FIELD: BoolField = {
   kind: "boolean",
@@ -65,6 +66,15 @@ const THINKING_FIELD: EnumField = {
   values: [...PROFILE_THINKING_LEVELS],
 };
 
+const INSTRUCTIONS_FIELD: EnumField = {
+  kind: "enum",
+  key: "instructionScopes",
+  label: "Instructions",
+  description:
+    "Which AGENTS.md or CLAUDE.md files Agent Runs of this profile load. Run /reload to apply changes.",
+  values: Object.keys(INSTRUCTION_CHOICES),
+};
+
 /** Register one dynamic settings contribution per discovered Profile ID. */
 export function registerProfileSettings(pi: ExtensionAPI, catalogue: ProfileCatalogue): () => void {
   const modules = createProfileSettingsSections(catalogue);
@@ -81,7 +91,7 @@ export function createProfileSettingsSections(
   return catalogue.profiles.map((entry) => createProfileSettingsSection(entry, catalogue));
 }
 
-/** Build one Profile ID's Enabled, Model, and Thinking settings module. */
+/** Build one Profile ID's Enabled, Model, Thinking, and Instructions settings module. */
 export function createProfileSettingsSection(
   entry: ProfileCatalogueEntry,
   catalogue: ProfileCatalogue,
@@ -92,9 +102,10 @@ export function createProfileSettingsSection(
     subsection: entry.id,
     read: async ({ scope }) => ({ rows: loadProfileSettings(entry, catalogue, scope) }),
     apply: async ({ scope, fieldKey, action }) => {
-      if (fieldKey !== "enabled" && fieldKey !== "model" && fieldKey !== "thinking") return {};
+      if (!isProfileSettingField(fieldKey)) return {};
       persistProfileField({ entry, catalogue, scope, field: fieldKey, action });
-      return fieldKey === "enabled"
+      // Only Model and Thinking are read again for the next Agent Run.
+      return fieldKey === "enabled" || fieldKey === "instructionScopes"
         ? {
             notice: {
               message: "Profile setting saved. Run /reload to apply this change.",
@@ -135,6 +146,17 @@ function loadProfileSettings(
       resolved.thinkingInheritanceSource,
     ),
   ];
+  // An incomplete profile has no instruction policy to show; its diagnostic row explains why.
+  if (resolved.instructions !== undefined) {
+    values.push(
+      settingValue(
+        INSTRUCTIONS_FIELD,
+        resolved.instructions,
+        resolved.instructionsSource,
+        resolved.instructionsInheritanceSource,
+      ),
+    );
+  }
 
   if (diagnostics.length > 0) {
     const first = diagnostics[0];
@@ -186,6 +208,9 @@ function resolveProfileSettings(
   enabledInheritanceSource?: "global" | "default";
   modelInheritanceSource?: "global" | "default";
   thinkingInheritanceSource?: "global" | "default";
+  instructions?: string;
+  instructionsSource: "project" | "global" | "default";
+  instructionsInheritanceSource?: "global" | "default";
   diagnostics: ProfileDiagnostic[];
 } {
   const candidates = readCurrentProfileSources(entry.id, catalogue.sourceDirectories).filter(
@@ -198,7 +223,15 @@ function resolveProfileSettings(
   const enabled = resolveSetting(candidates, "enabled");
   const model = resolveSetting(candidates, "model");
   const thinking = resolveSetting(candidates, "thinking");
+  const instructions = resolveSetting(candidates, "instructionScopes");
   return {
+    instructions: instructionChoice(instructions?.value),
+    instructionsSource: toSettingsSource(instructions?.candidate.source),
+    instructionsInheritanceSource: inheritanceSource(
+      candidates,
+      "instructionScopes",
+      instructions?.candidate.source,
+    ),
     enabled: enabled?.value !== false,
     enabledSource: toSettingsSource(enabled?.candidate.source),
     enabledInheritanceSource: inheritanceSource(candidates, "enabled", enabled?.candidate.source),
@@ -276,7 +309,7 @@ function persistProfileField(options: {
 
   if (action.kind === "set" && !(field === "model" && action.value === "")) {
     validateSettingValue(field, action.value);
-    updateProfileJson(directory, field, field === "enabled" ? action.value === "on" : action.value);
+    updateProfileJson(directory, field, persistedValue(field, action.value));
     return;
   }
   removeProfileField(directory, field);
@@ -291,7 +324,19 @@ function writableProfileDirectory(
   return root ? join(root, entry.id) : undefined;
 }
 
+function persistedValue(field: ProfileSettingField, value: string): string | boolean | string[] {
+  if (field === "enabled") return value === "on";
+  if (field === "instructionScopes") return [...(INSTRUCTION_CHOICES[value] ?? [])];
+  return value;
+}
+
 function validateSettingValue(field: ProfileSettingField, value: string): void {
+  if (field === "instructionScopes") {
+    if (!Object.hasOwn(INSTRUCTION_CHOICES, value)) {
+      throw new Error("Instructions must be none, project, global, or global+project.");
+    }
+    return;
+  }
   if (field === "enabled") {
     if (value !== "on" && value !== "off") throw new Error("Enabled must be on or off.");
     return;
@@ -305,43 +350,17 @@ function validateSettingValue(field: ProfileSettingField, value: string): void {
   }
 }
 
-function updateProfileJson(
-  directory: string,
-  field: ProfileSettingField,
-  value: string | boolean,
-): void {
-  const data = readProfileJson(directory);
-  mkdirSync(directory, { recursive: true });
-  data[field] = value;
-  writeFileSync(join(directory, "profile.json"), `${JSON.stringify(data, null, 2)}\n`, "utf8");
+function isProfileSettingField(key: string): key is ProfileSettingField {
+  return key === "enabled" || key === "model" || key === "thinking" || key === "instructionScopes";
 }
 
-function removeProfileField(directory: string, field: ProfileSettingField): void {
-  const profilePath = join(directory, "profile.json");
-  if (!existsSync(profilePath)) return;
-  const data = readProfileJson(directory);
-  delete data[field];
-  if (Object.keys(data).length === 0) {
-    unlinkSync(profilePath);
-    if (readdirSync(directory).length === 0) rmdirSync(directory);
-    return;
-  }
-  writeFileSync(profilePath, `${JSON.stringify(data, null, 2)}\n`, "utf8");
-}
-
-function readProfileJson(directory: string): Record<string, unknown> {
-  const path = join(directory, "profile.json");
-  if (!existsSync(path)) return {};
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(readFileSync(path, "utf8"));
-  } catch (error) {
-    throw new Error("profile.json is not valid JSON.", { cause: error });
-  }
-  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-    throw new Error("profile.json must contain an object.");
-  }
-  return parsed as Record<string, unknown>;
+/** Name the row choice for a stored scope list, in any order. */
+function instructionChoice(value: unknown): string | undefined {
+  if (!Array.isArray(value)) return undefined;
+  return Object.keys(INSTRUCTION_CHOICES).find((choice) => {
+    const scopes = INSTRUCTION_CHOICES[choice] ?? [];
+    return scopes.length === value.length && scopes.every((scope) => value.includes(scope));
+  });
 }
 
 function isThinkingLevel(value: unknown): value is AgentThinkingLevel {

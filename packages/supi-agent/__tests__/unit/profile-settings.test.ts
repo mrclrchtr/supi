@@ -47,7 +47,12 @@ describe("profile settings", () => {
     expect(section.label).toBe("Agent");
     expect(section.subsection).toBe("explore");
     const rows = (await section.read({ scope: "global", cwd: paths.root })).rows;
-    expect(rows.map((row) => row.field.kind)).toEqual(["boolean", "modelPicker", "enum"]);
+    expect(rows.map((row) => row.field.key)).toEqual([
+      "enabled",
+      "model",
+      "thinking",
+      "instructionScopes",
+    ]);
     expect(rows.find((row) => row.field.key === "model")).toMatchObject({
       displayValue: "Inherit from session (default)",
       editValue: "",
@@ -198,6 +203,64 @@ describe("profile settings", () => {
         ),
       ),
     ).toEqual({ description: "local note", model: "openai/new" });
+  });
+
+  it("shows the instruction policy and persists a choice as a scope list", async () => {
+    const paths = await roots();
+    await writeProfile(
+      paths.packageDirectory,
+      "general",
+      manifest({ instructionScopes: ["global", "project"] }),
+    );
+    const catalogue = await discoverProfileCatalogue({
+      cwd: paths.root,
+      agentDir: paths.agentDirectory,
+      packageDirectory: paths.packageDirectory,
+      projectTrusted: false,
+    });
+    const entry = catalogue.profiles.find((profile) => profile.id === "general");
+    if (!entry) throw new Error("expected general profile");
+    const section = createProfileSettingsSection(entry, catalogue);
+    const instructions = async () =>
+      (await section.read({ scope: "global", cwd: paths.root })).rows.find(
+        (row) => row.field.key === "instructionScopes",
+      );
+
+    expect(await instructions()).toMatchObject({ editValue: "global+project", source: "default" });
+
+    const result = await section.apply({
+      scope: "global",
+      cwd: paths.root,
+      fieldKey: "instructionScopes",
+      action: { kind: "set", value: "project" },
+    });
+    const profilePath = join(paths.agentDirectory, "supi", "agents", "general", "profile.json");
+    expect(JSON.parse(await readFile(profilePath, "utf8"))).toEqual({
+      instructionScopes: ["project"],
+    });
+    expect(result.notice?.message).toContain("/reload");
+    expect(await instructions()).toMatchObject({ editValue: "project", source: "global" });
+    // The written override is a valid partial manifest: the profile still resolves.
+    const reloaded = await discoverProfileCatalogue({
+      cwd: paths.root,
+      agentDir: paths.agentDirectory,
+      packageDirectory: paths.packageDirectory,
+      projectTrusted: false,
+    });
+    const reloadedEntry = reloaded.profiles.find((profile) => profile.id === "general");
+    if (!reloadedEntry) throw new Error("expected general profile after reload");
+    expect(resolveProfileDefinition(reloadedEntry)).toMatchObject({
+      manifest: { instructionScopes: ["project"] },
+    });
+
+    await expect(
+      section.apply({
+        scope: "global",
+        cwd: paths.root,
+        fieldKey: "instructionScopes",
+        action: { kind: "set", value: "everything" },
+      }),
+    ).rejects.toThrow("Instructions must be");
   });
 
   it("shows an incomplete-profile diagnostic for a profile without a package base", async () => {
