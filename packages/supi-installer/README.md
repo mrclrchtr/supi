@@ -26,12 +26,13 @@ The installer does not find a Git root, install PI, or grant project trust. With
   Package                          Project  Global
   supi-code-intelligence ★         [x]      [-]
 › supi-web ★                       [ ]     >[+]
-  Obsolete · removal only
-  supi-claude-md                   [x]      ( )
+  Obsolete · remove recommended
+  supi-claude-md remove            [!]      ( )
 ```
 
 - A checkbox represents a direct declaration in that scope, not effective capability availability.
 - `[x]` keeps a declaration, `[+]` adds one, `[-]` removes one, and `( )` marks a cell that cannot change. The status line counts pending changes.
+- `[!]` marks a kept obsolete declaration. Removal is recommended; press Space to mark it `[-]`. The status line counts obsolete declarations still kept.
 - `★` marks Recommended packages. Beta and opt-in packages are tagged next to their name.
 - Colors follow the terminal's color support and honor `NO_COLOR`.
 - Project uses `<project>/.pi/settings.json`. Global uses PI's agent settings.

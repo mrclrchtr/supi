@@ -66,8 +66,8 @@ function wrapLine(line, width) {
 }
 
 /**
- * Show the draft against the current declaration: `[x]` kept, `[+]` added, `[-]` removed, and
- * parentheses for cells that cannot change. Without color, a `>` marks the focused cell.
+ * Show the draft against the current declaration: `[x]` kept, `[+]` added, `[-]` removed, `[!]` an
+ * obsolete declaration that is still kept, and parentheses for cells that cannot change. Without color, a `>` marks the focused cell.
  * @param {View} view @param {number} index @param {import('../types.ts').Scope} scope @returns {Line}
  */
 function cell(view, index, scope) {
@@ -76,12 +76,15 @@ function cell(view, index, scope) {
   const selected = row.selected[scope];
   const focused = view.index === index && view.scope === scope;
   const locked = !canEdit(view.matrix, index, scope);
-  const mark = selected === declared ? (selected ? "x" : " ") : selected ? "+" : "-";
-  const tone = locked
-    ? SGR.dim
-    : selected === declared
-      ? undefined
-      : `${SGR.bold};${selected ? SGR.green : SGR.red}`;
+  const stale = row.item.obsolete && selected;
+  const mark = stale ? "!" : selected === declared ? (selected ? "x" : " ") : selected ? "+" : "-";
+  const tone = stale
+    ? `${SGR.bold};${SGR.yellow}`
+    : locked
+      ? SGR.dim
+      : selected === declared
+        ? undefined
+        : `${SGR.bold};${selected ? SGR.green : SGR.red}`;
   const text = locked ? `(${mark})` : `[${mark}]`;
   if (!focused) return [[" "], [text, tone]];
   if (view.color) return [[" "], [text, [tone, SGR.inverse].filter(Boolean).join(";")]];
@@ -93,6 +96,7 @@ function tags(item) {
   /** @type {Line} */
   const line = [];
   if (item.recommended) line.push([" ★", SGR.yellow]);
+  if (item.obsolete) line.push([" remove", SGR.yellow]);
   const inline = item.labels.filter((label) => label === "Beta" || label === "Opt-in");
   if (inline.length) line.push([` ${inline.join(" ").toLowerCase()}`, SGR.dim]);
   return line;
@@ -121,10 +125,17 @@ function displayItems(view) {
   const items = [];
   for (const [index, row] of view.matrix.rows.entries()) {
     if (row.item.obsolete && !view.matrix.rows[index - 1]?.item.obsolete)
-      items.push({ heading: "Obsolete · removal only" });
+      items.push({ heading: "Obsolete · remove recommended" });
     items.push({ index });
   }
   return items;
+}
+
+/** Obsolete declarations the draft still keeps, counted per scope. @param {import('../matrix.mjs').Matrix} matrix */
+function obsoleteKept(matrix) {
+  return matrix.rows
+    .filter((row) => row.item.obsolete)
+    .reduce((count, row) => count + Number(row.selected.project) + Number(row.selected.global), 0);
 }
 
 /** @param {View} view @returns {Line} */
@@ -133,6 +144,7 @@ function statusLine(view) {
   const { blocked, unmanaged } = matrix.inventory;
   const pending = getPlan(matrix).length;
   const unmanagedCount = unmanaged.project.length + unmanaged.global.length;
+  const stale = obsoleteKept(matrix);
   return [
     [`${index + 1}/${matrix.rows.length}`, SGR.dim],
     [" · Focus: "],
@@ -141,6 +153,7 @@ function statusLine(view) {
     pending
       ? [`${pending} pending change${pending === 1 ? "" : "s"}`, `${SGR.bold};${SGR.yellow}`]
       : ["No pending changes", SGR.dim],
+    ...(stale ? [[` · ${stale} obsolete to remove`, `${SGR.bold};${SGR.yellow}`]] : []),
     ...(unmanagedCount ? [[` · Unmanaged: ${unmanagedCount}`, SGR.dim]] : []),
     ...["project", "global"]
       .filter((name) => blocked[/** @type {import('../types.ts').Scope} */ (name)].length)
@@ -159,7 +172,7 @@ function detailLines(view) {
   const about = row.item.obsolete
     ? [
         [row.item.name, SGR.bold],
-        [" — Obsolete; removal only. "],
+        [" — Obsolete; remove it. ", `${SGR.bold};${SGR.yellow}`],
         [row.item.replacement ?? "No replacement.", SGR.yellow],
       ]
     : [
@@ -193,7 +206,7 @@ function matrixLines(view, height) {
   return [
     [
       ["SuPi installer", SGR.bold],
-      ["  [x] declared [+] add [-] remove ( ) locked", SGR.dim],
+      ["  [x] declared [+] add [-] remove [!] obsolete ( ) locked", SGR.dim],
     ],
     [
       ["Project: ", SGR.dim],
