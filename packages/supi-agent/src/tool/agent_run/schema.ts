@@ -45,7 +45,7 @@ export function buildAgentRunSchema(catalogue: ProfileCatalogue): TSchema {
       minLength: 1,
       maxLength: MAX_INSTRUCTIONS_CHARS,
       description:
-        "Scoped objective, required result, and task-specific findings with accessible sources or excerpts. Label uncertainty. For follow-ups, include only new work or changed facts.",
+        "Objective and its boundary, the result to return, and what you already know as exact paths, symbols, or excerpts. Mark unverified claims as such. For follow-ups, include only new work or changed facts.",
     }),
   };
   const taskSchema = Type.Object(
@@ -106,7 +106,7 @@ export function buildAgentRunSchema(catalogue: ProfileCatalogue): TSchema {
         Type.String({
           maxLength: MAX_SHARED_CONTEXT_CHARS,
           description:
-            "Evidence and background needed by every task, with uncertainty labeled. For follow-ups, include only new or changed context.",
+            "Background every task needs, written by the same rules as instructions. For follow-ups, include only new or changed context.",
         }),
       ),
     },

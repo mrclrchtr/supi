@@ -83,10 +83,12 @@ A fresh Delegation Conversation does not inherit the parent's conversation histo
 
 | Input | Include | Leave out |
 | --- | --- | --- |
-| Task `instructions` | Scoped objective, task-specific evidence and uncertainty, required result | Unrelated history and unrequested implementation alternatives |
+| Task `instructions` | Objective and its boundary, required result, known facts as exact paths, symbols, or excerpts, unverified claims marked as such | Unrelated history, unrequested implementation alternatives, and reading lists longer than the task needs |
 | `sharedContext` | Background and source-backed findings needed by **every** task | Sibling-specific work and whole previous reports |
 | Delegation Follow-Up | New work, changed facts, and new relevant context | Earlier findings already retained in that conversation |
 
+- The child receives `sharedContext` under the heading "Context shared by every task in this batch" and its own `instructions` under "Your task".
+- Check paths and facts before passing them. The child cannot ask, so a wrong path costs it calls.
 - Supply findings with accessible source locations or short excerpts, not just a reading itinerary. Separate observations, assumptions, and unresolved questions. Supplied evidence is not a required conclusion: the child should surface contradictions or stale evidence.
 - Match evidence access to the selected Agent Profile. For example, fetch an issue in the parent and pass its relevant requirements when the child has no shell or Web tools; do not tell that child to run `gh`. Put task-specific evidence in `instructions`, not batch-wide context.
 - Resolve product choices before assigning work that depends on them. A child can report a blocking choice rather than investigate every possible implementation branch.

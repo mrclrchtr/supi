@@ -2,7 +2,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { requestChildWebTools } from "@mrclrchtr/supi-core/session";
 import type { DelegationController } from "../../delegation/controller.ts";
 import { makeAgentRunExecute } from "./execute.ts";
-import { toolDescription } from "./guidance.ts";
+import { promptGuidelines, toolDescription } from "./guidance.ts";
 import { prepareAgentRunArguments } from "./input.ts";
 import { renderCall, renderResult } from "./render.ts";
 import { agentRunSpec, buildAgentRunParameters } from "./spec.ts";
@@ -13,6 +13,7 @@ export function registerAgentRunTool(pi: ExtensionAPI, controller: DelegationCon
   pi.registerTool({
     ...agentRunSpec,
     description: toolDescription,
+    promptGuidelines,
     parameters,
     prepareArguments: prepareAgentRunArguments,
     renderCall,

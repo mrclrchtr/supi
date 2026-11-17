@@ -20,7 +20,13 @@ export function buildChildPrompt(task: ResolvedTask, sharedContext?: string): st
       `Your tools run in ${task.inputs.cwd}. This overrides any other working directory named in your environment; use relative paths without a cd prefix.`,
     );
   }
-  if (sharedContext?.trim()) sections.push(sharedContext.trim());
-  sections.push(task.instructions);
+  const context = sharedContext?.trim();
+  if (context) {
+    // Shared context is written for the whole batch; the label tells the child which part is its own.
+    sections.push(`Context shared by every task in this batch:\n${context}`);
+    sections.push(`Your task:\n${task.instructions}`);
+  } else {
+    sections.push(task.instructions);
+  }
   return sections.join("\n\n");
 }

@@ -100,8 +100,10 @@ describe("resumable conversations through registered tools", () => {
     };
 
     const newPrompt = harness.children[1]?.session.prompt.mock.calls[0]?.[0];
-    expect(newPrompt).toContain("Changed: deploy.yml now reads production secrets");
-    expect(newPrompt).toContain("Check how production secrets reach the service.");
+    expect(newPrompt).toContain(
+      "Context shared by every task in this batch:\nChanged: deploy.yml now reads production secrets",
+    );
+    expect(newPrompt).toContain("Your task:\nCheck how production secrets reach the service.");
     expect(newPrompt).not.toContain("Observed: deploy.yml:12");
     expect(newPrompt).not.toContain("Inspect deployment configuration.");
     expect(secondTask.conversationId).toBe(firstTask.conversationId);
