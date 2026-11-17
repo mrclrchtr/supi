@@ -4,7 +4,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { loadWebConfig } from "./config.ts";
 import { registerWebSettings } from "./settings-registration.ts";
 import { registerWebFetchMdTool } from "./tool/web_fetch_md/register.ts";
-import { isBxAvailable } from "./tool/web_search/bx.ts";
+import { hasBxApiKey, isBxAvailable } from "./tool/web_search/bx.ts";
 import { registerWebSearchTool } from "./tool/web_search/register.ts";
 
 /** Register web tools and evaluate Web Search at the session load boundary. */
@@ -29,5 +29,14 @@ export default function webExtension(pi: ExtensionAPI): void {
 
     registerWebSearchTool(pi);
     webSearchRegistered = true;
+
+    // Stay registered without a key: bx rereads its config per call, so a later
+    // `bx config set-key` takes effect without /reload.
+    if ((await hasBxApiKey(ctx.cwd)) === false) {
+      ctx.ui.notify(
+        "Web Search is enabled, but bx has no Brave API key. Run `bx config set-key` or set BRAVE_SEARCH_API_KEY in the environment that starts Pi.",
+        "warning",
+      );
+    }
   });
 }

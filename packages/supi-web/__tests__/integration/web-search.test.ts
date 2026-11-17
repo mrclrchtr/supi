@@ -31,6 +31,8 @@ describe("web_search process integration", () => {
       ]),
     );
     fake = createFakeBx();
+    vi.stubEnv("BRAVE_SEARCH_API_KEY", "");
+    vi.stubEnv("BX_KEY_EXIT_CODE", "0");
   });
 
   afterEach(() => {
@@ -109,6 +111,36 @@ describe("web_search process integration", () => {
 
     expect(pi.tools).toHaveLength(1);
     expect(ctx.ui.notify).toHaveBeenCalledWith(expect.stringContaining("bx"), "warning");
+  });
+
+  it("warns on load without an API key but keeps web_search registered", async () => {
+    useFakeBx(fake, JSON.stringify({ grounding: { generic: [] } }));
+    vi.stubEnv("BX_KEY_EXIT_CODE", "2");
+    writeWebSearchSetting(fake.cwd, true);
+
+    const pi = createPiMock();
+    webExtension(pi as never);
+    const ctx = makeCtx({ cwd: fake.cwd });
+    await pi.emit("session_start", { reason: "startup" }, ctx);
+
+    expect(getTool(pi, "web_search")).toBeDefined();
+    expect(ctx.ui.notify).toHaveBeenCalledWith(
+      expect.stringContaining("no Brave API key"),
+      "warning",
+    );
+  });
+
+  it("does not warn on load when an API key is configured", async () => {
+    useFakeBx(fake, JSON.stringify({ grounding: { generic: [] } }));
+    writeWebSearchSetting(fake.cwd, true);
+
+    const pi = createPiMock();
+    webExtension(pi as never);
+    const ctx = makeCtx({ cwd: fake.cwd });
+    await pi.emit("session_start", { reason: "startup" }, ctx);
+
+    expect(getTool(pi, "web_search")).toBeDefined();
+    expect(ctx.ui.notify).not.toHaveBeenCalled();
   });
 
   it("keeps web_fetch_md available when Web Search is disabled", async () => {

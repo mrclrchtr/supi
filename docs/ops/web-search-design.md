@@ -94,6 +94,7 @@ web_search({
 - Settings changes report that `/reload` is required. Enabling while bx is missing also produces the requested warning. Do not change active tools before reload.
 - Keep warnings in human-facing channels. Do not add missing-setup instructions to the model's system prompt.
 - Do not make a network request to test credentials at startup. A present binary does not prove valid credentials or plan access; these failures remain call-time errors.
+- After registration, check locally for a configured key: a non-empty `BRAVE_SEARCH_API_KEY`, or exit 0 from `bx config show-key` (exit 2 means none). Warn when no key exists, but keep `web_search` registered because bx rereads its config per call. Treat any other check result as unknown and stay silent. When `bx context` exits 2, run the same check to report a missing key instead of a usage error; never read stderr for this.
 - Keep the existing web tools independent. Do not change Agent or Review capability sets or the bx skill preference.
 
 ### Package structure and verification

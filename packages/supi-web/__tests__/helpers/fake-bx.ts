@@ -14,6 +14,13 @@ interface FakeBxOptions {
   splitUtf8?: boolean;
 }
 
+/**
+ * Shared fake prelude. `bx config ...` exits with `BX_KEY_EXIT_CODE` (default 0 = key present)
+ * and does not overwrite the captured search arguments.
+ */
+const FAKE_BX_HEADER =
+  '#!/bin/sh\n[ -n "$BX_KEY_EXIT_CODE" ] || BX_KEY_EXIT_CODE=0\nif [ "$1" = config ]; then exit "$BX_KEY_EXIT_CODE"; fi\nprintf \'%s\\n\' "$@" > "$BX_ARGS_FILE"\n';
+
 /** Create a local bx command for deterministic process tests. */
 export function createFakeBx(options: FakeBxOptions = {}): FakeBx {
   const directory = mkdtempSync(join(tmpdir(), "supi-web-bx-"));
@@ -31,11 +38,7 @@ printf '%s' '","url":"https://example.test/utf8","snippets":["utf8"]}]}}'
 printf '%s' "$BX_STDERR" >&2
 exit "$BX_EXIT_CODE"`
       : 'printf \'%s\' "$BX_OUTPUT"\nprintf \'%s\' "$BX_STDERR" >&2\nexit "$BX_EXIT_CODE"';
-  writeFileSync(
-    executable,
-    `#!/bin/sh\nprintf '%s\\n' "$@" > "$BX_ARGS_FILE"\n${command}\n`,
-    "utf8",
-  );
+  writeFileSync(executable, `${FAKE_BX_HEADER}${command}\n`, "utf8");
   chmodSync(executable, 0o755);
 
   return {
@@ -53,7 +56,7 @@ exit "$BX_EXIT_CODE"`
 export function restoreFakeBx(fake: FakeBx): void {
   writeFileSync(
     join(fake.directory, "bx"),
-    '#!/bin/sh\nprintf \'%s\\n\' "$@" > "$BX_ARGS_FILE"\nprintf \'%s\' "$BX_OUTPUT"\nprintf \'%s\' "$BX_STDERR" >&2\nexit "$BX_EXIT_CODE"\n',
+    `${FAKE_BX_HEADER}printf '%s' "$BX_OUTPUT"\nprintf '%s' "$BX_STDERR" >&2\nexit "$BX_EXIT_CODE"\n`,
     "utf8",
   );
   chmodSync(join(fake.directory, "bx"), 0o755);

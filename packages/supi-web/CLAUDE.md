@@ -18,7 +18,7 @@ Context7 using `web_docs_search` + `web_docs_fetch`.
 3. Parse required `grounding.generic` source data and format all sources and excerpts.
 4. Apply the shared model-visible output limit.
 
-The tool registers only when Web Search is enabled and `bx` is available on `PATH`. Settings apply after `/reload`; the setting does not change active tools during apply. Missing `bx` produces a human warning and does not stop the extension.
+The tool registers only when Web Search is enabled and `bx` is available on `PATH`. Settings apply after `/reload`; the setting does not change active tools during apply. Missing `bx` produces a human warning and does not stop the extension. A missing Brave API key (`hasBxApiKey()`: env var or `bx config show-key`, no network) also warns but keeps the tool registered; the same check turns a `bx context` exit 2 into a missing-key error.
 
 ## Context7 pipeline (web_docs_search + web_docs_fetch)
 

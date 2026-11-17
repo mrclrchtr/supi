@@ -16,12 +16,14 @@ interface BxProcessResult {
 type BxFailureKind = "cancelled" | "missing" | "start";
 
 /** Return a safe message for a documented bx process exit category. */
-export function formatBxExitFailure(exitCode: number | null): string {
+export function formatBxExitFailure(exitCode: number | null | typeof BX_MISSING_KEY_EXIT): string {
   switch (exitCode) {
     case 1:
       return "bx web search failed: client error. Check the query and request.";
     case 2:
       return "bx web search failed: CLI usage or compatibility error. Check the bx version.";
+    case BX_MISSING_KEY_EXIT:
+      return BX_MISSING_KEY_MESSAGE;
     case 3:
       return "bx web search failed: authentication or permission error. Check bx credentials and service access.";
     case 4:
@@ -32,6 +34,16 @@ export function formatBxExitFailure(exitCode: number | null): string {
       return `bx web search failed: unknown bx error (exit code ${exitCode ?? "unknown"}).`;
   }
 }
+
+/** Pseudo exit category for a usage error caused by a missing local API key. */
+const BX_MISSING_KEY_EXIT = "missing-key";
+
+/** Safe next step for a missing Brave API key. */
+export const BX_MISSING_KEY_MESSAGE =
+  "bx web search failed: no Brave API key configured. Run `bx config set-key` or set BRAVE_SEARCH_API_KEY in the environment that starts Pi.";
+
+/** Upper bound for the local key check; it never makes a network request. */
+const BX_KEY_CHECK_TIMEOUT_MS = 2000;
 
 class BxProcessFailure extends Error {
   constructor(readonly kind: BxFailureKind) {
@@ -82,6 +94,10 @@ export async function runBxContext(
   options: BxRunOptions,
 ): Promise<unknown> {
   const result = await invokeBx(buildBxContextArgs(query, freshness), options);
+  if (result.exitCode === 2 && (await hasBxApiKey(options.cwd)) === false) {
+    // bx also uses exit 2 when no key is configured; distinguish it without reading stderr.
+    throw new Error(formatBxExitFailure(BX_MISSING_KEY_EXIT));
+  }
   if (result.exitCode !== 0) {
     throw new Error(formatBxExitFailure(result.exitCode));
   }
@@ -92,6 +108,53 @@ export async function runBxContext(
     // biome-ignore lint/style/useErrorCause: Keep parser details out of tool errors.
     throw new Error("bx returned invalid JSON for web search.");
   }
+}
+
+/**
+ * Detect a locally configured Brave API key without a network request or quota use.
+ *
+ * `BRAVE_SEARCH_API_KEY` counts as configured. Otherwise `bx config show-key` reads only the
+ * bx config file: exit 0 means a key exists, exit 2 means none. Output is discarded so the
+ * masked key never leaves the process. Returns `undefined` when the result is unknown
+ * (timeout, start failure, or an unexpected exit code), so callers must not treat it as missing.
+ * The check cannot prove that a key is valid; invalid keys remain call-time errors.
+ */
+export async function hasBxApiKey(cwd: string): Promise<boolean | undefined> {
+  if (process.env.BRAVE_SEARCH_API_KEY?.trim()) return true;
+
+  const exitCode = await runBxQuiet(["config", "show-key"], cwd, BX_KEY_CHECK_TIMEOUT_MS);
+  if (exitCode === 0) return true;
+  if (exitCode === 2) return false;
+  return undefined;
+}
+
+function runBxQuiet(args: string[], cwd: string, timeoutMs: number): Promise<number | null> {
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (exitCode: number | null) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(exitCode);
+    };
+    let child: ReturnType<typeof spawn>;
+    try {
+      child = spawn("bx", args, { cwd, shell: false, stdio: "ignore" });
+    } catch {
+      resolve(null);
+      return;
+    }
+    const timer = setTimeout(() => {
+      try {
+        child.kill();
+      } catch {
+        // The process may have already exited.
+      }
+      finish(null);
+    }, timeoutMs);
+    child.once("error", () => finish(null));
+    child.once("close", (exitCode: number | null) => finish(exitCode));
+  });
 }
 
 function windowsCommandNames(pathExtValue: string | undefined): string[] {

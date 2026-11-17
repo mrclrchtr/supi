@@ -2,8 +2,8 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createPiMock, getTool, makeCtx } from "@mrclrchtr/supi-test-utils";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { runBxContext } from "../../src/tool/web_search/bx.ts";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { hasBxApiKey, runBxContext } from "../../src/tool/web_search/bx.ts";
 import type { WebSearchOutput } from "../../src/tool/web_search/result-schema.ts";
 import webExtension from "../../src/web.ts";
 import { createFakeBx, type FakeBx, useFakeBx, writeWebSearchSetting } from "../helpers/fake-bx.ts";
@@ -25,6 +25,8 @@ describe("web_search failures and output limits", () => {
       ]),
     );
     fake = createFakeBx();
+    vi.stubEnv("BRAVE_SEARCH_API_KEY", "");
+    vi.stubEnv("BX_KEY_EXIT_CODE", "0");
   });
 
   afterEach(() => {
@@ -32,6 +34,7 @@ describe("web_search failures and output limits", () => {
       if (value === undefined) delete process.env[key];
       else process.env[key] = value;
     }
+    vi.unstubAllEnvs();
     fake.cleanup();
   });
 
@@ -74,6 +77,32 @@ describe("web_search failures and output limits", () => {
     await expect(runBxContext("service failure", undefined, { cwd: fake.cwd })).rejects.toThrow(
       expected,
     );
+  });
+
+  it("reports a missing API key when bx exits 2 and the local key check finds none", async () => {
+    useFakeBx(fake, "", 2, "SECRET_TOKEN=do-not-show");
+    vi.stubEnv("BX_KEY_EXIT_CODE", "2");
+
+    const error = (await runBxContext("query", undefined, { cwd: fake.cwd }).catch(
+      (value) => value as Error,
+    )) as Error;
+
+    expect(error.message).toContain("no Brave API key configured");
+    expect(error.message).toContain("bx config set-key");
+    expect(error.message).not.toContain("SECRET_TOKEN");
+  });
+
+  it.each([
+    ["config key", "", "0", true],
+    ["no key", "", "2", false],
+    ["unexpected check exit", "", "7", undefined],
+    ["environment key without starting bx", "env-key", "2", true],
+  ])("detects %s locally", async (_label, envKey, keyExitCode, expected) => {
+    useFakeBx(fake, "");
+    vi.stubEnv("BRAVE_SEARCH_API_KEY", envKey);
+    vi.stubEnv("BX_KEY_EXIT_CODE", keyExitCode);
+
+    await expect(hasBxApiKey(fake.cwd)).resolves.toBe(expected);
   });
 
   it("hides unrestricted stderr on process failure", async () => {

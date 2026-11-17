@@ -1,5 +1,10 @@
 # Changelog
 
+## [13.1.0]
+
+- If Web Search is enabled and bx has no Brave API key, SuPi now warns at session start. The check is local: it reads `BRAVE_SEARCH_API_KEY` or runs `bx config show-key`, with no network request or quota use. `web_search` stays available, so a later `bx config set-key` works without `/reload`.
+- When bx fails because no API key is configured, `web_search` now names the missing key and how to set it, instead of suggesting a bx version problem.
+
 ## [13.0.0]
 
 - `web_search` requests about half as much source text per search (a 4,096-token budget instead of the Brave default of about 8,192), so one search uses less of the context window. Results hold fewer sources; search again with a narrower query when the first results are not enough.
