@@ -1,7 +1,7 @@
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { createPiMock, getHandlerOrThrow, getTool, makeCtx } from "@mrclrchtr/supi-test-utils";
+import { createPiMock, getTool, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import codeIntelligenceExtension from "../../../../src/extension.ts";
 import { clearMockRuntime } from "../../../helpers/register-mock-runtime.ts";
@@ -397,8 +397,8 @@ describe("code_orientation instruction-file reconstruction", () => {
 
     const pi = createPiMock();
     extensionWithIsolatedHome(pi);
-    const sessionStart = getHandlerOrThrow(pi, "session_start");
-    await sessionStart(
+    await pi.emit(
+      "session_start",
       {},
       makeCtx({
         cwd: tmpDir,
@@ -417,8 +417,8 @@ describe("code_orientation instruction-file reconstruction", () => {
 
     const pi = createPiMock();
     extensionWithIsolatedHome(pi);
-    const sessionStart = getHandlerOrThrow(pi, "session_start");
-    await sessionStart(
+    await pi.emit(
+      "session_start",
       {},
       makeCtx({
         cwd: tmpDir,
@@ -445,8 +445,8 @@ describe("code_orientation instruction-file reconstruction", () => {
 
     const pi = createPiMock();
     extensionWithIsolatedHome(pi);
-    const sessionStart = getHandlerOrThrow(pi, "session_start");
-    await sessionStart(
+    await pi.emit(
+      "session_start",
       {},
       makeCtx({
         cwd: tmpDir,

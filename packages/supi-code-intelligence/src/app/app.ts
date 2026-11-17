@@ -6,7 +6,7 @@
  * feature wiring.
  */
 
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { WorkspaceCodeIntelligenceSession } from "../session/session.ts";
 
 /**
@@ -69,13 +69,43 @@ export function createSessionCache(): {
 }
 
 /**
+ * Keep a session informed about the instruction files its model already has, so directory
+ * `code_orientation` does not deliver them again. Shared by the full extension and the
+ * headless profile; without it every instruction file counts as unseen.
+ *
+ * Registers:
+ * - `session_start` / `session_tree` — rebuild surfaced directories and full reads from the branch
+ * - `before_agent_start` — record the context files Pi loaded into the system prompt
+ * - `tool_result` — record full `read` results
+ * - `session_compact` — reset, so instructions are delivered again
+ */
+export function registerInstructionDedup(
+  pi: ExtensionAPI,
+  getSession: (cwd: string) => WorkspaceCodeIntelligenceSession,
+): void {
+  const restore = (_event: unknown, ctx: ExtensionContext): void => {
+    getSession(ctx.cwd).reconstructInstructionState(ctx.sessionManager.getBranch());
+  };
+  pi.on("session_start", restore);
+  pi.on("session_tree", restore);
+  pi.on("before_agent_start", (event, ctx) => {
+    getSession(ctx.cwd).captureNativeInstructionPaths(event.systemPromptOptions.contextFiles ?? []);
+  });
+  pi.on("tool_result", (event, ctx) => {
+    getSession(ctx.cwd).recordToolResult(event);
+  });
+  pi.on("session_compact", (_event, ctx) => {
+    getSession(ctx.cwd).resetInstructionDedup();
+  });
+}
+
+/**
  * Create the code-intelligence app and wire it to pi lifecycle events.
  *
  * Registers:
- * - `session_start` / `session_tree` — create or restore the session for the
- *   cwd from the active branch (overview and instruction dedup state)
- * - `tool_result` — records full `read` results for instruction dedup
- * - `session_compact` — resets instruction dedup state
+ * - instruction deduplication, see {@link registerInstructionDedup}
+ * - `session_start` / `session_tree` — create the session for the cwd and
+ *   restore overview state from the active branch
  * - `session_shutdown` — releases all sessions and clears per-session stores
  */
 export function createCodeIntelligenceApp(pi: ExtensionAPI): CodeIntelligenceApp {
@@ -93,13 +123,7 @@ export function createCodeIntelligenceApp(pi: ExtensionAPI): CodeIntelligenceApp
     restoreBranchOverviewState(session, ctx.sessionManager.getBranch());
   });
 
-  pi.on("tool_result", (event, ctx) => {
-    sessions.get(ctx.cwd)?.recordToolResult(event);
-  });
-
-  pi.on("session_compact", (_event, ctx) => {
-    sessions.get(ctx.cwd)?.resetInstructionDedup();
-  });
+  registerInstructionDedup(pi, (cwd) => getOrCreateSession(sessions, cwd));
 
   pi.on("session_shutdown", () => {
     for (const session of sessions.values()) {
@@ -108,19 +132,11 @@ export function createCodeIntelligenceApp(pi: ExtensionAPI): CodeIntelligenceApp
     sessions.clear();
   });
 
-  /**
-   * Restore overview injection state from a branch.
-   *
-   * Reconstructs instruction-file state and checks whether this branch
-   * already contains a code-intelligence-overview custom message.
-   */
+  /** Check whether this branch already contains a code-intelligence-overview custom message. */
   function restoreBranchOverviewState(
     session: WorkspaceCodeIntelligenceSession,
     branch: unknown[],
   ): void {
-    session.reconstructInstructionState(
-      branch as Parameters<typeof session.reconstructInstructionState>[0],
-    );
     session.restoreOverviewInjection(false);
     for (const entry of branch as Array<{ type?: string; customType?: string }>) {
       if (entry.type === "custom_message" && entry.customType === OVERVIEW_CUSTOM_TYPE) {

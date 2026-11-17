@@ -85,9 +85,8 @@ export default function codeIntelligenceExtension(
       ?.setOverviewEnabledOnce(resolveOverviewEnabled(ctx.cwd, ctx.isProjectTrusted(), homeDir));
   });
 
-  pi.on("before_agent_start", (event, ctx) => {
+  pi.on("before_agent_start", (_event, ctx) => {
     const session = app.getSession(ctx.cwd) ?? app.createSession(ctx.cwd);
-    session.captureNativeInstructionPaths(event.systemPromptOptions.contextFiles ?? []);
     session.setHomeDir(homeDir);
     session.setGradleObserver(gradle.forContext(ctx));
     if (!session.hasPinnedOverview()) {

@@ -1,5 +1,9 @@
 # Changelog
 
+## [13.1.0]
+
+- Directory `code_orientation` in managed child sessions (Agent Runs and Reviewer Sessions) no longer repeats an instruction file the session already has: one loaded into its system prompt, or one it read in full with `read`. After a compaction the files are delivered again. The parent session already behaved this way ([#612](https://github.com/mrclrchtr/supi/issues/612)).
+
 ## [13.0.0]
 
 - **Breaking:** every `code_*` evidence list in structured details now carries `completeness`: `complete`, `capped`, `partial`, or `unbounded`. Scripts can read it directly instead of inferring completeness from a null `totalCount`. `code_orientation` source lists and context definitions replace `collectedCount`/`omittedCount` with one `evidence` list. Expanded TUI sections report rows hidden by the 20-row view separately (for example `25 of 30; 5 omitted; 5 rows hidden in view`), instead of adding them to the evidence omission count. Structured TUI chrome from sessions saved before this change falls back to the markdown output on resume.

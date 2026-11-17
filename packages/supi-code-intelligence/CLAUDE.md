@@ -23,7 +23,7 @@ Whole-workflow capability unavailable → throw from `execute()` so PI marks a r
 ## Tool adapter contract
 
 - `src/tool/infra/truncate.ts` (`boundCodeToolResult`) truncates content at PI defaults (2000 lines / 50 KB); details remain structured and untruncated. Full content spills to a temporary file. Each tool's `result.ts` owns the final model-visible content and details via its `finish*Result` builder; `execute.ts` only calls the session workflow and delegates.
-- `src/headless.ts` is the managed-child profile. It registers exactly `code_resolve`, `code_inspect`, `code_orientation`, `code_graph`, `code_find`, and `code_health`; never add refactors, settings, UI, commands, or overview injection there.
+- `src/headless.ts` is the managed-child profile. It registers exactly `code_resolve`, `code_inspect`, `code_orientation`, `code_graph`, `code_find`, and `code_health`; never add refactors, settings, UI, commands, or overview injection there. Both entry points call `registerInstructionDedup` (`src/app/app.ts`); add instruction-state handlers there, not in one entry point.
 - Forward `signal` and `onUpdate` through `toWorkflowControl()`. The tool adapter derives one absolute deadline per public call (`DEFAULT_WORKFLOW_DEADLINE_MS`). Every workflow must pass the exact signal/deadline control to its provider. AST Scan creates one shared absolute deadline for enumeration and substrate work.
 - PI schema validation is not enough: workflow validation must protect direct callers.
 - Exact-one schemas use closed one-key objects rather than TypeBox unions/literals for model-provider compatibility.

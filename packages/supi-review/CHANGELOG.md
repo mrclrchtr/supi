@@ -1,5 +1,9 @@
 # Changelog
 
+## [13.1.0]
+
+- `code_orientation` no longer repeats an instruction file a Reviewer already read in full, and delivers instruction files again after a compaction ([#612](https://github.com/mrclrchtr/supi/issues/612)).
+
 ## [13.0.0]
 
 - `/supi-review-cleanup` reports one status row per workspace (`✓` removed, `✗` with the failure reason) instead of the raw `[supi-review-cleanup]` message.

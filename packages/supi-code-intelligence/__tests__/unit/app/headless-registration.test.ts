@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
@@ -45,6 +45,62 @@ describe("headless inspection profile", () => {
       rmSync(cwd, { recursive: true, force: true });
     }
   });
+  it("does not deliver an instruction file the child session already has", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "headless-instructions-"));
+    for (const name of ["loaded", "read", "unseen"]) {
+      mkdirSync(join(cwd, name));
+      writeFileSync(join(cwd, name, "CLAUDE.md"), `# ${name}\n`);
+    }
+    try {
+      const pi = createPiMock();
+      headlessInspectionProfile(pi as unknown as ExtensionAPI);
+      const ctx = makeCtx({ cwd });
+      const orient = async (path: string): Promise<string> => {
+        const tool = getTool(pi, "code_orientation") as unknown as {
+          execute: (...args: unknown[]) => Promise<{ content: Array<{ text: string }> }>;
+        };
+        const result = await tool.execute(
+          "headless",
+          { focus: { path } },
+          undefined,
+          undefined,
+          ctx,
+        );
+        return result.content[0]?.text ?? "";
+      };
+      await pi.emit(
+        "before_agent_start",
+        { systemPromptOptions: { contextFiles: [{ path: join(cwd, "loaded/CLAUDE.md") }] } },
+        ctx,
+      );
+      await pi.emit(
+        "tool_result",
+        {
+          toolName: "read",
+          input: { path: "read/CLAUDE.md" },
+          isError: false,
+          content: [{ type: "text", text: "# read\n" }],
+          details: undefined,
+        },
+        ctx,
+      );
+
+      expect(await orient("unseen")).toContain("### unseen/CLAUDE.md");
+      expect(await orient("loaded")).not.toContain("## Instructions");
+      expect(await orient("read")).not.toContain("## Instructions");
+
+      await pi.emit("session_compact", {}, ctx);
+
+      // A compaction drops the read result and the earlier Orientation output from context.
+      expect(await orient("read")).toContain("### read/CLAUDE.md");
+      expect(await orient("unseen")).toContain("### unseen/CLAUDE.md");
+      expect(await orient("loaded")).not.toContain("## Instructions");
+    } finally {
+      clearMockRuntime();
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
   it("registers exactly the six non-mutating Code Intelligence tools", () => {
     const pi = createPiMock();
     headlessInspectionProfile(pi as unknown as ExtensionAPI);

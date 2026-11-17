@@ -23,9 +23,10 @@ import codeIntelligenceExtension from "../../../src/extension.ts";
  * Uses the full extension factory (codeIntelligenceExtension) because the
  * before_agent_start handler is registered there, not in createCodeIntelligenceApp.
  *
- * The extension registers two before_agent_start handlers:
+ * The extension registers three before_agent_start handlers:
  *   0: native instruction path capture (sync, no return)
- *   1: overview injection (async, returns BeforeAgentStartEventResult)
+ *   1: session setup (sync, no return)
+ *   2: overview injection (async, returns BeforeAgentStartEventResult)
  */
 describe("overview injection", () => {
   let pi: ReturnType<typeof createPiMock> & ExtensionAPI;
@@ -100,11 +101,11 @@ describe("overview injection", () => {
     return { cwd, sessionManager: makeSessionManager(branch), isProjectTrusted: () => trusted };
   }
 
-  /** The overview handler is the second before_agent_start handler (index 1). */
+  /** The overview handler is the third before_agent_start handler (index 2). */
   function getOverviewHandler() {
     const handlers = pi.getHandlers("before_agent_start");
     expect(handlers.length).toBeGreaterThanOrEqual(2);
-    return handlers[1];
+    return handlers[2];
   }
 
   it("injects a bounded overview without a package manifest", async () => {

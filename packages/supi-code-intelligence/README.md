@@ -344,7 +344,7 @@ Tool results and the hidden overview enter Pi's model context and can be saved i
 
 The package-root export also re-exports types; prefer `/api`. See [the type exports](src/api.ts) for the complete list.
 
-The headless factory registers only `code_resolve`, `code_inspect`, `code_orientation`, `code_graph`, `code_find`, and `code_health` for managed child sessions. It adds no refactor tools, settings, commands, UI, or overview. It is a tool profile, not a filesystem sandbox.
+The headless factory registers only `code_resolve`, `code_inspect`, `code_orientation`, `code_graph`, `code_find`, and `code_health` for managed child sessions. It adds no refactor tools, settings, commands, UI, or overview. Directory orientation skips instruction files the child session already has, by the same rules as the full extension. It is a tool profile, not a filesystem sandbox.
 
 ## See it in action
 

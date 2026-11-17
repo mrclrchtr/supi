@@ -1,5 +1,5 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { createSessionCache } from "./app/app.ts";
+import { createSessionCache, registerInstructionDedup } from "./app/app.ts";
 import { registerGradleObservations } from "./gradle/consent.ts";
 import { registerLspSessionLifecycle } from "./substrate/lsp/lifecycle.ts";
 import { createLspAdapterState } from "./substrate/lsp/state.ts";
@@ -20,7 +20,8 @@ const inspectionToolNames = new Set<string>(HEADLESS_INSPECTION_TOOL_NAMES);
 
 /**
  * Register the managed-child profile: six inspection tools backed by the shared
- * Workspace provider host, without refactors, settings, UI, or overview state.
+ * Workspace provider host and instruction deduplication, without refactors, settings, UI, or
+ * overview state.
  */
 export default function headlessInspectionProfile(pi: ExtensionAPI): void {
   const sessions = createSessionCache();
@@ -34,6 +35,7 @@ export default function headlessInspectionProfile(pi: ExtensionAPI): void {
     session.setGradleObserver(gradle.forContext(ctx));
     session.setAutomaticPathPolicy(lspState.providerLease?.automaticPathPolicy ?? null);
   });
+  registerInstructionDedup(pi, sessions.getOrCreate);
   pi.on("session_shutdown", () => sessions.clear());
 
   registerCodeIntelligenceTools(
