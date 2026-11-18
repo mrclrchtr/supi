@@ -53,7 +53,16 @@ export default defineConfig({
     testTimeout: 5000,
     hookTimeout: 5000,
     fsModuleCache: true,
-    env: { TMPDIR: testTmpDir, TMP: testTmpDir, TEMP: testTmpDir },
+    env: {
+      TMPDIR: testTmpDir,
+      TMP: testTmpDir,
+      TEMP: testTmpDir,
+      // Git starts detached maintenance after a commit. Its lock files appear and vanish inside
+      // fixture repositories while tests copy or delete them, which fails with ENOENT.
+      GIT_CONFIG_COUNT: "1",
+      GIT_CONFIG_KEY_0: "maintenance.auto",
+      GIT_CONFIG_VALUE_0: "false",
+    },
     exclude: ["**/node_modules/**", "**/.worktrees/**", "**/dist/**"],
     onUnhandledError(error) {
       if (isBenignVscodeJsonRpcShutdownNoise(error)) {
