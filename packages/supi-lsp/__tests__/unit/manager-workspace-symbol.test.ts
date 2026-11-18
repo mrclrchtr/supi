@@ -476,6 +476,114 @@ describe("LspManager.workspaceSymbol cold warm-up", () => {
     });
   });
 
+  it("loads every project root before reporting a TypeScript result complete", async () => {
+    const root = makeTempRoot();
+    const declare = (name: string) => {
+      const file = join(root, "packages", name, "src", "index.ts");
+      mkdirSync(dirname(file), { recursive: true });
+      writeFileSync(join(root, "packages", name, "package.json"), JSON.stringify({ name }));
+      writeFileSync(file, "export const Widget = 1;\n");
+      return {
+        name: "Widget",
+        kind: 13,
+        location: { uri: fileToUri(file), range: { start: {}, end: {} } },
+      };
+    };
+    const symbols = [declare("a"), declare("b")];
+    const manager = new LspManager(
+      {
+        servers: {
+          typescript: {
+            command: "node",
+            args: [],
+            fileTypes: ["ts"],
+            rootMarkers: ["package.json"],
+          },
+        },
+      },
+      root,
+    );
+    // Like tsserver, the client answers only from projects with an open file.
+    const opened = new Set<string>();
+    const client = {
+      name: "typescript",
+      root,
+      status: "running",
+      serverCapabilities: { workspaceSymbolProvider: true },
+      workspaceSymbol: vi.fn(async () =>
+        completedCodeQuery(symbols.filter((symbol) => opened.has(symbol.location.uri))),
+      ),
+      documentSymbols: vi.fn().mockResolvedValue(completedCodeQuery([])),
+      hover: vi.fn(),
+      projectMembership: vi.fn().mockResolvedValue("configured"),
+    };
+    getClients(manager).set(`typescript:${root}`, client);
+    const ensureFileOpen = vi
+      .spyOn(manager, "ensureFileOpen")
+      .mockImplementation(async (filePath: string) => {
+        opened.add(fileToUri(filePath));
+        return client as never;
+      });
+    // One project is already loaded, so the first request has an answering row.
+    opened.add(symbols[0].location.uri);
+
+    // Concurrent first queries share one pass and both see every project.
+    const results = await Promise.all([
+      manager.workspaceSymbol("Widget"),
+      manager.workspaceSymbol("Widget"),
+    ]);
+    for (const result of results) expect(result).toEqual({ kind: "completed", data: symbols });
+    const opens = ensureFileOpen.mock.calls.length;
+
+    await expect(manager.workspaceSymbol("Widget")).resolves.toEqual({
+      kind: "completed",
+      data: symbols,
+    });
+    expect(ensureFileOpen).toHaveBeenCalledTimes(opens);
+  });
+
+  it("reports a TypeScript result at the server row limit as partial", async () => {
+    const root = makeTempRoot();
+    const manager = new LspManager(
+      {
+        servers: {
+          typescript: {
+            command: "node",
+            args: [],
+            fileTypes: ["ts"],
+            rootMarkers: ["package.json"],
+          },
+        },
+      },
+      root,
+    );
+    const row = {
+      name: "Widget",
+      kind: 13,
+      location: { uri: fileToUri(join(root, "src", "index.ts")), range: { start: {}, end: {} } },
+    };
+    const client = {
+      name: "typescript",
+      root,
+      status: "running",
+      serverCapabilities: { workspaceSymbolProvider: true },
+      workspaceSymbol: vi.fn().mockResolvedValue(completedCodeQuery(Array(256).fill(row))),
+      documentSymbols: vi.fn().mockResolvedValue(completedCodeQuery([])),
+      hover: vi.fn(),
+      projectMembership: vi.fn().mockResolvedValue("configured"),
+    };
+    getClients(manager).set(`typescript:${root}`, client);
+    vi.spyOn(manager, "ensureFileOpen").mockResolvedValue(client as never);
+
+    const result = await manager.workspaceSymbol("Widget");
+    expect(result).toMatchObject({
+      kind: "partial",
+      reason: expect.stringContaining("limit of 256 workspace symbols"),
+    });
+    // A truncated list must block automatic target selection.
+    expect(result).not.toHaveProperty("metadata.exclusionOnly");
+  });
+
   it("warms a cold workspace-symbol client and returns warmed results", async () => {
     const root = makeTempRoot();
     const manager = new LspManager(

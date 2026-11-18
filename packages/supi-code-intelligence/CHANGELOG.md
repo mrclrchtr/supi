@@ -2,6 +2,8 @@
 
 ## [13.1.0]
 
+- Symbol queries on TypeScript workspaces with several projects no longer return a short candidate list as complete. The language server searches only projects it has loaded, and the first query stopped after loading one. A query for `toolDescription` could list 13 of 26 declarations, and a name declared in two projects could be selected automatically from the one that was loaded. The first symbol query now loads every project root (up to 96) before collecting, which can take a few seconds once per session; roots past that limit are reported as a coverage limit ([#615](https://github.com/mrclrchtr/supi/issues/615)).
+- A TypeScript symbol result at the server's limit of 256 rows is reported as provider-limited instead of complete, so a target is not selected automatically from a truncated list.
 - Directory `code_orientation` in managed child sessions (Agent Runs and Reviewer Sessions) no longer repeats an instruction file the session already has: one loaded into its system prompt, or one it read in full with `read`. After a compaction the files are delivered again. The parent session already behaved this way ([#612](https://github.com/mrclrchtr/supi/issues/612)).
 - Directory `code_orientation` names the instruction files it does not repeat: `Instruction files already supplied in this session, not repeated: …`. Before, the missing `## Instructions` section could not be told apart from a discovery failure. The workspace-root file is not listed, because nearly every session already has it.
 - The note about results excluded by the automatic path policy is shorter: it names at most two example paths, and a path is written once unless the observed and canonical forms differ. Structured output still lists every collected example.

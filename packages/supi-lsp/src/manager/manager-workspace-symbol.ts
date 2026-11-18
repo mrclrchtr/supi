@@ -89,6 +89,31 @@ export function workspaceSymbolCoverageGap(
   };
 }
 
+/** Project roots one all-roots warm-up pass opens for a route. */
+const MAX_WARM_ROOTS = 96;
+
+/**
+ * Bound an all-roots warm-up pass. Roots past the limit stay unopened, and the
+ * returned gap says so: their symbols may be missing from the result.
+ */
+export function limitWorkspaceSymbolWarmRoots(targets: readonly WorkspaceSymbolWarmTarget[]): {
+  targets: WorkspaceSymbolWarmTarget[];
+  gap: string | null;
+} {
+  const roots = [...new Set(targets.map((target) => target.projectRoot))];
+  if (roots.length <= MAX_WARM_ROOTS) return { targets: [...targets], gap: null };
+  const kept = new Set(roots.slice(0, MAX_WARM_ROOTS));
+  return {
+    targets: targets.filter((target) => kept.has(target.projectRoot)),
+    gap:
+      `Workspace-symbol coverage is limited: ${roots.length - MAX_WARM_ROOTS} of ${roots.length} ` +
+      "project roots were not opened. Pass a narrower scope and retry.",
+  };
+}
+
+/** Rows typescript-language-server and the native TypeScript server return at most per query. */
+const TYPESCRIPT_WORKSPACE_SYMBOL_LIMIT = 256;
+
 export async function collectWorkspaceSymbols(
   clients: Iterable<LspClient>,
   query: string,
@@ -111,6 +136,15 @@ export async function collectWorkspaceSymbols(
     completedClientCount++;
     results.push(...(result.data ?? []));
     if (result.kind === "partial") failures.push(result.reason);
+    if (
+      client.name === "typescript" &&
+      (result.data?.length ?? 0) >= TYPESCRIPT_WORKSPACE_SYMBOL_LIMIT
+    ) {
+      failures.push(
+        `The TypeScript server returned its limit of ${TYPESCRIPT_WORKSPACE_SYMBOL_LIMIT} ` +
+          "workspace symbols; more matches may exist. Use a more specific query or a scope.",
+      );
+    }
   }
 
   return { results, hasSupport, completedClientCount, failures };
