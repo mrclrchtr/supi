@@ -152,7 +152,19 @@ async function trySniffNegotiation(
     const ct = sniffRes.headers.get("content-type") || "";
     const finalUrl = sniffRes.url || url;
 
-    if (!sniffRes.ok || isHtml(sniffText)) return null;
+    if (!sniffRes.ok) return null;
+    // Before the HTML check: an XML declaration also opens XHTML, so content alone cannot tell.
+    if (isXmlDataContentType(ct)) {
+      return fetchFullTextResult({
+        url,
+        timeoutMs,
+        signal,
+        contentType: ct,
+        kind: PLAIN_TEXT_RESPONSE_KIND,
+        headers: { "User-Agent": USER_AGENT },
+      });
+    }
+    if (isHtml(sniffText)) return null;
     const nonText = nonTextKind(ct, sniffText);
     if (nonText) return nonText;
     if (isMarkdownCandidate(ct, finalUrl, sniffText)) {
@@ -496,6 +508,12 @@ function isHtmlContentType(ct: string): boolean {
   return lower.includes("text/html") || lower.includes("application/xhtml+xml");
 }
 
+/** XML that is data, not a page: SVG, feeds, and other XML types except XHTML. */
+function isXmlDataContentType(ct: string): boolean {
+  const type = mediaTypeOf(ct);
+  return !isHtmlContentType(ct) && (type.endsWith("/xml") || type.endsWith("+xml"));
+}
+
 export function isPlainTextContentType(ct: string): boolean {
   const lower = ct.toLowerCase();
   if (isHtmlContentType(ct)) return false;
@@ -606,6 +624,7 @@ export function guessLanguage(url: string): string {
       scss: "scss",
       sh: "sh",
       sql: "sql",
+      svg: "xml",
       svelte: "svelte",
       swift: "swift",
       toml: "toml",

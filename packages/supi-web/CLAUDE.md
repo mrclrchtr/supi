@@ -39,6 +39,7 @@ The tool registers only when Web Search is enabled and `bx` is available on `PAT
 
 ## Key gotchas
 
+- XML data types (`/xml`, `+xml`, not XHTML) are returned as plain text before the HTML check: `isHtml` matches any `<?xml` declaration, so SVG and feeds were otherwise converted as HTML and came back empty.
 - Never return bytes as text. Images with a `read`-supported content type are saved as spill files (`result.image`, file mode with `mediaType`); other binary content (NUL in the sniff) and PDF failures (over 32 MB, password-protected, unreadable, no text layer) throw `FetchError`. `unpdf` is pinned to 1.x because 2.x requires Node 24 and Pi supports Node 22. It loads lazily on the first PDF.
 - `turndown-plugin-gfm` has no `@types` package — import uses `@ts-expect-error`
 - `fetchWithNegotiation` is split into 4 internal helpers to stay under Biome cognitive complexity limits

@@ -4,6 +4,7 @@
 
 - `web_fetch_md` now reads PDFs. It returns the text layer as Markdown with one `## Page N` section per page, instead of the raw PDF bytes. A PDF without a text layer (such as a scan), a password-protected or unreadable PDF, or one over 32 MB fails the call with a message that names the cause.
 - `web_fetch_md` now saves PNG, JPEG, GIF, WebP, and BMP images to a temporary file and returns the path, so the agent can view the image with the `read` tool. Other binary content, such as archives, fails the call instead of returning bytes as text.
+- `web_fetch_md` now returns SVG, RSS, Atom, and other XML as fenced source text. These were converted as HTML before, which often returned nothing.
 - If Web Search is enabled and bx has no Brave API key, SuPi now warns at session start. The check is local: it reads `BRAVE_SEARCH_API_KEY` or runs `bx config show-key`, with no network request or quota use. `web_search` stays available, so a later `bx config set-key` works without `/reload`.
 - When bx fails because no API key is configured, `web_search` now names the missing key and how to set it, instead of suggesting a bx version problem.
 

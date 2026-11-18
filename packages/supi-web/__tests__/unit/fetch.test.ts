@@ -326,6 +326,28 @@ describe("fetchWithNegotiation with other non-text content", () => {
   );
 });
 
+describe("fetchWithNegotiation with XML data", () => {
+  it.each([
+    ["image/svg+xml", '<?xml version="1.0"?>\n<svg xmlns="http://www.w3.org/2000/svg"/>'],
+    // biome-ignore lint/security/noSecrets: static XML fixture, not a credential
+    ["application/rss+xml; charset=utf-8", "<rss><channel><title>Feed</title></channel></rss>"],
+  ])("returns %s as plain text instead of converting it as HTML", async (contentType, body) => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string | URL | Request, init?: RequestInit) =>
+        init?.method === "HEAD"
+          ? new Response(null, { headers: { "content-type": contentType } })
+          : new Response(body, { headers: { "content-type": contentType } }),
+      ),
+    );
+
+    await expect(fetchWithNegotiation("https://example.com/data")).resolves.toMatchObject({
+      text: body,
+      isPlainText: true,
+    });
+  });
+});
+
 describe("isPlainTextContentType", () => {
   it("returns true for text/plain", () => {
     expect(isPlainTextContentType("text/plain")).toBe(true);

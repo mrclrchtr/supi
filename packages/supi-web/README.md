@@ -117,7 +117,7 @@ Search results are provider-reported source material. A source date can be a pub
 
 A PDF returns its text layer as Markdown with one `## Page N` section per page, so pages can be cited. Layout is not reconstructed: tables and multi-column pages come out as plain lines. A PDF over 32 MB, a password-protected or unreadable PDF, or one without a text layer (such as a scan) fails the call.
 
-A PNG, JPEG, GIF, WebP, or BMP image (up to 32 MB) is saved to a temporary file in every output mode; the result holds its path, media type, and size, and the `read` tool can show it. Other binary content, such as archives or video, fails the call.
+A PNG, JPEG, GIF, WebP, or BMP image (up to 32 MB) is saved to a temporary file in every output mode; the result holds its path, media type, and size, and the `read` tool can show it. Other binary content, such as archives or video, fails the call. SVG and other XML data, such as feeds, return as fenced source text; XHTML pages are converted like HTML.
 
 It follows redirects and, for HTML, removes scripts and styles while preserving headings, links, lists, code blocks, and tables.
 
