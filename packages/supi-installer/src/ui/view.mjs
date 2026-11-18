@@ -65,6 +65,21 @@ function wrapLine(line, width) {
   return [...lines, part];
 }
 
+/** @param {boolean} stale @param {boolean} selected @param {boolean} declared */
+function cellMark(stale, selected, declared) {
+  if (stale) return "!";
+  if (selected === declared) return selected ? "x" : " ";
+  return selected ? "+" : "-";
+}
+
+/** @param {boolean} stale @param {boolean} locked @param {boolean | undefined} change Added (`true`), removed (`false`), or unchanged. */
+function cellTone(stale, locked, change) {
+  if (stale) return `${SGR.bold};${SGR.yellow}`;
+  if (locked) return SGR.dim;
+  if (change === undefined) return undefined;
+  return `${SGR.bold};${change ? SGR.green : SGR.red}`;
+}
+
 /**
  * Show the draft against the current declaration: `[x]` kept, `[+]` added, `[-]` removed, `[!]` an
  * obsolete declaration that is still kept, and parentheses for cells that cannot change. Without color, a `>` marks the focused cell.
@@ -76,15 +91,9 @@ function cell(view, index, scope) {
   const selected = row.selected[scope];
   const focused = view.index === index && view.scope === scope;
   const locked = !canEdit(view.matrix, index, scope);
-  const stale = row.item.obsolete && selected;
-  const mark = stale ? "!" : selected === declared ? (selected ? "x" : " ") : selected ? "+" : "-";
-  const tone = stale
-    ? `${SGR.bold};${SGR.yellow}`
-    : locked
-      ? SGR.dim
-      : selected === declared
-        ? undefined
-        : `${SGR.bold};${selected ? SGR.green : SGR.red}`;
+  const stale = Boolean(row.item.obsolete && selected);
+  const mark = cellMark(stale, selected, declared);
+  const tone = cellTone(stale, locked, selected === declared ? undefined : selected);
   const text = locked ? `(${mark})` : `[${mark}]`;
   if (!focused) return [[" "], [text, tone]];
   if (view.color) return [[" "], [text, [tone, SGR.inverse].filter(Boolean).join(";")]];
