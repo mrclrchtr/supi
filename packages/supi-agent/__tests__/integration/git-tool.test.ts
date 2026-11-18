@@ -6,7 +6,6 @@ import { join } from "node:path";
 import { createPiMock, getTool, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { registerGitTool } from "../../src/tool/git/register.ts";
-import { EMPTY_OUTPUT_TEXT } from "../../src/tool/git/result.ts";
 
 let repo: string;
 
@@ -71,7 +70,21 @@ describe("git tool", () => {
 
   it("passes arguments after -- through as paths", async () => {
     const result = await runGitTool(["log", "--oneline", "--", "--output"]);
-    expect(result.content[0]?.text).toBe(EMPTY_OUTPUT_TEXT);
+    expect(result.content[0]?.text).toMatch(/^\(no output: no commits matched\./);
+  });
+
+  it("names the rejected leading token", async () => {
+    await expect(runGitTool(["-c", "diff.external=sh", "diff"])).rejects.toThrow(
+      'Option "-c" before the subcommand is not allowed',
+    );
+    await expect(runGitTool(["stash"])).rejects.toThrow('"stash" is not an allowed subcommand');
+  });
+
+  it("explains empty output by subcommand", async () => {
+    const untracked = await runGitTool(["ls-files", "no-such-dir"]);
+    expect(untracked.content[0]?.text).toContain("no tracked files matched");
+    const missingPath = await runGitTool(["diff", "HEAD", "--", "no-such-file"]);
+    expect(missingPath.content[0]?.text).toContain("paths are not checked for existence");
   });
 
   it("truncates output past the collection cap instead of failing", async () => {

@@ -7,6 +7,7 @@
 - Agent Runs with a package-owned or custom system prompt now receive the usage rules of their active tools in a `<tool_rules>` section. Before, those rules reached only profiles with `systemPrompt: "native"`.
 - `code_orientation` no longer repeats instruction files an Agent Run already has. A `general` run that loads the project `CLAUDE.md` into its system prompt got the same file again from the first directory orientation ([#612](https://github.com/mrclrchtr/supi/issues/612)).
 - `agent_run` guides the calling agent toward better briefs: `instructions` asks for the task boundary and for known facts as exact paths, symbols, or excerpts, and two usage rules ask it to check what it passes and to keep reading lists short. A child that receives `sharedContext` now sees it and its own task under separate headings.
+- The `git` tool explains empty output per subcommand, for example `(no output: no commits matched. …)`, and says that every revision resolved while paths are not checked for existence. A rejected first argument is named, for example `Option "-c" before the subcommand is not allowed`.
 - Each profile has an **Instructions** row in `/supi-settings` that sets `instructionScopes`: `none`, `project`, `global`, or `global+project`. Use it to keep a global AGENTS.md out of delegated runs. Run `/reload` to apply a change.
 
 ## [13.0.0]

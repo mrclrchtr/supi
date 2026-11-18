@@ -27,7 +27,11 @@ export interface GitQueryOutput {
 export function rejectGitArgs(args: readonly string[]): string | undefined {
   const [subcommand, ...rest] = args;
   if (!(GIT_READ_SUBCOMMANDS as readonly string[]).includes(subcommand ?? "")) {
-    return `Subcommand must be one of: ${GIT_READ_SUBCOMMANDS.join(", ")}.`;
+    const allowed = `the first argument must be one of: ${GIT_READ_SUBCOMMANDS.join(", ")}.`;
+    // Name the token: a leading option such as `-c` otherwise reads like a missing subcommand.
+    return subcommand?.startsWith("-")
+      ? `Option ${JSON.stringify(subcommand)} before the subcommand is not allowed; ${allowed}`
+      : `${JSON.stringify(subcommand ?? "")} is not an allowed subcommand; ${allowed}`;
   }
   for (const arg of rest) {
     if (arg === "--") break;
