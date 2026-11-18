@@ -15,8 +15,8 @@ export interface SpillFileOptions {
   owner: string;
   /** Descriptive file name, e.g. `"snapshot.md"`. The content hash is inserted before the extension. */
   name: string;
-  /** Full content to persist. */
-  content: string;
+  /** Full content to persist: text (written as UTF-8) or raw bytes. */
+  content: string | Uint8Array;
 }
 
 const SEGMENT = /^[a-z0-9][a-z0-9-]*$/;
