@@ -157,6 +157,7 @@ export async function resolveSymbolTarget(
       });
     }
     return resolveCandidates({
+      symbol,
       candidates: exactKind,
       discovery: candidateDiscovery(result, cwd),
       exclusionNote: exclusionOnlyNote(result, cwd),
@@ -168,6 +169,7 @@ export async function resolveSymbolTarget(
   }
 
   return resolveCandidates({
+    symbol,
     candidates: eligible,
     discovery: candidateDiscovery(result, cwd),
     exclusionNote: exclusionOnlyNote(result, cwd),
@@ -188,6 +190,8 @@ function normalizeProviderKind(kind: string): string {
 
 async function resolveCandidates(
   options: CandidateOutcomeBase & {
+    /** The queried name; one case-sensitive exact match wins over partial-name matches. */
+    symbol: string;
     discovery: CandidateDiscovery;
     /** Disclosure for a unique match beside policy-excluded rows. */
     exclusionNote?: string;
@@ -198,10 +202,16 @@ async function resolveCandidates(
     (candidate) =>
       candidate.declarationAnchor.line > 0 || candidate.declarationAnchor.character > 0,
   );
-  if (ranged.length === 1 && discovery.partialMessage === null) {
-    const resolved = resolvedTarget(await refineResolvedSymbolAnchor(ranged[0], semantic, control));
-    // Exclusion-only evidence resolves, but the excluded rows stay disclosed.
-    return exclusionNote ? { ...resolved, notes: [exclusionNote] } : resolved;
+  // Workspace-symbol providers match substrings, so a query for `foo` also returns `fooBar`.
+  const exact = ranged.filter((candidate) => candidate.name === options.symbol);
+  const selected = ranged.length === 1 ? ranged[0] : exact.length === 1 ? exact[0] : undefined;
+  if (selected && discovery.partialMessage === null) {
+    const resolved = resolvedTarget(await refineResolvedSymbolAnchor(selected, semantic, control));
+    // Unselected rows stay disclosed: partial-name matches and policy exclusions.
+    const notes = [partialNameNote(candidates, selected), exclusionNote].filter(
+      (note): note is string => note !== undefined,
+    );
+    return notes.length > 0 ? { ...resolved, notes } : resolved;
   }
   return buildCandidateOutcome({
     kind: "disambiguation",
@@ -212,6 +222,21 @@ async function resolveCandidates(
     discovery,
     control,
   });
+}
+
+const MAX_NOTE_NAMES = 3;
+
+/** Name the partial-name matches passed over for the only exact-name match. */
+function partialNameNote(
+  candidates: readonly CodeSymbol[],
+  selected: CodeSymbol,
+): string | undefined {
+  const others = candidates.filter((candidate) => candidate !== selected);
+  if (others.length === 0) return undefined;
+  const names = [...new Set(others.map((candidate) => candidate.name))];
+  const shown = names.slice(0, MAX_NOTE_NAMES).map((name) => `\`${name}\``);
+  if (names.length > MAX_NOTE_NAMES) shown.push(`${names.length - MAX_NOTE_NAMES} more`);
+  return `Selected the only exact-name match; ${others.length} partial-name ${others.length === 1 ? "match was" : "matches were"} not selected (${shown.join(", ")}).`;
 }
 
 function resolvedTarget(candidate: CodeSymbol): Extract<TargetOutcome, { kind: "resolved" }> {

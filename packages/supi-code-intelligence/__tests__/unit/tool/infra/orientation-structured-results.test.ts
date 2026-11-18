@@ -221,7 +221,8 @@ describe("orientation structured results", () => {
             nameAnchor: { line: 1, character: 14 },
           },
           {
-            name: "valueOther",
+            // Two exact-name matches: one exact name beside partial names would resolve.
+            name: "value",
             kind: "Variable",
             file: join(cwd, "index.ts"),
             declarationAnchor: { line: 1, character: 1 },

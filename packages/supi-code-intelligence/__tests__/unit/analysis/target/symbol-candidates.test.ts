@@ -113,13 +113,47 @@ describe("symbol candidates", () => {
       candidates: [{ name: "Widget", rank: 1 }],
     });
   });
+  it("selects the only exact-name match and names the partial-name matches", async () => {
+    const result = await resolveSymbolTarget(
+      "Widget",
+      "/project",
+      provider([
+        candidate("WidgetProps", "props"),
+        candidate("Widget", "widget"),
+        candidate("widget", "lowercase"),
+      ]),
+    );
+
+    expect(result).toMatchObject({
+      kind: "resolved",
+      target: { name: "Widget", file: "/project/src/widget.ts" },
+      notes: [
+        "Selected the only exact-name match; 2 partial-name matches were not selected (`WidgetProps`, `widget`).",
+      ],
+    });
+  });
+
+  it("keeps candidates when an incomplete result has one exact name among others", async () => {
+    const result = await resolveSymbolTarget(
+      "Widget",
+      "/project",
+      provider(
+        [candidate("WidgetProps", "props"), candidate("Widget", "widget")],
+        "One route failed.",
+      ),
+    );
+
+    expect(result.kind).toBe("disambiguation");
+  });
+
   it.each([1, 6])("puts exact names first before the display cap of %s", async (maxResults) => {
     const result = await resolveSymbolTarget(
       "ShowingPositionRow",
       "/project",
       provider([
         candidate("ShowingPositionRowProps", "props"),
-        candidate("ShowingPositionRow", "component"),
+        candidate("ShowingPositionRow", "first"),
+        candidate("ShowingPositionRow", "second"),
       ]),
       { maxResults },
     );
@@ -129,9 +163,9 @@ describe("symbol candidates", () => {
       candidateEvidence: {
         key: "target.candidates",
         completeness: maxResults === 1 ? "capped" : "complete",
-        totalCount: 2,
-        shownCount: maxResults === 1 ? 1 : 2,
-        omittedCount: maxResults === 1 ? 1 : 0,
+        totalCount: 3,
+        shownCount: maxResults === 1 ? 1 : 3,
+        omittedCount: maxResults === 1 ? 2 : 0,
         partialReason: null,
       },
     });
@@ -141,7 +175,8 @@ describe("symbol candidates", () => {
         ? [{ name: "ShowingPositionRow", rank: 1 }]
         : [
             { name: "ShowingPositionRow", rank: 1 },
-            { name: "ShowingPositionRowProps", rank: 2 },
+            { name: "ShowingPositionRow", rank: 2 },
+            { name: "ShowingPositionRowProps", rank: 3 },
           ],
     );
   });

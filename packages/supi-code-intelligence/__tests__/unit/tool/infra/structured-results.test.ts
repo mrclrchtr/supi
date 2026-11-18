@@ -305,7 +305,7 @@ describe("structured navigation results", () => {
     async (name) => {
       writeFileSync(
         join(cwd, "index.ts"),
-        "export function widget() {}\nexport function widgetOther() {}\n",
+        "export function widget() {}\nexport function widget() {}\n",
       );
       registerMockProvider(cwd, {
         workspaceSymbols: async () =>
@@ -318,7 +318,8 @@ describe("structured navigation results", () => {
               nameAnchor: { line: 1, character: 17 },
             },
             {
-              name: "widgetOther",
+              // Two exact-name matches: one exact name beside partial names would resolve.
+              name: "widget",
               kind: "Function",
               file: join(cwd, "index.ts"),
               declarationAnchor: { line: 2, character: 1 },
