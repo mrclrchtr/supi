@@ -8,6 +8,7 @@ import {
   type WorkspaceLspRuntime,
 } from "@mrclrchtr/supi-lsp/api";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { MAX_PENDING_INPUT_OPERATIONS } from "../../src/client/client-input-admission.ts";
 import { disabledDefaultServers } from "../helpers/disabled-default-servers.ts";
 
 const FIXTURE = path.resolve(import.meta.dirname, "../fixtures/lsp-semantic-server.mjs");
@@ -221,14 +222,20 @@ describe("public WorkspaceLspRuntime enrollment admission", () => {
       expect(events().filter((event) => event.method === "workspace/symbol")).toHaveLength(1),
     );
     const caller = new AbortController();
-    const accesses = Array.from({ length: 33 }, () =>
+    const accesses = Array.from({ length: MAX_PENDING_INPUT_OPERATIONS + 1 }, () =>
       observe(runtime.documentSymbols(cold, { signal: caller.signal })),
     );
-    await expect(Promise.race(accesses)).resolves.toMatchObject({ kind: "unavailable" });
+    // The overflow names its cause instead of a missing route.
+    await expect(Promise.race(accesses)).resolves.toMatchObject({
+      kind: "unavailable",
+      reason: expect.stringContaining("LSP input admission queue is full."),
+    });
     const reason = new Error("cancel waiting enrollment batch");
     caller.abort(reason);
     const outcomes = await Promise.allSettled(accesses);
-    expect(outcomes.filter((outcome) => outcome.status === "rejected")).toHaveLength(32);
+    expect(outcomes.filter((outcome) => outcome.status === "rejected")).toHaveLength(
+      MAX_PENDING_INPUT_OPERATIONS,
+    );
     for (const outcome of outcomes)
       if (outcome.status === "rejected") expect(outcome.reason).toBe(reason);
     expect(runtime.getOpenDocumentVersion(cold)).toBeNull();

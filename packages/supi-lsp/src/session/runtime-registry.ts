@@ -114,8 +114,17 @@ function isRange(value: Position | Range): value is Range {
   );
 }
 
-function unavailableFileQuery<T>(operation: string, file: string): CodeQueryResult<T> {
-  return unavailableCodeQuery(`No routed LSP client could complete ${operation} for ${file}.`);
+/** Name the open failure when a route exists; otherwise report the missing route. */
+function unavailableFileQuery<T>(
+  operation: string,
+  file: string,
+  openFailure?: string,
+): CodeQueryResult<T> {
+  return unavailableCodeQuery(
+    openFailure
+      ? `LSP could not open ${file} for ${operation}: ${openFailure}`
+      : `No routed LSP client could complete ${operation} for ${file}.`,
+  );
 }
 
 function hasProcessCrashRecovery(report: ProcessCrashRecoveryReport): boolean {
@@ -172,12 +181,16 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
     control?: CodeRequestControl,
   ): Promise<CodeQueryResult<Hover | null>> {
     const resolvedPath = this.resolveFilePath(filePath);
+    let openFailure: string | undefined;
     const client = await this.manager.ensureFileOpen(resolvedPath, {
       recoverProcessCrash: true,
       protectInputs: true,
       control,
+      onOpenFailure: (reason) => {
+        openFailure = reason;
+      },
     });
-    if (!client) return unavailableFileQuery("hover", resolvedPath);
+    if (!client) return unavailableFileQuery("hover", resolvedPath, openFailure);
     return client.hover(resolvedPath, position, control);
   }
 
@@ -187,12 +200,16 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
     control?: CodeRequestControl,
   ): Promise<CodeQueryResult<Location | Location[] | LocationLink[] | null>> {
     const resolvedPath = this.resolveFilePath(filePath);
+    let openFailure: string | undefined;
     const client = await this.manager.ensureFileOpen(resolvedPath, {
       recoverProcessCrash: true,
       protectInputs: true,
       control,
+      onOpenFailure: (reason) => {
+        openFailure = reason;
+      },
     });
-    if (!client) return unavailableFileQuery("definition", resolvedPath);
+    if (!client) return unavailableFileQuery("definition", resolvedPath, openFailure);
     return client.definition(resolvedPath, position, control);
   }
 
@@ -202,12 +219,16 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
     control?: CodeRequestControl,
   ): Promise<CodeQueryResult<Location[]>> {
     const resolvedPath = this.resolveFilePath(filePath);
+    let openFailure: string | undefined;
     const client = await this.manager.ensureFileOpen(resolvedPath, {
       recoverProcessCrash: true,
       protectInputs: true,
       control,
+      onOpenFailure: (reason) => {
+        openFailure = reason;
+      },
     });
-    if (!client) return unavailableFileQuery("references", resolvedPath);
+    if (!client) return unavailableFileQuery("references", resolvedPath, openFailure);
     return this.withProjectCoverage(
       client,
       { file: resolvedPath, position },
@@ -225,12 +246,16 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
     control?: CodeRequestControl,
   ): Promise<CodeQueryResult<Location | Location[] | LocationLink[] | null>> {
     const resolvedPath = this.resolveFilePath(filePath);
+    let openFailure: string | undefined;
     const client = await this.manager.ensureFileOpen(resolvedPath, {
       recoverProcessCrash: true,
       protectInputs: true,
       control,
+      onOpenFailure: (reason) => {
+        openFailure = reason;
+      },
     });
-    if (!client) return unavailableFileQuery("implementation", resolvedPath);
+    if (!client) return unavailableFileQuery("implementation", resolvedPath, openFailure);
     return this.withProjectCoverage(
       client,
       { file: resolvedPath, position },
@@ -262,12 +287,16 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
     control?: CodeRequestControl,
   ): Promise<CodeQueryResult<DocumentSymbol[] | SymbolInformation[]>> {
     const resolvedPath = this.resolveFilePath(filePath);
+    let openFailure: string | undefined;
     const client = await this.manager.ensureFileOpen(resolvedPath, {
       recoverProcessCrash: true,
       protectInputs: true,
       control,
+      onOpenFailure: (reason) => {
+        openFailure = reason;
+      },
     });
-    if (!client) return unavailableFileQuery("document symbols", resolvedPath);
+    if (!client) return unavailableFileQuery("document symbols", resolvedPath, openFailure);
     return mapCodeQueryResult(
       await client.documentSymbols(resolvedPath, control),
       (data) => data ?? [],

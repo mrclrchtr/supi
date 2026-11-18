@@ -203,6 +203,7 @@ describe("workspace runtime behavior", () => {
       recoverProcessCrash: true,
       protectInputs: true,
       control: undefined,
+      onOpenFailure: expect.any(Function),
     });
   });
 

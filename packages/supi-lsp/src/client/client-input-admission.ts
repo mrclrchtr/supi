@@ -4,7 +4,13 @@ import {
   throwIfCodeRequestInterrupted,
 } from "@mrclrchtr/supi-code-runtime/api";
 
-const MAX_PENDING_INPUT_OPERATIONS = 32;
+/**
+ * Waiting operations per client. First opens dispatch one at a time, so the
+ * bound limits memory for a stalled server, not server load. It must exceed
+ * the first opens of several concurrent tool calls: candidate lists open one
+ * file per candidate.
+ */
+export const MAX_PENDING_INPUT_OPERATIONS = 1024;
 
 type InputOperationKind = "request" | "enrollment" | "request-enrollment";
 
