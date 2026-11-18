@@ -6,6 +6,7 @@ import { Readability } from "@mozilla/readability";
 import { JSDOM, VirtualConsole } from "jsdom";
 import Turndown from "turndown";
 import { guessLanguage } from "./fetch.ts";
+import { languageForContentType } from "./media.ts";
 
 const ORIGINAL_URL_ATTRIBUTE = "data-supi-original-url";
 
@@ -21,13 +22,13 @@ const ORIGINAL_URL_ATTRIBUTE = "data-supi-original-url";
 export async function htmlToMarkdown(
   html: string,
   baseUrl: string,
-  options: { absLinks?: boolean } = {},
+  options: { absLinks?: boolean; contentType?: string } = {},
 ): Promise<string> {
   const absLinks = options.absLinks ?? true;
 
   if (!isHtml(html)) {
     // Not HTML — wrap as fenced code block
-    return wrapAsCodeBlock(html, baseUrl);
+    return wrapAsCodeBlock(html, baseUrl, options.contentType);
   }
 
   const doc = createDocument(html, baseUrl);
@@ -69,9 +70,12 @@ export async function htmlToMarkdown(
 
 /**
  * Wrap plain text in a fenced code block.
+ *
+ * The language comes from the response content type when it names one, otherwise from the URL
+ * extension: an API URL ending in `.js` can return JSON, and a feed URL has no extension.
  */
-export function wrapAsCodeBlock(text: string, url: string): string {
-  const lang = guessLanguage(url);
+export function wrapAsCodeBlock(text: string, url: string, contentType = ""): string {
+  const lang = languageForContentType(contentType) || guessLanguage(url);
   const normalized = String(text || "")
     .replace(/\r\n/g, "\n")
     .replace(/\r/g, "\n");

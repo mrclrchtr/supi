@@ -28,3 +28,18 @@ export function imageExtension(contentType: string): string | undefined {
 export function looksBinary(leadingText: string): boolean {
   return leadingText.includes("\0");
 }
+
+/**
+ * Code-fence language stated by a content type, or "" when it names none. Generic types such as
+ * `text/plain` say nothing about the language, so callers fall back to the URL extension.
+ */
+export function languageForContentType(contentType: string): string {
+  const type = mediaTypeOf(contentType);
+  if (type.endsWith("/json") || type.endsWith("+json")) return "json";
+  if (type.endsWith("/xml") || type.endsWith("+xml")) return "xml";
+  if (type.endsWith("/yaml") || type.endsWith("/x-yaml")) return "yaml";
+  if (type.endsWith("/javascript")) return "javascript";
+  if (type === "text/css") return "css";
+  if (type === "text/csv") return "csv";
+  return "";
+}

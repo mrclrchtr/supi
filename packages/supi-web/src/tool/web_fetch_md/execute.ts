@@ -93,10 +93,16 @@ function shouldReturnFile(outputMode: WebFetchOutputMode, chars: number): boolea
 }
 
 async function resolveMarkdown(
-  result: { isMarkdown: boolean; isPlainText: boolean; text: string; url: string },
+  result: {
+    isMarkdown: boolean;
+    isPlainText: boolean;
+    text: string;
+    url: string;
+    contentType: string;
+  },
   absLinks: boolean,
 ): Promise<string> {
   if (result.isMarkdown) return result.text;
-  if (result.isPlainText) return wrapAsCodeBlock(result.text, result.url);
-  return htmlToMarkdown(result.text, result.url, { absLinks });
+  if (result.isPlainText) return wrapAsCodeBlock(result.text, result.url, result.contentType);
+  return htmlToMarkdown(result.text, result.url, { absLinks, contentType: result.contentType });
 }

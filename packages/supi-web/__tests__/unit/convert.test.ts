@@ -13,6 +13,14 @@ describe("wrapAsCodeBlock", () => {
     expect(result).toContain("```ts\n");
   });
 
+  it.each([
+    ["application/json; charset=utf-8", "https://api.example.com/repos/pdf.js", "json"],
+    ["application/rss+xml", "https://example.com/feed/", "xml"],
+    ["text/plain", "https://example.com/script.ts", "ts"],
+  ])("prefers the language named by %s over the URL extension", (contentType, url, language) => {
+    expect(wrapAsCodeBlock("body", url, contentType)).toContain(`\`\`\`${language}\n`);
+  });
+
   it("handles backticks in content by using longer fence", () => {
     const result = wrapAsCodeBlock("code with `backticks`", "https://example.com/file.txt");
     expect(result).toContain("```\n");

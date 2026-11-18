@@ -16,7 +16,7 @@ After installation, keep asking Pi normal questions. The agent can:
 
 - **Read public web pages as best-effort Markdown** — prefer main content, but results may include page clutter or omit content.
 - **Prefer source Markdown when available** — detect Markdown responses and common Markdown siblings before converting HTML.
-- **Handle plain-text and source files** — wrap them in fenced code blocks with a language hint when the URL provides one.
+- **Handle plain-text and source files** — wrap them in fenced code blocks with a language hint when the content type or URL provides one.
 - **Look up current library docs** — search Context7 for the right project and version, then retrieve documentation focused on the task at hand.
 - **Search public web sources** — return source titles, URLs, and source excerpts without generating an answer.
 - **Protect the context window** — return small results inline, move long pages to temporary files, and preserve full output when model-visible text must be truncated.
