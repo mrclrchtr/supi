@@ -3276,8 +3276,75 @@ export class LspManager {
       return client;
     } catch (error) {
       if (isCodeRequestInterruption(error, options.control)) throw error;
-      options.onOpenFailure?.(error instanceof Error ? error.message : String(error));
+      const reason = error instanceof Error ? error.message : String(error);
+      this.recordOpenFailureEvent(client.name, resolvedPath, reason, options.control);
+      options.onOpenFailure?.(reason);
       return null;
+    }
+  }
+
+  /**
+   * Record a routed client that could not open a file. The caller only sees
+   * an unavailable result, so this event is the trace of the cause.
+   */
+  private recordOpenFailureEvent(
+    serverName: string,
+    file: string,
+    reason: string,
+    control?: CodeRequestControl,
+  ): void {
+    try {
+      recordDebugEvent({
+        operationId: control?.operationId,
+        source: "lsp",
+        level: "warning",
+        category: "document.open-failed",
+        message: "LSP client could not open a document",
+        cwd: boundCwd(this.cwd),
+        data: {
+          server: truncateIdentity(serverName),
+          file: truncateIdentity(displayRelativeFilePath(file, this.cwd)),
+          reason: truncateIdentity(reason),
+        },
+      });
+    } catch {
+      // Telemetry must never change query behavior.
+    }
+  }
+
+  /**
+   * Record one finished all-roots warm-up pass. Per-file probes are `debug`
+   * events and are not persisted; this summary is.
+   */
+  private recordWarmPassEvent(
+    serverName: string,
+    pass: {
+      roots: number;
+      loadedRoots: number;
+      inferredProbes: number;
+      failedProbes: number;
+      limited: boolean;
+      startedAt: number;
+    },
+    control?: CodeRequestControl,
+  ): void {
+    try {
+      const { startedAt, ...counts } = pass;
+      recordDebugEvent({
+        operationId: control?.operationId,
+        source: "lsp",
+        level: "info",
+        category: "workspace-symbol.warm-pass",
+        message: `Workspace-symbol warm-up loaded ${pass.loadedRoots} of ${pass.roots} project roots`,
+        cwd: boundCwd(this.cwd),
+        data: {
+          server: truncateIdentity(serverName),
+          ...counts,
+          elapsedMs: Math.max(0, Date.now() - startedAt),
+        },
+      });
+    } catch {
+      // Telemetry must never change query behavior.
     }
   }
 
@@ -3326,22 +3393,11 @@ export class LspManager {
       rootLimitGaps,
     });
 
-    // All-roots routes go first so a first-result route cannot end the search before them.
-    const clients = Array.from(this.clients.values()).filter(
-      (client) =>
-        (!routeMatches || routeMatches(client)) &&
-        client.status === "running" &&
-        Boolean(client.serverCapabilities?.workspaceSymbolProvider) &&
-        this.config.servers[client.name] !== undefined,
+    const warmClients = this.workspaceSymbolWarmClients(
+      routeMatches,
+      options.skipFirstResultRoutes === true,
     );
-    const allRootsClients = clients.filter((client) =>
-      this.warmsEveryWorkspaceSymbolProject(client),
-    );
-    const firstResultClients = options.skipFirstResultRoutes
-      ? []
-      : clients.filter((client) => !this.warmsEveryWorkspaceSymbolProject(client));
-
-    for (const client of [...allRootsClients, ...firstResultClients]) {
+    for (const client of warmClients) {
       const allRoots = this.warmsEveryWorkspaceSymbolProject(client);
       if (!allRoots && collectionStale) {
         latestCollection = await collect(this.clients.values(), query);
@@ -3351,40 +3407,40 @@ export class LspManager {
       const serverConfig = this.config.servers[client.name];
       if (!serverConfig) continue;
 
-      const routeKey = this.workspaceSymbolRouteWarmKey(client, options.scopes);
-      if (allRoots) {
-        const waited = await this.waitForWorkspaceSymbolRouteWarmup(routeKey, control);
-        const recorded = this.warmedWorkspaceSymbolRoute(client, options.scopes);
-        if (recorded !== undefined) {
-          if (recorded) rootLimitGaps.push(recorded);
-          // Another query's pass may have loaded projects after this query's rows.
-          collectionStale ||= waited;
-          continue;
-        }
+      const pass = allRoots
+        ? await this.joinOrBeginWorkspaceSymbolRouteWarmup(client, options.scopes, control)
+        : null;
+      if (pass && "recorded" in pass) {
+        if (pass.recorded) rootLimitGaps.push(pass.recorded);
+        // Another query's pass may have loaded projects after this query's rows.
+        collectionStale ||= pass.waited;
+        continue;
       }
-
-      const candidates = findWarmTargets(
-        client.root,
-        serverConfig.rootMarkers,
-        serverConfig.fileTypes,
-      );
-      const { targets: warmTargets, gap: rootLimitGap } = allRoots
-        ? limitWorkspaceSymbolWarmRoots(candidates)
-        : { targets: candidates.slice(0, 24), gap: null };
-
-      const finishRouteWarmup = allRoots ? this.beginWorkspaceSymbolRouteWarmup(routeKey) : null;
       // Marker roots whose program an earlier candidate already loaded.
       const coveredRoots = new Set<string>();
-      let routeInferred = false;
-      let probeFailed = false;
+      let routeInferredProbes = 0;
+      let failedProbes = 0;
+      let rootLimitGap: string | null = null;
+      let roots = 0;
+      const startedAt = Date.now();
       try {
-        for (const target of warmTargets) {
+        const candidates = findWarmTargets(
+          client.root,
+          serverConfig.rootMarkers,
+          serverConfig.fileTypes,
+        );
+        const limited = allRoots
+          ? limitWorkspaceSymbolWarmRoots(candidates)
+          : { targets: candidates.slice(0, 24), gap: null };
+        rootLimitGap = limited.gap;
+        roots = new Set(limited.targets.map((target) => target.projectRoot)).size;
+        for (const target of limited.targets) {
           if (coveredRoots.has(target.projectRoot)) continue;
           // A file probe does not load every program under the route root.
           const fileKey = `${client.name}:${path.resolve(target.file)}`;
           const previous = this.warmedWorkspaceSymbolFiles.get(fileKey);
           if (previous === "inferred") {
-            routeInferred = true;
+            routeInferredProbes++;
             inferredProbeCount++;
             continue;
           }
@@ -3400,7 +3456,7 @@ export class LspManager {
             control,
           );
           if (membership === null) {
-            probeFailed = true;
+            failedProbes++;
             continue;
           }
           this.warmedWorkspaceSymbolFiles.set(fileKey, membership);
@@ -3409,7 +3465,7 @@ export class LspManager {
             // still cannot see the configured program, so try the next file
             // without collecting: a hit here could come from that inferred
             // project alone and would hide the configured program's rows.
-            routeInferred = true;
+            routeInferredProbes++;
             inferredProbeCount++;
             continue;
           }
@@ -3426,14 +3482,27 @@ export class LspManager {
           }
         }
       } finally {
-        finishRouteWarmup?.();
+        pass?.finish();
       }
-      const covered = coveredRoots.size > 0 || !routeInferred;
+      const covered = coveredRoots.size > 0 || routeInferredProbes === 0;
       routeCoverage.push(covered);
       if (!allRoots) continue;
       if (rootLimitGap) rootLimitGaps.push(rootLimitGap);
       // A failed probe is retried, and an inferred-only route recounted, by the next query.
-      if (!probeFailed && covered) this.warmedWorkspaceSymbolRoutes.set(routeKey, rootLimitGap);
+      if (pass && failedProbes === 0 && covered) {
+        this.warmedWorkspaceSymbolRoutes.set(pass.routeKey, rootLimitGap);
+      }
+      const counts = { roots, loadedRoots: coveredRoots.size, failedProbes };
+      this.recordWarmPassEvent(
+        client.name,
+        {
+          ...counts,
+          inferredProbes: routeInferredProbes,
+          limited: rootLimitGap !== null,
+          startedAt,
+        },
+        control,
+      );
     }
 
     if (collectionStale || (inferredProbeCount > 0 && latestCollection === null)) {
@@ -3443,33 +3512,66 @@ export class LspManager {
     return outcome();
   }
 
-  /** Wait for in-flight all-roots passes on this route; true when one was running. */
-  private async waitForWorkspaceSymbolRouteWarmup(
-    routeKey: string,
-    control?: CodeRequestControl,
-  ): Promise<boolean> {
-    let pending = this.pendingWorkspaceSymbolRouteWarmups.get(routeKey);
-    const waited = pending !== undefined;
-    // Re-check after each wait: another waiter may have started its own pass.
-    while (pending !== undefined) {
-      await raceRequestControl(pending, control);
-      pending = this.pendingWorkspaceSymbolRouteWarmups.get(routeKey);
-    }
-    return waited;
+  /**
+   * Routes to warm for a symbol query. All-roots routes go first so a
+   * first-result route cannot end the search before them.
+   */
+  private workspaceSymbolWarmClients(
+    routeMatches: ((client: LspClient) => boolean) | undefined,
+    skipFirstResultRoutes: boolean,
+  ): LspClient[] {
+    const clients = Array.from(this.clients.values()).filter(
+      (client) =>
+        (!routeMatches || routeMatches(client)) &&
+        client.status === "running" &&
+        Boolean(client.serverCapabilities?.workspaceSymbolProvider) &&
+        this.config.servers[client.name] !== undefined,
+    );
+    const allRoots = clients.filter((client) => this.warmsEveryWorkspaceSymbolProject(client));
+    return skipFirstResultRoutes
+      ? allRoots
+      : [...allRoots, ...clients.filter((client) => !allRoots.includes(client))];
   }
 
-  /** Register an all-roots pass so concurrent queries wait for it; returns its release. */
-  private beginWorkspaceSymbolRouteWarmup(routeKey: string): () => void {
+  /**
+   * Wait for in-flight all-roots passes on this route, then report the
+   * recorded pass or register this query's own. The last check and the
+   * registration share one synchronous step: with an await between them,
+   * concurrent queries each see no pass and each start one.
+   */
+  private async joinOrBeginWorkspaceSymbolRouteWarmup(
+    client: LspClient,
+    scopes: readonly string[] | undefined,
+    control?: CodeRequestControl,
+  ): Promise<
+    { waited: boolean; recorded: string | null } | { routeKey: string; finish: () => void }
+  > {
+    const routeKey = this.workspaceSymbolRouteWarmKey(client, scopes);
+    let waited = false;
+    for (
+      let running = this.pendingWorkspaceSymbolRouteWarmups.get(routeKey);
+      running !== undefined;
+      running = this.pendingWorkspaceSymbolRouteWarmups.get(routeKey)
+    ) {
+      waited = true;
+      await raceRequestControl(running, control);
+    }
+    const recorded = this.warmedWorkspaceSymbolRoute(client, scopes);
+    if (recorded !== undefined) return { waited, recorded };
+
     let release = () => {};
     const pending = new Promise<void>((resolve) => {
       release = resolve;
     });
     this.pendingWorkspaceSymbolRouteWarmups.set(routeKey, pending);
-    return () => {
-      if (this.pendingWorkspaceSymbolRouteWarmups.get(routeKey) === pending) {
-        this.pendingWorkspaceSymbolRouteWarmups.delete(routeKey);
-      }
-      release();
+    return {
+      routeKey,
+      finish: () => {
+        if (this.pendingWorkspaceSymbolRouteWarmups.get(routeKey) === pending) {
+          this.pendingWorkspaceSymbolRouteWarmups.delete(routeKey);
+        }
+        release();
+      },
     };
   }
 
@@ -3656,9 +3758,18 @@ export class LspManager {
     return client.name === "typescript";
   }
 
+  /**
+   * Identity of one all-roots pass. A scope that contains the route root
+   * selects every project root, so it shares the unscoped pass: `code_find`
+   * passes the workspace root as its default scope, symbol targets pass none.
+   */
   private workspaceSymbolRouteWarmKey(client: LspClient, scopes?: readonly string[]): string {
-    const prefix = `${client.name}:${path.resolve(client.root)}`;
-    return `${prefix}\0${[...(scopes ?? [])].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)).join("\0")}`;
+    const root = path.resolve(client.root);
+    const prefix = `${client.name}:${root}`;
+    const narrowing = scopes?.some((scope) => projectRoots.isWithinOrEqual(scope, root))
+      ? []
+      : [...(scopes ?? [])];
+    return `${prefix}\0${narrowing.sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)).join("\0")}`;
   }
 
   /** The recorded all-roots pass for these scopes; an unscoped pass covers every scope. */

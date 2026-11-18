@@ -2,6 +2,11 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { completedCodeQuery, unavailableCodeQuery } from "@mrclrchtr/supi-code-runtime/api";
+import {
+  configureDebugRegistry,
+  getDebugEvents,
+  resetDebugRegistry,
+} from "@mrclrchtr/supi-core/debug";
 import { fileToUri } from "@mrclrchtr/supi-core/path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { LspManager } from "../../src/manager/manager.ts";
@@ -25,6 +30,7 @@ function makeTempRoot(): string {
 }
 
 afterEach(() => {
+  resetDebugRegistry();
   vi.restoreAllMocks();
   for (const dir of tempDirs.splice(0)) {
     rmSync(dir, { recursive: true, force: true });
@@ -526,13 +532,22 @@ describe("LspManager.workspaceSymbol cold warm-up", () => {
       });
     // One project is already loaded, so the first request has an answering row.
     opened.add(symbols[0].location.uri);
+    configureDebugRegistry({ enabled: true });
 
-    // Concurrent first queries share one pass and both see every project.
+    // Concurrent first queries share one pass and both see every project. A
+    // scope naming the workspace root selects the same roots as no scope.
     const results = await Promise.all([
       manager.workspaceSymbol("Widget"),
-      manager.workspaceSymbol("Widget"),
+      manager.workspaceSymbol("Widget", undefined, [root]),
     ]);
     for (const result of results) expect(result).toEqual({ kind: "completed", data: symbols });
+    // One persisted summary describes the shared pass; per-file probes stay debug-level.
+    const passes = getDebugEvents({ source: "lsp", category: "workspace-symbol.warm-pass" }).events;
+    expect(passes).toHaveLength(1);
+    expect(passes[0]).toMatchObject({
+      level: "info",
+      data: { server: "typescript", roots: 3, loadedRoots: 3, failedProbes: 0, limited: false },
+    });
     const opens = ensureFileOpen.mock.calls.length;
 
     await expect(manager.workspaceSymbol("Widget")).resolves.toEqual({

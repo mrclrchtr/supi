@@ -1,6 +1,11 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import {
+  configureDebugRegistry,
+  getDebugEvents,
+  resetDebugRegistry,
+} from "@mrclrchtr/supi-core/debug";
 import { fileToUri } from "@mrclrchtr/supi-core/path";
 import {
   FileChangeType,
@@ -94,6 +99,7 @@ describe("public WorkspaceLspRuntime enrollment admission", () => {
     if (logPath) release();
     await Promise.allSettled(pending.splice(0));
     await controller?.shutdown();
+    resetDebugRegistry();
     if (cwd) fs.rmSync(cwd, { recursive: true, force: true });
   });
 
@@ -222,6 +228,7 @@ describe("public WorkspaceLspRuntime enrollment admission", () => {
       expect(events().filter((event) => event.method === "workspace/symbol")).toHaveLength(1),
     );
     const caller = new AbortController();
+    configureDebugRegistry({ enabled: true });
     const accesses = Array.from({ length: MAX_PENDING_INPUT_OPERATIONS + 1 }, () =>
       observe(runtime.documentSymbols(cold, { signal: caller.signal })),
     );
@@ -230,6 +237,12 @@ describe("public WorkspaceLspRuntime enrollment admission", () => {
       kind: "unavailable",
       reason: expect.stringContaining("LSP input admission queue is full."),
     });
+    expect(getDebugEvents({ source: "lsp", category: "document.open-failed" }).events).toEqual([
+      expect.objectContaining({
+        level: "warning",
+        data: { server: "fixture", file: "cold.tsx", reason: "LSP input admission queue is full." },
+      }),
+    ]);
     const reason = new Error("cancel waiting enrollment batch");
     caller.abort(reason);
     const outcomes = await Promise.allSettled(accesses);
