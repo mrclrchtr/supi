@@ -33,7 +33,12 @@ export function renderOrientationData(
 
   if (data.workspace) lines.push(`# ${data.title}`, "");
   for (const note of data.notes) lines.push(note);
-  if (data.notes.length > 0) lines.push("");
+  const known = data.knownInstructionPaths ?? [];
+  if (known.length > 0)
+    lines.push(
+      `Instruction files already supplied in this session, not repeated: ${known.map(code).join(", ")}.`,
+    );
+  if (data.notes.length > 0 || known.length > 0) lines.push("");
 
   if (!data.workspace) lines.push(`# ${data.title}`, "");
 

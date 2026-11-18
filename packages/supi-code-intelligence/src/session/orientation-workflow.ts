@@ -234,7 +234,7 @@ function addInstructionFiles(
 ): Awaited<ReturnType<typeof executeOrientation>> {
   if (!deps.projectTrusted || !isDirectory(focusPath)) return result;
   const config = loadCodeIntelligenceConfig(deps.cwd, deps.homeDir);
-  const matches = findInstructionFilesForDirectory({
+  const { matches, known } = findInstructionFilesForDirectory({
     directory: focusPath,
     cwd: deps.cwd,
     fileNames: config.instructionFileNames,
@@ -248,7 +248,8 @@ function addInstructionFiles(
       relativePath: toDisplayPath(deps.cwd, match.absolutePath),
     })),
   );
-  if (!collected) return result;
+  const knownInstructionPaths = known.map((match) => toDisplayPath(deps.cwd, match.absolutePath));
+  if (!collected) return { ...result, knownInstructionPaths };
   const items: OrientationItem[] = [];
   for (const file of collected.files) {
     items.push(
@@ -277,6 +278,7 @@ function addInstructionFiles(
   };
   return {
     ...result,
+    knownInstructionPaths,
     sections: [section, ...result.sections],
     renderedSections: ["instructions", ...result.renderedSections],
     instructions: collected.metadata,

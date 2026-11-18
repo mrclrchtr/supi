@@ -4,7 +4,7 @@ Keep `src/analysis/` independent of Pi. It owns evidence collection and refactor
 
 ## Public tool gotchas
 
-- **`code_orientation`**: On-demand workspace/path facts are direct filesystem observations, parsed manifest/workspace configuration, or explicit providers; manifest-declared topology is not a runtime architecture graph. Directory focus surfaces configured instruction files once per session branch.
+- **`code_orientation`**: On-demand workspace/path facts are direct filesystem observations, parsed manifest/workspace configuration, or explicit providers; manifest-declared topology is not a runtime architecture graph. Directory focus surfaces configured instruction files once per session branch and names the ones it does not repeat.
 - **`code_inspect`**: validates a readable regular file and UTF-16 bounds before providers, reports only point-local facts, preserves completed-empty/partial/unavailable state per section, selects the narrowest provider-reported enclosing range, and throws only when every inspection substrate is unavailable.
 - **`code_graph`**: Callees are source-shape calls, not symbol identity. Semantic provider locations are canonically normalized before containment, declaration filtering, and deterministic deduplication; invalid locations are disclosed as partial evidence rather than counted as external.
 - **`code_find`**: Test identity is not inferred. AST `call` matches by written name. Modes never silently fall back. AST mode uses the owned, operation-aware Scan policy documented in the README: exact operation-ineligible files are invalid, unsupported-only directories are unavailable, mixed scopes disclose policy exclusions without becoming partial, and runtime limitations remain partial.

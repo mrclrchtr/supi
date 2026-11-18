@@ -57,6 +57,9 @@ export function isValidInstructionFileName(name: unknown): name is string {
  * When the project is not trusted, all project-configured instruction files
  * are rejected so a repository-authored path cannot cause reads outside the
  * workspace root.
+ *
+ * `known` lists files the session already has (loaded natively, read in full, or
+ * delivered by an earlier orientation), so callers can say why they are not repeated.
  */
 export function findInstructionFilesForDirectory(options: {
   directory: string;
@@ -66,7 +69,7 @@ export function findInstructionFilesForDirectory(options: {
   surfacedDirectories: Set<string>;
   /** Whether project-local configuration is trusted. */
   projectTrusted: boolean;
-}): InstructionFileMatch[] {
+}): { matches: InstructionFileMatch[]; known: InstructionFileMatch[] } {
   const cwd = path.resolve(options.cwd);
   const directory = path.resolve(options.directory);
 
@@ -74,21 +77,22 @@ export function findInstructionFilesForDirectory(options: {
     options.projectTrusted && Array.isArray(options.fileNames)
       ? options.fileNames.filter(isValidInstructionFileName)
       : [];
-  if (validNames.length === 0) return [];
-  if (!isDirectoryWithinCwd(directory, cwd)) return [];
+  if (validNames.length === 0) return { matches: [], known: [] };
+  if (!isDirectoryWithinCwd(directory, cwd)) return { matches: [], known: [] };
 
   const dirs = collectDirsShallowestFirst(directory, cwd);
   const matches: InstructionFileMatch[] = [];
+  const known: InstructionFileMatch[] = [];
 
   for (const dir of dirs) {
-    if (options.surfacedDirectories.has(dir)) continue;
     const match = findFirstInstructionFile(dir, cwd, validNames);
     if (!match) continue;
-    if (options.nativeContextPaths.has(match.absolutePath)) continue;
-    matches.push(match);
+    const seen =
+      options.surfacedDirectories.has(dir) || options.nativeContextPaths.has(match.absolutePath);
+    (seen ? known : matches).push(match);
   }
 
-  return matches;
+  return { matches, known };
 }
 
 function isDirectoryWithinCwd(directory: string, cwd: string): boolean {

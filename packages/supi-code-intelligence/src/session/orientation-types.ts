@@ -133,6 +133,11 @@ export interface OrientationResultData {
   readonly instructions?: InstructionFilesMetadata;
   /** Collected instruction snippets; separate from mutable session deduplication state. */
   readonly instructionFiles?: readonly import("../analysis/instruction-files.ts").RenderedInstructionFile[];
+  /**
+   * Instruction files for the focused directory that the session already has, so they are not
+   * repeated. Rendered as one line so an absent section does not read as a discovery failure.
+   */
+  readonly knownInstructionPaths?: readonly string[];
   /** Captured generic workspace facts; absent for the unchanged file and symbol paths. */
   readonly workspace?: import("./orientation/workspace-context.ts").WorkspaceOrientationFacts;
   readonly target?: Readonly<TargetStoreEntry>;

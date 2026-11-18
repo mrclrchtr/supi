@@ -3,6 +3,7 @@
 ## [13.1.0]
 
 - Directory `code_orientation` in managed child sessions (Agent Runs and Reviewer Sessions) no longer repeats an instruction file the session already has: one loaded into its system prompt, or one it read in full with `read`. After a compaction the files are delivered again. The parent session already behaved this way ([#612](https://github.com/mrclrchtr/supi/issues/612)).
+- Directory `code_orientation` names the instruction files it does not repeat: `Instruction files already supplied in this session, not repeated: …`. Before, the missing `## Instructions` section could not be told apart from a discovery failure.
 
 ## [13.0.0]
 

@@ -295,6 +295,9 @@ describe("code_orientation instruction-file limits and deduplication", () => {
     const result = await orientDirectory(pi, "packages/foo");
 
     expect(result.text).not.toContain("## Instructions");
+    expect(result.text).toContain(
+      "Instruction files already supplied in this session, not repeated: `packages/foo/CLAUDE.md`.",
+    );
   });
 
   it("skips instruction files the agent already read in full until compaction", async () => {
@@ -380,8 +383,12 @@ describe("code_orientation instruction-file limits and deduplication", () => {
     const pi = createPiMock();
     extensionWithIsolatedHome(pi);
 
-    expect((await orientDirectory(pi, "packages/foo")).text).toContain("## Instructions");
-    expect((await orientDirectory(pi, "packages/foo")).text).not.toContain("## Instructions");
+    const first = await orientDirectory(pi, "packages/foo");
+    expect(first.text).toContain("## Instructions");
+    expect(first.text).not.toContain("not repeated");
+    const second = await orientDirectory(pi, "packages/foo");
+    expect(second.text).not.toContain("## Instructions");
+    expect(second.text).toContain("not repeated: `packages/foo/CLAUDE.md`");
 
     await pi.emit("session_compact", {}, makeCtx({ cwd: tmpDir }));
 
