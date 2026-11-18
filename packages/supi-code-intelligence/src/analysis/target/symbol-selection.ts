@@ -51,7 +51,27 @@ export function unselectedNote(
   symbol: string,
 ): string | undefined {
   const others = candidates.filter((candidate) => candidate !== selected);
-  if (others.length === 0) return undefined;
+  const parts = describeOthers(others, symbol);
+  if (!parts) return undefined;
+  const subject = others.some((candidate) => candidate.name === symbol)
+    ? "declaration of that name"
+    : "exact-name match";
+  return `Selected the only ${subject}; ${parts} ${others.length === 1 ? "was" : "were"} not selected.`;
+}
+
+/** Name the matches left out of a candidate list that holds only declarations of the name. */
+export function unlistedNote(
+  candidates: readonly CodeSymbol[],
+  listed: readonly CodeSymbol[],
+  symbol: string,
+): string | undefined {
+  const others = candidates.filter((candidate) => !listed.includes(candidate));
+  const parts = describeOthers(others, symbol);
+  if (!parts) return undefined;
+  return `Listing the ${listed.length} declarations named \`${symbol}\`; ${parts} ${others.length === 1 ? "is" : "are"} not listed.`;
+}
+
+function describeOthers(others: readonly CodeSymbol[], symbol: string): string | undefined {
   const bindings = others.filter((candidate) => candidate.name === symbol);
   const partial = others.filter((candidate) => candidate.name !== symbol);
   const parts: string[] = [];
@@ -65,9 +85,7 @@ export function unselectedNote(
     const names = [...new Set(partial.map((candidate) => candidate.name))];
     parts.push(`${count(partial.length, "partial-name match", "es")} (${listed(names)})`);
   }
-  const subject = bindings.length > 0 ? "declaration of that name" : "exact-name match";
-  const verb = others.length === 1 ? "was" : "were";
-  return `Selected the only ${subject}; ${parts.join(" and ")} ${verb} not selected.`;
+  return parts.length > 0 ? parts.join(" and ") : undefined;
 }
 
 function count(n: number, noun: string, plural = "s"): string {

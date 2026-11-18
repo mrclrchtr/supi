@@ -21,7 +21,7 @@ import type { AnchorKind } from "../../session/target-store.ts";
 import { createEvidenceList, createPartialEvidenceList } from "../evidence.ts";
 import { describePartialQuery } from "../search/exclusions.ts";
 import { normalizePath } from "../search/paths.ts";
-import { declarationsAmong, unselectedNote } from "./symbol-selection.ts";
+import { declarationsAmong, unlistedNote, unselectedNote } from "./symbol-selection.ts";
 import type { DisambiguationCandidateData, TargetOutcome } from "./types.ts";
 
 const MAX_CANDIDATES = 8; // default fallback when maxResults is not provided
@@ -225,15 +225,19 @@ async function resolveCandidates(
     );
     return notes.length > 0 ? { ...resolved, notes } : resolved;
   }
-  return buildCandidateOutcome({
+  // Several declarations of the queried name: partial-name matches cannot be meant.
+  const listed = complete && declared.length > 1 ? declared : candidates;
+  const outcome = await buildCandidateOutcome({
     kind: "disambiguation",
-    candidates,
+    candidates: listed,
     semantic,
     cwd,
     maxResults,
     discovery,
     control,
   });
+  const note = unlistedNote(candidates, listed, options.symbol);
+  return note ? { ...outcome, candidateNotes: [note] } : outcome;
 }
 
 function resolvedTarget(candidate: CodeSymbol): Extract<TargetOutcome, { kind: "resolved" }> {

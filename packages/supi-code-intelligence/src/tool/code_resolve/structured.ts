@@ -94,7 +94,12 @@ export function structuredResolveResult(
     ],
     evidenceLists: (data.evidenceLists ?? []).map((evidence) => ({ ...evidence })),
     nextQueries: data.nextQueries,
-    notes: outcome.kind === "resolved" ? [...outcome.notes] : [],
+    notes:
+      outcome.kind === "resolved"
+        ? [...outcome.notes]
+        : outcome.kind === "disambiguation"
+          ? [...(outcome.candidateNotes ?? [])]
+          : [],
     ...(data.message === undefined ? {} : { message: data.message }),
     ...(data.outlineFile === undefined ? {} : { file: data.outlineFile }),
     ...(data.requestedKind === undefined ? {} : { requestedKind: data.requestedKind }),

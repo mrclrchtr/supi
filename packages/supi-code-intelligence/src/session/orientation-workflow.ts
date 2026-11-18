@@ -151,7 +151,12 @@ async function orientTarget(options: {
           candidates,
           candidateEvidence: target.candidateEvidence,
         }
-      : { kind: "disambiguation", candidates, candidateEvidence: target.candidateEvidence };
+      : {
+          kind: "disambiguation",
+          candidates,
+          candidateEvidence: target.candidateEvidence,
+          ...(target.candidateNotes ? { candidateNotes: target.candidateNotes } : {}),
+        };
   }
   if (target.kind !== "resolved") return target;
   throwIfAborted(control);

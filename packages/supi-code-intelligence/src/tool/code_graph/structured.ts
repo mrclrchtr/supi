@@ -147,6 +147,9 @@ export function structuredGraphCandidates(
     })),
     evidenceLists: [{ ...evidence }],
     readNext: [],
+    ...(outcome.kind === "disambiguation" && outcome.candidateNotes?.length
+      ? { notes: [...outcome.candidateNotes] }
+      : {}),
     nextQueries,
     ...(outcome.kind === "kind-mismatch" ? { requestedKind: outcome.requestedKind } : {}),
   };

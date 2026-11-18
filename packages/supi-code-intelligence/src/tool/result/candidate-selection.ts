@@ -41,6 +41,8 @@ export type CandidateSelectionOutcome<C extends SelectionCandidate = SelectionCa
       readonly kind: "disambiguation";
       readonly candidates: readonly C[];
       readonly candidateEvidence: EvidenceListMetadata;
+      /** Matches left out of the candidates on purpose; rendered as notes. */
+      readonly candidateNotes?: readonly string[];
     }
   | {
       readonly kind: "kind-mismatch";
@@ -106,6 +108,8 @@ export function assembleCandidateSelection<C extends SelectionCandidate>(
   for (const candidate of candidates) lines.push(formatCandidateMarkdownRow(candidate));
   const disclosure = renderEvidenceListMetadataDisclosure(evidence, CANDIDATE_NOUN);
   if (disclosure) lines.push("", disclosure);
+  const notes = outcome.kind === "disambiguation" ? (outcome.candidateNotes ?? []) : [];
+  for (const note of notes) lines.push("", `_Note: ${note}_`);
   lines.push("", `${recovery}.`);
 
   return Object.freeze({

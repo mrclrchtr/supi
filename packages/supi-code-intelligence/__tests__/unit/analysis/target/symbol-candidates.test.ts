@@ -179,52 +179,58 @@ describe("symbol candidates", () => {
     expect(result.kind).toBe("disambiguation");
   });
 
-  it.each([1, 6])("puts exact names first before the display cap of %s", async (maxResults) => {
-    const result = await resolveSymbolTarget(
-      "ShowingPositionRow",
-      "/project",
-      provider([
-        candidate("ShowingPositionRowProps", "props"),
-        candidate("ShowingPositionRow", "first"),
-        candidate("ShowingPositionRow", "second"),
-      ]),
-      { maxResults },
-    );
+  it.each([1, 6])(
+    "lists only declarations of the queried name with a display cap of %s",
+    async (maxResults) => {
+      const result = await resolveSymbolTarget(
+        "ShowingPositionRow",
+        "/project",
+        provider([
+          candidate("ShowingPositionRowProps", "props"),
+          candidate("ShowingPositionRow", "first"),
+          candidate("ShowingPositionRow", "second"),
+        ]),
+        { maxResults },
+      );
 
-    expect(result).toMatchObject({
-      kind: "disambiguation",
-      candidateEvidence: {
-        key: "target.candidates",
-        completeness: maxResults === 1 ? "capped" : "complete",
-        totalCount: 3,
-        shownCount: maxResults === 1 ? 1 : 3,
-        omittedCount: maxResults === 1 ? 2 : 0,
-        partialReason: null,
-      },
-    });
-    if (result.kind !== "disambiguation") throw new Error("Expected candidates");
-    expect(result.candidates.map(({ name, rank }) => ({ name, rank }))).toEqual(
-      maxResults === 1
-        ? [{ name: "ShowingPositionRow", rank: 1 }]
-        : [
-            { name: "ShowingPositionRow", rank: 1 },
-            { name: "ShowingPositionRow", rank: 2 },
-            { name: "ShowingPositionRowProps", rank: 3 },
-          ],
-    );
-  });
+      expect(result).toMatchObject({
+        kind: "disambiguation",
+        candidateEvidence: {
+          key: "target.candidates",
+          completeness: maxResults === 1 ? "capped" : "complete",
+          totalCount: 2,
+          shownCount: maxResults === 1 ? 1 : 2,
+          omittedCount: maxResults === 1 ? 1 : 0,
+          partialReason: null,
+        },
+        candidateNotes: [
+          "Listing the 2 declarations named `ShowingPositionRow`; 1 partial-name match (`ShowingPositionRowProps`) is not listed.",
+        ],
+      });
+      if (result.kind !== "disambiguation") throw new Error("Expected candidates");
+      expect(result.candidates.map(({ file, rank }) => ({ file, rank }))).toEqual(
+        [
+          { file: "src/first.ts", rank: 1 },
+          { file: "src/second.ts", rank: 2 },
+        ].slice(0, maxResults),
+      );
+    },
+  );
 
-  it("keeps provider order within exact and other name matches", async () => {
+  it("lists every match of an incomplete result, exact names first in provider order", async () => {
     const result = await resolveSymbolTarget(
       "Widget",
       "/project",
-      provider([
-        candidate("widget", "lowercase"),
-        candidate("WidgetProps", "props"),
-        candidate("Widget", "first"),
-        candidate("WidgetFactory", "factory"),
-        candidate("Widget", "second"),
-      ]),
+      provider(
+        [
+          candidate("widget", "lowercase"),
+          candidate("WidgetProps", "props"),
+          candidate("Widget", "first"),
+          candidate("WidgetFactory", "factory"),
+          candidate("Widget", "second"),
+        ],
+        "One route failed.",
+      ),
     );
 
     if (result.kind !== "disambiguation") throw new Error("Expected candidates");

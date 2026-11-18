@@ -333,7 +333,12 @@ function toWorkflowOutcome(
         candidates,
         candidateEvidence: outcome.candidateEvidence,
       }
-    : { kind: "disambiguation", candidates, candidateEvidence: outcome.candidateEvidence };
+    : {
+        kind: "disambiguation",
+        candidates,
+        candidateEvidence: outcome.candidateEvidence,
+        ...(outcome.candidateNotes ? { candidateNotes: outcome.candidateNotes } : {}),
+      };
 }
 
 function registerFileOutline(

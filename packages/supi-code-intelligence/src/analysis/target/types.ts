@@ -172,6 +172,8 @@ export interface DisambiguationCandidateData {
 export interface TargetCandidateCompleteness {
   /** Candidate Evidence list metadata; consumers re-key it, never rebuild it. */
   candidateEvidence: EvidenceListMetadata;
+  /** Matches left out of `candidates` on purpose, such as partial names beside exact ones. */
+  candidateNotes?: readonly string[];
 }
 
 /**

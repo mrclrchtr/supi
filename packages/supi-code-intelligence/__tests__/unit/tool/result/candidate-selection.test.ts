@@ -78,6 +78,26 @@ describe("candidate selection", () => {
     });
   });
 
+  it("renders notes about unlisted matches before the recovery sentence", () => {
+    const selection = assembleCandidateSelection({
+      outcome: {
+        kind: "disambiguation",
+        candidates,
+        candidateEvidence: complete,
+        candidateNotes: ["1 partial-name match (`runAll`) is not listed."],
+      },
+      key: "resolve.candidates",
+      cwd,
+    });
+
+    expect(selection.content.split("\n").slice(-4)).toEqual([
+      "",
+      "_Note: 1 partial-name match (`runAll`) is not listed._",
+      "",
+      "Choose one candidate handle, or narrow the symbol selector with scope or symbolKind.",
+    ]);
+  });
+
   it.each([
     [
       "disambiguation",
