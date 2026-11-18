@@ -282,13 +282,22 @@ describe("code_orientation instruction-file limits and deduplication", () => {
     writeJson("packages/foo/package.json", { name: "foo" });
     writeFile("packages/foo/src/index.ts", "export const foo = 1;\n");
     const nativePath = path.join(tmpDir, "packages/foo/CLAUDE.md");
+    const rootPath = path.join(tmpDir, "CLAUDE.md");
     writeFile("packages/foo/CLAUDE.md", "# Native\n");
+    writeFile("CLAUDE.md", "# Root\n");
 
     const pi = createPiMock();
     extensionWithIsolatedHome(pi);
     await pi.emit(
       "before_agent_start",
-      { systemPromptOptions: { contextFiles: [{ path: nativePath, content: "# Native" }] } },
+      {
+        systemPromptOptions: {
+          contextFiles: [
+            { path: rootPath, content: "# Root" },
+            { path: nativePath, content: "# Native" },
+          ],
+        },
+      },
       makeCtx({ cwd: tmpDir }),
     );
 

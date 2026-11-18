@@ -28,11 +28,26 @@ export function displayAutomaticPathExclusion(
     : undefined;
 }
 
-/** Explain which observed path was excluded even when a matching canonical source was retained. */
+/** Examples named in prose; structured output keeps every collected example. */
+const MAX_PROSE_EXAMPLES = 2;
+
+/**
+ * Explain which observed path was excluded even when a matching canonical source was retained.
+ * A path that is already canonical is named once.
+ */
 export function describeExcludedPath(
   example: AutomaticPathExclusionDisplay["examples"][number],
 ): string {
-  return `observed \`${example.observedPath}\` → canonical \`${example.canonicalPath}\``;
+  return example.observedPath === example.canonicalPath
+    ? `\`${example.canonicalPath}\``
+    : `observed \`${example.observedPath}\` → canonical \`${example.canonicalPath}\``;
+}
+
+/** Render the bounded ` Excluded path examples: …` suffix, or an empty string without examples. */
+export function describeExcludedPathExamples(exclusion: AutomaticPathExclusionDisplay): string {
+  if (exclusion.examples.length === 0) return "";
+  const shown = exclusion.examples.slice(0, MAX_PROSE_EXAMPLES).map(describeExcludedPath);
+  return ` Excluded path examples: ${shown.join(", ")}.`;
 }
 
 /** Preserve provider failure reasons and append path explanations from typed metadata only. */
@@ -42,6 +57,5 @@ export function describePartialQuery(
   cwd: string,
 ): string {
   const exclusion = displayAutomaticPathExclusion(metadata?.automaticPathExclusion, cwd);
-  if (!exclusion?.examples.length) return reason;
-  return `${reason} Excluded path examples: ${exclusion.examples.map(describeExcludedPath).join(", ")}.`;
+  return exclusion ? `${reason}${describeExcludedPathExamples(exclusion)}` : reason;
 }

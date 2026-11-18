@@ -6,7 +6,7 @@ import {
 } from "../../analysis/evidence.ts";
 import {
   type AutomaticPathExclusionDisplay,
-  describeExcludedPath,
+  describeExcludedPathExamples,
 } from "../../analysis/search/exclusions.ts";
 import { renderStructuredEmptyState, renderStructuredMatches } from "./markdown.ts";
 import type { FindResultAssembly } from "./result.ts";
@@ -67,9 +67,7 @@ function renderAutomaticPathExclusionDisclosure(
 ): string | null {
   if (!exclusion || exclusion.excludedCount <= 0) return null;
   const noun = `workspace-symbol result${exclusion.excludedCount === 1 ? "" : "s"}`;
-  const examples = exclusion.examples.length
-    ? ` Excluded path examples: ${exclusion.examples.map(describeExcludedPath).join(", ")}.`
-    : "";
+  const examples = describeExcludedPathExamples(exclusion);
   return `_Automatic path policy excluded ${exclusion.excludedCount} ${noun}.${examples}_`;
 }
 

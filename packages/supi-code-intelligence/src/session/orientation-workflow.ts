@@ -248,7 +248,10 @@ function addInstructionFiles(
       relativePath: toDisplayPath(deps.cwd, match.absolutePath),
     })),
   );
-  const knownInstructionPaths = known.map((match) => toDisplayPath(deps.cwd, match.absolutePath));
+  // The workspace-root file is in nearly every session's system prompt; naming it adds nothing.
+  const knownInstructionPaths = known
+    .filter((match) => match.relativeDirectory !== ".")
+    .map((match) => toDisplayPath(deps.cwd, match.absolutePath));
   if (!collected) return { ...result, knownInstructionPaths };
   const items: OrientationItem[] = [];
   for (const file of collected.files) {
