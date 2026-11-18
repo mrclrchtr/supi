@@ -32,7 +32,8 @@ export const reviewTaskSchema = Type.Object(
             summary: Type.String({
               maxLength: REVIEW_LIMITS.criteriaSummaryCharacters,
               pattern: "\\S",
-              description: "Source summary; the reviewer retrieves more detail only when needed.",
+              description:
+                "The rules or requirements from this source that apply to this task, quoted or closely paraphrased, each with its section heading. The reviewer retrieves the source only for what the summary lacks.",
             }),
           },
           { additionalProperties: false },

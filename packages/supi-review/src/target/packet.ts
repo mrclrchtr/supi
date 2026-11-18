@@ -115,7 +115,7 @@ export function buildReviewPacket(
     parts.push(
       "",
       "## Review criteria sources",
-      "Use these summaries first. Each identified source is authoritative. Retrieve a source read-only only when its summary is not sufficient. If required detail is unavailable, preserve concrete findings and mark Criteria Coverage incomplete with the reason.",
+      "Each identified source is authoritative; its summary is the caller's extract of the criteria that apply. Cite a criterion from the summary when it is stated there. Retrieve the source read-only for wording, exceptions, or criteria the summary lacks. If required detail is unavailable, preserve concrete findings and mark Criteria Coverage incomplete with the reason.",
       ...task.criteriaSources.map((source) => `- ${source.reference}: ${source.summary}`),
     );
   }

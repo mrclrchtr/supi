@@ -75,7 +75,7 @@ Each task must set `mode` to `change` or `state`.
 
 A committed change cannot use a root commit as `to`. A root commit is valid as `from`. Every Review requires a repository with `HEAD`.
 
-Tasks can include `criteriaSources`. Each source has a `reference` and a `summary`. The source remains authoritative when the summary is not sufficient.
+Tasks can include `criteriaSources`. Each source has a `reference` and a `summary`. The summary states the criteria that apply, quoted or closely paraphrased; the reviewer retrieves the authoritative source for anything the summary lacks.
 
 `paths` is an optional top-level Review Scope. Each path is workspace-relative. The Review Engine validates each path in the frozen after state before it starts Reviewer Sessions. Paths are advisory. They focus every task, but they do not restrict inspection, evidence, or findings.
 
