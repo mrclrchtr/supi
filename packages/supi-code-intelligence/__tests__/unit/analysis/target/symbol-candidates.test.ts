@@ -204,7 +204,7 @@ describe("symbol candidates", () => {
           partialReason: null,
         },
         candidateNotes: [
-          "Listing the 2 declarations named `ShowingPositionRow`; 1 partial-name match (`ShowingPositionRowProps`) is not listed.",
+          "Listing declarations named `ShowingPositionRow`; 1 partial-name match (`ShowingPositionRowProps`) is not listed.",
         ],
       });
       if (result.kind !== "disambiguation") throw new Error("Expected candidates");

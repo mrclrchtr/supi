@@ -68,7 +68,8 @@ export function unlistedNote(
   const others = candidates.filter((candidate) => !listed.includes(candidate));
   const parts = describeOthers(others, symbol);
   if (!parts) return undefined;
-  return `Listing the ${listed.length} declarations named \`${symbol}\`; ${parts} ${others.length === 1 ? "is" : "are"} not listed.`;
+  // No count: the candidate disclosure already states it.
+  return `Listing declarations named \`${symbol}\`; ${parts} ${others.length === 1 ? "is" : "are"} not listed.`;
 }
 
 function describeOthers(others: readonly CodeSymbol[], symbol: string): string | undefined {
