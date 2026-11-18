@@ -38,7 +38,7 @@ Stdout is a single compact JSON summary: `records`, `filters`, `coverage`, and `
 
 ## Aggregate in a script
 
-Read the JSONL inside a codemode script with `tools.bash` (`cat`), not `tools.read`, which adds line numbers. Parse, aggregate, and return only the counts and a few cited examples. Without codemode, use a short `node -e` script over the file. Never print the whole export into the conversation.
+Read the JSONL inside a codemode script with `tools.bash` (`cat`), not `tools.read`, which stops at 50 KB and appends a continuation notice. Parse, aggregate, and return only the counts and a few cited examples. Without codemode, use a short `node -e` script over the file. Never print the whole export into the conversation.
 
 Record fields:
 
