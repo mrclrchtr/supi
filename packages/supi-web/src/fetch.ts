@@ -3,6 +3,9 @@
  */
 
 // biome-ignore lint/style/noExcessiveLinesPerFile: expanded guessLanguage map pushes past the threshold; nursery rule, not stable
+import { BINARY_MAX_BYTES, imageExtension, looksBinary, mediaTypeOf } from "./media.ts";
+import { isPdf, pdfToMarkdown } from "./pdf.ts";
+
 const USER_AGENT = "Mozilla/5.0 (compatible; supi-web/1.0; +https://github.com/mrclrchtr/supi)";
 const ACCEPT_SIBLING = "text/markdown,text/plain;q=0.9,*/*;q=0.1";
 const DEFAULT_TIMEOUT_MS = 30_000;
@@ -22,6 +25,15 @@ export interface FetchResult {
   isMarkdown: boolean;
   /** Whether the body is plain text that should be fenced as code. */
   isPlainText: boolean;
+  /** An image body to save as a file; `text` is empty when set. */
+  image?: FetchedImage;
+}
+
+/** Image bytes with the media type and the extension for the saved file. */
+export interface FetchedImage {
+  data: Uint8Array;
+  mediaType: string;
+  extension: string;
 }
 
 /** Fetch options. */
@@ -60,6 +72,8 @@ export async function fetchWithNegotiation(
 
   // 2. Range GET to sniff content type
   const sniffResult = await trySniffNegotiation(url, timeoutMs, signal);
+  // Outside the sniff's fallback handling: unreadable non-text content is a failure, not HTML.
+  if (typeof sniffResult === "string") return fetchNonText(sniffResult, url, timeoutMs, signal);
   if (sniffResult) return sniffResult;
 
   // 3. Try sibling .md URLs
@@ -109,11 +123,20 @@ async function tryHeadNegotiation(
   }
 }
 
+/** Non-text content found by the sniff; handled outside its fallback handling. */
+type NonTextKind = "pdf" | "image" | "binary";
+
+function nonTextKind(contentType: string, leadingText: string): NonTextKind | undefined {
+  if (isPdf(contentType, leadingText)) return "pdf";
+  if (imageExtension(contentType)) return "image";
+  return looksBinary(leadingText) ? "binary" : undefined;
+}
+
 async function trySniffNegotiation(
   url: string,
   timeoutMs: number,
   signal: AbortSignal | undefined,
-): Promise<FetchResult | null> {
+): Promise<FetchResult | NonTextKind | null> {
   try {
     const sniffRes = await timedFetch(
       url,
@@ -130,6 +153,8 @@ async function trySniffNegotiation(
     const finalUrl = sniffRes.url || url;
 
     if (!sniffRes.ok || isHtml(sniffText)) return null;
+    const nonText = nonTextKind(ct, sniffText);
+    if (nonText) return nonText;
     if (isMarkdownCandidate(ct, finalUrl, sniffText)) {
       return fetchFullTextResult({
         url,
@@ -267,6 +292,89 @@ function isPlainTextCandidate(contentType: string, finalUrl: string, sniffText: 
   );
 }
 
+async function fetchNonText(
+  kind: NonTextKind,
+  url: string,
+  timeoutMs: number,
+  signal: AbortSignal | undefined,
+): Promise<FetchResult> {
+  const res = await timedFetch(
+    url,
+    { method: "GET", redirect: "follow", headers: { "User-Agent": USER_AGENT } },
+    timeoutMs,
+    signal,
+  );
+  if (!res.ok)
+    throw new FetchError(`Fetch failed for ${url}: ${res.status} ${res.statusText}`, {
+      status: res.status,
+    });
+  return buildNonTextResult(kind, res, url);
+}
+
+function buildNonTextResult(
+  kind: NonTextKind,
+  res: Response,
+  fallbackUrl: string,
+): Promise<FetchResult> {
+  const url = res.url || fallbackUrl;
+  if (kind === "pdf") return buildPdfResult(res, url);
+  if (kind === "image") return buildImageResult(res, url);
+  const type = mediaTypeOf(res.headers.get("content-type") || "") || "unknown type";
+  throw new FetchError(
+    `${url} is binary content (${type}), not a page; only text, PDFs, and PNG, JPEG, GIF, WebP, or BMP images can be fetched`,
+  );
+}
+
+/** Read a whole binary body, bounded because it is held in memory. */
+async function readBoundedBytes(res: Response, url: string): Promise<Uint8Array> {
+  const tooLarge = () =>
+    new FetchError(`${url} exceeds the ${BINARY_MAX_BYTES / 1024 / 1024} MB download limit`);
+  if (Number(res.headers.get("content-length")) > BINARY_MAX_BYTES) throw tooLarge();
+  const data = new Uint8Array(await res.arrayBuffer());
+  if (data.byteLength > BINARY_MAX_BYTES) throw tooLarge();
+  return data;
+}
+
+async function buildImageResult(res: Response, url: string): Promise<FetchResult> {
+  const contentType = res.headers.get("content-type") || "";
+  const extension = imageExtension(contentType);
+  // The sniff saw an image type, but the full response may differ.
+  if (!extension) throw new FetchError(`${url} did not return a supported image`);
+  const data = await readBoundedBytes(res, url);
+  return {
+    url,
+    text: "",
+    contentType,
+    isMarkdown: false,
+    isPlainText: false,
+    image: { data, mediaType: mediaTypeOf(contentType), extension },
+  };
+}
+
+/** Extract a PDF response as page-marked Markdown; unreadable PDFs fail the fetch. */
+async function buildPdfResult(res: Response, url: string): Promise<FetchResult> {
+  const data = await readBoundedBytes(res, url);
+
+  let text: string;
+  try {
+    text = await pdfToMarkdown(data);
+  } catch (err) {
+    if (err instanceof Error && err.name === "PasswordException") {
+      throw new FetchError(`The PDF at ${url} is password-protected; its text cannot be read`, {
+        cause: err,
+      });
+    }
+    const reason = err instanceof Error ? err.message : String(err);
+    throw new FetchError(`Could not read the PDF at ${url}: ${reason}`, { cause: err });
+  }
+  if (!text) {
+    throw new FetchError(
+      `The PDF at ${url} has no text layer (likely scanned pages); no text could be extracted`,
+    );
+  }
+  return { url, text, contentType: "application/pdf", isMarkdown: true, isPlainText: false };
+}
+
 async function fetchAsHtml(
   url: string,
   timeoutMs: number,
@@ -286,10 +394,16 @@ async function fetchAsHtml(
     throw new FetchError(`Fetch failed for ${url}: ${res.status} ${res.statusText}`, {
       status: res.status,
     });
+  const contentType = res.headers.get("content-type") || "";
+  // Reached when the sniff request failed, so non-text content was not detected earlier.
+  const typedKind = nonTextKind(contentType, "");
+  if (typedKind) return buildNonTextResult(typedKind, res, url);
+  const text = await res.text();
+  if (looksBinary(text.slice(0, SNIFF_BYTES))) return buildNonTextResult("binary", res, url);
   return {
     url: res.url || url,
-    text: await res.text(),
-    contentType: res.headers.get("content-type") || "",
+    text,
+    contentType,
     isMarkdown: false,
     isPlainText: false,
   };

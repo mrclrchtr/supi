@@ -7,7 +7,7 @@ Context7 using `web_docs_search` + `web_docs_fetch`.
 ## Content negotiation pipeline (web_fetch_md)
 
 1. **HEAD** — check `content-type` for Markdown; if so, full GET and return raw
-2. **Sniff** — range GET first 8KB; detect Markdown / plain text / HTML by content + headers
+2. **Sniff** — range GET first 8KB; detect PDF / image / binary / Markdown / plain text / HTML by content + headers. A PDF (content type or `%PDF-` signature) is fetched in full and its text layer extracted with `unpdf` under `## Page N` headings
 3. **Siblings** — try `.md` / `.markdown` / `index.md` / `README.md` variants
 4. **Full GET HTML** — JSDOM parse, strip script/style/noscript, Readability extract, Turndown convert
 
@@ -39,6 +39,7 @@ The tool registers only when Web Search is enabled and `bx` is available on `PAT
 
 ## Key gotchas
 
+- Never return bytes as text. Images with a `read`-supported content type are saved as spill files (`result.image`, file mode with `mediaType`); other binary content (NUL in the sniff) and PDF failures (over 32 MB, password-protected, unreadable, no text layer) throw `FetchError`. `unpdf` is pinned to 1.x because 2.x requires Node 24 and Pi supports Node 22. It loads lazily on the first PDF.
 - `turndown-plugin-gfm` has no `@types` package — import uses `@ts-expect-error`
 - `fetchWithNegotiation` is split into 4 internal helpers to stay under Biome cognitive complexity limits
 - `fetchWithNegotiation` and Context7 client calls accept `AbortSignal` and pass it through to abort-aware `fetch()` calls

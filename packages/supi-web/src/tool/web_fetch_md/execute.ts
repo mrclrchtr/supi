@@ -2,14 +2,19 @@ import type { AgentToolUpdateCallback, ExtensionContext } from "@earendil-works/
 import { loadWebConfig } from "../../config.ts";
 import { htmlToMarkdown, wrapAsCodeBlock } from "../../convert.ts";
 import { isValidHttpUrl } from "../../fetch.ts";
-import { writeTempFile } from "../../temp-file.ts";
+import { writeImageFile, writeTempFile } from "../../temp-file.ts";
 import { fetchPage } from "./fetch.ts";
 import {
   WEB_FETCH_INLINE_MAX_CHARS,
   type WebFetchMdInput,
   type WebFetchOutputMode,
 } from "./input.ts";
-import { buildFileResult, buildInlineResult, type WebFetchResult } from "./result.ts";
+import {
+  buildFileResult,
+  buildImageResult,
+  buildInlineResult,
+  type WebFetchResult,
+} from "./result.ts";
 
 /**
  * Build web_fetch_md execution. `configCwd` fixes where Web settings (Firecrawl) are read;
@@ -56,6 +61,14 @@ async function fetchAsMarkdown(
     fetchMode: input.fetchMode,
     firecrawlEnabled: loadWebConfig(configCwd).firecrawlEnabled,
   });
+  if (result.image) {
+    const { data, extension, mediaType } = result.image;
+    const filePath = writeImageFile(data, "web-fetch", extension);
+    return buildImageResult(
+      { chars: 0, lines: 0, url: result.url, outputMode },
+      { filePath, mediaType, bytes: data.byteLength },
+    );
+  }
   const markdown = await resolveMarkdown(result, absLinks);
   const lines = markdown.split("\n").length;
   const chars = markdown.length;

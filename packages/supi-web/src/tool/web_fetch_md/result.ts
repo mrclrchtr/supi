@@ -15,6 +15,9 @@ export interface WebFetchDetails extends Record<string, unknown> {
   outputMode: WebFetchOutputMode;
   retrieval?: FirecrawlRetrieval;
   filePath?: string;
+  /** Set when the file is a saved image, not Markdown. */
+  mediaType?: string;
+  bytes?: number;
   truncation?: TruncationResult;
   fullOutputPath?: string;
 }
@@ -46,6 +49,23 @@ export function buildFileResult(base: WebFetchResultBase, filePath: string): Web
       ...(base.retrieval ? { retrieval: base.retrieval } : {}),
     },
     details: { ...base, filePath },
+  };
+}
+
+/** Assemble the result for an image saved to disk; images are never returned inline. */
+export function buildImageResult(
+  base: WebFetchResultBase,
+  image: { filePath: string; mediaType: string; bytes: number },
+): WebFetchResult {
+  return {
+    content: [
+      {
+        type: "text",
+        text: `Image (${image.mediaType}, ${image.bytes.toLocaleString()} bytes) saved to ${image.filePath}. Use the read tool to view it.`,
+      },
+    ],
+    structuredContent: { mode: "file", url: base.url, chars: 0, lines: 0, ...image },
+    details: { ...base, ...image },
   };
 }
 

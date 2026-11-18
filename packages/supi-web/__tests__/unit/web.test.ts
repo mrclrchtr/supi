@@ -195,6 +195,45 @@ describe("webExtension", () => {
     }
   });
 
+  it.each([["inline"], ["auto"]])(
+    "saves an image and returns its path in %s mode",
+    async (outputMode) => {
+      const pi = createPiMock();
+      webExtension(pi as never);
+      const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0xff, 0xfe]);
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(
+          async (_url: unknown, init?: RequestInit) =>
+            new Response(init?.method === "HEAD" ? null : png.slice(), {
+              headers: { "content-type": "image/png" },
+            }),
+        ),
+      );
+      const tool = pi.tools[0] as RenderableTool;
+      try {
+        const result = await tool.execute(
+          "image",
+          { url: "https://example.com/logo.png", outputMode },
+          undefined,
+          undefined,
+          makeCtx(),
+        );
+        const data = expectStructuredContent<WebFetchMdOutput>(tool, result);
+        if (data.mode !== "file") throw new Error("Expected file payload");
+        expect(data).toMatchObject({ mediaType: "image/png", bytes: png.byteLength });
+        expect(data.filePath.endsWith(".png")).toBe(true);
+        expect(new Uint8Array(await readFile(data.filePath))).toEqual(png);
+        expect(result).toMatchObject({
+          content: [{ text: expect.stringContaining(data.filePath) }],
+        });
+        expect(renderToolResult(tool, result, false)).toContain("Saved image to");
+      } finally {
+        vi.unstubAllGlobals();
+      }
+    },
+  );
+
   it.each([
     ["file", "# Small"],
     ["auto", "x".repeat(15_001)],

@@ -48,6 +48,14 @@ function buildWebFetchSummary(
     return theme.fg("success", "Fetched web content");
   }
 
+  if (details.filePath && details.mediaType) {
+    return [
+      theme.fg("success", "Saved image to "),
+      theme.fg("dim", details.filePath),
+      theme.fg("dim", ` (${details.mediaType}, ${(details.bytes ?? 0).toLocaleString()} bytes)`),
+    ].join("");
+  }
+
   if (details.filePath) {
     return [
       theme.fg("success", "Saved Markdown to "),

@@ -39,7 +39,8 @@
     "jsdom": "31.0.0",
     "@mozilla/readability": "0.6.0",
     "turndown": "7.2.5",
-    "turndown-plugin-gfm": "1.0.2"
+    "turndown-plugin-gfm": "1.0.2",
+    "unpdf": "1.9.1"
   },
   "bundledDependencies": [
     "@mrclrchtr/supi-core"

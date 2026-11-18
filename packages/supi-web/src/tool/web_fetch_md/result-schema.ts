@@ -32,6 +32,10 @@ export const webFetchMdOutputSchema = Type.Union([
     ...metrics,
     mode: Type.Literal("file"),
     filePath: Type.String(),
+    mediaType: Type.Optional(
+      Type.String({ description: "Set when the file is a saved image; chars and lines are 0." }),
+    ),
+    bytes: Type.Optional(Type.Integer({ minimum: 0 })),
   }),
 ]);
 

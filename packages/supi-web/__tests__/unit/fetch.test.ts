@@ -215,6 +215,117 @@ describe("fetchWithNegotiation", () => {
   );
 });
 
+/** Build a minimal one-page-per-entry PDF; an empty entry is a page without text. */
+function makePdf(pages: string[]): Uint8Array {
+  const kids = pages.map((_, i) => `${4 + i * 2} 0 R`).join(" ");
+  const objects = [
+    "<< /Type /Catalog /Pages 2 0 R >>",
+    `<< /Type /Pages /Kids [${kids}] /Count ${pages.length} >>`,
+    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+  ];
+  pages.forEach((text, i) => {
+    const stream = text ? `BT /F1 12 Tf 72 720 Td (${text}) Tj ET` : "";
+    objects.push(
+      `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents ${5 + i * 2} 0 R >>`,
+      `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`,
+    );
+  });
+  let body = "%PDF-1.4\n";
+  const offsets = objects.map((object, i) => {
+    const offset = body.length;
+    body += `${i + 1} 0 obj\n${object}\nendobj\n`;
+    return offset;
+  });
+  const xref = body.length;
+  body += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  for (const offset of offsets) body += `${String(offset).padStart(10, "0")} 00000 n \n`;
+  body += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+  return new TextEncoder().encode(body);
+}
+
+function stubPdfResponse(body: Uint8Array, contentType = "application/pdf") {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (_url: string | URL | Request, init?: RequestInit) =>
+      init?.method === "HEAD"
+        ? new Response(null, { headers: { "content-type": contentType } })
+        : new Response(body.slice(), { headers: { "content-type": contentType } }),
+    ),
+  );
+}
+
+describe("fetchWithNegotiation with PDFs", () => {
+  it("returns the text layer with a section per page", async () => {
+    stubPdfResponse(makePdf(["First page text", "", "Third page text"]));
+
+    const result = await fetchWithNegotiation("https://example.com/guide.pdf");
+
+    expect(result.isMarkdown).toBe(true);
+    expect(result.text).toBe("## Page 1\n\nFirst page text\n\n## Page 3\n\nThird page text");
+  });
+
+  it("detects a PDF served with a generic content type", async () => {
+    stubPdfResponse(makePdf(["Generic type"]), "application/octet-stream");
+
+    await expect(fetchWithNegotiation("https://example.com/download")).resolves.toMatchObject({
+      text: "## Page 1\n\nGeneric type",
+    });
+  });
+
+  it("fails when the PDF has no text layer", async () => {
+    stubPdfResponse(makePdf([""]));
+
+    await expect(fetchWithNegotiation("https://example.com/scan.pdf")).rejects.toMatchObject({
+      name: "FetchError",
+      message: expect.stringContaining("no text layer"),
+    });
+  });
+
+  it("fails on an unreadable PDF instead of returning its bytes", async () => {
+    stubPdfResponse(new TextEncoder().encode("%PDF-1.4 not a document"));
+
+    await expect(fetchWithNegotiation("https://example.com/broken.pdf")).rejects.toMatchObject({
+      name: "FetchError",
+      message: expect.stringContaining("Could not read the PDF"),
+    });
+  });
+});
+
+describe("fetchWithNegotiation with other non-text content", () => {
+  function stubBody(body: Uint8Array, contentType: string) {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string | URL | Request, init?: RequestInit) =>
+        init?.method === "HEAD"
+          ? new Response(null, { headers: { "content-type": contentType } })
+          : new Response(body.slice(), { headers: { "content-type": contentType } }),
+      ),
+    );
+  }
+
+  it("returns image bytes for saving instead of decoding them as text", async () => {
+    const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13]);
+    stubBody(png, "image/png");
+
+    const result = await fetchWithNegotiation("https://example.com/logo");
+
+    expect(result.text).toBe("");
+    expect(result.image).toEqual({ data: png, mediaType: "image/png", extension: ".png" });
+  });
+
+  it.each([["application/zip"], ["text/plain"]])(
+    "rejects binary content served as %s",
+    async (contentType) => {
+      stubBody(new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0, 0, 0, 0, 0x08, 0]), contentType);
+
+      await expect(fetchWithNegotiation("https://example.com/archive")).rejects.toMatchObject({
+        name: "FetchError",
+        message: expect.stringContaining("is binary content"),
+      });
+    },
+  );
+});
+
 describe("isPlainTextContentType", () => {
   it("returns true for text/plain", () => {
     expect(isPlainTextContentType("text/plain")).toBe(true);

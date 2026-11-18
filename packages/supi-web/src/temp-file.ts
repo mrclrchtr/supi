@@ -15,3 +15,8 @@ export async function writeTempFile(
 ): Promise<string> {
   return writeSpillFile({ owner: "web", name: `${prefix}${suffix}`, content });
 }
+
+/** Persist image bytes as a SuPi spill file and return the absolute path. */
+export function writeImageFile(content: Uint8Array, prefix: string, suffix: string): string {
+  return writeSpillFile({ owner: "web", name: `${prefix}${suffix}`, content });
+}
