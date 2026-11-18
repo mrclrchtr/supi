@@ -13,6 +13,7 @@ import {
   type CodeSymbol,
   isCodeRequestInterruption,
   type SemanticProvider as SemanticSubstrate,
+  type StructuralProvider as StructuralSubstrate,
 } from "@mrclrchtr/supi-code-runtime/api";
 import { isWithinOrEqual } from "@mrclrchtr/supi-core/project";
 import type { TargetSymbolKind } from "../../session/target-input.ts";
@@ -20,6 +21,7 @@ import type { AnchorKind } from "../../session/target-store.ts";
 import { createEvidenceList, createPartialEvidenceList } from "../evidence.ts";
 import { describePartialQuery } from "../search/exclusions.ts";
 import { normalizePath } from "../search/paths.ts";
+import { declarationsAmong, unselectedNote } from "./symbol-selection.ts";
 import type { DisambiguationCandidateData, TargetOutcome } from "./types.ts";
 
 const MAX_CANDIDATES = 8; // default fallback when maxResults is not provided
@@ -115,6 +117,8 @@ export async function resolveSymbolTarget(
     exportedOnly?: boolean;
     maxResults?: number;
     control?: CodeRequestControl;
+    /** Syntax provider used to tell declarations from import and export-list bindings. */
+    structural?: StructuralSubstrate;
   },
 ): Promise<TargetOutcome> {
   const scopePath = options?.path ? normalizePath(options.path, cwd) : null;
@@ -165,6 +169,7 @@ export async function resolveSymbolTarget(
       cwd,
       maxResults: options.maxResults,
       control: options.control,
+      structural: options.structural,
     });
   }
 
@@ -177,6 +182,7 @@ export async function resolveSymbolTarget(
     cwd,
     maxResults: options?.maxResults,
     control: options?.control,
+    structural: options?.structural,
   });
 }
 
@@ -204,11 +210,17 @@ async function resolveCandidates(
   );
   // Workspace-symbol providers match substrings, so a query for `foo` also returns `fooBar`.
   const exact = ranged.filter((candidate) => candidate.name === options.symbol);
-  const selected = ranged.length === 1 ? ranged[0] : exact.length === 1 ? exact[0] : undefined;
-  if (selected && discovery.partialMessage === null) {
+  const complete = discovery.partialMessage === null;
+  const declared =
+    complete && exact.length > 1
+      ? await declarationsAmong(exact, options.structural, control)
+      : exact;
+  const selected =
+    ranged.length === 1 ? ranged[0] : declared.length === 1 ? declared[0] : undefined;
+  if (selected && complete) {
     const resolved = resolvedTarget(await refineResolvedSymbolAnchor(selected, semantic, control));
-    // Unselected rows stay disclosed: partial-name matches and policy exclusions.
-    const notes = [partialNameNote(candidates, selected), exclusionNote].filter(
+    // Unselected rows stay disclosed: bindings, partial-name matches, and policy exclusions.
+    const notes = [unselectedNote(candidates, selected, options.symbol), exclusionNote].filter(
       (note): note is string => note !== undefined,
     );
     return notes.length > 0 ? { ...resolved, notes } : resolved;
@@ -222,21 +234,6 @@ async function resolveCandidates(
     discovery,
     control,
   });
-}
-
-const MAX_NOTE_NAMES = 3;
-
-/** Name the partial-name matches passed over for the only exact-name match. */
-function partialNameNote(
-  candidates: readonly CodeSymbol[],
-  selected: CodeSymbol,
-): string | undefined {
-  const others = candidates.filter((candidate) => candidate !== selected);
-  if (others.length === 0) return undefined;
-  const names = [...new Set(others.map((candidate) => candidate.name))];
-  const shown = names.slice(0, MAX_NOTE_NAMES).map((name) => `\`${name}\``);
-  if (names.length > MAX_NOTE_NAMES) shown.push(`${names.length - MAX_NOTE_NAMES} more`);
-  return `Selected the only exact-name match; ${others.length} partial-name ${others.length === 1 ? "match was" : "matches were"} not selected (${shown.join(", ")}).`;
 }
 
 function resolvedTarget(candidate: CodeSymbol): Extract<TargetOutcome, { kind: "resolved" }> {
@@ -266,6 +263,7 @@ interface CandidateOutcomeBase {
   cwd: string;
   maxResults?: number;
   control?: CodeRequestControl;
+  structural?: StructuralSubstrate;
 }
 
 /**

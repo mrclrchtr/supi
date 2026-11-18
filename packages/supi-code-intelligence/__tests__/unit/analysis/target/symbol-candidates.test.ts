@@ -3,6 +3,7 @@ import {
   completedCodeQuery,
   partialCodeQuery,
   type SemanticProvider,
+  type StructuralProvider,
 } from "@mrclrchtr/supi-code-runtime/api";
 import { describe, expect, it } from "vitest";
 import { resolveSymbolTarget } from "../../../../src/analysis/target/symbol.ts";
@@ -128,9 +129,41 @@ describe("symbol candidates", () => {
       kind: "resolved",
       target: { name: "Widget", file: "/project/src/widget.ts" },
       notes: [
-        "Selected the only exact-name match; 2 partial-name matches were not selected (`WidgetProps`, `widget`).",
+        "Selected the only exact-name match; 2 partial-name matches (`WidgetProps`, `widget`) were not selected.",
       ],
     });
+  });
+
+  it("selects the declaration over a re-export binding of the same name", async () => {
+    const reExport: CodeSymbol = {
+      ...candidate("Widget", "index"),
+      kind: "Variable",
+      declarationAnchor: { line: 2, character: 3 },
+    };
+    const span = { startLine: 2, startCharacter: 3, endLine: 2, endCharacter: 9 };
+    const structural = {
+      imports: async () => ({ kind: "success", data: [] }),
+      exports: async (file: string) => ({
+        kind: "success",
+        data: file.endsWith("index.ts") ? [{ name: "Widget", kind: "re-export", ...span }] : [],
+      }),
+    } as unknown as StructuralProvider;
+    const symbols = [reExport, candidate("Widget", "widget"), candidate("WidgetProps", "props")];
+
+    await expect(
+      resolveSymbolTarget("Widget", "/project", provider(symbols), { structural }),
+    ).resolves.toMatchObject({
+      kind: "resolved",
+      target: { name: "Widget", file: "/project/src/widget.ts" },
+      notes: [
+        // biome-ignore lint/security/noSecrets: note text, not a secret.
+        "Selected the only declaration of that name; 1 import or export-list binding of that name (`index.ts`) and 1 partial-name match (`WidgetProps`) were not selected.",
+      ],
+    });
+    // Without syntax evidence both exact names stay candidates.
+    await expect(
+      resolveSymbolTarget("Widget", "/project", provider(symbols)),
+    ).resolves.toMatchObject({ kind: "disambiguation" });
   });
 
   it("keeps candidates when an incomplete result has one exact name among others", async () => {

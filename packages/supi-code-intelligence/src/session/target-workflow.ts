@@ -231,20 +231,18 @@ async function resolveSymbolWorkflow(
     };
   }
 
+  const structural =
+    withStructuralRequestControl(deps.capability.getStructuralProvider(deps.cwd), control) ??
+    undefined;
   const outcome = await resolveSymbolTarget(symbol.query, deps.cwd, provider, {
     path: scope,
     kind: symbol.symbolKind,
     maxResults: policy.maxResults,
     control,
+    structural,
   });
   return toWorkflowOutcome(
-    await refineTargetOutcomeIdentity(
-      outcome,
-      deps.cwd,
-      withStructuralRequestControl(deps.capability.getStructuralProvider(deps.cwd), control) ??
-        undefined,
-      control,
-    ),
+    await refineTargetOutcomeIdentity(outcome, deps.cwd, structural, control),
     policy,
     deps,
   );

@@ -21,7 +21,7 @@ interface SourceSpan {
 }
 
 /** Statements that bind names the file does not declare itself. */
-interface BindingRanges {
+export interface BindingRanges {
   readonly imports: readonly SourceSpan[];
   /** Specifiers of `export { … }` lists, with or without `from`. */
   readonly exportLists: readonly SourceSpan[];
@@ -56,6 +56,18 @@ export async function collectBindingRanges(
     if (isCodeRequestInterruption(error, control)) throw error;
     return null;
   }
+}
+
+/**
+ * Whether a 1-based position lies in an import statement or an export list, where a name is
+ * bound or forwarded but not declared.
+ */
+export function isBindingPosition(
+  ranges: BindingRanges,
+  position: { line: number; character: number },
+): boolean {
+  const target = { displayLine: position.line, displayCharacter: position.character };
+  return [...ranges.imports, ...ranges.exportLists].some((range) => containsTarget(range, target));
 }
 
 /**
@@ -131,7 +143,10 @@ function containsLines(outer: SourceSpan, inner: SourceSpan): boolean {
   return inner.startLine >= outer.startLine && inner.endLine <= outer.endLine;
 }
 
-function containsTarget(range: SourceSpan, target: ResolvedTargetData): boolean {
+function containsTarget(
+  range: SourceSpan,
+  target: Pick<ResolvedTargetData, "displayLine" | "displayCharacter">,
+): boolean {
   const { displayLine: line, displayCharacter: character } = target;
   const afterStart =
     line > range.startLine || (line === range.startLine && character >= range.startCharacter);
