@@ -18,6 +18,12 @@ import {
 } from "./target-workflow.ts";
 import { reportProgress, throwIfAborted, type WorkflowControl } from "./workflow-control.ts";
 
+/**
+ * Displayed relation sites when a call sets no `maxResults`. High enough that most
+ * results are shown whole: a capped result costs a second call to complete.
+ */
+const DEFAULT_MAX_RESULTS = 50;
+
 const DEFAULT_RELATIONS: readonly GraphRelationKind[] = ["references"];
 const ALL_RELATIONS: readonly GraphRelationKind[] = ["references", "callees", "implements"];
 
@@ -75,7 +81,7 @@ export async function runGraphWorkflow(
     control,
   });
   const provider = deps.capability.getProvider(deps.cwd);
-  const maxResults = request.maxResults ?? 8;
+  const maxResults = request.maxResults ?? DEFAULT_MAX_RESULTS;
   const displayName =
     entry.name ?? `symbol at ${toDisplayPath(deps.cwd, entry.file)}:${entry.displayLine}`;
 

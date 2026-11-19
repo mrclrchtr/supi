@@ -13,17 +13,10 @@
       },
       "code": {
         "calls": 1,
-        "tokens": 468,
+        "tokens": 736,
         "precision": 1,
-        "recall": 0.381,
-        "tokensPerHit": 59,
-        "complete": {
-          "calls": 2,
-          "tokens": 1208,
-          "precision": 1,
-          "recall": 1,
-          "tokensPerHit": 58
-        }
+        "recall": 1,
+        "tokensPerHit": 35
       }
     },
     "refs-unique-all": {
@@ -268,20 +261,13 @@
       },
       "code": {
         "calls": 1,
-        "tokens": 320,
-        "precision": 0.875,
-        "recall": 0.545,
-        "tokensPerHit": 53,
-        "complete": {
-          "calls": 2,
-          "tokens": 717,
-          "precision": 0.818,
-          "recall": 0.727,
-          "tokensPerHit": 90
-        },
+        "tokens": 393,
+        "precision": 0.818,
+        "recall": 0.727,
+        "tokensPerHit": 49,
         "viewed": {
-          "calls": 2,
-          "tokens": 717
+          "calls": 1,
+          "tokens": 393
         }
       }
     },
@@ -299,20 +285,13 @@
       },
       "code": {
         "calls": 1,
-        "tokens": 525,
-        "precision": 0.875,
-        "recall": 0.583,
-        "tokensPerHit": 75,
-        "complete": {
-          "calls": 2,
-          "tokens": 1108,
-          "precision": 0.923,
-          "recall": 1,
-          "tokensPerHit": 92
-        },
+        "tokens": 579,
+        "precision": 0.923,
+        "recall": 1,
+        "tokensPerHit": 48,
         "viewed": {
-          "calls": 2,
-          "tokens": 1108
+          "calls": 1,
+          "tokens": 579
         }
       }
     },
@@ -354,20 +333,13 @@
       },
       "code": {
         "calls": 1,
-        "tokens": 529,
-        "precision": 1,
-        "recall": 0.4,
-        "tokensPerHit": 66,
-        "complete": {
-          "calls": 2,
-          "tokens": 1359,
-          "precision": 0.909,
-          "recall": 1,
-          "tokensPerHit": 68
-        },
+        "tokens": 826,
+        "precision": 0.909,
+        "recall": 1,
+        "tokensPerHit": 41,
         "viewed": {
-          "calls": 24,
-          "tokens": 2979
+          "calls": 23,
+          "tokens": 2446
         }
       }
     },
@@ -397,17 +369,10 @@
       },
       "code": {
         "calls": 1,
-        "tokens": 293,
+        "tokens": 315,
         "precision": 1,
-        "recall": 0.889,
-        "tokensPerHit": 37,
-        "complete": {
-          "calls": 2,
-          "tokens": 611,
-          "precision": 1,
-          "recall": 1,
-          "tokensPerHit": 68
-        }
+        "recall": 1,
+        "tokensPerHit": 35
       }
     },
     "find-definition-missing": {

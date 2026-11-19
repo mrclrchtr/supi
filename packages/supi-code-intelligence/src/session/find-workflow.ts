@@ -13,6 +13,12 @@ import { parseFindWorkflowInput } from "./input/workflows.ts";
 import { resolveWorkspaceSemanticDemand } from "./semantic-demand.ts";
 import { reportProgress, throwIfAborted, type WorkflowControl } from "./workflow-control.ts";
 
+/**
+ * Displayed matches when a call sets no `maxResults`. High enough that most
+ * results are shown whole: a capped result costs a second call to complete.
+ */
+const DEFAULT_MAX_RESULTS = 50;
+
 export interface FindWorkflowDeps {
   readonly cwd: string;
   readonly capability: CapabilityAdapter;
@@ -42,7 +48,7 @@ export async function runFindWorkflow(
     message: `Searching in ${mode} mode`,
   });
 
-  const maxResults = request.maxResults ?? 8;
+  const maxResults = request.maxResults ?? DEFAULT_MAX_RESULTS;
   const scopeLabel = scope.display ?? ".";
   if ("semantic" in request.search) {
     return runSemanticSearch({
