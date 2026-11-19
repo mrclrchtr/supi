@@ -4,6 +4,7 @@ import {
   type EvidenceList,
 } from "../../analysis/evidence.ts";
 import type { RelationLocationPartialReason } from "../../analysis/relations/provider-locations.ts";
+import { attachSourceLines } from "../../analysis/relations/source-lines.ts";
 import type {
   CallEntry,
   ImplementationEntry,
@@ -51,7 +52,9 @@ export function assembleGraphSection(
         ...section,
         evidence: {
           ...evidence,
-          items: selectReferenceLocations(section.data.references, evidence.metadata.shownCount),
+          items: attachSourceLines(
+            selectReferenceLocations(section.data.references, evidence.metadata.shownCount),
+          ),
         },
         selectionNote:
           (evidence.metadata.omittedCount ?? 0) > 0 &&
@@ -78,18 +81,17 @@ export function assembleGraphSection(
             }),
       };
     }
-    case "implements":
-      return {
-        ...section,
-        evidence: createRelationEvidenceList({
-          key: "implements.locations",
-          items: [...section.data.implementations],
-          maxResults,
-          invalidLocationCount: section.data.invalidLocationCount,
-          partialReason: section.data.partialReason,
-          partialMessage: section.data.partialMessage,
-        }),
-      };
+    case "implements": {
+      const evidence = createRelationEvidenceList({
+        key: "implements.locations",
+        items: [...section.data.implementations],
+        maxResults,
+        invalidLocationCount: section.data.invalidLocationCount,
+        partialReason: section.data.partialReason,
+        partialMessage: section.data.partialMessage,
+      });
+      return { ...section, evidence: { ...evidence, items: attachSourceLines(evidence.items) } };
+    }
   }
 }
 

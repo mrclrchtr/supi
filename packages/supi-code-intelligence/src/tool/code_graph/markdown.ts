@@ -13,6 +13,9 @@ import {
 import type { GraphResultAssembly } from "./result.ts";
 import type { AssembledGraphSection } from "./section.ts";
 
+/** Longest source-line preview shown beside a reference or implementation site. */
+const SOURCE_LINE_LIMIT = 160;
+
 /** Render one target and one summary per requested relation. */
 export function renderGraphResult(assembly: GraphResultAssembly): string {
   const lines = [
@@ -62,14 +65,32 @@ function formatLocations(
   section: Extract<AssembledGraphSection, { kind: "ok"; rel: "references" | "implements" }>,
   cwd: string,
 ): string[] {
-  const groups = new Map<string, string[]>();
+  // One row per source line: sites on the same line share its text.
+  const groups = new Map<string, Map<number, { sites: string[]; text: string | undefined }>>();
   for (const location of section.evidence.items) {
     const file = toDisplayPath(cwd, location.file);
-    const sites = groups.get(file) ?? [];
-    sites.push(`L${location.line}:${location.character}`);
-    groups.set(file, sites);
+    const rows = groups.get(file) ?? new Map();
+    const row = rows.get(location.line) ?? { sites: [], text: location.text };
+    row.sites.push(`L${location.line}:${location.character}`);
+    rows.set(location.line, row);
+    groups.set(file, rows);
   }
-  return [...groups].map(([file, sites]) => `- ${graphCodeSpan(file)}: ${sites.join(", ")}`);
+  return [...groups].flatMap(([file, rows]) => {
+    const entries = [...rows.values()];
+    // No readable source: keep the compact one-row form.
+    if (entries.every((row) => row.text === undefined)) {
+      return [`- ${graphCodeSpan(file)}: ${entries.flatMap((row) => row.sites).join(", ")}`];
+    }
+    return [
+      `- ${graphCodeSpan(file)}`,
+      ...entries.map((row) => {
+        const source = row.text
+          ? ` — ${graphCodeSpan(compactGraphLabel(row.text, SOURCE_LINE_LIMIT))}`
+          : "";
+        return `  - ${row.sites.join(", ")}${source}`;
+      }),
+    ];
+  });
 }
 
 /** Group by the full expression, never by a shortened display label. */

@@ -303,9 +303,13 @@ function collectLocations(evidence: Evidence, call: BenchCall, output: string, c
   const isGrep = call.tool === "grep";
   const base = isGrep ? grepBase(cwd, String(call.args.path ?? ".")) : cwd;
   for (const location of locations(output, base, cwd)) {
-    // grep match lines carry their source text; code_* rows name positions only.
+    // grep match lines carry their source text; most code_* rows name positions only.
     if (isGrep) evidence.shown.add(location);
     if (!call.locate) evidence.found.add(location);
+  }
+  if (isGrep) return;
+  for (const row of graphSiteRows(output.split("## Read Next")[0] ?? "", cwd)) {
+    if (row.hasText) evidence.shown.add(row.location);
   }
 }
 
@@ -349,7 +353,8 @@ function scoreLocations(
  * code_* (`` `path`: L12:3, L40 `` / `` `path:12:3` `` / file outline rows
  * `` — L12:3 `` under `` # File outline of `path` `` / code_graph callee rows
  * `` - `name` — L12:3 `` under `` Target: … — `path` `` / code_find rows
- * `` - `name` (kind) L12:3–L12:9 `` under `` ### path ``). "Read Next" hints are
+ * `` - `name` (kind) L12:3–L12:9 `` under `` ### path `` / code_graph site rows
+ * ``   - L12:3 — `source` `` under `` - `path` ``). "Read Next" hints are
  * navigation suggestions, not answers, and are excluded.
  */
 function locations(text: string, base: string, cwd: string): Set<string> {
@@ -360,6 +365,7 @@ function locations(text: string, base: string, cwd: string): Set<string> {
     for (const m of answer.matchAll(/ — L(\d+):\d+/g)) out.add(`${outlineFile}:${m[1]}`);
   }
   for (const location of findRowLocations(answer, cwd)) out.add(location);
+  for (const row of graphSiteRows(answer, cwd)) out.add(row.location);
   // code_graph callee rows (`` - `callee` — L12:3 ``) belong to the target's file.
   const targetFile = /^Target: `[^`]+` — `([^`]+)`/m.exec(answer)?.[1];
   if (targetFile) {
@@ -376,6 +382,35 @@ function locations(text: string, base: string, cwd: string): Set<string> {
   }
   for (const m of answer.matchAll(/`([\w./@-]+\.\w+):(\d+)(?::\d+)?`/g)) {
     out.add(`${relative(cwd, resolve(cwd, m[1] as string))}:${m[2]}`);
+  }
+  return out;
+}
+
+/**
+ * code_graph reference and implementation rows (``   - L12:3, L12:9 — `source` ``) under
+ * their `` - `path` `` file row. `hasText` marks rows that carry the source line.
+ */
+function graphSiteRows(answer: string, cwd: string): { location: string; hasText: boolean }[] {
+  const out: { location: string; hasText: boolean }[] = [];
+  let file: string | undefined;
+  for (const line of answer.split("\n")) {
+    const heading = /^- `([\w./@-]+\.\w+)`$/.exec(line)?.[1];
+    if (heading) {
+      file = heading;
+      continue;
+    }
+    const row = /^ {2}- ((?:L\d+:\d+(?:, )?)+)( — `)?/.exec(line);
+    if (!row) {
+      file = undefined;
+      continue;
+    }
+    if (!file) continue;
+    for (const site of (row[1] as string).matchAll(/L(\d+):/g)) {
+      out.push({
+        location: `${relative(cwd, resolve(cwd, file))}:${site[1]}`,
+        hasText: row[2] !== undefined,
+      });
+    }
   }
   return out;
 }

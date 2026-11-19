@@ -16,6 +16,8 @@ export interface CallerReference {
   line: number;
   character: number;
   name: string | null;
+  /** Trimmed source line at the site; set on bounded evidence during result assembly. */
+  text?: string;
 }
 
 /** Consumer-facing alias for reference/usages entries. */
@@ -48,6 +50,8 @@ export interface ImplementationEntry {
   line: number;
   character: number;
   name: string | null;
+  /** Trimmed source line at the site; set on bounded evidence during result assembly. */
+  text?: string;
 }
 
 /** Shared provider deps for all relation kinds. */

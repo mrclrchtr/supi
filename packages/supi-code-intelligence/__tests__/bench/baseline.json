@@ -13,16 +13,16 @@
       },
       "code": {
         "calls": 1,
-        "tokens": 317,
+        "tokens": 468,
         "precision": 1,
         "recall": 0.381,
-        "tokensPerHit": 40,
+        "tokensPerHit": 59,
         "complete": {
           "calls": 2,
-          "tokens": 667,
+          "tokens": 1208,
           "precision": 1,
           "recall": 1,
-          "tokensPerHit": 32
+          "tokensPerHit": 58
         }
       }
     },
@@ -40,13 +40,13 @@
       },
       "code": {
         "calls": 1,
-        "tokens": 350,
+        "tokens": 740,
         "precision": 1,
         "recall": 1,
-        "tokensPerHit": 17,
+        "tokensPerHit": 35,
         "viewed": {
-          "calls": 22,
-          "tokens": 2457
+          "calls": 1,
+          "tokens": 740
         }
       }
     },
@@ -64,13 +64,13 @@
       },
       "code": {
         "calls": 1,
-        "tokens": 168,
+        "tokens": 232,
         "precision": 1,
         "recall": 1,
-        "tokensPerHit": 28,
+        "tokensPerHit": 39,
         "viewed": {
-          "calls": 7,
-          "tokens": 624
+          "calls": 1,
+          "tokens": 232
         }
       }
     },
@@ -84,10 +84,10 @@
       },
       "code": {
         "calls": 2,
-        "tokens": 346,
+        "tokens": 410,
         "precision": 1,
         "recall": 1,
-        "tokensPerHit": 58
+        "tokensPerHit": 68
       }
     },
     "definition-signature": {
@@ -268,20 +268,20 @@
       },
       "code": {
         "calls": 1,
-        "tokens": 257,
+        "tokens": 320,
         "precision": 0.875,
         "recall": 0.545,
-        "tokensPerHit": 43,
+        "tokensPerHit": 53,
         "complete": {
           "calls": 2,
-          "tokens": 556,
+          "tokens": 717,
           "precision": 0.818,
           "recall": 0.727,
-          "tokensPerHit": 70
+          "tokensPerHit": 90
         },
         "viewed": {
-          "calls": 12,
-          "tokens": 1292
+          "calls": 2,
+          "tokens": 717
         }
       }
     },
@@ -299,20 +299,20 @@
       },
       "code": {
         "calls": 1,
-        "tokens": 375,
+        "tokens": 525,
         "precision": 0.875,
         "recall": 0.583,
-        "tokensPerHit": 54,
+        "tokensPerHit": 75,
         "complete": {
           "calls": 2,
-          "tokens": 751,
+          "tokens": 1108,
           "precision": 0.923,
           "recall": 1,
-          "tokensPerHit": 63
+          "tokensPerHit": 92
         },
         "viewed": {
-          "calls": 13,
-          "tokens": 1965
+          "calls": 2,
+          "tokens": 1108
         }
       }
     },
@@ -330,13 +330,13 @@
       },
       "code": {
         "calls": 1,
-        "tokens": 149,
+        "tokens": 208,
         "precision": 1,
         "recall": 0.75,
-        "tokensPerHit": 50,
+        "tokensPerHit": 69,
         "viewed": {
-          "calls": 4,
-          "tokens": 486
+          "calls": 1,
+          "tokens": 208
         }
       }
     },

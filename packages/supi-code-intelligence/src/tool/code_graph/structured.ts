@@ -35,6 +35,12 @@ export const GraphOutputSchema = Type.Object(
                 file: Type.String(),
                 line: Type.Integer(),
                 character: Type.Integer(),
+                text: Type.Optional(
+                  Type.String({
+                    description:
+                      "Trimmed source line at a references or implements site; absent when unreadable.",
+                  }),
+                ),
               },
               { additionalProperties: false },
             ),
@@ -100,6 +106,7 @@ export function structuredGraphResult(
                 file: toDisplayPath(assembly.cwd, item.file),
                 line: item.line,
                 character: item.character,
+                ...("text" in item && item.text ? { text: item.text } : {}),
               })),
         ...(section.kind === "ok" ? { evidence: { ...section.evidence.metadata } } : {}),
         externalCount: info.externalCount,

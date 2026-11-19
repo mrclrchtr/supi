@@ -1,5 +1,9 @@
 # Changelog
 
+## [14.1.0]
+
+- `code_graph` shows the source line of every reference and implementation site, so a result answers how a symbol is used without a follow-up `read` or `rg`. Sites are listed one row per source line under their file (``  - L120:25 — `const stashes = await git(["stash", "list", "--format=%gs"], cwd);` ``) instead of as bare positions (`L117:24, L120:25`). Structured output adds an optional `text` to each item of these relations, and the expanded transcript shows the same line. Lines are trimmed and shortened when long; a site whose file cannot be read keeps the position-only form. Callee rows are unchanged.
+
 ## [14.0.0]
 
 - The LSP footer moved to the right side of the footer path line and is shorter: `λ 3✓ 1⟳ ◫43` instead of `λ lsp • 3 ✓ • 1 ⟳ • 43 open files`. Route counts are colored by severity (`✓` success, `⟳` accent, `↻` and `⊘` warning, `✗` error). The file count covers files synchronized to a language server, not files open in an editor; it uses `◫`, the Nerd Font file-with-eye outline (U+F0DCB), or `f` depending on the footer `icons` setting, and ASCII mode writes `lsp 3ok`. When LSP startup fails, the footer shows `λ ✗ config` for a configuration error and `λ ✗ unavailable` otherwise, instead of disappearing. Pi's built-in footer and other custom footers now show the LSP status too, on their extension status line. The footer renders the last published runtime state instead of re-querying every route on each render, and a route whose server command is missing or fails to start shows up without waiting for another state change.

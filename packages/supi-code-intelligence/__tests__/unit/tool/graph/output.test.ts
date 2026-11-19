@@ -81,11 +81,11 @@ describe("code_graph agent output", () => {
         expect.objectContaining({
           relation: "references",
           items: [
-            { file: "a.ts", line: 1, character: 1, name: "foo" },
-            { file: "a.ts", line: 2, character: 1, name: "foo" },
-            { file: "a.ts", line: 3, character: 1, name: "foo" },
-            { file: "b.ts", line: 1, character: 1, name: "foo" },
-            { file: "c.ts", line: 1, character: 1, name: "foo" },
+            { file: "a.ts", line: 1, character: 1, name: "foo", text: "foo();" },
+            { file: "a.ts", line: 2, character: 1, name: "foo", text: "foo();" },
+            { file: "a.ts", line: 3, character: 1, name: "foo", text: "foo();" },
+            { file: "b.ts", line: 1, character: 1, name: "foo", text: "foo();" },
+            { file: "c.ts", line: 1, character: 1, name: "foo", text: "foo();" },
           ],
           evidence: {
             key: "references.locations",
@@ -101,8 +101,12 @@ describe("code_graph agent output", () => {
     expect(result.content).toContain(
       "5 of 42 locations; 37 omitted — Selection: one site per file per round.",
     );
-    expect(result.content).toContain("- `a.ts`: L1:1, L2:1, L3:1\n");
-    expect(result.content).toContain("- `b.ts`: L1:1\n- `c.ts`: L1:1");
+    expect(result.content).toContain(
+      "- `a.ts`\n  - L1:1 — `foo();`\n  - L2:1 — `foo();`\n  - L3:1 — `foo();`\n",
+    );
+    expect(result.content).toContain(
+      "- `b.ts`\n  - L1:1 — `foo();`\n- `c.ts`\n  - L1:1 — `foo();`",
+    );
     expect(result.details?.data).toMatchObject({
       sections: expect.arrayContaining([
         expect.objectContaining({
@@ -117,7 +121,13 @@ describe("code_graph agent output", () => {
     });
     expect(
       result.details?.displaySections?.find((section) => section.key === "graph.references")?.lines,
-    ).toEqual(["L1:1", "L2:1", "L3:1", "L1:1", "L1:1"]);
+    ).toEqual([
+      "L1:1 — foo();",
+      "L2:1 — foo();",
+      "L3:1 — foo();",
+      "L1:1 — foo();",
+      "L1:1 — foo();",
+    ]);
   });
 
   it("expands file coverage monotonically without changing implementation selection", async () => {
@@ -178,7 +188,18 @@ describe("code_graph agent output", () => {
         sections: expect.arrayContaining([
           expect.objectContaining({
             relation: "references",
-            items: count === 0 ? [] : [{ file: "consumer.ts", line: 1, character: 1, name: "foo" }],
+            items:
+              count === 0
+                ? []
+                : [
+                    {
+                      file: "consumer.ts",
+                      line: 1,
+                      character: 1,
+                      name: "foo",
+                      text: "foo(); foo();",
+                    },
+                  ],
             evidence: expect.objectContaining({
               totalCount: count,
               shownCount: count === 0 ? 0 : 1,
@@ -235,6 +256,8 @@ describe("code_graph agent output", () => {
       implementation: async () => completedCodeQuery([location("implementation.ts", 6)]),
     });
     const { content } = await execute();
+    // A site whose file cannot be read keeps the compact row without source text.
+    expect(content).toContain("- `implementation.ts`: L1:7");
     const guidance = content.split("## Read Next")[1];
     expect(guidance?.match(/`consumer.ts`/g)).toHaveLength(1);
     expect(guidance).toContain("implementation.ts");
@@ -250,7 +273,8 @@ describe("code_graph agent output", () => {
     expect(content.match(/3 call sites/g)).toHaveLength(1);
     expect(content.match(/`bar`/g)).toHaveLength(1);
     expect(content).toContain("L2:3, L2:10, L3:3");
-    expect(content).toContain("L1:1, L1:8");
+    // Sites on one source line share a row and its text.
+    expect(content).toContain("- `consumer.ts`\n  - L1:1, L1:8 — `foo(); foo();`");
     expect(content).not.toContain("L1:1, L1:1");
   });
 });

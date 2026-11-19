@@ -35,7 +35,10 @@ export function graphDisplaySection(
     evidence: section.evidence.metadata,
     format: (item: CallEntry | ReferenceEntry) => {
       const site = `L${item.line}:${item.character}`;
-      if (section.rel !== "callees") return site;
+      if (section.rel !== "callees") {
+        const text = (item as ReferenceEntry).text;
+        return text ? `${site} — ${compactGraphLabel(text)}` : site;
+      }
       const call = item as CallEntry;
       return `${site} — ${compactGraphLabel(call.displayName ?? call.name)}`;
     },
