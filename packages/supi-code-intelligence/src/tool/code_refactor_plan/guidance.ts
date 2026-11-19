@@ -3,4 +3,6 @@ export const toolDescription =
 
 export const promptSnippet = "preview a semantic refactor";
 
-export const promptGuidelines: string[] = [];
+export const promptGuidelines = [
+  "Rename a symbol across files with code_refactor_plan rename_symbol instead of text edits.",
+];

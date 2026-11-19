@@ -185,17 +185,21 @@ describe("focused code intelligence tool registration", () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
 
-    const findGuidelines = (getTool(pi, "code_find").promptGuidelines ?? []).join("\n");
-    expect(findGuidelines).toMatch(/broad code-aware discovery/i);
-    expect(findGuidelines).toMatch(/target identity/i);
-    expect(findGuidelines).toMatch(/relationships/i);
-    expect(findGuidelines).toMatch(/when each tool is available/i);
+    // Guidelines name an action the agent is about to take, not a tool category.
+    expect((getTool(pi, "code_graph").promptGuidelines ?? []).join(" ")).toMatch(
+      /before renaming, removing, or changing the signature/i,
+    );
+    expect((getTool(pi, "code_refactor_plan").promptGuidelines ?? []).join(" ")).toMatch(
+      /rename a symbol across files/i,
+    );
+    expect((getTool(pi, "code_resolve").promptGuidelines ?? []).join(" ")).toMatch(
+      /search pattern is one identifier/i,
+    );
+    expect(getTool(pi, "code_find").promptGuidelines).toEqual([]);
     expect((getTool(pi, "code_inspect").promptGuidelines ?? []).join(" ")).toMatch(
       /when code_health is available/i,
     );
-    expect(getTool(pi, "code_resolve").promptGuidelines).toEqual([]);
     expect(getTool(pi, "code_health").promptGuidelines).toEqual([]);
-    expect(getTool(pi, "code_refactor_plan").promptGuidelines).toEqual([]);
 
     for (const name of CODE_INTELLIGENCE_TOOL_NAMES) {
       const guidelines: string[] = getTool(pi, name).promptGuidelines ?? [];

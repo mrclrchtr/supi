@@ -3,4 +3,6 @@ export const toolDescription =
 
 export const promptSnippet = "resolve symbols or file declarations";
 
-export const promptGuidelines: string[] = [];
+export const promptGuidelines = [
+  "When a search pattern is one identifier and you need its declaration, call code_resolve instead of rg.",
+];
