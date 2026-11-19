@@ -2,6 +2,7 @@
 
 ## [13.1.0]
 
+- Live `debug` and `/supi-debug` queries keep `info`, `warning`, and `error` events longer. When the retained buffer (`maxEvents`, default 100) is full, the oldest `debug` event is dropped first, and higher-level events keep at most half of the buffer. Before, a few tool calls produced enough per-request LSP timings to push out a summary such as `workspace-symbol.warm-pass` within seconds; it was then only readable from the session file.
 - The `gather-retrospectives` skill is now user-invoked only (`/skill:gather-retrospectives`); the agent no longer loads it on its own, because it reads many past sessions.
 
 ## [13.0.0]

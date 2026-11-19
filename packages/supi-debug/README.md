@@ -175,7 +175,7 @@ Available settings:
 
 - `enabled` — turn session-local event capture on or off
 - `agentAccess` — `off`, `sanitized`, or `raw`
-- `maxEvents` — maximum retained events in memory
+- `maxEvents` — maximum retained events in memory. When the buffer is full, the oldest `debug` event is dropped first, so per-request timings do not push out `info`, `warning`, and `error` events; those keep at most half of the buffer
 - `persistLevel` — minimum level (`debug`, `info`, `warning`, `error`) written to the session file; default `info`. Set `debug` to persist high-volume timing telemetry, which can add hundreds of MB across sessions. Live `/supi-debug` and `debug` queries still see all retained levels
 - `tuiRenderTool` — activate the `tui_render` tool; off by default, so it adds no prompt cost until enabled
 - `agentRunRetrospectivesEnabled` — opt in to Agent Run retrospectives; off by default and eligible only while Debug capture and its session persistence sink are active and `persistLevel` admits `info` events. Retrospective prose is stored in the sanitized event data using the existing Debug session-entry path.

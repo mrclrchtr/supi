@@ -148,6 +148,41 @@ describe("debug registry", () => {
     expect(getDebugEvents().events.map((event) => event.category)).toEqual(["three", "two"]);
   });
 
+  it("keeps a summary event while high-volume debug events fill the buffer", () => {
+    configureDebugRegistry({ enabled: true, maxEvents: 4 });
+
+    recordDebugEvent({ source: "a", level: "info", category: "summary", message: "summary" });
+    for (const category of ["one", "two", "three", "four", "five"]) {
+      recordDebugEvent({ source: "a", level: "debug", category, message: category });
+    }
+
+    expect(getDebugEvents().events.map((event) => event.category)).toEqual([
+      "five",
+      "four",
+      "three",
+      "summary",
+    ]);
+  });
+
+  it("keeps recent debug events when summary events alone would fill the buffer", () => {
+    configureDebugRegistry({ enabled: true, maxEvents: 4 });
+
+    for (const category of ["s1", "s2", "s3", "s4", "s5"]) {
+      recordDebugEvent({ source: "a", level: "info", category, message: category });
+    }
+    recordDebugEvent({ source: "a", level: "debug", category: "d1", message: "d1" });
+    recordDebugEvent({ source: "a", level: "debug", category: "d2", message: "d2" });
+    recordDebugEvent({ source: "a", level: "debug", category: "d3", message: "d3" });
+
+    // Summaries hold at most half the buffer, so the newest debug events stay visible.
+    expect(getDebugEvents().events.map((event) => event.category)).toEqual([
+      "d3",
+      "d2",
+      "s5",
+      "s4",
+    ]);
+  });
+
   it("filters by operation, source, level, and category with newest-first limits", () => {
     configureDebugRegistry({ enabled: true, maxEvents: 10 });
     const operationId = "op-AAAAAAAAAAAAAAAAAAAAAA";

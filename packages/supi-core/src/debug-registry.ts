@@ -16,7 +16,10 @@ export interface DebugRegistryConfig {
   agentAccess: DebugAgentAccess;
   /** Whether Agent Run retrospective capture is explicitly enabled. */
   agentRunRetrospectivesEnabled: boolean;
-  /** Maximum number of session-local events to keep in memory. */
+  /**
+   * Maximum number of session-local events to keep in memory. `debug` events
+   * are evicted first; higher levels keep at most half of the buffer.
+   */
   maxEvents: number;
   /**
    * Minimum level forwarded to persistence sinks. Lower-level events stay in the
@@ -146,12 +149,22 @@ function normalizeMaxEvents(value: number): number {
   return Math.floor(value);
 }
 
+/**
+ * Evict down to `maxEvents`. The oldest `debug` event goes first, so
+ * high-volume timings cannot push out a summary recorded moments earlier.
+ * Higher-level events keep at most half the buffer; past that the oldest of
+ * them goes instead, so recent `debug` events stay visible too.
+ */
 function trimToMaxEvents(state: DebugRegistryState): void {
   const maxEvents = normalizeMaxEvents(state.config.maxEvents);
-  if (state.events.length <= maxEvents) {
-    return;
+  const summaryShare = Math.floor(maxEvents / 2);
+  let summaries = state.events.filter((event) => event.level !== "debug").length;
+  while (state.events.length > maxEvents) {
+    const evictSummary = summaries > summaryShare;
+    const index = state.events.findIndex((event) => (event.level !== "debug") === evictSummary);
+    if (evictSummary) summaries--;
+    state.events.splice(Math.max(index, 0), 1);
   }
-  state.events.splice(0, state.events.length - maxEvents);
 }
 
 /** Return whether a debug level is recognized by the registry. */
