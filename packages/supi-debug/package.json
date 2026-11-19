@@ -1,6 +1,6 @@
 {
   "name": "@mrclrchtr/supi-debug",
-  "version": "13.0.0",
+  "version": "14.0.0",
   "description": "Capture and inspect SuPi debug events",
   "license": "MIT",
   "repository": {

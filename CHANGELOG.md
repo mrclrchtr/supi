@@ -1,5 +1,56 @@
 # Changelog
 
+## [14.0.0](https://github.com/mrclrchtr/supi/compare/v13.0.0...v14.0.0) (2026-11-19)
+
+This release makes TypeScript symbol lookups complete across multi-project workspaces, gives delegated agents a read-only `git` tool and better prompts, lets `web_fetch_md` read PDFs and images, and reorganizes the footer.
+
+### ⚠ BREAKING CHANGES
+
+* **Debug:** `/supi-tooling-retro` is now an extension command instead of a prompt template, so a prompt-template override named `supi-tooling-retro.md` no longer applies. **Migration:** rename the override, for example to `my-tooling-retro.md`, and invoke it as `/my-tooling-retro` (its reports are not stored as Debug events).
+
+### Code Intelligence & LSP
+
+* Symbol queries on multi-project TypeScript workspaces no longer report a partial candidate list as complete: every project root (up to 96) is loaded first. Loading starts in the background after startup and shows as `loading projects` in the LSP footer, `code_health`, and `/supi-ci-status` ([#615](https://github.com/mrclrchtr/supi/issues/615), [#618](https://github.com/mrclrchtr/supi/issues/618)).
+* `code_graph` references no longer miss a project whose first file is one it excludes, such as a test fixture ([#616](https://github.com/mrclrchtr/supi/issues/616)).
+* Symbol targets select the only exact-name match instead of listing partial-name matches as candidates; re-export bindings no longer count as a second declaration, and candidate lists contain only declarations of the queried name.
+* A TypeScript symbol result cut at the native server's 256-row limit is reported as provider-limited, and the only exact-name declaration in such a result is still selected ([#617](https://github.com/mrclrchtr/supi/issues/617), [#622](https://github.com/mrclrchtr/supi/issues/622)).
+* Parallel `code_*` calls that open many new files no longer fail with `No routed LSP client could complete …`; a full open queue is now named as the cause.
+* Directory `code_orientation` in Agent Runs and Reviewer Sessions no longer repeats instruction files the session already has, and names the ones it skips ([#612](https://github.com/mrclrchtr/supi/issues/612)).
+* Shorter notes for path-policy exclusions and incomplete results, with clearer reasons in `code_find`.
+* LSP debug traces are leaner and more useful: batch operations report request timings on one summary event, a warm-up pass records one summary instead of ~90 events, and failed file opens are recorded ([#619](https://github.com/mrclrchtr/supi/issues/619)).
+
+### Agents & Review
+
+* The `explore` profile gets a read-only `git` tool (`diff`, `log`, `show`, `blame`, `status`, `rev-parse`, `ls-files`) that explains empty output and names rejected arguments. Custom profiles can add `git` to their tools.
+* The `explore` and `general` system prompts are rewritten for delegated work, and runs with a package-owned or custom system prompt now receive their tools' usage rules.
+* `agent_run` guides the calling agent toward better task briefs, and `review_run` asks for the applicable criteria in each criteria-source summary.
+* Each agent profile has an **Instructions** row in `/supi-settings` to choose which instruction files (`none`, `project`, `global`, `global+project`) a delegated run loads.
+* Agent Run transcripts list only system prompts actually sent with a model request ([#611](https://github.com/mrclrchtr/supi/issues/611)); run summaries show Git format arguments unquoted.
+
+### Web
+
+* `web_fetch_md` reads PDFs as Markdown (one section per page) and saves images to a temporary file for the `read` tool; other binary content fails instead of returning bytes.
+* `web_fetch_md` returns SVG, RSS, Atom, and other XML as fenced source text, and labels fenced text by content type before URL extension.
+* SuPi warns at session start when Web Search is enabled but bx has no Brave API key, and `web_search` names the missing key when bx fails.
+
+### Footer & UI
+
+* The footer is organized into a workspace line (path, Git, LSP status) and a session line (metrics, model with status icons), with one ` · ` separator and a consistent Nerd Font icon set. The LSP status is shorter (`λ 3✓ 1⟳ ◫43`), colored by severity, and also appears in Pi's built-in footer.
+* `/supi-insights` and `/supi-review-cleanup` results now render a summary instead of raw `[customType]` messages.
+* Prompt suggestions are cleared after session-tree navigation and are no longer requested for abandoned side runs such as `/supi-tooling-retro` ([#623](https://github.com/mrclrchtr/supi/issues/623)).
+* The installer matrix shows pending changes as `[+]`/`[-]` with a count, highlights the focused cell, tags recommended and beta packages, and marks kept obsolete declarations for removal.
+
+### Debug & Skills
+
+* `/supi-tooling-retro` runs on a side branch and, with persisted Debug capture, stores each completed report as a Debug event that `gather-retrospectives` collects ([#608](https://github.com/mrclrchtr/supi/issues/608)).
+* The live Debug buffer keeps `info`/`warning`/`error` events longer and evicts the most frequent source and category first.
+* `gather-retrospectives` is now user-invoked only.
+* The `pi-tui-design` skill is published in the skills.sh catalog in a separate developer group; the code-review skill no longer imposes a word limit on briefs.
+
+### Dependencies
+
+* Routine updates, including pnpm 12.20, Biome 2.6.7, the Context7 SDK 0.7 (any library-search 404 is now an empty result), unpdf 2, and the SQL Tree-sitter grammar.
+
 ## [13.0.0](https://github.com/mrclrchtr/supi/compare/v12.0.0...v13.0.0) (2026-11-16)
 
 SuPi 13.0.0 retires three small packages into existing ones, makes `code_health` honest about what it actually checked, adds the `tui_render` and `session-analytics` debugging aids, and compacts codemode, agent, and footer rows in the TUI.

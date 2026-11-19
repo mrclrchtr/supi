@@ -4,10 +4,11 @@
 
 - `review_run` asks callers to put the applicable criteria into each `criteriaSources` summary, quoted or closely paraphrased, and Reviewers retrieve a source only for what its summary lacks. One-line topic summaries made Reviewers read every source anyway.
 - `code_orientation` no longer repeats an instruction file a Reviewer already read in full, and delivers instruction files again after a compaction ([#612](https://github.com/mrclrchtr/supi/issues/612)).
+- `/supi-review-cleanup` reports one status row per workspace (`✓` removed, `✗` with the failure reason) instead of the raw `[supi-review-cleanup]` message.
+- The Agent Run transcript (`/supi-agents`) of a Reviewer Session lists only the system prompts sent with a model request; before, one run could show up to four "Effective system prompt" entries ([#611](https://github.com/mrclrchtr/supi/issues/611)).
 
 ## [13.0.0]
 
-- `/supi-review-cleanup` reports one status row per workspace (`✓` removed, `✗` with the failure reason) instead of the raw `[supi-review-cleanup]` message.
 - Reviews of a working tree with many untracked files start much faster. Their patches now come from one `git diff` instead of several Git processes per file; 205 untracked files took 0.5 s instead of 4.8 s. The repository's object store is not written.
 - When a `bash` result shows a BSD sed script error (macOS `sed: 1: ...`), the first one in a session gets a one-line hint: `sed -i` needs a suffix argument, the delimiter must not occur in the pattern, and the edit tool or `gsed` are alternatives. Reviewers and the parent session both get it.
 - The Reviewer protocol names the frozen Review Workspace path and says it overrides any other working directory in the environment. Providers such as `claude-code` describe the parent worktree as the working directory, so reviewers prefixed every command with `cd`.

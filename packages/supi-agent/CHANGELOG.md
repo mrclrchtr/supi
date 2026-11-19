@@ -9,6 +9,8 @@
 - `agent_run` guides the calling agent toward better briefs: `instructions` asks for the task boundary and for known facts as exact paths, symbols, or excerpts, and two usage rules ask it to check what it passes and to keep reading lists short. A child that receives `sharedContext` now sees it and its own task under separate headings.
 - The `git` tool explains empty output per subcommand, for example `(no output: no commits matched. …)`, and says that every revision resolved while paths are not checked for existence. A rejected first argument is named, for example `Option "-c" before the subcommand is not allowed`.
 - Each profile has an **Instructions** row in `/supi-settings` that sets `instructionScopes`: `none`, `project`, `global`, or `global+project`. Use it to keep a global AGENTS.md out of delegated runs. Run `/reload` to apply a change.
+- The Agent Run transcript lists only the system prompts sent with a model request. Before, one `explore` run showed four "Effective system prompt" entries, including an empty one and the base prompt without extension changes ([#611](https://github.com/mrclrchtr/supi/issues/611)).
+- Run activity lines show Git format arguments unquoted: `--format=%h` instead of `'--format=%h'`.
 
 ## [13.0.0]
 
