@@ -10,7 +10,7 @@
 
 /** Pinned SuPi commit used as the frozen corpus. */
 // biome-ignore lint/security/noSecrets: git commit SHA
-export const CORPUS_COMMIT = "b0c23833bb5b1da0c8f4a1619ca7ffdb47fd5f20";
+export const CORPUS_COMMIT = "fd3add9fb2ee64beb94816b5a893a7a949ae54ea";
 
 /**
  * Completed `code_*` calls per usage category in persisted Pi sessions across
@@ -142,17 +142,17 @@ const WORKFLOW_CONTROL_SITES = [
   ...[
     ["code_orientation", 8, 22],
     ["code_graph", 6, 22],
-    ["code_refactor_plan", 9, 24],
+    ["code_refactor_plan", 8, 22],
     ["code_health", 5, 19],
     ["code_inspect", 6, 18],
     ["code_refactor_apply", 4, 15],
-    ["code_find", 5, 21],
+    ["code_find", 5, 18],
     ["code_resolve", 5, 17],
   ].flatMap(([tool, importLine, callLine]) => [
     `${CI}/src/tool/${tool}/execute.ts:${importLine}`,
     `${CI}/src/tool/${tool}/execute.ts:${callLine}`,
   ]),
-  ...[11, 57, 102, 116, 187].map(
+  ...[11, 58, 103, 117, 188].map(
     (line) => `${CI}/__tests__/unit/tool/infra/operation-correlation.test.ts:${line}`,
   ),
 ];
@@ -160,11 +160,13 @@ const workflowControl = { symbol: { query: "toWorkflowControl" } };
 
 // biome-ignore lint/security/noSecrets: regex pattern
 const SESSION_DECLARATIONS = "^(export )?(async )?(function|class|interface|type|const|enum) ";
-/** The class and two module functions; re-export statements forward other modules' names. */
-const SESSION_TOP_LEVEL = [140, 484, 492].map((line) => `${CI}/src/session/session.ts:${line}`);
+/** The class and five module functions; re-export statements forward other modules' names. */
+const SESSION_TOP_LEVEL = [145, 521, 529, 550, 560, 574].map(
+  (line) => `${CI}/src/session/session.ts:${line}`,
+);
 
 const SETTINGS_MODULE_IMPLEMENTATIONS = [
-  "supi-agent/src/profile-settings.ts:88-89",
+  "supi-agent/src/profile-settings.ts:98-99",
   "supi-code-intelligence/src/config.ts:138",
   "supi-code-intelligence/src/gradle/consent.ts:204",
   "supi-consulting/src/settings.ts:39",
@@ -185,7 +187,7 @@ const SESSION_RESOLVE_CALLS = [
     (line) =>
       `__tests__/integration/substrate/lsp/latex-target-public-tool.integration.test.ts:${line}`,
   ),
-  ...[381, 403, 408, 411, 530, 558].map(
+  ...[380, 402, 407, 410, 519, 547].map(
     (line) => `__tests__/integration/workspace-session-contract.test.ts:${line}`,
   ),
   "__tests__/unit/session/structural-workflow-control.test.ts:110",
@@ -194,8 +196,6 @@ const SESSION_RESOLVE_CALLS = [
 /** Calls across packages; mocks, README snippets, and the declaration are not calls. */
 const REGISTER_SETTINGS_CALLS = [
   "supi-agent/src/config.ts:53",
-  "supi-bash-timeout/src/settings-registration.ts:6",
-  "supi-cache/src/settings-registration.ts:12",
   "supi-code-intelligence/src/config.ts:138",
   "supi-code-intelligence/src/gradle/consent.ts:204",
   "supi-code-intelligence/src/substrate/lsp/settings.ts:217",
@@ -204,7 +204,11 @@ const REGISTER_SETTINGS_CALLS = [
   "supi-core/__tests__/unit/settings/settings-schema.test.ts:280",
   "supi-core/__tests__/unit/settings/settings-schema.test.ts:307",
   "supi-core/__tests__/unit/settings/settings-schema.test.ts:343",
-  "supi-debug/src/debug.ts:27",
+  "supi-debug/src/cache/settings-registration.ts:12",
+  "supi-debug/src/debug.ts:34",
+  "supi-extras/src/bash-timeout-settings.ts:6",
+  "supi-extras/src/codemode-compact-config.ts:21",
+  "supi-extras/src/supi-footer-config.ts:28",
   "supi-insights/src/insights.ts:80",
   "supi-prompt-improver/src/config.ts:28",
   "supi-prompt-suggestions/src/config/settings.ts:23",
@@ -233,9 +237,6 @@ const WORKSPACE_PATHS = [
     "agent-runtime",
     "agent",
     "ask-user",
-    "bash-timeout",
-    "cache",
-    "claude-md",
     "code-intelligence",
     "code-runtime",
     "consulting",
@@ -381,9 +382,7 @@ export const scenarios: readonly BenchScenario[] = [
         },
       },
     ],
-    truth: [47, 50, 56].map(
-      (line) => `${CI}/src/tool/code_orientation/workspace-output.ts:${line}`,
-    ),
+    truth: [`${CI}/src/tool/code_orientation/workspace-output.ts:122`],
     truthText: /selectDirectoryNavigation\(/,
   },
   {
@@ -454,7 +453,7 @@ export const scenarios: readonly BenchScenario[] = [
       },
     ],
     // Direct calls; the nested `execute` callback runs later, not during registration.
-    truth: [95, 96, 97, 101].map((line) => `${CI}/src/tool/register.ts:${line}`),
+    truth: [96, 97, 98, 102].map((line) => `${CI}/src/tool/register.ts:${line}`),
     truthText: /\w\(/,
   },
   {
@@ -583,13 +582,13 @@ export const scenarios: readonly BenchScenario[] = [
     truth: [
       "find-workflow.ts:16",
       "graph-workflow.ts:24",
-      "health-workflow.ts:46",
+      "health-workflow.ts:47",
       "inspect-workflow.ts:19",
-      "orientation-workflow.ts:30",
-      "refactor-workflow.ts:48",
-      "target-workflow.ts:84",
-      "session.ts:389",
+      "orientation-workflow.ts:31",
+      "refactor-plan-pipeline.ts:24",
+      "target-workflow.ts:95",
       "session.ts:398",
+      "session.ts:407",
     ].map((site) => `${CI}/src/session/${site}`),
     truthText: /(interface \w*WorkflowDeps|WorkflowDeps\(\) \{)/,
   },

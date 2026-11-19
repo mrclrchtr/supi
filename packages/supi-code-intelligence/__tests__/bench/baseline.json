@@ -1,5 +1,5 @@
 {
-  "corpusCommit": "b0c23833bb5b1da0c8f4a1619ca7ffdb47fd5f20",
+  "corpusCommit": "fd3add9fb2ee64beb94816b5a893a7a949ae54ea",
   "tokenEstimate": "chars/4",
   "codeToolSurfaceTokens": 3163,
   "scenarios": {
@@ -46,7 +46,7 @@
         "tokensPerHit": 17,
         "viewed": {
           "calls": 22,
-          "tokens": 2467
+          "tokens": 2457
         }
       }
     },
@@ -64,13 +64,13 @@
       },
       "code": {
         "calls": 1,
-        "tokens": 222,
+        "tokens": 168,
         "precision": 1,
         "recall": 1,
-        "tokensPerHit": 37,
+        "tokensPerHit": 28,
         "viewed": {
           "calls": 7,
-          "tokens": 678
+          "tokens": 624
         }
       }
     },
@@ -84,10 +84,10 @@
       },
       "code": {
         "calls": 2,
-        "tokens": 388,
+        "tokens": 346,
         "precision": 1,
         "recall": 1,
-        "tokensPerHit": 65
+        "tokensPerHit": 58
       }
     },
     "definition-signature": {
@@ -109,63 +109,70 @@
     "file-outline-default": {
       "native": {
         "calls": 1,
-        "tokens": 248,
-        "precision": 0.2,
+        "tokens": 289,
+        "precision": 0.333,
         "recall": 1,
-        "tokensPerHit": 83
+        "tokensPerHit": 48
       },
       "code": {
         "calls": 1,
-        "tokens": 424,
-        "precision": 0.3,
+        "tokens": 422,
+        "precision": 0.6,
         "recall": 1,
-        "tokensPerHit": 141,
+        "tokensPerHit": 70,
         "complete": {
           "calls": 2,
-          "tokens": 1569,
-          "precision": 0.06,
+          "tokens": 1692,
+          "precision": 0.105,
           "recall": 1,
-          "tokensPerHit": 523
+          "tokensPerHit": 282
         }
       }
     },
     "file-outline": {
       "native": {
         "calls": 1,
-        "tokens": 248,
-        "precision": 0.2,
+        "tokens": 289,
+        "precision": 0.333,
         "recall": 1,
-        "tokensPerHit": 83
+        "tokensPerHit": 48
       },
       "code": {
         "calls": 1,
-        "tokens": 1145,
-        "precision": 0.06,
+        "tokens": 1155,
+        "precision": 0.12,
         "recall": 1,
-        "tokensPerHit": 382
+        "tokensPerHit": 193,
+        "complete": {
+          "calls": 2,
+          "tokens": 2425,
+          "precision": 0.105,
+          "recall": 1,
+          "tokensPerHit": 404
+        }
       }
     },
     "find-calls": {
       "native": {
         "calls": 1,
-        "tokens": 158,
-        "precision": 0.75,
+        "tokens": 94,
+        "precision": 0.5,
         "recall": 1,
-        "tokensPerHit": 53,
+        "tokensPerHit": 94,
         "viewed": {
           "calls": 1,
-          "tokens": 158
+          "tokens": 94
         }
       },
       "code": {
         "calls": 1,
-        "tokens": 171,
+        "tokens": 145,
         "precision": 1,
         "recall": 1,
-        "tokensPerHit": 57,
+        "tokensPerHit": 145,
         "viewed": {
-          "calls": 3,
-          "tokens": 426
+          "calls": 2,
+          "tokens": 243
         }
       }
     },
@@ -186,58 +193,58 @@
     "orient-package": {
       "native": {
         "calls": 3,
-        "tokens": 732,
+        "tokens": 742,
         "recall": 0.714,
-        "tokensPerHit": 146
+        "tokensPerHit": 148
       },
       "code": {
         "calls": 1,
-        "tokens": 430,
+        "tokens": 461,
         "recall": 0.714,
-        "tokensPerHit": 86
+        "tokensPerHit": 92
       }
     },
     "orient-workspace": {
       "native": {
         "calls": 2,
-        "tokens": 124,
+        "tokens": 112,
         "recall": 1,
         "tokensPerHit": 5
       },
       "code": {
         "calls": 1,
-        "tokens": 881,
-        "recall": 0.346,
-        "tokensPerHit": 98,
+        "tokens": 918,
+        "recall": 0.348,
+        "tokensPerHit": 115,
         "complete": {
           "calls": 2,
-          "tokens": 2564,
+          "tokens": 2558,
           "recall": 1,
-          "tokensPerHit": 99
+          "tokensPerHit": 111
         }
       }
     },
     "orient-directory": {
       "native": {
         "calls": 1,
-        "tokens": 128,
+        "tokens": 141,
         "recall": 1,
-        "tokensPerHit": 16
+        "tokensPerHit": 18
       },
       "code": {
         "calls": 1,
-        "tokens": 402,
+        "tokens": 451,
         "recall": 1,
-        "tokensPerHit": 50
+        "tokensPerHit": 56
       }
     },
     "callees": {
       "native": {
         "calls": 2,
-        "tokens": 856,
+        "tokens": 874,
         "precision": 1,
         "recall": 1,
-        "tokensPerHit": 214
+        "tokensPerHit": 219
       },
       "code": {
         "calls": 1,
@@ -250,62 +257,62 @@
     "implementations": {
       "native": {
         "calls": 1,
-        "tokens": 1171,
+        "tokens": 1167,
         "precision": 0.182,
         "recall": 0.727,
         "tokensPerHit": 146,
         "viewed": {
           "calls": 1,
-          "tokens": 1171
+          "tokens": 1167
         }
       },
       "code": {
-        "calls": 2,
-        "tokens": 350,
+        "calls": 1,
+        "tokens": 257,
         "precision": 0.875,
         "recall": 0.545,
-        "tokensPerHit": 58,
+        "tokensPerHit": 43,
         "complete": {
-          "calls": 3,
-          "tokens": 617,
+          "calls": 2,
+          "tokens": 556,
           "precision": 0.818,
           "recall": 0.727,
-          "tokensPerHit": 77
+          "tokensPerHit": 70
         },
         "viewed": {
-          "calls": 13,
-          "tokens": 1352
+          "calls": 12,
+          "tokens": 1292
         }
       }
     },
     "method-callers": {
       "native": {
         "calls": 1,
-        "tokens": 394,
+        "tokens": 395,
         "precision": 1,
         "recall": 1,
         "tokensPerHit": 33,
         "viewed": {
           "calls": 1,
-          "tokens": 394
+          "tokens": 395
         }
       },
       "code": {
-        "calls": 2,
-        "tokens": 438,
+        "calls": 1,
+        "tokens": 375,
         "precision": 0.875,
         "recall": 0.583,
-        "tokensPerHit": 63,
+        "tokensPerHit": 54,
         "complete": {
-          "calls": 3,
-          "tokens": 737,
+          "calls": 2,
+          "tokens": 751,
           "precision": 0.923,
           "recall": 1,
-          "tokensPerHit": 61
+          "tokensPerHit": 63
         },
         "viewed": {
-          "calls": 14,
-          "tokens": 1950
+          "calls": 13,
+          "tokens": 1965
         }
       }
     },
@@ -336,31 +343,31 @@
     "calls-across-packages": {
       "native": {
         "calls": 1,
-        "tokens": 465,
-        "precision": 0.818,
+        "tokens": 497,
+        "precision": 0.833,
         "recall": 1,
-        "tokensPerHit": 26,
+        "tokensPerHit": 25,
         "viewed": {
           "calls": 1,
-          "tokens": 465
+          "tokens": 497
         }
       },
       "code": {
         "calls": 1,
-        "tokens": 538,
+        "tokens": 529,
         "precision": 1,
-        "recall": 0.444,
-        "tokensPerHit": 67,
+        "recall": 0.4,
+        "tokensPerHit": 66,
         "complete": {
           "calls": 2,
-          "tokens": 1320,
-          "precision": 0.9,
+          "tokens": 1359,
+          "precision": 0.909,
           "recall": 1,
-          "tokensPerHit": 73
+          "tokensPerHit": 68
         },
         "viewed": {
-          "calls": 22,
-          "tokens": 2795
+          "calls": 24,
+          "tokens": 2979
         }
       }
     },
@@ -383,20 +390,20 @@
     "find-definition-substring": {
       "native": {
         "calls": 1,
-        "tokens": 703,
-        "precision": 0.209,
+        "tokens": 773,
+        "precision": 0.188,
         "recall": 1,
-        "tokensPerHit": 78
+        "tokensPerHit": 86
       },
       "code": {
         "calls": 1,
-        "tokens": 292,
+        "tokens": 293,
         "precision": 1,
         "recall": 0.889,
         "tokensPerHit": 37,
         "complete": {
           "calls": 2,
-          "tokens": 608,
+          "tokens": 611,
           "precision": 1,
           "recall": 1,
           "tokensPerHit": 68
@@ -420,17 +427,17 @@
     "orient-then-read": {
       "native": {
         "calls": 3,
-        "tokens": 634,
+        "tokens": 638,
         "precision": 1,
         "recall": 1,
-        "tokensPerHit": 634
+        "tokensPerHit": 638
       },
       "code": {
         "calls": 2,
-        "tokens": 449,
+        "tokens": 481,
         "precision": 1,
         "recall": 1,
-        "tokensPerHit": 449
+        "tokensPerHit": 481
       }
     }
   }
