@@ -3,6 +3,11 @@ import { createRequire } from "node:module";
 import * as os from "node:os";
 import * as path from "node:path";
 import { pathToFileURL } from "node:url";
+import {
+  configureDebugRegistry,
+  getDebugEvents,
+  resetDebugRegistry,
+} from "@mrclrchtr/supi-core/debug";
 import { afterEach, expect, it, vi } from "vitest";
 import { loadConfig } from "../../src/config/config.ts";
 import { LspManager } from "../../src/manager/manager.ts";
@@ -19,6 +24,7 @@ let owner: ReturnType<typeof createWorkspaceLspRuntimeOwner> | undefined;
 afterEach(async () => {
   await owner?.shutdown();
   owner = undefined;
+  resetDebugRegistry();
   vi.unstubAllEnvs();
   if (root) fs.rmSync(root, { recursive: true, force: true });
   root = undefined;
@@ -286,4 +292,54 @@ it("keeps every exact-name declaration in a native answer cut at its row limit",
   const rows = result.kind === "partial" ? result.data : [];
   expect(rows).toHaveLength(256);
   expect(rows.slice(0, 2).map((row) => row.name)).toEqual(["git", "git"]);
+}, 30_000);
+
+// The native server reports no project membership and drops a project that
+// excludes its only open file once other projects load. A fixture script the
+// test project excludes sorts before its test files as a warm-up candidate.
+it("loads a project whose first warm-up candidate it excludes", async () => {
+  root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "supi-ts7-warm-excluded-")));
+  const dir = root;
+  const write = (file: string, content: unknown): string => {
+    const target = path.join(dir, file);
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.writeFileSync(target, typeof content === "string" ? content : JSON.stringify(content));
+    return target;
+  };
+  fs.mkdirSync(path.join(root, "node_modules"));
+  fs.symlinkSync(native, path.join(root, "node_modules/typescript"), "dir");
+  write("tsconfig.json", { include: ["src/**/*.ts"] });
+  write("__tests__/tsconfig.json", { include: ["**/*.ts", "../src/**/*.ts"] });
+  const source = write("src/value.ts", "export const value = 1;\n");
+  write("__tests__/fixtures/server.mjs", "export const fixture = 1;\n");
+  write(
+    "__tests__/unit/value.test.ts",
+    'import { value } from "../../src/value";\nexport const checked = value;\n',
+  );
+  // Projects opened after the excluded candidate make the server drop its project.
+  for (const name of ["a", "b", "c", "d", "e", "f"]) {
+    write(`packages/${name}/tsconfig.json`, { include: ["src/**/*.ts"] });
+    write(`packages/${name}/src/index.ts`, `export const ${name} = 1;\n`);
+  }
+  vi.stubEnv("PATH", "");
+  const typescript = loadConfig(root, { homeDir: path.join(root, "home") }).servers.typescript;
+  if (!typescript) throw new Error("Missing TypeScript route");
+  owner = createWorkspaceLspRuntimeOwner(new LspManager({ servers: { typescript } }, root));
+  await expect(owner.runtime.waitUntilReadyForFile(source)).resolves.toMatchObject({
+    kind: "ready",
+  });
+
+  configureDebugRegistry({ enabled: true });
+  const symbols = await owner.runtime.workspaceSymbol("checked");
+  expect(symbols).toMatchObject({ kind: "completed", data: [{ name: "checked" }] });
+  // The skipped candidate is named with its cause, not as an inferred project.
+  const probes = getDebugEvents({ source: "lsp", category: "workspace-symbol.warm-probe" });
+  expect(probes.events.map((event) => event.data)).toEqual([
+    { server: "typescript", file: "__tests__/fixtures/server.mjs", outcome: "excluded" },
+  ]);
+
+  const references = await owner.runtime.references(source, { line: 0, character: 13 });
+  expect(references.kind).toBe("completed");
+  const uris = references.kind === "completed" ? references.data.map((row) => row.uri) : [];
+  expect(uris.some((uri) => uri.endsWith("/__tests__/unit/value.test.ts"))).toBe(true);
 }, 30_000);

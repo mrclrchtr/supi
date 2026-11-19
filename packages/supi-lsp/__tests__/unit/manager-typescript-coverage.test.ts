@@ -69,6 +69,13 @@ describe("findUnloadedTypeScriptProjects", () => {
     const { root, source, testFile } = monorepo();
     expect(unloaded(root, source, [source], [source, testFile])).toEqual([]);
   });
+
+  it("does not report an including project that owns no file", () => {
+    const { root, source, testFile } = monorepo();
+    // No file to open and no file that could appear in an answer: the advice would be unfollowable.
+    fs.rmSync(testFile);
+    expect(unloaded(root, source, [source])).toEqual([]);
+  });
 });
 
 // biome-ignore lint/security/noSecrets: describe name, not a secret

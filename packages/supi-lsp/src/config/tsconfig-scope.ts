@@ -177,6 +177,9 @@ export function projectConfigIncludesFile(configPath: string, filePath: string):
   return parsed !== null && decideFileScope(parsed, path.resolve(filePath)).included;
 }
 
+/** Normalized paths of the files in a project config's program; undefined when it cannot be parsed. */
+export const projectFileNames = (config: string) => parseProjectConfig(config)?.fileNames;
+
 function isOutOfTree(cwd: string, absolutePath: string): boolean {
   const relative = path.relative(path.resolve(cwd), absolutePath);
   return relative.startsWith(`..${path.sep}`) || relative === "..";

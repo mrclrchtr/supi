@@ -3723,11 +3723,18 @@ export class LspManager {
       this.recordWarmProbeEvent(serverName, file, "probe-unavailable", control);
       return null;
     }
-    const membership = await openedClient.projectMembership(file, requestControl);
+    const reported = await openedClient.projectMembership(file, requestControl);
     throwIfCodeRequestInterrupted(control);
+    // The native server reports no membership. It does not keep a project loaded
+    // for an open file that project excludes, so the pass tries the next candidate.
+    const excluded =
+      reported === "unknown" &&
+      serverName === "typescript" &&
+      getFileScopeDecision(file, this.cwd).status === "excluded";
+    const membership = excluded ? "inferred" : reported;
     // An all-roots pass counts its loaded roots in the `warm-pass` summary.
     if (!requestTimings || membership === "inferred") {
-      this.recordWarmProbeEvent(serverName, file, membership, control);
+      this.recordWarmProbeEvent(serverName, file, excluded ? "excluded" : membership, control);
     }
     return membership;
   }
@@ -3735,14 +3742,16 @@ export class LspManager {
   /**
    * Record one workspace-symbol warm-up probe: which file was opened and
    * whether the server placed it in a configured project. `unknown` means the
-   * route cannot report membership (non-TypeScript or native TS7). An
-   * all-roots pass records only probes that did not load a root: failed
-   * opens, unavailable probes, and inferred projects.
+   * route cannot report membership (non-TypeScript or native TS7). `excluded`
+   * is a native TS7 probe of a file its nearest project config excludes; the
+   * pass treats it like `inferred`. An all-roots pass records only probes that
+   * did not load a root: failed opens, unavailable probes, and inferred or
+   * excluded files.
    */
   private recordWarmProbeEvent(
     serverName: string,
     file: string,
-    outcome: ProjectMembership | "open-failed" | "probe-unavailable",
+    outcome: ProjectMembership | "excluded" | "open-failed" | "probe-unavailable",
     control?: CodeRequestControl,
   ): void {
     try {

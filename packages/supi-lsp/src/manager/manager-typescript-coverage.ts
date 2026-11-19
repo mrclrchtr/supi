@@ -1,7 +1,11 @@
 import * as path from "node:path";
 import { collectExtendedProjectConfigs } from "../config/tsconfig-extends.ts";
 import { normalizeTsconfigPath } from "../config/tsconfig-path.ts";
-import { getFileScopeDecision, projectConfigIncludesFile } from "../config/tsconfig-scope.ts";
+import {
+  getFileScopeDecision,
+  projectConfigIncludesFile,
+  projectFileNames,
+} from "../config/tsconfig-scope.ts";
 import { type AutomaticLspPathPolicy, walkAutomaticLspTree } from "../workspace-path-policy.ts";
 
 /** Directory depth searched for project configs below a TypeScript route root. */
@@ -43,6 +47,9 @@ export function discoverTypeScriptProjectConfigs(
  * Base configs extended by another discovered config are skipped: their
  * default include usually spans the whole tree while they own only root
  * tooling files, so counting them would mark nearly every answer partial.
+ *
+ * Projects that own no file are skipped too: their program holds only files of
+ * other projects, and no open file or answer could ever show them as loaded.
  */
 export function findUnloadedTypeScriptProjects(options: {
   readonly file: string;
@@ -64,9 +71,27 @@ export function findUnloadedTypeScriptProjects(options: {
   return options.configs.filter((config) => {
     const key = normalizeTsconfigPath(config);
     return (
-      !loaded.has(key) && !baseConfigs.has(key) && projectConfigIncludesFile(config, options.file)
+      !loaded.has(key) &&
+      !baseConfigs.has(key) &&
+      projectConfigIncludesFile(config, options.file) &&
+      ownsProgramFile(config, options.cwd)
     );
   });
+}
+
+/**
+ * Whether a project config is the nearest config of a file in its own program.
+ * A test config that includes `../src` before any test exists owns none.
+ */
+function ownsProgramFile(config: string, cwd: string): boolean {
+  const key = normalizeTsconfigPath(config);
+  // Program file names are normalized, so the tree root must be too.
+  const root = normalizeTsconfigPath(cwd);
+  for (const file of projectFileNames(config) ?? []) {
+    const nearest = getFileScopeDecision(file, root).configPath;
+    if (nearest && normalizeTsconfigPath(nearest) === key) return true;
+  }
+  return false;
 }
 
 /**
