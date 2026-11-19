@@ -15,6 +15,7 @@ import {
   provenanceOf,
   resolveCommit,
 } from "../packages/supi-debug/skills/gather-retrospectives/scripts/provenance.mjs";
+import { analyzeOpportunities, SEARCH_CATEGORIES } from "./code-tool-opportunities.mjs";
 
 const SNAPSHOT_MARKER = "supi-orientation-";
 const PATH_TOKEN = /[\w@.-]*[\w@-]\/[\w@./-]*\w|[\w@-]+\.[a-z]{1,5}\b/gi;
@@ -206,6 +207,7 @@ export function analyze(sessions) {
       withCode: summarizeGroup(groups.withCode),
       withoutCode: summarizeGroup(groups.withoutCode),
     },
+    opportunities: analyzeOpportunities(sessions),
   };
 }
 
@@ -317,6 +319,25 @@ function printReport(report) {
     "Before first edit (median, correlation only):\n" +
       `  with code_*:    ${withCode.sessions} sessions, ${withCode.medianCallsBeforeEdit} calls, ${withCode.medianCharsBeforeEdit} result chars\n` +
       `  without code_*: ${withoutCode.sessions} sessions, ${withoutCode.medianCallsBeforeEdit} calls, ${withoutCode.medianCharsBeforeEdit} result chars`,
+  );
+  printOpportunities(report.opportunities);
+}
+
+function printOpportunities({ searches, fullReadsBeforeEdit }) {
+  console.log("\nNative symbol searches next to code_* calls of the same kind (heuristic):");
+  console.table(
+    Object.entries(searches).map(([name, entry]) => ({
+      category: name,
+      "native searches": entry.native,
+      "in sessions": entry.nativeSessions,
+      "code_* calls": entry.codeTool,
+      "code_* tool": SEARCH_CATEGORIES[name].codeTool,
+      "benchmark favors": SEARCH_CATEGORIES[name].benchmark,
+    })),
+  );
+  console.log(
+    `Whole-file reads before an edit of that file: ${fullReadsBeforeEdit.count} in ${fullReadsBeforeEdit.sessions} sessions; ` +
+      `median ${fullReadsBeforeEdit.medianLinesRead} lines read, ${fullReadsBeforeEdit.medianLinesEdited} lines replaced`,
   );
 }
 

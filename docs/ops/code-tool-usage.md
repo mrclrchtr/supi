@@ -31,7 +31,24 @@ The JSON report also counts argument keys per tool (e.g. how often `maxResults` 
 
 `beforeFirstEdit` compares sessions that called a `code_*` tool before their first mutation with sessions that did not: median calls and model-visible result characters before that edit.
 
+## Missed opportunities
+
+The report also counts native calls that a `code_*` tool could have answered, next to the `code_*` calls of the same kind. Logic: `scripts/code-tool-opportunities.mjs`; JSON key `opportunities`.
+
+| Category | Native search counted | `code_*` call counted | Benchmark favors |
+| --- | --- | --- | --- |
+| `references` | Pattern is one identifier or an alternation of identifiers, each camelCase, PascalCase with a second word, or snake_case (`fooBar`, `\bfooBar\(`, `FooBar\|BazQux`) | `code_graph` with `references` (default) or `all` | `code_*` for ambiguous names |
+| `implementations` | Pattern ends in `implements X` or `extends X` | `code_graph` with `implements` or `all` | `code_*` |
+| `declaration` | Pattern is a declaration keyword plus a name (`export function foo`, `interface Foo`) | `code_resolve` symbol query; `code_find` semantic or AST `definition` | grep for exact names |
+
+Native searches are `rg`/`grep` commands in `bash` (each command of a chain counts) and Pi's `grep` tool. Not counted: filters over another command's output (`… | rg`), `rg --files`, case-insensitive searches, searches whose paths are all non-code files, other regular expressions, and single lowercase words. `in sessions` is the number of sessions with at least one such search. The JSON report lists the five most frequent patterns per category.
+
+`Whole-file reads before an edit` counts `read` calls without `offset`/`limit` on source files of at least 100 lines whose next mutation of the same path is an `edit`, with median lines read and median `oldText` lines replaced. It estimates how often a declaration-scoped read could replace a whole-file read.
+
 ## Interpretation limits
+
+- Missed-opportunity categories come from the search pattern alone. A counted search is a candidate, not proof that the `code_*` tool would have been cheaper or more precise: an identifier search can be a text question (log messages, config keys, SQL names), and for exact names the benchmark favors grep. Compare ratios across versions.
+- Whole-file reads are matched to edits by literal path, so a read by absolute path and an edit by relative path are not paired.
 
 - Follow-up classes compare path tokens in `read.path` and bash commands with the result text. A `gap` can be a planned next step (e.g. reading repository docs), not a missing fact; compare ratios across versions rather than reading them as absolute failure rates.
 - `beforeFirstEdit` is a correlation. Sessions that use `code_*` tools are often exploratory and larger; it does not show an effect.
