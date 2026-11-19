@@ -8,6 +8,7 @@ import {
 } from "@mrclrchtr/supi-code-runtime/api";
 import { fileToUri, uriToFile } from "@mrclrchtr/supi-core/path";
 import type { TextDocumentIdentifier } from "../config/types.ts";
+import type { RequestTimingBatch } from "../debug-telemetry.ts";
 import {
   type DiagnosticEvidenceSummary,
   summarizeDiagnosticEvidence,
@@ -314,6 +315,7 @@ interface ClientDiagnosticRefreshOptions {
     signal?: AbortSignal;
     deadline?: number;
     operationId?: string;
+    requestTimings?: RequestTimingBatch;
   }) => Promise<boolean>;
   readonly options: { maxWaitMs?: number; quietMs?: number } & CodeRequestControl;
   /** Push-publication telemetry surface for this client. */
@@ -501,6 +503,7 @@ export async function refreshClientOpenDiagnostics(
       synchronizations: requestSynchronizations,
       syncStart,
       maxWaitMs,
+      requestTimings: observer.requestTimings,
     });
     failedPullUris = new Set(request.failedPullUris);
     const source = requestSourceFor(options.host, requestSynchronizations);
@@ -560,6 +563,7 @@ async function collectPullEvidenceForRefresh(options: {
   synchronizations: readonly DiagnosticSynchronization[];
   syncStart: number;
   maxWaitMs: number;
+  requestTimings: RequestTimingBatch | undefined;
 }): Promise<{ completed: boolean; failedPullUris: ReadonlySet<string>; timedOut: boolean }> {
   const { options: refresh, synchronizations, syncStart, maxWaitMs } = options;
   try {
@@ -577,6 +581,7 @@ async function collectPullEvidenceForRefresh(options: {
           signal: pullOptions.signal,
           deadline: pullOptions.deadline,
           operationId: pullOptions.operationId,
+          requestTimings: options.requestTimings,
         }),
     });
     const failedPullUris = new Set(result.failedUris);

@@ -50,7 +50,7 @@ import type {
 import { FileChangeType } from "../config/types.ts";
 import { inspectTypeScriptLaunch } from "../config/typescript-launch.ts";
 import { getTypeScript } from "../config/typescript-module.ts";
-import { boundCwd } from "../debug-telemetry.ts";
+import { type BatchedRequestControl, boundCwd, RequestTimingBatch } from "../debug-telemetry.ts";
 import {
   accumulateOutstandingDiagnostics,
   collectDiagnosticSummaryCounts,
@@ -2255,7 +2255,7 @@ export class LspManager {
     ).slice(0, MAX_BULK_TRACK_FILES);
     if (selected.length === 0) return { outcomes: [] };
 
-    this.trackedFilesBatchDepth++;
+    const endTrackedFilesBatch = this.beginTrackedFilesBatch();
     const outcomes = new Array<BulkTrackFileOutcome>(selected.length);
     const workerCount = Math.min(MAX_CONCURRENT_BULK_TRACKS, selected.length);
     let nextIndex = 0;
@@ -2278,12 +2278,23 @@ export class LspManager {
       await Promise.allSettled(workers);
       throw error;
     } finally {
-      this.trackedFilesBatchDepth--;
-      if (this.trackedFilesBatchDepth === 0 && this.trackedFilesBatchChanged) {
-        this.trackedFilesBatchChanged = false;
-        this.publishLifecycle("tracked-files");
-      }
+      endTrackedFilesBatch();
     }
+  }
+
+  /**
+   * Hold back `tracked-files` transitions until the returned function runs,
+   * then publish one for the whole batch. Opening many files otherwise
+   * publishes one transition, and one `runtime.transition` debug event, each.
+   */
+  private beginTrackedFilesBatch(): () => void {
+    this.trackedFilesBatchDepth++;
+    return () => {
+      this.trackedFilesBatchDepth--;
+      if (this.trackedFilesBatchDepth > 0 || !this.trackedFilesBatchChanged) return;
+      this.trackedFilesBatchChanged = false;
+      if (!this.shuttingDown) this.publishLifecycle("tracked-files");
+    };
   }
 
   private async trackBulkFile(
@@ -3402,7 +3413,9 @@ export class LspManager {
 
   /**
    * Record one finished all-roots warm-up pass. Per-file probes are `debug`
-   * events and are not persisted; this summary is.
+   * events and are not persisted; this summary is. `requests` holds the
+   * completed protocol requests of the pass by method: only an all-roots
+   * pass records this summary, so only its probes batch their timings.
    */
   private recordWarmPassEvent(
     serverName: string,
@@ -3413,11 +3426,13 @@ export class LspManager {
       failedProbes: number;
       limited: boolean;
       startedAt: number;
+      requestTimings: RequestTimingBatch;
     },
     control?: CodeRequestControl,
   ): void {
     try {
-      const { startedAt, ...counts } = pass;
+      const { startedAt, requestTimings, ...counts } = pass;
+      const requests = requestTimings.snapshot();
       recordDebugEvent({
         operationId: control?.operationId,
         source: "lsp",
@@ -3429,6 +3444,7 @@ export class LspManager {
           server: truncateIdentity(serverName),
           ...counts,
           elapsedMs: Math.max(0, Date.now() - startedAt),
+          ...(requests ? { requests } : {}),
         },
       });
     } catch {
@@ -3513,7 +3529,7 @@ export class LspManager {
       let rootLimitGap: string | null = null;
       let roots = 0;
       const configGeneration = this.projectConfigGeneration;
-      const startedAt = Date.now();
+      const timing = { startedAt: Date.now(), requestTimings: new RequestTimingBatch() };
       try {
         const candidates = findWarmTargets(
           client.root,
@@ -3544,7 +3560,7 @@ export class LspManager {
             client.name,
             target.file,
             getWarmPosition,
-            control,
+            { control, requestTimings: allRoots ? timing.requestTimings : undefined },
           );
           if (membership === null) {
             failedProbes++;
@@ -3593,7 +3609,7 @@ export class LspManager {
           ...counts,
           inferredProbes: routeInferredProbes,
           limited: rootLimitGap !== null,
-          startedAt,
+          ...timing,
         },
         control,
       );
@@ -3658,9 +3674,12 @@ export class LspManager {
       release = resolve;
     });
     this.pendingWorkspaceSymbolRouteWarmups.set(routeKey, pending);
+    // The pass opens one file per project root; publish their tracking once.
+    const endTrackedFilesBatch = this.beginTrackedFilesBatch();
     return {
       routeKey,
       finish: () => {
+        endTrackedFilesBatch();
         if (this.pendingWorkspaceSymbolRouteWarmups.get(routeKey) === pending) {
           this.pendingWorkspaceSymbolRouteWarmups.delete(routeKey);
         }
@@ -3671,7 +3690,9 @@ export class LspManager {
 
   /**
    * Open one warm-up file and report the project the server placed it in;
-   * `null` when the file could not be opened or probed.
+   * `null` when the file could not be opened or probed. With
+   * `probe.requestTimings`, the probe's completed requests are added to that
+   * batch.
    */
   private async probeWorkspaceSymbolWarmFile(
     serverName: string,
@@ -3679,8 +3700,9 @@ export class LspManager {
     getWarmPosition: (
       symbols: import("../config/types.ts").DocumentSymbol[] | SymbolInformation[] | null,
     ) => import("../config/types.ts").Position | null,
-    control?: CodeRequestControl,
+    probe: { control?: CodeRequestControl; requestTimings?: RequestTimingBatch },
   ): Promise<ProjectMembership | null> {
+    const { control, requestTimings } = probe;
     const openedClient = await this.ensureFileOpen(file, { control });
     if (!openedClient) {
       this.recordWarmProbeEvent(serverName, file, "open-failed", control);
@@ -3689,20 +3711,28 @@ export class LspManager {
     this.workspaceSymbolLoadGeneration++;
     // A cancelled pass must not mark projects warmed on its way out.
     throwIfCodeRequestInterrupted(control);
-    if (!(await this.probeDocumentSymbols(openedClient, file, getWarmPosition, control))) {
+    const requestControl: BatchedRequestControl | undefined = requestTimings
+      ? { ...control, requestTimings }
+      : control;
+    if (!(await this.probeDocumentSymbols(openedClient, file, getWarmPosition, requestControl))) {
       this.recordWarmProbeEvent(serverName, file, "probe-unavailable", control);
       return null;
     }
-    const membership = await openedClient.projectMembership(file, control);
+    const membership = await openedClient.projectMembership(file, requestControl);
     throwIfCodeRequestInterrupted(control);
-    this.recordWarmProbeEvent(serverName, file, membership, control);
+    // An all-roots pass counts its loaded roots in the `warm-pass` summary.
+    if (!requestTimings || membership === "inferred") {
+      this.recordWarmProbeEvent(serverName, file, membership, control);
+    }
     return membership;
   }
 
   /**
    * Record one workspace-symbol warm-up probe: which file was opened and
    * whether the server placed it in a configured project. `unknown` means the
-   * route cannot report membership (non-TypeScript or native TS7).
+   * route cannot report membership (non-TypeScript or native TS7). An
+   * all-roots pass records only probes that did not load a root: failed
+   * opens, unavailable probes, and inferred projects.
    */
   private recordWarmProbeEvent(
     serverName: string,

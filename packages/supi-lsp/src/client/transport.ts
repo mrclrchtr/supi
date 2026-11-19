@@ -3,11 +3,9 @@
 // and notification/request dispatching through vscode-jsonrpc's MessageConnection.
 // biome-ignore-all lint/style/noExcessiveLinesPerFile: Transport lifetime and protocol handling stay together.
 
+import { performance } from "node:perf_hooks";
 import type { Readable, Writable } from "node:stream";
-import {
-  type CodeRequestControl,
-  CodeRequestDeadlineError,
-} from "@mrclrchtr/supi-code-runtime/api";
+import { CodeRequestDeadlineError } from "@mrclrchtr/supi-code-runtime/api";
 import {
   startDebugTimer,
   truncateDebugIdentity as truncateIdentity,
@@ -22,7 +20,11 @@ import {
   StreamMessageReader,
   StreamMessageWriter,
 } from "vscode-jsonrpc/node";
-import { boundCwd, LSP_REQUEST_TIMEOUT_ERROR_CODE } from "../debug-telemetry.ts";
+import {
+  type BatchedRequestControl,
+  boundCwd,
+  LSP_REQUEST_TIMEOUT_ERROR_CODE,
+} from "../debug-telemetry.ts";
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 
@@ -112,7 +114,7 @@ export class JsonRpcClient {
   sendRequestOwned(
     method: string,
     params?: unknown,
-    options?: { timeoutMs?: number } & CodeRequestControl,
+    options?: { timeoutMs?: number } & BatchedRequestControl,
   ): { result: Promise<unknown>; settled: Promise<void> } {
     let settle!: () => void;
     const settled = new Promise<void>((resolve) => {
@@ -133,12 +135,20 @@ export class JsonRpcClient {
     return { result, settled };
   }
 
-  /** Send a request and wait for the correlated response, optionally overriding the timeout. */
+  /**
+   * Send a request and wait for the correlated response, optionally overriding
+   * the timeout. With `requestTimings`, a completed request adds its duration
+   * to that batch instead of recording its own `request.timing` event.
+   */
   // biome-ignore lint/complexity/noExcessiveLinesPerFunction: Request timeout and cancellation races stay together.
   sendRequest(
     method: string,
     params?: unknown,
-    options?: { timeoutMs?: number; onSettled?: () => void; owned?: boolean } & CodeRequestControl,
+    options?: {
+      timeoutMs?: number;
+      onSettled?: () => void;
+      owned?: boolean;
+    } & BatchedRequestControl,
   ): Promise<unknown> {
     const timeoutMs = options?.timeoutMs ?? this.timeoutMs;
     const owned = options?.owned === true;
@@ -147,6 +157,8 @@ export class JsonRpcClient {
     const methodClass = classifyRequestMethod(method);
     const boundedMethod = truncateIdentity(method);
     const timer = startDebugTimer();
+    const requestTimings = timer.enabled ? options?.requestTimings : undefined;
+    const startedAt = requestTimings ? performance.now() : 0;
     // A request cancelled before dispatch must not produce protocol traffic.
     if (signal?.aborted) {
       const result = rejectUndispatchedRequest(
@@ -259,6 +271,10 @@ export class JsonRpcClient {
     ])
       .then(
         (result) => {
+          if (requestTimings) {
+            requestTimings.add(boundedMethod, performance.now() - startedAt);
+            return result;
+          }
           recordRequestTiming(
             timer,
             options?.operationId,

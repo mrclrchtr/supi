@@ -15,7 +15,7 @@ import {
   StreamMessageWriter,
 } from "vscode-jsonrpc/node";
 import { JsonRpcClient, JsonRpcRequestError } from "../../src/client/transport.ts";
-import { LSP_REQUEST_TIMEOUT_ERROR_CODE } from "../../src/debug-telemetry.ts";
+import { LSP_REQUEST_TIMEOUT_ERROR_CODE, RequestTimingBatch } from "../../src/debug-telemetry.ts";
 
 /**
  * Creates a client JsonRpcClient connected to a server MessageConnection
@@ -111,6 +111,31 @@ describe("JsonRpcClient", () => {
     expect(JSON.stringify(events)).not.toContain("/private/source.ts");
     expect(JSON.stringify(events)).not.toContain("secret source text");
     expect(JSON.stringify(events)).not.toContain("private-command");
+  });
+
+  it("adds a completed batch request to its batch instead of recording an event", async () => {
+    server.onRequest("textDocument/diagnostic", () => ({ kind: "full", items: [] }));
+    server.onRequest("bad/method", () => {
+      throw new JsonRpcRequestError(-32601, "Method not found");
+    });
+    const requestTimings = new RequestTimingBatch();
+
+    await client.sendRequest("textDocument/diagnostic", {}, { requestTimings });
+    await client.sendRequest("textDocument/diagnostic", {}, { requestTimings });
+    await expect(client.sendRequest("bad/method", {}, { requestTimings })).rejects.toThrow();
+
+    expect(requestTimings.snapshot()).toEqual({
+      "textDocument/diagnostic": {
+        count: 2,
+        totalMs: expect.any(Number),
+        maxMs: expect.any(Number),
+      },
+    });
+    // The failed request stays an individual event; the completed ones do not.
+    const events = getDebugEvents({ source: "lsp", category: "request.timing" }).events;
+    expect(events.map((event) => event.data)).toEqual([
+      expect.objectContaining({ method: "bad/method", outcome: "failed", errorCode: -32601 }),
+    ]);
   });
 
   it("bounds a long server name in request timing identity", async () => {

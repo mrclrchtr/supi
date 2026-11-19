@@ -1133,6 +1133,7 @@ export class LspClient {
           timeoutMs: request.timeoutMs,
           deadline: ownerDeadline,
           ...(request.operationId !== undefined ? { operationId: request.operationId } : {}),
+          ...(request.requestTimings ? { requestTimings: request.requestTimings } : {}),
         },
       );
       activeSettled = owned.settled;

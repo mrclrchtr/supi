@@ -3,7 +3,7 @@ import {
   startDebugTimer,
   truncateDebugIdentity as truncateIdentity,
 } from "@mrclrchtr/supi-core/debug";
-import { boundCwd } from "../debug-telemetry.ts";
+import { boundCwd, RequestTimingBatch } from "../debug-telemetry.ts";
 
 type DiagnosticCollection =
   | "cache"
@@ -63,6 +63,12 @@ export interface DiagnosticTimingIdentity {
  */
 export class DiagnosticObserver {
   readonly #timer = startDebugTimer();
+  /**
+   * Completed protocol requests of a `refresh-open` pass. The pass sends one
+   * request per open document, so its event reports them as `requests` totals
+   * instead of one `request.timing` event each.
+   */
+  readonly requestTimings: RequestTimingBatch | undefined;
   #pull: "failed" | "not-supported" | "timed-out";
   #requestSource: DiagnosticRequestSource | undefined;
   #request: "failed" | "timed-out" | undefined;
@@ -74,6 +80,7 @@ export class DiagnosticObserver {
     readonly identity?: DiagnosticTimingIdentity,
   ) {
     this.#pull = hasDiagnosticRequestAdapter ? "failed" : "not-supported";
+    this.requestTimings = operation === "refresh-open" ? new RequestTimingBatch() : undefined;
   }
 
   synchronized(): void {
@@ -279,6 +286,7 @@ export class DiagnosticObserver {
         data: {
           operation: this.operation,
           ...data,
+          ...requestTotals(this.requestTimings),
           ...(this.identity?.server !== undefined
             ? { server: truncateIdentity(this.identity.server) }
             : {}),
@@ -290,6 +298,11 @@ export class DiagnosticObserver {
       finalPhase,
     );
   }
+}
+
+function requestTotals(batch: RequestTimingBatch | undefined): { requests?: object } {
+  const requests = batch?.snapshot();
+  return requests ? { requests } : {};
 }
 
 /** Return whether a diagnostic failure represents a timeout without retaining its message. */

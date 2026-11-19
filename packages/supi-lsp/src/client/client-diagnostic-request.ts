@@ -3,6 +3,7 @@ import {
   throwIfCodeRequestInterrupted,
 } from "@mrclrchtr/supi-code-runtime/api";
 import type { DocumentDiagnosticReport } from "../config/types.ts";
+import type { RequestTimingBatch } from "../debug-telemetry.ts";
 import { raceRequestControl } from "../session/readiness.ts";
 
 /** Evidence source used by an explicit diagnostic request. */
@@ -30,6 +31,8 @@ export interface DiagnosticPullRequest {
   /** Adapter cancellation stops adapter work, not the owned transport. */
   readonly signal?: AbortSignal;
   readonly operationId?: string;
+  /** Batch that collects this request's completed protocol timings. */
+  readonly requestTimings?: RequestTimingBatch;
 }
 
 /** Result returned by one request adapter. */

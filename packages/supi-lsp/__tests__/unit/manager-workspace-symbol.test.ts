@@ -10,6 +10,7 @@ import {
 import { fileToUri } from "@mrclrchtr/supi-core/path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { FileChangeType } from "../../src/config/types.ts";
+import { type BatchedRequestControl, RequestTimingBatch } from "../../src/debug-telemetry.ts";
 import { LspManager } from "../../src/manager/manager.ts";
 import {
   findWorkspaceSymbolWarmTargets,
@@ -41,6 +42,9 @@ afterEach(() => {
 function getClients(manager: LspManager): Map<string, unknown> {
   return (manager as unknown as { clients: Map<string, unknown> }).clients;
 }
+
+const warmProbes = () =>
+  getDebugEvents({ source: "lsp", category: "workspace-symbol.warm-probe" }).events;
 
 // biome-ignore lint/security/noSecrets: test name only; no secret material.
 describe("findWorkspaceSymbolWarmTargets", () => {
@@ -379,6 +383,7 @@ describe("LspManager.workspaceSymbol cold warm-up", () => {
     };
     getClients(manager).set(`typescript:${root}`, client);
     vi.spyOn(manager, "ensureFileOpen").mockResolvedValue(client as never);
+    configureDebugRegistry({ enabled: true });
 
     const first = await manager.workspaceSymbol("Widget");
     expect(first).toMatchObject({
@@ -387,6 +392,11 @@ describe("LspManager.workspaceSymbol cold warm-up", () => {
       reason: expect.stringContaining("2 opened warm-up files loaded only inferred projects"),
     });
     expect(client.projectMembership).toHaveBeenCalledTimes(2);
+    // A probe that did not load its root keeps its own event, naming the file.
+    expect(warmProbes().map((event) => event.data)).toEqual([
+      expect.objectContaining({ outcome: "inferred", file: expect.any(String) }),
+      expect.objectContaining({ outcome: "inferred", file: expect.any(String) }),
+    ]);
 
     // Inferred probes are remembered: no reopening, and the gap stays visible.
     const second = await manager.workspaceSymbol("Widget");
@@ -520,7 +530,11 @@ describe("LspManager.workspaceSymbol cold warm-up", () => {
       workspaceSymbol: vi.fn(async () =>
         completedCodeQuery(symbols.filter((symbol) => opened.has(symbol.location.uri))),
       ),
-      documentSymbols: vi.fn().mockResolvedValue(completedCodeQuery([])),
+      // Stand in for the transport, which adds each completed request to the batch.
+      documentSymbols: vi.fn(async (_file: string, control?: BatchedRequestControl) => {
+        control?.requestTimings?.add("textDocument/documentSymbol", 4);
+        return completedCodeQuery([]);
+      }),
       hover: vi.fn(),
       projectMembership: vi.fn().mockResolvedValue("configured"),
     };
@@ -549,6 +563,14 @@ describe("LspManager.workspaceSymbol cold warm-up", () => {
       level: "info",
       data: { server: "typescript", roots: 3, loadedRoots: 3, failedProbes: 0, limited: false },
     });
+    // The pass reports its probe requests as totals, not one event per request.
+    expect(passes[0]?.data).toMatchObject({
+      requests: {
+        "textDocument/documentSymbol": { count: client.documentSymbols.mock.calls.length },
+      },
+    });
+    // Probes that loaded their root are counted in the summary only.
+    expect(warmProbes()).toEqual([]);
     const opens = ensureFileOpen.mock.calls.length;
 
     await expect(manager.workspaceSymbol("Widget")).resolves.toEqual({
@@ -667,11 +689,14 @@ describe("LspManager.workspaceSymbol cold warm-up", () => {
     expect(ensureFileOpen).toHaveBeenCalledWith(join(root, "src", "index.ts"), {
       control: undefined,
     });
-    expect(client.documentSymbols).toHaveBeenCalledWith(join(root, "src", "index.ts"));
-    expect(client.hover).toHaveBeenCalledWith(join(root, "src", "index.ts"), {
-      line: 0,
-      character: 13,
-    });
+    // An all-roots pass hands its probe requests the batch that collects their timings.
+    const batched = { requestTimings: expect.any(RequestTimingBatch) };
+    expect(client.documentSymbols).toHaveBeenCalledWith(join(root, "src", "index.ts"), batched);
+    expect(client.hover).toHaveBeenCalledWith(
+      join(root, "src", "index.ts"),
+      { line: 0, character: 13 },
+      batched,
+    );
     expect(client.workspaceSymbol).toHaveBeenCalledTimes(2);
 
     await manager.workspaceSymbol("Widget");

@@ -6,6 +6,7 @@ import {
 } from "@mrclrchtr/supi-code-runtime/api";
 import { fileToUri, uriToFile } from "@mrclrchtr/supi-core/path";
 import type { Diagnostic, Position } from "../config/types.ts";
+import type { RequestTimingBatch } from "../debug-telemetry.ts";
 import { raceRequestControl } from "../session/readiness.ts";
 import type {
   DiagnosticPullRequest,
@@ -38,7 +39,12 @@ export interface TypeScriptDiagnosticAdapterOptions {
   readonly sendRequestOwned: (
     method: string,
     params: unknown,
-    options: { timeoutMs: number; deadline?: number; operationId?: string },
+    options: {
+      timeoutMs: number;
+      deadline?: number;
+      operationId?: string;
+      requestTimings?: RequestTimingBatch;
+    },
   ) => OwnedRequest;
 }
 
@@ -242,6 +248,7 @@ async function collectTypeScriptPhase(options: TypeScriptPhaseOptions): Promise<
       timeoutMs: remaining,
       deadline: collectionDeadline,
       ...(request.operationId !== undefined ? { operationId: request.operationId } : {}),
+      ...(request.requestTimings ? { requestTimings: request.requestTimings } : {}),
     },
   );
   options.setActiveSettled(execution.settled);

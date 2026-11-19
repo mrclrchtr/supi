@@ -1,6 +1,7 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { completedCodeQuery } from "@mrclrchtr/supi-code-runtime/api";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -268,6 +269,44 @@ describe("LspManager lifecycle aggregation", () => {
       ]);
       expect(transitions.filter((transition) => transition.kind === "tracked-files")).toHaveLength(
         1,
+      );
+    } finally {
+      await manager.shutdownAll();
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("publishes one tracked-files transition for a project warm-up pass", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "lsp-warm-tracking-"));
+    writeFileSync(join(cwd, "package.json"), "{}\n");
+    for (const name of ["a", "b", "c"]) {
+      mkdirSync(join(cwd, "packages", name, "src"), { recursive: true });
+      writeFileSync(join(cwd, "packages", name, "package.json"), "{}\n");
+      writeFileSync(join(cwd, "packages", name, "src", "index.ts"), "export {};\n");
+    }
+    const transitions: ManagerLifecycleTransition[] = [];
+    const manager = createManager(transitions, cwd);
+
+    try {
+      await manager.startServerForRoot("typescript", cwd);
+      const client = mocks.clients[0];
+      if (!client) throw new Error("Expected a client.");
+      Object.assign(client, {
+        serverCapabilities: { workspaceSymbolProvider: true },
+        documentSymbols: async () => completedCodeQuery([]),
+        projectMembership: async () => "configured",
+      });
+      client.becomeReady();
+
+      await manager.startWorkspaceSymbolWarmup();
+
+      // The pass opens one file per project root but reports their tracking once.
+      expect(client.openFiles.length).toBeGreaterThan(1);
+      expect(transitions.filter((transition) => transition.kind === "tracked-files")).toHaveLength(
+        1,
+      );
+      expect(transitions.at(-1)?.projectServers[0]?.openFiles).toHaveLength(
+        client.openFiles.length,
       );
     } finally {
       await manager.shutdownAll();

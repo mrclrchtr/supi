@@ -7,6 +7,7 @@ import {
   resetDebugRegistry,
 } from "@mrclrchtr/supi-core/debug";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { RequestTimingBatch } from "../../src/debug-telemetry.ts";
 import { createPullTestClient, createRunningTestClient } from "../helpers/client-test-harness.ts";
 
 const fsPromisesMock = vi.hoisted(() => ({ readFile: vi.fn() }));
@@ -72,6 +73,32 @@ describe("LSP diagnostic timing observations", () => {
     // refresh-open stays aggregate: no file identity in data.
     expect(events[0]?.data).not.toHaveProperty("file");
     expect(JSON.stringify(events)).not.toContain("privateSource");
+  });
+
+  it("reports the pull requests of a refresh as totals on its one event", async () => {
+    const files = ["a.ts", "b.ts", "c.ts"].map((name) => join(cwd, name));
+    const { client, rpc } = createPullTestClient({ root: cwd, cwd });
+    for (const file of files) {
+      writeFileSync(file, "const value = true;\n");
+      client.didOpen(file, "const value = true;\n");
+    }
+    // Stand in for the transport, which adds each completed request to the batch.
+    rpc.sendRequest.mockImplementation(
+      (method: string, _params: unknown, options: { requestTimings?: RequestTimingBatch }) => {
+        options.requestTimings?.add(method, 5);
+        return { kind: "full", items: [] };
+      },
+    );
+
+    await client.refreshOpenDiagnostics({ maxWaitMs: 500, quietMs: 20 });
+
+    const events = getDebugEvents({ source: "lsp", category: "diagnostics.timing" }).events;
+    expect(events).toHaveLength(1);
+    expect(events[0]?.data).toMatchObject({
+      operation: "refresh-open",
+      documentCount: 3,
+      requests: { "textDocument/diagnostic": { count: 3, totalMs: 15, maxMs: 5 } },
+    });
   });
 
   it("records cache reuse for a fully reusable push-only refresh", async () => {

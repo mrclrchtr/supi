@@ -11,6 +11,7 @@ import {
 } from "@mrclrchtr/supi-code-runtime/api";
 import { fileToUri, uriToFile } from "@mrclrchtr/supi-core/path";
 import type { Diagnostic, TextDocumentItem } from "../config/types.ts";
+import type { RequestTimingBatch } from "../debug-telemetry.ts";
 import type { DiagnosticEvidenceSummary } from "../diagnostics/evidence.ts";
 import { detectLanguageId } from "../utils.ts";
 import { applyPushDiagnostics, buildClientDiagnosticSnapshot } from "./client-diagnostic-cache.ts";
@@ -722,6 +723,7 @@ export class ClientDiagnostics {
           },
           deadline: requestOptions.deadline,
           operationId: requestOptions.operationId,
+          requestTimings: requestOptions.requestTimings,
         }),
       options,
       publications: {
@@ -1082,6 +1084,7 @@ export class ClientDiagnostics {
     control?: CodeRequestControl;
     deadline?: number;
     operationId?: string;
+    requestTimings?: RequestTimingBatch;
   }): Promise<boolean> {
     const adapter = this.host.diagnosticRequestAdapter;
     if (!adapter?.supports(options.request.uri)) return Promise.resolve(false);
@@ -1118,6 +1121,7 @@ export class ClientDiagnostics {
           timeoutMs: ownerTimeoutMs,
           signal: controller.signal,
           operationId: options.operationId,
+          requestTimings: options.requestTimings,
         };
         const execution = startDiagnosticEvidenceFromAdapter({
           adapter,
