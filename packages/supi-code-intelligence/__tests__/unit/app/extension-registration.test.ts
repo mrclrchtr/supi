@@ -195,7 +195,9 @@ describe("focused code intelligence tool registration", () => {
     expect((getTool(pi, "code_resolve").promptGuidelines ?? []).join(" ")).toMatch(
       /search pattern is one identifier/i,
     );
-    expect(getTool(pi, "code_find").promptGuidelines).toEqual([]);
+    expect((getTool(pi, "code_find").promptGuidelines ?? []).join(" ")).toMatch(
+      /name contains a fragment/i,
+    );
     expect((getTool(pi, "code_inspect").promptGuidelines ?? []).join(" ")).toMatch(
       /when code_health is available/i,
     );

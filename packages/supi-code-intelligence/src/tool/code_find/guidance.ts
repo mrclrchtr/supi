@@ -3,4 +3,6 @@ export const toolDescription =
 
 export const promptSnippet = "search code structure or workspace symbols";
 
-export const promptGuidelines: string[] = [];
+export const promptGuidelines = [
+  "For declarations whose name contains a fragment, call code_find with ast kind definition instead of an rg keyword pattern, which also matches imports and misses methods.",
+];

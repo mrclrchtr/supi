@@ -1,7 +1,7 @@
 {
   "corpusCommit": "fd3add9fb2ee64beb94816b5a893a7a949ae54ea",
   "tokenEstimate": "chars/4",
-  "codeToolSurfaceTokens": 3163,
+  "codeToolSurfaceTokens": 3305,
   "scenarios": {
     "refs-unique-default": {
       "native": {
