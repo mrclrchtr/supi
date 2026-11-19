@@ -21,6 +21,12 @@
       "source": "./",
       "description": "SuPi-owned public agent skills.",
       "skills": ["./skills/claude-md-improver", "./skills/claude-md-revision", "./skills/commit"]
+    },
+    {
+      "name": "supi-dev-skills",
+      "source": "./",
+      "description": "SuPi-owned skills for Pi extension developers.",
+      "skills": ["./skills/pi-tui-design"]
     }
   ]
 }

@@ -12,7 +12,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { createRequire } from "node:module";
-import { dirname, join, relative, resolve } from "node:path";
+import { basename, dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { walkFiles } from "./file-walk.ts";
 
@@ -42,6 +42,11 @@ const upstreamRoot = dirname(
 const upstreamSkillsRoot = join(upstreamRoot, "skills");
 const licensePath = join(upstreamRoot, "LICENSE");
 const upstreamLicenseName = "LICENSE.mattpocock";
+/**
+ * SuPi-owned skills for Pi extension developers. They are published in a separate
+ * marketplace group so `supi-skills` stays the end-user set that the installer lists.
+ */
+const developerSkillNames = new Set(["pi-tui-design"]);
 
 function readInventory(): UpstreamInventory {
   return JSON.parse(readFileSync(inventoryPath, "utf8")) as UpstreamInventory;
@@ -151,7 +156,10 @@ function formatSkillMarketplaceManifest(
   groups: Record<string, string[]>,
 ): string {
   const mattpocockSkills = publicSkillPaths(inventory, groups);
-  const supiSkills = ownedSkillPaths();
+  const ownedSkills = ownedSkillPaths();
+  const isDeveloperSkill = (path: string) => developerSkillNames.has(basename(path));
+  const supiSkills = ownedSkills.filter((path) => !isDeveloperSkill(path));
+  const developerSkills = ownedSkills.filter(isDeveloperSkill);
   const plugins: SkillMarketplacePlugin[] = [];
   if (mattpocockSkills.length > 0) {
     plugins.push({
@@ -167,6 +175,14 @@ function formatSkillMarketplaceManifest(
       source: "./",
       description: "SuPi-owned public agent skills.",
       skills: supiSkills,
+    });
+  }
+  if (developerSkills.length > 0) {
+    plugins.push({
+      name: "supi-dev-skills",
+      source: "./",
+      description: "SuPi-owned skills for Pi extension developers.",
+      skills: developerSkills,
     });
   }
 

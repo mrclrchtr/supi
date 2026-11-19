@@ -104,7 +104,7 @@ The root [`skills/`](skills) catalog contains patched SuPi-compatible editions o
 npx skills add mrclrchtr/supi -a pi --skill code-review commit
 ```
 
-The `claude-md-improver` and `claude-md-revision` skills (formerly `@mrclrchtr/supi-claude-md`) audit and revise `CLAUDE.md` and `AGENTS.md` files.
+The `claude-md-improver` and `claude-md-revision` skills (formerly `@mrclrchtr/supi-claude-md`) audit and revise `CLAUDE.md` and `AGENTS.md` files. For Pi extension development, the `pi-tui-design` skill helps build Pi TUI components.
 
 [`supi-skill-patches`](packages/supi-skill-patches/README.md) is the private maintenance workspace that synchronizes and validates this catalog.
 
