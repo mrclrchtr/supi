@@ -22,7 +22,7 @@
   },
   "dependencies": {
     "cross-spawn": "7.0.6",
-    "string-width": "8.3.0"
+    "string-width": "9.0.0"
   },
   "devDependencies": {
     "@types/cross-spawn": "6.0.6"
