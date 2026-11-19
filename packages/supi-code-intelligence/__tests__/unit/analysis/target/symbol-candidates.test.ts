@@ -69,6 +69,30 @@ describe("symbol candidates", () => {
     });
   });
 
+  it("selects the only exact-name declaration from a row-limited result that holds every exact name", async () => {
+    const reason = "The TypeScript server returned its limit of 256 workspace symbols; …";
+    const rowLimited = (symbols: CodeSymbol[]): SemanticProvider =>
+      ({
+        workspaceSymbols: async () =>
+          partialCodeQuery(symbols, reason, { rowLimit: { exactNamesComplete: true } }),
+        documentSymbols: async () => completedCodeQuery([]),
+      }) as unknown as SemanticProvider;
+
+    const resolved = await resolveSymbolTarget(
+      "git",
+      "/project",
+      rowLimited([candidate("git", "footer"), candidate("gitEditor", "editor")]),
+    );
+    expect(resolved).toMatchObject({ kind: "resolved", target: { name: "git" } });
+    // The note discloses that partial-name matches may be missing.
+    expect(resolved).toMatchObject({ notes: expect.arrayContaining([reason]) });
+
+    // A lone partial-name match is not covered: other partial names may have been cut.
+    await expect(
+      resolveSymbolTarget("git", "/project", rowLimited([candidate("gitEditor", "editor")])),
+    ).resolves.toMatchObject({ kind: "disambiguation" });
+  });
+
   it("keeps disambiguation when exclusions accompany another gap", async () => {
     const symbols = [candidate("Widget", "widget")];
     const mixed: SemanticProvider = {

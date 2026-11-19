@@ -303,8 +303,9 @@ export function finishResolveResult(
   target?: ResolveTargetInput,
 ): CodeIntelResult {
   if (outcome.kind === "unavailable") {
+    // A row-limit reason already names its next step; readiness recovery would contradict it.
     const reason =
-      target && "symbol" in target && target.symbol.scope
+      target && "symbol" in target && target.symbol.scope && !outcome.rowLimited
         ? scopedSymbolFailureMessage(outcome.reason)
         : outcome.reason;
     throw new Error(reason);

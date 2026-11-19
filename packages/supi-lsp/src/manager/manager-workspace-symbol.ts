@@ -1,28 +1,12 @@
 import { type Dirent, realpathSync, statSync } from "node:fs";
 import * as path from "node:path";
-import {
-  type CodeQueryResult,
-  type CodeRequestControl,
-  completedCodeQuery,
-  partialCodeQuery,
-  unavailableCodeQuery,
-} from "@mrclrchtr/supi-code-runtime/api";
 import { isWithinOrEqual } from "@mrclrchtr/supi-core/project";
-import type { LspClient } from "../client/client.ts";
-import type {
-  DocumentSymbol,
-  Position,
-  SymbolInformation,
-  WorkspaceSymbol,
-} from "../config/types.ts";
+import type { DocumentSymbol, Position, SymbolInformation } from "../config/types.ts";
 import {
   type AutomaticLspPathPolicy,
   createDefaultAutomaticLspPathPolicy,
   walkAutomaticLspTree,
 } from "../workspace-path-policy.ts";
-import { nativeTypeScriptLimitReason } from "./workspace-symbol-row-limit.ts";
-
-type WorkspaceSymbolLike = SymbolInformation | WorkspaceSymbol;
 
 const DEFAULT_WARM_FILE_DEPTH = 4;
 const DEFAULT_MARKER_SCAN_DEPTH = 6;
@@ -59,37 +43,6 @@ export function getWorkspaceSymbolWarmPosition(
   return null;
 }
 
-export interface WorkspaceSymbolCollection {
-  results: WorkspaceSymbolLike[];
-  hasSupport: boolean;
-  completedClientCount: number;
-  failures: string[];
-  /** Results removed by the automatic path policy. */
-  excludedCount?: number;
-  /** Bounded paths removed by the automatic path policy. */
-  excludedExamples?: string[];
-  /** Known coverage limits: the server may not have loaded every project in scope. */
-  coverageGap?: string;
-}
-
-/**
- * Mark a collection whose warm-up never reached a configured project.
- * The server answered only from inferred projects of the opened probe files,
- * so an empty or short result does not prove a symbol is absent.
- */
-export function workspaceSymbolCoverageGap(
-  collection: WorkspaceSymbolCollection,
-  inferredProbeCount: number,
-): WorkspaceSymbolCollection {
-  const noun = `file${inferredProbeCount === 1 ? "" : "s"}`;
-  return {
-    ...collection,
-    coverageGap:
-      `Workspace-symbol coverage is limited: ${inferredProbeCount} opened warm-up ${noun} ` +
-      "loaded only inferred projects, not a configured project. Open a project source file and retry.",
-  };
-}
-
 /** Project roots one all-roots warm-up pass opens for a route. */
 const MAX_WARM_ROOTS = 96;
 
@@ -110,100 +63,6 @@ export function limitWorkspaceSymbolWarmRoots(targets: readonly WorkspaceSymbolW
       `Workspace-symbol coverage is limited: ${roots.length - MAX_WARM_ROOTS} of ${roots.length} ` +
       "project roots were not opened. Pass a narrower scope and retry.",
   };
-}
-
-/**
- * Collect workspace symbols from every running client that supports them.
- *
- * @param scoped - the caller already limits results to a scope, so the
- *   row-limit advice must not suggest adding one.
- */
-export async function collectWorkspaceSymbols(
-  clients: Iterable<LspClient>,
-  query: string,
-  control?: CodeRequestControl,
-  scoped = false,
-): Promise<WorkspaceSymbolCollection> {
-  const results: WorkspaceSymbolLike[] = [];
-  const failures: string[] = [];
-  let hasSupport = false;
-  let completedClientCount = 0;
-
-  for (const client of clients) {
-    if (client.status !== "running") continue;
-    if (!client.serverCapabilities?.workspaceSymbolProvider) continue;
-    hasSupport = true;
-    const result = await client.workspaceSymbol(query, control);
-    if (result.kind === "unavailable") {
-      failures.push(result.reason);
-      continue;
-    }
-    completedClientCount++;
-    results.push(...(result.data ?? []));
-    if (result.kind === "partial") failures.push(result.reason);
-    const limitReason = nativeTypeScriptLimitReason(client, result.data?.length ?? 0, scoped);
-    if (limitReason) failures.push(limitReason);
-  }
-
-  return { results, hasSupport, completedClientCount, failures };
-}
-
-/**
- * Join partial-result reasons into one message. A reason that already ends a
- * sentence is followed by a space, so the message never reads `.;`.
- */
-export function joinWorkspaceSymbolReasons(
-  reasons: readonly (string | null | undefined)[],
-): string {
-  return reasons
-    .filter((reason): reason is string => Boolean(reason))
-    .reduce((joined, reason) => {
-      if (!joined) return reason;
-      return `${joined}${/[.!?]$/.test(joined) ? " " : "; "}${reason}`;
-    }, "");
-}
-
-function workspaceSymbolExclusionReason(collection: WorkspaceSymbolCollection): string | null {
-  const excludedCount = collection.excludedCount ?? 0;
-  if (excludedCount === 0) return null;
-  const noun = `workspace-symbol result${excludedCount === 1 ? "" : "s"}`;
-  // Paths belong to typed metadata so consumers can distinguish observed aliases from navigation.
-  return `Automatic path policy excluded ${excludedCount} ${noun}.`;
-}
-
-/** Project one multi-client collection into the shared typed query contract. */
-export function workspaceSymbolCollectionResult(
-  collection: WorkspaceSymbolCollection,
-): CodeQueryResult<WorkspaceSymbolLike[]> {
-  if (!collection.hasSupport) {
-    return unavailableCodeQuery("No active LSP client supports workspace-symbol requests.");
-  }
-  if (collection.completedClientCount === 0) {
-    return unavailableCodeQuery(
-      joinWorkspaceSymbolReasons(collection.failures) || "No workspace-symbol request completed.",
-    );
-  }
-  const exclusion = workspaceSymbolExclusionReason(collection);
-  if (collection.failures.length > 0 || exclusion || collection.coverageGap) {
-    const excludedCount = collection.excludedCount ?? 0;
-    const exclusionOnly = collection.failures.length === 0 && !collection.coverageGap;
-    const metadata =
-      excludedCount > 0
-        ? {
-            automaticPathExclusion: {
-              excludedCount,
-              examples: [...(collection.excludedExamples ?? [])],
-            },
-            ...(exclusionOnly ? { exclusionOnly: true } : {}),
-          }
-        : undefined;
-    return partialCodeQuery(
-      collection.results,
-      joinWorkspaceSymbolReasons([...collection.failures, collection.coverageGap, exclusion]),
-      metadata,
-    );
-  }
-  return completedCodeQuery(collection.results);
 }
 
 /**

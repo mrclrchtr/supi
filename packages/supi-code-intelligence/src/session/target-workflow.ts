@@ -84,7 +84,12 @@ export type TargetWorkflowOutcome =
       candidates: ReadonlyArray<TargetWorkflowCandidate>;
     } & TargetCandidateCompleteness)
   | { kind: "invalid-input"; message: string }
-  | { kind: "unavailable"; reason: string };
+  | {
+      kind: "unavailable";
+      reason: string;
+      /** A provider row limit, not readiness, left the result incomplete. */
+      rowLimited?: true;
+    };
 
 /** Dependencies hidden behind the Workspace code-intelligence session seam. */
 export interface TargetWorkflowDeps {
@@ -296,9 +301,7 @@ function toWorkflowOutcome(
   policy: TargetWorkflowPolicy,
   deps: TargetWorkflowDeps,
 ): TargetWorkflowOutcome {
-  if (outcome.kind === "unavailable") {
-    return { kind: "unavailable", reason: outcome.reason };
-  }
+  if (outcome.kind === "unavailable") return outcome;
   if (outcome.kind === "error") {
     return { kind: "invalid-input", message: outcome.message };
   }

@@ -199,5 +199,10 @@ export type TargetOutcome =
       requestedKind: TargetSymbolKind;
       candidates: DisambiguationCandidateData[];
     } & TargetCandidateCompleteness)
-  | { kind: "unavailable"; reason: string }
+  | {
+      kind: "unavailable";
+      reason: string;
+      /** A provider row limit, not readiness, left the result incomplete; the reason names the next step. */
+      rowLimited?: true;
+    }
   | { kind: "error"; message: string };

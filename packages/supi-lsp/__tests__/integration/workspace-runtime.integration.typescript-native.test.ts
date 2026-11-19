@@ -255,3 +255,35 @@ it("routes and synchronizes native TSX/JSX and module suffixes", async () => {
   }
   expect(runtime.getProjectServers()).toMatchObject([{ typescript: { backend: "native" } }]);
 }, 30_000);
+
+// Exact-name selection from a cut answer relies on the native server's order:
+// it sorts exact names first and cuts at 256 rows afterwards.
+it("keeps every exact-name declaration in a native answer cut at its row limit", async () => {
+  root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "supi-ts7-row-limit-")));
+  fs.mkdirSync(path.join(root, "node_modules"));
+  fs.symlinkSync(native, path.join(root, "node_modules/typescript"), "dir");
+  fs.writeFileSync(path.join(root, "tsconfig.json"), JSON.stringify({ include: ["*.ts"] }));
+  const partial = Array.from({ length: 300 }, (_, i) => `export function gitAa${i}() {}`);
+  // Exact names in the last file and after the partial names, so the server's order decides.
+  fs.writeFileSync(path.join(root, "a.ts"), `${partial.join("\n")}\n`);
+  fs.writeFileSync(
+    path.join(root, "z.ts"),
+    "export function git() {}\nexport type T = { git: 1 };\n",
+  );
+  vi.stubEnv("PATH", "");
+  const typescript = loadConfig(root, { homeDir: path.join(root, "home") }).servers.typescript;
+  if (!typescript) throw new Error("Missing TypeScript route");
+  owner = createWorkspaceLspRuntimeOwner(new LspManager({ servers: { typescript } }, root));
+  await expect(owner.runtime.waitUntilReadyForFile(path.join(root, "a.ts"))).resolves.toMatchObject(
+    { kind: "ready" },
+  );
+
+  const result = await owner.runtime.workspaceSymbol("git");
+  expect(result).toMatchObject({
+    kind: "partial",
+    metadata: { rowLimit: { exactNamesComplete: true } },
+  });
+  const rows = result.kind === "partial" ? result.data : [];
+  expect(rows).toHaveLength(256);
+  expect(rows.slice(0, 2).map((row) => row.name)).toEqual(["git", "git"]);
+}, 30_000);

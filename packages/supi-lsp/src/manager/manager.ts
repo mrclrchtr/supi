@@ -142,17 +142,19 @@ import {
   type WorkspaceRecoveryResult,
 } from "./manager-workspace-recovery.ts";
 import {
-  collectWorkspaceSymbols,
   findWorkspaceSymbolWarmTargets,
   getWorkspaceSymbolWarmPosition,
   isWithinAnyScope,
-  joinWorkspaceSymbolReasons,
   limitWorkspaceSymbolWarmRoots,
+} from "./manager-workspace-symbol.ts";
+import { isFileLocalTopLevelDeclaration } from "./typescript-file-local.ts";
+import {
+  collectWorkspaceSymbols,
+  joinWorkspaceSymbolReasons,
   type WorkspaceSymbolCollection,
   workspaceSymbolCollectionResult,
   workspaceSymbolCoverageGap,
-} from "./manager-workspace-symbol.ts";
-import { isFileLocalTopLevelDeclaration } from "./typescript-file-local.ts";
+} from "./workspace-symbol-collection.ts";
 
 type UnavailableReason = "missing-command" | "start-failed" | "runtime-error";
 

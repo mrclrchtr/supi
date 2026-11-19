@@ -211,22 +211,29 @@ async function resolveCandidates(
   // Workspace-symbol providers match substrings, so a query for `foo` also returns `fooBar`.
   const exact = ranged.filter((candidate) => candidate.name === options.symbol);
   const complete = discovery.partialMessage === null;
+  // A row-limited answer may lack partial-name matches but holds every exact name.
+  const exactComplete = complete || discovery.exactNamesComplete;
   const declared =
-    complete && exact.length > 1
+    exactComplete && exact.length > 1
       ? await declarationsAmong(exact, options.structural, control)
       : exact;
   const selected =
-    ranged.length === 1 ? ranged[0] : declared.length === 1 ? declared[0] : undefined;
-  if (selected && complete) {
+    complete && ranged.length === 1
+      ? ranged[0]
+      : exactComplete && declared.length === 1
+        ? declared[0]
+        : undefined;
+  if (selected) {
     const resolved = resolvedTarget(await refineResolvedSymbolAnchor(selected, semantic, control));
-    // Unselected rows stay disclosed: bindings, partial-name matches, and policy exclusions.
-    const notes = [unselectedNote(candidates, selected, options.symbol), exclusionNote].filter(
-      (note): note is string => note !== undefined,
-    );
+    // Unselected rows stay disclosed: bindings, partial-name matches, policy exclusions, and the row limit.
+    const notes = [
+      unselectedNote(candidates, selected, options.symbol),
+      exclusionNote ?? discovery.partialMessage ?? undefined,
+    ].filter((note): note is string => note !== undefined);
     return notes.length > 0 ? { ...resolved, notes } : resolved;
   }
   // Several declarations of the queried name: partial-name matches cannot be meant.
-  const listed = complete && declared.length > 1 ? declared : candidates;
+  const listed = exactComplete && declared.length > 1 ? declared : candidates;
   const outcome = await buildCandidateOutcome({
     kind: "disambiguation",
     candidates: listed,
@@ -276,6 +283,8 @@ interface CandidateOutcomeBase {
  */
 interface CandidateDiscovery {
   readonly partialMessage: string | null;
+  /** Every exact-name declaration is present although the result is partial. */
+  readonly exactNamesComplete: boolean;
 }
 
 function candidateDiscovery(
@@ -286,8 +295,11 @@ function candidateDiscovery(
   // automatic scope; the retained in-policy rows are complete. Failures and
   // coverage gaps keep the total unknown.
   return result.kind === "partial" && result.metadata?.exclusionOnly !== true
-    ? { partialMessage: describePartialQuery(result.reason, result.metadata, cwd) }
-    : { partialMessage: null };
+    ? {
+        partialMessage: describePartialQuery(result.reason, result.metadata, cwd),
+        exactNamesComplete: result.metadata?.rowLimit?.exactNamesComplete === true,
+      }
+    : { partialMessage: null, exactNamesComplete: false };
 }
 
 /** Describe exclusion-only evidence so a resolved target still discloses dropped rows. */
@@ -319,6 +331,7 @@ function emptySymbolOutcome(
     return {
       kind: "unavailable",
       reason: `Symbol discovery for \`${symbol}\` is incomplete: ${describePartialQuery(result.reason, result.metadata, cwd)}`,
+      ...(result.metadata?.rowLimit ? { rowLimited: true as const } : {}),
     };
   }
   return {

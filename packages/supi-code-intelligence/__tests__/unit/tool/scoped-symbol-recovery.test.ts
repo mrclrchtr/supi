@@ -1,7 +1,11 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { completedCodeQuery, unavailableCodeQuery } from "@mrclrchtr/supi-code-runtime/api";
+import {
+  completedCodeQuery,
+  partialCodeQuery,
+  unavailableCodeQuery,
+} from "@mrclrchtr/supi-code-runtime/api";
 import { createPiMock, getTool, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { WorkspaceCodeIntelligenceSession } from "../../../src/session/session.ts";
@@ -92,6 +96,37 @@ describe("public scoped symbol recovery guidance", () => {
       await expect(call).rejects.not.toThrow("Next steps:");
     },
   );
+
+  it("keeps only the row-limit next step when a cut answer leaves the scope empty", async () => {
+    const reason =
+      "The TypeScript server returned its limit of 256 workspace symbols; more matches may exist. Use a more specific query, or pass an anchor target (file, line, character).";
+    const session = new WorkspaceCodeIntelligenceSession(
+      cwd,
+      new TestCapabilityAdapter({
+        semantic: {
+          references: async () => completedCodeQuery([]),
+          implementation: async () => completedCodeQuery([]),
+          documentSymbols: fileDocumentSymbolsMock(),
+          // Every row of the cut answer lies outside the scope.
+          workspaceSymbols: async () =>
+            partialCodeQuery([], reason, { rowLimit: { exactNamesComplete: false } }),
+        },
+      }),
+    );
+    const limited = createPiMock();
+    registerCodeIntelligenceTools(limited as never, () => session, undefined, [codeResolveSpec]);
+    const call = getTool(limited, "code_resolve").execute(
+      "row-limit",
+      { target: { symbol: { query: "result", scope } } },
+      undefined,
+      undefined,
+      makeCtx({ cwd }),
+    );
+
+    await expect(call).rejects.toThrow("pass an anchor target");
+    // target.file lists no body-local declarations and points back to this query.
+    await expect(call).rejects.not.toThrow("Next steps:");
+  });
 
   it("does not add LSP recovery guidance to AST failures", async () => {
     const call = getTool(pi, "code_find").execute(

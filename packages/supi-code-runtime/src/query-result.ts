@@ -14,6 +14,16 @@ export interface CodeQueryPartialMetadata {
    * answer.
    */
   readonly exclusionOnly?: boolean;
+  /** A provider cut its answer at a row limit; a narrower scope cannot avoid it. */
+  readonly rowLimit?: {
+    /**
+     * True when every declaration whose name equals the query is still in the
+     * result, though partial-name matches may be missing: the provider sorted
+     * exact names first. Set only when no provider failed and no coverage gap
+     * was observed, so exact-name selection stays sound.
+     */
+    readonly exactNamesComplete: boolean;
+  };
 }
 
 /**

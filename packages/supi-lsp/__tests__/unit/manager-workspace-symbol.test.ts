@@ -12,11 +12,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { FileChangeType } from "../../src/config/types.ts";
 import { type BatchedRequestControl, RequestTimingBatch } from "../../src/debug-telemetry.ts";
 import { LspManager } from "../../src/manager/manager.ts";
+import { findWorkspaceSymbolWarmTargets } from "../../src/manager/manager-workspace-symbol.ts";
 import {
-  findWorkspaceSymbolWarmTargets,
   workspaceSymbolCollectionResult,
   workspaceSymbolCoverageGap,
-} from "../../src/manager/manager-workspace-symbol.ts";
+} from "../../src/manager/workspace-symbol-collection.ts";
 import { createAutomaticLspPathPolicy } from "../../src/workspace-path-policy.ts";
 
 const tempDirs: string[] = [];
@@ -625,13 +625,33 @@ describe("LspManager.workspaceSymbol cold warm-up", () => {
     const scoped = await manager.workspaceSymbol("Widget", undefined, [join(root, "src")]);
     expect(scoped).toMatchObject({
       kind: "partial",
-      reason: expect.stringContaining("resolve the declaration by its file or position"),
+      reason: expect.stringContaining("pass an anchor target (file, line, character)"),
     });
     expect(scoped).not.toMatchObject({ reason: expect.stringContaining("or a scope") });
+    expect(scoped).toMatchObject({ metadata: { rowLimit: { exactNamesComplete: false } } });
 
     // A scope equal to the session root narrows nothing; code_find passes it by default.
     expect(await manager.workspaceSymbol("Widget", undefined, [root])).toMatchObject({
       reason: expect.stringContaining("Use a more specific query or a scope."),
+    });
+
+    // The server sorts exact names first and cuts after: a cut answer whose
+    // exact names lead and whose tail differs still holds every exact name.
+    const partialRow = { ...row, name: "WidgetBox" };
+    client.workspaceSymbol.mockResolvedValue(
+      completedCodeQuery([row, ...Array(255).fill(partialRow)]),
+    );
+    expect(await manager.workspaceSymbol("widget", undefined, [join(root, "src")])).toMatchObject({
+      kind: "partial",
+      reason: expect.stringContaining("it includes every declaration named `widget`"),
+      metadata: { rowLimit: { exactNamesComplete: true } },
+    });
+    // Another order proves nothing.
+    client.workspaceSymbol.mockResolvedValue(
+      completedCodeQuery([...Array(255).fill(partialRow), row]),
+    );
+    expect(await manager.workspaceSymbol("Widget")).toMatchObject({
+      metadata: { rowLimit: { exactNamesComplete: false } },
     });
 
     // tsserver has no row limit, so the same row count is a complete answer.
