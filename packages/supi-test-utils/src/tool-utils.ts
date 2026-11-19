@@ -15,6 +15,7 @@ export interface ToolDef {
   promptSnippet?: string;
   promptGuidelines?: string[];
   parameters?: unknown;
+  prepareArguments?: (args: unknown) => unknown;
   execute: (...args: unknown[]) => Promise<unknown>;
 }
 

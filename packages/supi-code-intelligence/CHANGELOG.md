@@ -3,6 +3,7 @@
 ## [14.1.0]
 
 - `code_graph` shows the source line of every reference and implementation site, so a result answers how a symbol is used without a follow-up `read` or `rg`. Sites are listed one row per source line under their file (``  - L120:25 — `const stashes = await git(["stash", "list", "--format=%gs"], cwd);` ``) instead of as bare positions (`L117:24, L120:25`). Structured output adds an optional `text` to each item of these relations, and the expanded transcript shows the same line. Lines are trimmed and shortened when long; a site whose file cannot be read keeps the position-only form. Callee rows are unchanged.
+- The code tools accept a nested argument that a model sent as a JSON string, such as `target: "{\"symbol\":{…}}"` for `code_resolve`. Before, the call failed with `target: expected object, got string` and was retried; in a probe this happened on the first `code_resolve` call of every rename task. Only a string that parses to the object or array the schema declares is decoded; any other value still fails validation.
 
 ## [14.0.0]
 

@@ -76,8 +76,28 @@ describe("focused code intelligence tool registration", () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
 
-    expect(getTool(pi, "code_find")).not.toHaveProperty("prepareArguments");
-    expect(getTool(pi, "code_health")).not.toHaveProperty("prepareArguments");
+    const removedInput = { query: "registerSettings", kind: "definition" };
+    expect(getTool(pi, "code_find").prepareArguments?.(removedInput)).toBe(removedInput);
+    expect(getTool(pi, "code_refactor_apply")).not.toHaveProperty("prepareArguments");
+  });
+
+  it("decodes a nested argument sent as a JSON string and leaves other strings to validation", () => {
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const prepare = getTool(pi, "code_resolve").prepareArguments;
+
+    const target = { symbol: { query: "git", scope: "packages/supi-extras" } };
+    expect(prepare?.({ target: JSON.stringify(target), maxResults: 3 })).toEqual({
+      target,
+      maxResults: 3,
+    });
+
+    for (const invalid of [{ target: "git" }, { target: "[1]" }, { target: "{broken" }]) {
+      expect(prepare?.(invalid)).toBe(invalid);
+    }
+    expect(getTool(pi, "code_graph").prepareArguments?.({ relations: '["callees"]' })).toEqual({
+      relations: ["callees"],
+    });
   });
 
   it("keeps selection-critical distinctions in registered descriptions", () => {

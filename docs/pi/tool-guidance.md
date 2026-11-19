@@ -158,7 +158,7 @@ SuPi rules:
 - A root parameter-schema description does not replace the required tool `description`. Omit the root description when it only repeats the tool outcome.
 - Source-level reuse does not reduce wire size. A reused schema helper is serialized at every use, including its description. Move shared prose to the nearest common parent when this keeps the meaning clear.
 - Keep descriptions caller-facing. State what an input selects or means, not how the extension processes it.
-- Keep the public schema current. Do not add deprecated fields solely for old sessions; use `prepareArguments(args)` as the only legacy/resume shim.
+- Keep the public schema current. Do not add deprecated fields solely for old sessions; use `prepareArguments(args)` as the only legacy/resume shim. It may also decode an argument a model sent in the wrong encoding, such as a nested object as a JSON string, when the decoded value is still validated against the schema.
 - Export a custom tool input type when other extensions/events need typed `isToolCallEventType<"tool", Input>()` checks.
 
 ### Schema description audit
@@ -249,7 +249,7 @@ SuPi additions:
 - [ ] Shared parameter rules live once on the nearest common object; leaf descriptions contain only leaf-specific meaning.
 - [ ] The complete serialized schema was checked for repeated descriptions, and its wire shape has a test.
 - [ ] Important parameters have descriptions; string enums use TypeBox `Type.Enum` with `type: "string"`; schemas stay compact.
-- [ ] `prepareArguments()` is only a legacy compatibility shim.
+- [ ] `prepareArguments()` is only a legacy compatibility shim or an encoding decoder; it never accepts a shape the schema rejects.
 - [ ] `execute()` honors `signal`, streams progress when useful, and throws for real failures.
 - [ ] Long output is truncated with a clear truncation notice, or spilled to a file with path + preview.
 - [ ] Path tools normalize leading `@` and resolve from `ctx.cwd`.

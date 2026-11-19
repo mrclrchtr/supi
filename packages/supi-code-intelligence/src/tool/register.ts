@@ -11,6 +11,7 @@ import {
   CODE_INTELLIGENCE_TOOL_PROMPT_SURFACES,
   type CodeIntelligenceToolPromptSurfaceMap,
 } from "./guidance.ts";
+import { createJsonStringArgumentDecoder } from "./infra/arguments.ts";
 import { boundCodeToolResult } from "./infra/truncate.ts";
 import { CODE_TOOL_NAMESPACE } from "./namespace.ts";
 import { CODE_INTELLIGENCE_TOOL_SPECS, type CodeIntelligenceToolDefinitionSpec } from "./specs.ts";
@@ -99,6 +100,7 @@ export function registerCodeIntelligenceTools(
 
   for (const spec of specs) {
     const surface = promptSurfaces[spec.name];
+    const decodeArguments = createJsonStringArgumentDecoder(spec.parameters);
     pi.registerTool({
       name: spec.name,
       label: spec.label,
@@ -108,6 +110,7 @@ export function registerCodeIntelligenceTools(
       promptSnippet: surface.promptSnippet,
       promptGuidelines: surface.promptGuidelines,
       parameters: spec.parameters,
+      ...(decodeArguments ? { prepareArguments: decodeArguments as (args: unknown) => never } : {}),
       outputSchema: spec.outputSchema,
       // biome-ignore lint/complexity/useMaxParams: pi ToolDefinition.execute signature
       execute: async (toolCallId, params, signal, onUpdate, ctx: ExtensionContext) => {
