@@ -9,6 +9,7 @@ import {
 } from "@mrclrchtr/supi-core/debug";
 import { fileToUri } from "@mrclrchtr/supi-core/path";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { FileChangeType } from "../../src/config/types.ts";
 import { LspManager } from "../../src/manager/manager.ts";
 import {
   findWorkspaceSymbolWarmTargets,
@@ -675,5 +676,197 @@ describe("LspManager.workspaceSymbol cold warm-up", () => {
 
     await manager.workspaceSymbol("Widget");
     expect(ensureFileOpen).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("LspManager.startWorkspaceSymbolWarmup", () => {
+  /** A TypeScript route with three project roots; `releaseOpens` unblocks the gated opens. */
+  function makeGatedWorkspace() {
+    const root = makeTempRoot();
+    const declare = (name: string) => {
+      const file = join(root, "packages", name, "src", "index.ts");
+      mkdirSync(dirname(file), { recursive: true });
+      writeFileSync(join(root, "packages", name, "package.json"), JSON.stringify({ name }));
+      writeFileSync(file, "export const Widget = 1;\n");
+      return {
+        name: "Widget",
+        kind: 13,
+        location: { uri: fileToUri(file), range: { start: {}, end: {} } },
+      };
+    };
+    const symbols = [declare("a"), declare("b")];
+    const manager = new LspManager(
+      {
+        servers: {
+          typescript: {
+            command: "node",
+            args: [],
+            fileTypes: ["ts"],
+            rootMarkers: ["package.json"],
+          },
+        },
+      },
+      root,
+    );
+    // Like tsserver, the client answers only from projects with an open file.
+    const opened = new Set<string>();
+    const client = {
+      name: "typescript",
+      root,
+      status: "running",
+      ready: true,
+      openFiles: [] as string[],
+      serverCapabilities: { workspaceSymbolProvider: true },
+      getReady: vi.fn().mockResolvedValue(undefined),
+      getDiagnosticSnapshot: () => ({ entries: [], current: true, documents: [] }),
+      notifyWorkspaceFileChanges: vi.fn(),
+      shutdown: vi.fn().mockResolvedValue(undefined),
+      dispose: vi.fn(),
+      workspaceSymbol: vi.fn(async () =>
+        completedCodeQuery(symbols.filter((symbol) => opened.has(symbol.location.uri))),
+      ),
+      documentSymbols: vi.fn().mockResolvedValue(completedCodeQuery([])),
+      hover: vi.fn(),
+      projectMembership: vi.fn().mockResolvedValue("configured"),
+    };
+    getClients(manager).set(`typescript:${root}`, client);
+    let releaseOpens = () => {};
+    const gate = new Promise<void>((resolve) => {
+      releaseOpens = resolve;
+    });
+    const ensureFileOpen = vi
+      .spyOn(manager, "ensureFileOpen")
+      .mockImplementation(async (filePath: string) => {
+        await gate;
+        opened.add(fileToUri(filePath));
+        return client as never;
+      });
+    configureDebugRegistry({ enabled: true });
+    const passes = () =>
+      getDebugEvents({ source: "lsp", category: "workspace-symbol.warm-pass" }).events;
+    return { manager, root, client, declare, symbols, ensureFileOpen, releaseOpens, passes };
+  }
+
+  it("loads every project before a query and completes a query that arrives mid-pass", async () => {
+    const { manager, symbols, ensureFileOpen, releaseOpens, passes } = makeGatedWorkspace();
+
+    const warmup = manager.startWorkspaceSymbolWarmup();
+    await vi.waitFor(() => expect(ensureFileOpen).toHaveBeenCalledTimes(1));
+    const duringPass = manager.workspaceSymbol("Widget");
+    releaseOpens();
+
+    await expect(duringPass).resolves.toEqual({ kind: "completed", data: symbols });
+    await warmup;
+    // The query joined the background pass instead of opening the roots again.
+    expect(ensureFileOpen).toHaveBeenCalledTimes(3);
+    expect(passes()).toHaveLength(1);
+
+    await expect(manager.workspaceSymbol("Widget")).resolves.toEqual({
+      kind: "completed",
+      data: symbols,
+    });
+    expect(ensureFileOpen).toHaveBeenCalledTimes(3);
+  });
+
+  it("collects again when the pass ends unrecorded while a query's first rows are in flight", async () => {
+    const { manager, root, client, symbols, ensureFileOpen, releaseOpens } = makeGatedWorkspace();
+    let releaseRows = () => {};
+    const rowsGate = new Promise<void>((resolve) => {
+      releaseRows = resolve;
+    });
+    // The server answers the first request from the projects loaded when it arrived: none.
+    client.workspaceSymbol.mockImplementationOnce(async () => {
+      await rowsGate;
+      return completedCodeQuery([]);
+    });
+
+    const warmup = manager.startWorkspaceSymbolWarmup();
+    await vi.waitFor(() => expect(ensureFileOpen).toHaveBeenCalledTimes(1));
+    const query = manager.workspaceSymbol("Widget");
+    await vi.waitFor(() => expect(client.workspaceSymbol).toHaveBeenCalledTimes(1));
+    // The config change keeps the pass unrecorded, so the query runs its own
+    // pass and finds every file already opened.
+    manager.noteWorkspaceChanges([
+      { uri: fileToUri(join(root, "tsconfig.json")), type: FileChangeType.Changed },
+    ]);
+    releaseOpens();
+    await warmup;
+    releaseRows();
+
+    await expect(query).resolves.toEqual({ kind: "completed", data: symbols });
+  });
+
+  it("loads a project root added by a config change during the pass", async () => {
+    const { manager, root, declare, symbols, ensureFileOpen, releaseOpens } = makeGatedWorkspace();
+
+    const warmup = manager.startWorkspaceSymbolWarmup();
+    await vi.waitFor(() => expect(ensureFileOpen).toHaveBeenCalledTimes(1));
+    // The pass already chose its roots; this one arrives too late for it.
+    symbols.push(declare("c"));
+    const config = join(root, "packages", "c", "tsconfig.json");
+    writeFileSync(config, "{}");
+    manager.noteWorkspaceChanges([{ uri: fileToUri(config), type: FileChangeType.Created }]);
+    releaseOpens();
+    await warmup;
+
+    await expect(manager.workspaceSymbol("Widget")).resolves.toEqual({
+      kind: "completed",
+      data: symbols,
+    });
+  });
+
+  it("reports a query partial when a project config changes during its own pass", async () => {
+    const { manager, root, ensureFileOpen, releaseOpens } = makeGatedWorkspace();
+
+    const query = manager.workspaceSymbol("Widget");
+    await vi.waitFor(() => expect(ensureFileOpen).toHaveBeenCalledTimes(1));
+    manager.noteWorkspaceChanges([
+      { uri: fileToUri(join(root, "tsconfig.json")), type: FileChangeType.Changed },
+    ]);
+    releaseOpens();
+
+    await expect(query).resolves.toMatchObject({
+      kind: "partial",
+      reason: expect.stringContaining("a project config changed"),
+    });
+  });
+
+  it("stops a running pass on shutdown", async () => {
+    const { manager, ensureFileOpen, releaseOpens, passes } = makeGatedWorkspace();
+
+    const warmup = manager.startWorkspaceSymbolWarmup();
+    await vi.waitFor(() => expect(ensureFileOpen).toHaveBeenCalledTimes(1));
+    await manager.shutdownAll();
+    releaseOpens();
+    await warmup;
+
+    expect(ensureFileOpen).toHaveBeenCalledTimes(1);
+    expect(passes()).toHaveLength(0);
+  });
+
+  it("stops a running pass when its route restarts", async () => {
+    const { manager, root, client, ensureFileOpen, releaseOpens, passes } = makeGatedWorkspace();
+    // The pass must already be stopped while the restart waits for the old client.
+    client.shutdown.mockImplementation(async () => {
+      releaseOpens();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    // The replacement fails to start, so only the old route's pass could open more files.
+    vi.spyOn(
+      manager as unknown as { createClient: (...args: never[]) => unknown },
+      "createClient",
+    ).mockReturnValue({
+      start: vi.fn().mockRejectedValue(new Error("start failed")),
+      forceKill: vi.fn().mockResolvedValue(undefined),
+    });
+
+    const warmup = manager.startWorkspaceSymbolWarmup();
+    await vi.waitFor(() => expect(ensureFileOpen).toHaveBeenCalledTimes(1));
+    await manager.restartClientsForFiles([join(root, "src", "index.ts")]);
+    releaseOpens();
+    await warmup;
+
+    expect(ensureFileOpen).toHaveBeenCalledTimes(1);
+    expect(passes()).toHaveLength(0);
   });
 });

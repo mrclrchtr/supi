@@ -432,6 +432,18 @@ export class LspManager {
   private warmedWorkspaceSymbolRoutes = new Map<string, string | null>();
   /** In-flight all-roots warm-up passes; concurrent queries wait instead of reopening files. */
   private pendingWorkspaceSymbolRouteWarmups = new Map<string, Promise<void>>();
+  /**
+   * Background all-roots passes by client key (`clientKey`, not the warm-pass
+   * route key); no caller owns them, so shutdown and route restart abort them.
+   */
+  private backgroundWorkspaceSymbolWarmups = new Map<string, AbortController>();
+  /**
+   * Advances when a warm-up opens a file on any route. Rows collected across
+   * an advance may miss the project that open loaded.
+   */
+  private workspaceSymbolLoadGeneration = 0;
+  /** Advances on a project-config change; a pass that spans one must not be recorded. */
+  private projectConfigGeneration = 0;
   /** Project roots whose semantic state was warmed with a readiness probe. */
   private warmedSemanticProjects = new Set<string>();
   /** In-flight warm-up probes keyed by project key so concurrent callers share one probe. */
@@ -1737,6 +1749,8 @@ export class LspManager {
       .getDiagnosticSnapshot()
       .documents.map((document) => uriToFile(document.uri));
     const files = [...new Set([...openFiles, ...trackedDiagnosticFiles])];
+    // Before the shutdown wait: a running pass would start a client for its next file.
+    this.abortBackgroundWorkspaceSymbolWarmup(key);
     try {
       await client.shutdown();
     } catch {
@@ -2503,6 +2517,7 @@ export class LspManager {
       this.typeScriptProjectConfigs.clear();
       // A new or changed project config can add a root that was never probed.
       this.warmedWorkspaceSymbolRoutes.clear();
+      this.projectConfigGeneration++;
     }
     this.notifyWorkspaceFileChanges(changes);
   }
@@ -2670,6 +2685,9 @@ export class LspManager {
   /** Shut down all running LSP servers. */
   async shutdownAll(): Promise<void> {
     this.shuttingDown = true;
+    for (const key of Array.from(this.backgroundWorkspaceSymbolWarmups.keys())) {
+      this.abortBackgroundWorkspaceSymbolWarmup(key);
+    }
     const clients = Array.from(this.clients.values());
     const shutdowns = clients.map((client) => client.shutdown().catch(() => {}));
     await Promise.all([...shutdowns, ...this.retiredClientShutdowns]);
@@ -3048,7 +3066,10 @@ export class LspManager {
       );
       return this.filterWorkspaceSymbolCollection(collection, resolvedScopes);
     };
+    const loadsBefore = this.workspaceSymbolLoadGeneration;
     const initial = await collect(this.clients.values(), query);
+    // A pass that opened files while these rows were collected may have loaded projects they miss.
+    const initialStale = loadsBefore !== this.workspaceSymbolLoadGeneration;
     // Allowed out-of-scope rows do not show that the server knows the scope yet.
     const hasScopedResult = (collection: WorkspaceSymbolCollection) =>
       collection.hasSupport &&
@@ -3064,7 +3085,9 @@ export class LspManager {
     // and miss the same name in another, so its rows do not end the search either.
     if (
       !initial.hasSupport ||
-      (answered && !this.hasUnconfirmedWorkspaceSymbolRoute(routeMatches, resolvedScopes))
+      (answered &&
+        !initialStale &&
+        !this.hasUnconfirmedWorkspaceSymbolRoute(routeMatches, resolvedScopes))
     ) {
       return workspaceSymbolCollectionResult(initial);
     }
@@ -3081,6 +3104,7 @@ export class LspManager {
       routeMatches,
       scopes: resolvedScopes,
       skipFirstResultRoutes: answered,
+      initialStale,
       query,
       control,
     });
@@ -3088,13 +3112,64 @@ export class LspManager {
     if (!warmed.coverageConfirmed) {
       collection = workspaceSymbolCoverageGap(collection, warmed.inferredProbeCount);
     }
-    if (warmed.rootLimitGaps.length > 0) {
+    if (warmed.coverageGaps.length > 0) {
       collection = {
         ...collection,
-        coverageGap: [collection.coverageGap, ...warmed.rootLimitGaps].filter(Boolean).join("; "),
+        coverageGap: [collection.coverageGap, ...warmed.coverageGaps].filter(Boolean).join("; "),
       };
     }
     return workspaceSymbolCollectionResult(collection);
+  }
+
+  /**
+   * Load every project of the routes whose `workspace/symbol` searches only
+   * loaded projects, without a query. Runs in the background after startup so
+   * the first symbol query finds the projects loaded; a query that arrives
+   * during the pass waits for it. Resolves when the pass ends, so startup must
+   * not await it. Never rejects.
+   */
+  async startWorkspaceSymbolWarmup(): Promise<void> {
+    const routes = Array.from(this.clients.entries()).filter(
+      ([key, client]) =>
+        this.warmsEveryWorkspaceSymbolProject(client) &&
+        !this.backgroundWorkspaceSymbolWarmups.has(key),
+    );
+    await Promise.all(
+      routes.map(async ([key, client]) => {
+        const abort = new AbortController();
+        this.backgroundWorkspaceSymbolWarmups.set(key, abort);
+        const control = { signal: abort.signal };
+        try {
+          await client.getReady(control);
+          if (this.clients.get(key) !== client) return;
+          await this.warmWorkspaceSymbolProjectsUntilResult({
+            findWarmTargets: (root, rootMarkers, fileTypes) =>
+              findWorkspaceSymbolWarmTargets(root, rootMarkers, fileTypes, {
+                policy: this.automaticPathPolicy,
+              }),
+            getWarmPosition: getWorkspaceSymbolWarmPosition,
+            // No query waits for rows: the pass only loads projects.
+            collect: async () => ({
+              results: [],
+              hasSupport: true,
+              completedClientCount: 0,
+              failures: [],
+            }),
+            hasResult: () => false,
+            routeMatches: (candidate) => candidate === client,
+            skipFirstResultRoutes: true,
+            query: "",
+            control,
+          });
+        } catch {
+          // The first symbol query runs the pass when the background one fails or is aborted.
+        } finally {
+          if (this.backgroundWorkspaceSymbolWarmups.get(key) === abort) {
+            this.backgroundWorkspaceSymbolWarmups.delete(key);
+          }
+        }
+      }),
+    );
   }
 
   /** True when a matching route has inferred warm-up probes and no other probe. */
@@ -3366,6 +3441,8 @@ export class LspManager {
     scopes?: readonly string[];
     /** The initial rows already answer the request for routes that index their workspace. */
     skipFirstResultRoutes?: boolean;
+    /** The caller's rows predate a recorded pass; collect again before returning. */
+    initialStale?: boolean;
     query: string;
     control?: CodeRequestControl;
   }): Promise<{
@@ -3373,14 +3450,14 @@ export class LspManager {
     /** False only when every probe the server classified landed in an inferred project. */
     coverageConfirmed: boolean;
     inferredProbeCount: number;
-    /** Coverage limits from routes with more project roots than one pass opens. */
-    rootLimitGaps: string[];
+    /** Coverage limits of all-roots passes: roots past the limit, or a config change during the pass. */
+    coverageGaps: string[];
   }> {
     const { findWarmTargets, getWarmPosition, collect, hasResult, routeMatches, query, control } =
       options;
-    const rootLimitGaps: string[] = [];
+    const coverageGaps: string[] = [];
     /** An all-roots pass opened a project after the last collection. */
-    let collectionStale = false;
+    let collectionStale = options.initialStale === true;
     let latestCollection: WorkspaceSymbolCollection | null = null;
     // A route with no inferred probe keeps today's evidence: non-TypeScript
     // servers index the workspace, and `unknown` cannot prove a gap.
@@ -3390,7 +3467,7 @@ export class LspManager {
       collection: latestCollection,
       coverageConfirmed: routeCoverage.every(Boolean),
       inferredProbeCount,
-      rootLimitGaps,
+      coverageGaps,
     });
 
     const warmClients = this.workspaceSymbolWarmClients(
@@ -3411,7 +3488,7 @@ export class LspManager {
         ? await this.joinOrBeginWorkspaceSymbolRouteWarmup(client, options.scopes, control)
         : null;
       if (pass && "recorded" in pass) {
-        if (pass.recorded) rootLimitGaps.push(pass.recorded);
+        if (pass.recorded) coverageGaps.push(pass.recorded);
         // Another query's pass may have loaded projects after this query's rows.
         collectionStale ||= pass.waited;
         continue;
@@ -3422,6 +3499,7 @@ export class LspManager {
       let failedProbes = 0;
       let rootLimitGap: string | null = null;
       let roots = 0;
+      const configGeneration = this.projectConfigGeneration;
       const startedAt = Date.now();
       try {
         const candidates = findWarmTargets(
@@ -3487,9 +3565,12 @@ export class LspManager {
       const covered = coveredRoots.size > 0 || routeInferredProbes === 0;
       routeCoverage.push(covered);
       if (!allRoots) continue;
-      if (rootLimitGap) rootLimitGaps.push(rootLimitGap);
+      if (rootLimitGap) coverageGaps.push(rootLimitGap);
       // A failed probe is retried, and an inferred-only route recounted, by the next query.
-      if (pass && failedProbes === 0 && covered) {
+      if (configGeneration !== this.projectConfigGeneration) {
+        // The change may have added a root this pass never saw; the next query runs its own pass.
+        coverageGaps.push(PROJECT_CONFIG_CHANGED_GAP);
+      } else if (pass && failedProbes === 0 && covered) {
         this.warmedWorkspaceSymbolRoutes.set(pass.routeKey, rootLimitGap);
       }
       const counts = { roots, loadedRoots: coveredRoots.size, failedProbes };
@@ -3592,6 +3673,7 @@ export class LspManager {
       this.recordWarmProbeEvent(serverName, file, "open-failed", control);
       return null;
     }
+    this.workspaceSymbolLoadGeneration++;
     // A cancelled pass must not mark projects warmed on its way out.
     throwIfCodeRequestInterrupted(control);
     if (!(await this.probeDocumentSymbols(openedClient, file, getWarmPosition, control))) {
@@ -3738,7 +3820,14 @@ export class LspManager {
     return `${serverName}:${path.resolve(projectRoot)}`;
   }
 
+  private abortBackgroundWorkspaceSymbolWarmup(key: string): void {
+    this.backgroundWorkspaceSymbolWarmups.get(key)?.abort();
+    this.backgroundWorkspaceSymbolWarmups.delete(key);
+  }
+
   private clearWarmedWorkspaceSymbolFiles(serverName: string, root: string): void {
+    // The route is restarting or retiring: its background pass must not keep opening files.
+    this.abortBackgroundWorkspaceSymbolWarmup(clientKey(serverName, root));
     const prefix = `${serverName}:${path.resolve(root)}`;
     for (const key of Array.from(this.warmedWorkspaceSymbolFiles.keys())) {
       if (key === prefix || key.startsWith(`${prefix}${path.sep}`)) {
@@ -3816,6 +3905,10 @@ export class LspManager {
     }
   }
 }
+
+/** Coverage limit of an all-roots pass that a project-config change overtook. */
+const PROJECT_CONFIG_CHANGED_GAP =
+  "Workspace-symbol coverage is limited: a project config changed while projects were loading. Retry to include every project.";
 
 /** Invalidate parsed project configs; returns whether any config changed. */
 function invalidateProjectConfigCaches(changes: readonly FileEvent[]): boolean {

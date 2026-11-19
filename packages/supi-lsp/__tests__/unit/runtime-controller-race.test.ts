@@ -33,6 +33,7 @@ vi.mock("../../src/diagnostics/workspace-sentinels.ts", () => ({
 vi.mock("../../src/manager/manager.ts", () => ({
   LspManager: class {
     registerDetectedServers = vi.fn();
+    startWorkspaceSymbolWarmup = vi.fn().mockResolvedValue(undefined);
     shutdownAll = mocks.shutdownAll;
 
     constructor(_config: unknown, _cwd: string, listener?: (transition: unknown) => void) {

@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
     emit(transition: unknown): void;
     getKnownProjectServers: ReturnType<typeof vi.fn>;
     registerDetectedServers: ReturnType<typeof vi.fn>;
+    startWorkspaceSymbolWarmup: ReturnType<typeof vi.fn>;
     shutdownAll: ReturnType<typeof vi.fn>;
   }>,
   owners: [] as Array<{
@@ -44,6 +45,7 @@ vi.mock("../../src/manager/manager.ts", () => ({
   LspManager: class {
     getKnownProjectServers = vi.fn().mockReturnValue([]);
     registerDetectedServers = vi.fn();
+    startWorkspaceSymbolWarmup = vi.fn().mockResolvedValue(undefined);
     shutdownAll = vi.fn().mockResolvedValue(undefined);
 
     constructor(
@@ -84,6 +86,7 @@ import {
   LspRuntimeController,
   type LspRuntimeTransition,
 } from "../../src/session/runtime-controller.ts";
+import { startDetectedServers } from "../../src/session/scanner.ts";
 
 const readyServer: ProjectServerInfo = {
   name: "typescript",
@@ -165,6 +168,19 @@ describe("LspRuntimeController lifecycle projection", () => {
       semanticReady: false,
       projectServers: [],
     });
+  });
+
+  it("starts the workspace-symbol warm-up after the detected servers are started", async () => {
+    const controller = new LspRuntimeController("/project");
+
+    await controller.start();
+
+    // The warm-up covers the routes that exist when it is called.
+    const warmup = mocks.managers[0]?.startWorkspaceSymbolWarmup;
+    expect(warmup).toHaveBeenCalledOnce();
+    expect(warmup?.mock.invocationCallOrder[0]).toBeGreaterThan(
+      vi.mocked(startDetectedServers).mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY,
+    );
   });
 
   it("rebuilds the automatic path policy on runtime restart", async () => {

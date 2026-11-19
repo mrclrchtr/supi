@@ -367,6 +367,9 @@ export class LspRuntimeController {
       return supersededStartResult();
     }
 
+    // Not awaited: the pass loads TypeScript projects for the first symbol query.
+    void manager.startWorkspaceSymbolWarmup();
+
     const runtimeOwner = createWorkspaceLspRuntimeOwner(manager);
     const workspaceRuntime = runtimeOwner.runtime;
     setWorkspaceLspRuntimeState(this.#cwd, { kind: "ready", runtime: workspaceRuntime });

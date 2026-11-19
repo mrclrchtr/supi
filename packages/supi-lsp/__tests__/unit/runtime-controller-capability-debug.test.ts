@@ -39,6 +39,7 @@ vi.mock("../../src/manager/manager.ts", () => ({
   LspManager: class {
     getKnownProjectServers = vi.fn().mockReturnValue([]);
     registerDetectedServers = vi.fn();
+    startWorkspaceSymbolWarmup = vi.fn().mockResolvedValue(undefined);
     shutdownAll = vi.fn().mockResolvedValue(undefined);
 
     constructor(
