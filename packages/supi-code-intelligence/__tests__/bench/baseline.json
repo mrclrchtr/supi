@@ -77,10 +77,10 @@
       },
       "code": {
         "calls": 2,
-        "tokens": 410,
+        "tokens": 391,
         "precision": 1,
         "recall": 1,
-        "tokensPerHit": 68
+        "tokensPerHit": 65
       }
     },
     "definition-signature": {
@@ -93,10 +93,10 @@
       },
       "code": {
         "calls": 2,
-        "tokens": 311,
+        "tokens": 306,
         "precision": 1,
         "recall": 1,
-        "tokensPerHit": 311
+        "tokensPerHit": 306
       }
     },
     "file-outline-default": {
@@ -109,16 +109,16 @@
       },
       "code": {
         "calls": 1,
-        "tokens": 422,
+        "tokens": 375,
         "precision": 0.6,
         "recall": 1,
-        "tokensPerHit": 70,
+        "tokensPerHit": 63,
         "complete": {
           "calls": 2,
-          "tokens": 1692,
+          "tokens": 1375,
           "precision": 0.105,
           "recall": 1,
-          "tokensPerHit": 282
+          "tokensPerHit": 229
         }
       }
     },
@@ -132,16 +132,16 @@
       },
       "code": {
         "calls": 1,
-        "tokens": 1155,
+        "tokens": 917,
         "precision": 0.12,
         "recall": 1,
-        "tokensPerHit": 193,
+        "tokensPerHit": 153,
         "complete": {
           "calls": 2,
-          "tokens": 2425,
+          "tokens": 1917,
           "precision": 0.105,
           "recall": 1,
-          "tokensPerHit": 404
+          "tokensPerHit": 320
         }
       }
     },

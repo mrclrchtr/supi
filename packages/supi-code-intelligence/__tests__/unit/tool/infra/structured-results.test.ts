@@ -66,7 +66,7 @@ describe("structured navigation results", () => {
     });
     expect(Value.Check(tool.outputSchema, result.structuredContent)).toBe(true);
     const handle = (result.structuredContent.targets as Array<{ handle: string }>)[0]?.handle;
-    expect(handle).toMatch(/^tg-/);
+    expect(handle).toMatch(/^\d{12}$/);
     expect(result.content[0]?.text).toContain(handle);
     expect(JSON.stringify(result.structuredContent)).not.toMatch(
       /spanId|fileFingerprint|operationId/,
@@ -100,7 +100,7 @@ describe("structured navigation results", () => {
         kind: "resolved",
         targets: [
           {
-            handle: expect.stringMatching(/^tg-/),
+            handle: expect.stringMatching(/^\d{12}$/),
             name: "widget",
             line: 1,
             character: 17,
@@ -341,7 +341,7 @@ describe("structured navigation results", () => {
         );
         expect(result.structuredContent).toMatchObject({
           kind: symbolKind ? "kind-mismatch" : "disambiguation",
-          targets: [{ handle: expect.stringMatching(/^tg-/), name: "widget" }],
+          targets: [{ handle: expect.stringMatching(/^\d{12}$/), name: "widget" }],
           evidenceLists: [{ totalCount: 2, shownCount: 1, omittedCount: 1 }],
         });
         expect(Value.Check(tool.outputSchema, result.structuredContent)).toBe(true);

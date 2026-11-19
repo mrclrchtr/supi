@@ -335,6 +335,44 @@ describe("workflow target store", () => {
     expect(second.targetId).not.toBe(first.targetId);
   });
 
+  it("gives a target another handle when a different target already holds its handle", () => {
+    const filePath = path.join(tmpDir, "collision.ts");
+    writeFileSync(filePath, "export const foo = 1;\n");
+    const input = {
+      file: filePath,
+      position: { line: 0, character: 13 },
+      displayLine: 1,
+      displayCharacter: 14,
+      name: "foo",
+      kind: "Constant",
+      confidence: "semantic" as const,
+      provenance: ["semantic"] as const,
+      anchorKind: "name" as const,
+      container: null,
+    };
+    const undisturbed = registerWorkflowTarget(createStore(), tmpDir, input);
+    expect(undisturbed.targetId).toMatch(/^[1-9]\d{11}$/);
+
+    // Simulate a handle collision: another identity already occupies the handle.
+    const store = createStore();
+    const occupant: TargetStoreEntry = {
+      ...undisturbed.entry,
+      name: "other",
+      identityDigest: "another-identity",
+    };
+    store.set(undisturbed.targetId, occupant);
+
+    const first = registerWorkflowTarget(store, tmpDir, input);
+    const again = registerWorkflowTarget(store, tmpDir, input);
+
+    expect(first.targetId).not.toBe(undisturbed.targetId);
+    expect(first.targetId).toMatch(/^[1-9]\d{11}$/);
+    expect(again.targetId).toBe(first.targetId);
+    expect(store.get(undisturbed.targetId)?.name).toBe("other");
+    const lookup = getWorkflowTarget(store, first.targetId);
+    expect(lookup.kind === "available" && lookup.entry.name).toBe("foo");
+  });
+
   // ADR 0003 — targetId identity must not depend on the preferred anchor position.
   it("upgrades a stable target from declaration to name anchor", () => {
     const srcDir = path.join(tmpDir, "src");

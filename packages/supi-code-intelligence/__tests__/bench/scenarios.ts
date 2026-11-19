@@ -135,7 +135,7 @@ const candidateHandle = (outputs: readonly string[], pathHint?: string): string 
   const last = outputs.at(-1) ?? "";
   if (!last.includes("# Multiple targets match")) return null;
   const line = pathHint ? last.split("\n").find((row) => row.includes(pathHint)) : last;
-  return /`(tg-[0-9a-f]+)`/.exec(line ?? "")?.[1] ?? null;
+  return /^- `(\d{12})`/m.exec(line ?? "")?.[1] ?? null;
 };
 
 const WORKFLOW_CONTROL_SITES = [

@@ -302,7 +302,7 @@ describe("target-workflow (deep session seam)", () => {
       expect(outcome.kind).toBe("resolved");
       if (outcome.kind === "resolved") {
         expect(outcome.entry.name).toBe("foo");
-        expect(outcome.entry.targetId).toMatch(/^tg-/);
+        expect(outcome.entry.targetId).toMatch(/^\d{12}$/);
       }
     });
 
@@ -338,7 +338,7 @@ describe("target-workflow (deep session seam)", () => {
       expect(outcome.kind).toBe("disambiguation");
       if (outcome.kind === "disambiguation") {
         expect(outcome.candidates).toHaveLength(1);
-        expect(outcome.candidates[0]?.targetId).toMatch(/^tg-/);
+        expect(outcome.candidates[0]?.targetId).toMatch(/^\d{12}$/);
         expect(outcome.candidateEvidence).toMatchObject({
           key: "target.candidates",
           completeness: "capped",

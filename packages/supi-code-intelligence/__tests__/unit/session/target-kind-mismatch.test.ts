@@ -79,7 +79,7 @@ describe("target workflow symbol-kind mismatch", () => {
       candidateEvidence: { key: "target.candidates", omittedCount: 1 },
     });
     if (outcome.kind !== "kind-mismatch") return;
-    expect(outcome.candidates[0]?.targetId).toMatch(/^tg-/);
+    expect(outcome.candidates[0]?.targetId).toMatch(/^\d{12}$/);
     expect(outcome.candidates[0]).not.toHaveProperty("reason");
     expect(store).toHaveLength(1);
     expect([...store.values()][0]?.provenance).toEqual(["semantic"]);

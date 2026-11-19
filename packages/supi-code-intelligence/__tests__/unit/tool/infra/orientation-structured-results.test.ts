@@ -250,7 +250,7 @@ describe("orientation structured results", () => {
       });
       expect(result.structuredContent).toMatchObject({
         kind: symbolKind ? "kind-mismatch" : "disambiguation",
-        candidates: [{ handle: expect.stringMatching(/^tg-/), name: "value" }],
+        candidates: [{ handle: expect.stringMatching(/^\d{12}$/), name: "value" }],
         evidenceLists: [{ totalCount: 2, shownCount: 1, omittedCount: 1 }],
       });
     }
@@ -622,7 +622,7 @@ describe("orientation structured results", () => {
     expect(result.structuredContent).toMatchObject({
       kind: "completed",
       focusKind: "symbol",
-      targets: [{ handle: expect.stringMatching(/^tg-/), name: "widget" }],
+      targets: [{ handle: expect.stringMatching(/^\d{12}$/), name: "widget" }],
       sections: expect.arrayContaining([
         expect.objectContaining({
           key: "defs",

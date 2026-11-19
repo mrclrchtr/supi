@@ -2,7 +2,7 @@
  * Workflow target store — per-session target and span handle registry.
  *
  * Provides deterministic opaque IDs derived from cwd, file, position,
- * metadata, and file fingerprint. Re-resolving the same target with
+ * metadata, and file fingerprint. Target handles are 12 decimal digits. Re-resolving the same target with
  * unchanged file contents reuses the same IDs.
  *
  * The store map is passed in from the caller; this module provides pure
@@ -60,6 +60,8 @@ export interface TargetStoreEntry {
   fileFingerprint: string;
   /** Named symbolic container, or null when no container name was reported. */
   container: string | null;
+  /** Full identity digest behind the short handle; tells a re-registration from a handle collision. */
+  identityDigest?: string;
 }
 
 /** Input shape for registering a resolved target. */
@@ -134,8 +136,11 @@ export function computeFileFingerprint(
 
 // ── ID generation ─────────────────────────────────────────────────────
 
+/** Decimal digits in a target handle. Digits cost about half the provider tokens of hex characters. */
+const TARGET_HANDLE_DIGITS = 12;
+
 /**
- * Build a deterministic target handle from target identity fields.
+ * Digest the target identity fields.
  *
  * Per ADR 0003, the preferred display/name-anchor position is excluded from
  * symbol identity because it may refine. Identity uses cwd, file path, name,
@@ -143,7 +148,7 @@ export function computeFileFingerprint(
  * same-line occurrence, and fingerprint. The occurrence keeps overloads
  * distinct without coupling identity to provider-specific declaration columns.
  */
-function computeTargetId(opts: {
+function computeTargetIdentityDigest(opts: {
   cwd: string;
   file: string;
   name: string | null;
@@ -171,7 +176,33 @@ function computeTargetId(opts: {
   );
   hash.update("\0");
   hash.update(opts.fingerprint);
-  return `tg-${hash.digest("hex").slice(0, 28)}`;
+  return hash.digest("hex");
+}
+
+/**
+ * Derive a deterministic 12-digit decimal handle from an identity digest.
+ * The first digit is never 0, so the handle survives a round trip through a
+ * number. `attempt` selects an alternative handle after a collision.
+ */
+function targetHandleFromDigest(identityDigest: string, attempt: number): string {
+  const digest =
+    attempt === 0
+      ? identityDigest
+      : createHash("sha256").update(`${identityDigest}\0${attempt}`).digest("hex");
+  const floor = 10n ** BigInt(TARGET_HANDLE_DIGITS - 1);
+  return (floor + (BigInt(`0x${digest.slice(0, 16)}`) % (9n * floor))).toString();
+}
+
+/**
+ * Pick the handle for an identity: the entry already registered for it, or
+ * the first handle no other identity holds in this store.
+ */
+function claimTargetId(store: Map<string, TargetStoreEntry>, identityDigest: string): string {
+  for (let attempt = 0; ; attempt++) {
+    const targetId = targetHandleFromDigest(identityDigest, attempt);
+    const existing = store.get(targetId);
+    if (!existing || existing.identityDigest === identityDigest) return targetId;
+  }
 }
 
 /**
@@ -220,7 +251,7 @@ export function registerWorkflowTarget(
     input.fileFingerprint ??
     (fingerprintResult?.kind === "ok" ? fingerprintResult.fingerprint : "unfingerprinted");
 
-  const targetId = computeTargetId({
+  const identityDigest = computeTargetIdentityDigest({
     cwd: key,
     file: input.file,
     name: input.name,
@@ -230,6 +261,7 @@ export function registerWorkflowTarget(
     declarationOccurrence: input.declarationOccurrence ?? 0,
     fingerprint,
   });
+  const targetId = claimTargetId(store, identityDigest);
   const spanId = computeSpanId(key, input.file, input.position, fingerprint);
 
   const incoming: TargetStoreEntry = {
@@ -249,6 +281,7 @@ export function registerWorkflowTarget(
     anchorKind: input.anchorKind,
     fileFingerprint: fingerprint,
     container: input.container,
+    identityDigest,
   };
 
   const existing = store.get(targetId);

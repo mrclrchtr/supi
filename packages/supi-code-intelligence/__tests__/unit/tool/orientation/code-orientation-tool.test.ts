@@ -359,7 +359,7 @@ describe("code_orientation tool", () => {
     expect(result.content[0].text).toContain("## Diagnostics");
     expect(result.content[0].text).toContain("Widget diagnostic");
     expect(result.content[0].text).toContain("## Read Next");
-    expect(result.details?.data.target?.targetId).toMatch(/^tg-/);
+    expect(result.details?.data.target?.targetId).toMatch(/^\d{12}$/);
     expect(result.details?.data.target?.name).toBe("widget");
   });
 
