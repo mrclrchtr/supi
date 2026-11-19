@@ -1,5 +1,5 @@
-amends "package://github.com/jdx/hk/releases/download/v2.12.0/hk@2.12.0#/Config.pkl"
-import "package://github.com/jdx/hk/releases/download/v2.12.0/hk@2.12.0#/Builtins.pkl"
+amends "package://github.com/jdx/hk/releases/download/v2.13.0/hk@2.13.0#/Config.pkl"
+import "package://github.com/jdx/hk/releases/download/v2.13.0/hk@2.13.0#/Builtins.pkl"
 
 env {
   ["NODE_ENV"] = "development"
@@ -34,6 +34,7 @@ local precommit = new Mapping<String, Step> {
     exclude = List(
       "packages/supi-tree-sitter/resources/grammars/typescript/tree-sitter-typescript.wasm",
       "packages/supi-tree-sitter/resources/grammars/tsx/tree-sitter-tsx.wasm",
+      "packages/supi-tree-sitter/resources/grammars/sql/tree-sitter-sql.wasm",
       "packages/supi-code-intelligence/gradle-helper/lib/gradle-tooling-api-9.4.0.jar"
     )
   }

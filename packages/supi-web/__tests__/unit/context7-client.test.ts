@@ -90,16 +90,14 @@ describe("context7-client", () => {
       expect(results).toEqual([]);
     });
 
-    it("normalizes the provider's no_libraries_found 404 to a successful empty search", async () => {
-      mockFetch.mockResolvedValue(
-        mockResponse(404, {
-          error: "no_libraries_found",
-          message: "No libraries found for this query.",
-        }),
-      );
+    it.each(["no_libraries_found", "library_not_found"])(
+      "normalizes a 404/%s to a successful empty search",
+      async (code) => {
+        mockFetch.mockResolvedValue(mockResponse(404, { error: code, message: "Not found" }));
 
-      await expect(searchLibrary("unknown", "unknown")).resolves.toEqual([]);
-    });
+        await expect(searchLibrary("unknown", "unknown")).resolves.toEqual([]);
+      },
+    );
 
     it("does not treat malformed successful responses as empty searches", async () => {
       mockFetch.mockResolvedValue(mockResponse(200, {}));
@@ -108,7 +106,6 @@ describe("context7-client", () => {
     });
 
     it.each([
-      [404, "library_not_found"],
       [401, "unauthorized"],
       [429, "rate_limit_exceeded"],
       [503, "service_unavailable"],

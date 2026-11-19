@@ -191,7 +191,7 @@ pi
 
 `raw: true` requests JSON and normalizes both provider code snippets and information snippets into `{ title, content, source }` objects. It does not expose the untouched REST envelope or provider ranking metadata. Default mode retains Context7's formatted text.
 
-Requests make one attempt, forward cancellation, and add no SDK timeout. The explicit `no_libraries_found` HTTP 404 response is a successful empty library search; other API errors remain failures. Use a library ID returned by search: stale IDs can produce redirect errors instead of documentation.
+Requests make one attempt, forward cancellation, and add no SDK timeout. An HTTP 404 from library search is a successful empty search; other API errors remain failures. Use a library ID returned by search: stale IDs can produce redirect errors instead of documentation.
 
 ## Boundaries
 

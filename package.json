@@ -3,7 +3,7 @@
   "version": "13.0.0",
   "private": true,
   "description": "SuPi (Super Pi) — a curated extension stack for the Pi coding agent.",
-  "packageManager": "pnpm@12.18.0",
+  "packageManager": "pnpm@12.20.0",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -68,7 +68,7 @@
     "typebox": "*"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.6.6",
+    "@biomejs/biome": "2.6.7",
     "@commitlint/cli": "21.2.4",
     "@commitlint/config-conventional": "21.2.4",
     "@earendil-works/pi-ai": "1.5.1",

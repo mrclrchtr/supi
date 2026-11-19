@@ -7,6 +7,7 @@
 - `web_fetch_md` now returns SVG, RSS, Atom, and other XML as fenced source text. These were converted as HTML before, which often returned nothing.
 - Fenced text from `web_fetch_md` now takes its language from the response content type when that names one, such as JSON or XML, and from the URL extension otherwise. A JSON API whose URL ends in `.js` is no longer labeled JavaScript.
 - If Web Search is enabled and bx has no Brave API key, SuPi now warns at session start. The check is local: it reads `BRAVE_SEARCH_API_KEY` or runs `bx config show-key`, with no network request or quota use. `web_search` stays available, so a later `bx config set-key` works without `/reload`.
+- `web_docs_search` now returns an empty result for any HTTP 404 from Context7 library search, following the updated Context7 SDK. Before, only the `no_libraries_found` 404 counted as no matches; other 404s failed the call.
 - When bx fails because no API key is configured, `web_search` now names the missing key and how to set it, instead of suggesting a bx version problem.
 
 ## [13.0.0]

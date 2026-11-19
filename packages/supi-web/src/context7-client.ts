@@ -1,6 +1,6 @@
-/** Context7 SDK adapter: request policy and SuPi's successful empty-search outcome. */
+/** Context7 SDK adapter: single-attempt request policy over the official SDK. */
 
-import { Context7, Context7Error, type Documentation, type Library } from "@upstash/context7-sdk";
+import { Context7, type Documentation, type Library } from "@upstash/context7-sdk";
 
 export type { Documentation as DocSnippet, Library as SearchResult } from "@upstash/context7-sdk";
 export { Context7Error } from "@upstash/context7-sdk";
@@ -16,24 +16,13 @@ function createClient(): Context7 {
   return new Context7({ retry: false, timeout: false });
 }
 
-/** Search libraries; only the provider's explicit no-match response is a successful empty result. */
+/** Search libraries; the SDK returns every HTTP 404 as a successful empty result. */
 export async function searchLibrary(
   query: string,
   libraryName: string,
   options: Context7RequestOptions = {},
 ): Promise<Library[]> {
-  try {
-    return await createClient().searchLibrary(query, libraryName, options);
-  } catch (error) {
-    if (
-      error instanceof Context7Error &&
-      error.status === 404 &&
-      error.code === "no_libraries_found"
-    ) {
-      return [];
-    }
-    throw error;
-  }
+  return createClient().searchLibrary(query, libraryName, options);
 }
 
 /** Fetch text or SDK-normalized JSON snippets, preserving code and information snippets. */
