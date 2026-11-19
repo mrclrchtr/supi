@@ -52,7 +52,7 @@
     {
       "id": 4,
       "prompt": "Gather retrospective feedback about supi-agent from the supplied session directory.",
-      "expected_output": "Before running the collector, asks one combined scope question covering workspace, time range, and source, with recommended defaults (current workspace, since last gather or all dates, both producers). Ends the turn without collecting and states what it will do with the defaults, including whether the last-gather marker is updated. Runs non-interactively; the run ends at the question.",
+      "expected_output": "Before running the collector, asks one combined scope question covering workspace, time range, and source, with recommended defaults (current workspace, since last gather or all dates, all producers). Ends the turn without collecting and states what it will do with the defaults, including whether the last-gather marker is updated. Runs non-interactively; the run ends at the question.",
       "files": ["evals/files/sessions"],
       "expectations": [
         "Asks one combined question covering workspace, time range, and source before any collector run.",

@@ -7,7 +7,7 @@ See also: `packages/supi-core/GLOSSARY.md` (Debug Registry, Debug Event Producer
 The surface displays and filters an optional Debug Operation ID by exact equality in live and persisted events. The identity means explicit direct request ownership. It does not mean time overlap, security identity, raw Pi Tool-call identity, or a distributed trace.
 
 **Tooling Retrospective**:
-The `/supi-tooling-retro` Prompt Template that evaluates which SuPi surfaces were used, missed, missing, or noisy in the completed task. It is feedback for improving SuPi tooling, not a debug-event report.
+The report produced by the `/supi-tooling-retro` command, which evaluates which SuPi surfaces were used, missed, missing, or noisy in the completed task. It runs on a side branch, so the continued session keeps the report out of the agent's context. When Debug persistence is active, the report is stored as a `tooling-retrospective` Debug event so `gather-retrospectives` can collect it. It is feedback for improving SuPi tooling, not a debug-event report.
 _Avoid_: retro, post-task review
 
 **Cache Forensics**:

@@ -26,6 +26,7 @@ import { DEBUG_EVENT_ENTRY_TYPE } from "./session-events.ts";
 import { maybeLogLoadStatus } from "./status-log.ts";
 import { registerDebugTool } from "./tool/debug/register.ts";
 import { registerTuiRenderTool, syncTuiRenderTool } from "./tool/tui_render/register.ts";
+import { registerToolingRetroCommand } from "./tooling-retro/register.ts";
 
 const baseDir = dirname(dirname(fileURLToPath(import.meta.url)));
 
@@ -149,7 +150,7 @@ export default function debugExtension(pi: ExtensionAPI) {
   pi.on("resources_discover", async (_event, ctx) => {
     maybeLogLoadStatus(pi, ctx.cwd, "resources_discover");
     // Standalone installs and workspace-root loads expose the same resources.
-    return { promptPaths: [join(baseDir, "prompts")], skillPaths: [join(baseDir, "skills")] };
+    return { skillPaths: [join(baseDir, "skills")] };
   });
 
   pi.on("session_shutdown", () => {
@@ -157,6 +158,7 @@ export default function debugExtension(pi: ExtensionAPI) {
   });
 
   registerDebugCommand(pi, applyDebugConfig, normalizeMaxEvents);
+  registerToolingRetroCommand(pi);
   registerDebugTool(pi);
   registerTuiRenderTool(pi);
   registerCacheSurfaces(pi);

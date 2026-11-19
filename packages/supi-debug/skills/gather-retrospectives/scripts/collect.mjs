@@ -6,6 +6,12 @@ import { parseArgs } from "node:util";
 import { recordGather, recordSkipReason, sinceOptions } from "./gather-state.mjs";
 import { agentDirectory, canonicalPath, localPath, sessionDirectory } from "./paths.mjs";
 import {
+  isProducer,
+  isProducerEvent,
+  isRetrospectiveCategory,
+  PRODUCER_NAMES,
+} from "./producers.mjs";
+import {
   admitByCommit,
   provenanceOf,
   resolveCommit,
@@ -14,14 +20,16 @@ import {
 import { integer, scanComplete, scanCoverage, scanSessions, sinceTimestamp } from "./sessions.mjs";
 import { displayPage, exportReports, readEvidence, summarize } from "./snapshot.mjs";
 
-const help = `Collect stored Agent Run retrospectives without modifying sessions.
+const help = `Collect stored retrospectives without modifying sessions.
 Usage: node collect.mjs --output <new-file.json> [collection options]
        node collect.mjs --read <evidence.json> [display options]
        node collect.mjs --read <evidence.json> --export <new-file.jsonl> [--refs]
   --workspace <path>     Include sessions in this directory tree (default: cwd)
   --all-workspaces       Explicitly include other projects; replaces --workspace
   --sessions-dir <path>  Override PI storage discovery
-  --source <name>        supi-agent or supi-review (default: both, not a topic filter)
+  --source <name>        supi-agent (delegated runs), supi-review (Reviewer Runs), or
+                         supi-debug (/supi-tooling-retro reports); default: all
+                         producers. Not a topic filter
   --since <date|Nd>      Inclusive ISO date/time or number of days ago
   --since-last           Start at the previous gather for the same storage,
                          workspace, and source (all dates when none is recorded)
@@ -39,8 +47,10 @@ Usage: node collect.mjs --output <new-file.json> [collection options]
   --export <path>        With --read: write selected reports as complete JSONL
                          (one report per line) instead of paginated display
   --help                Show this help
-Only persisted supi-debug-event / agent-run-retrospective entries are collected.
-Interactive reports and quoted tool results are excluded. Stdout is bounded to
+Only persisted supi-debug-event entries of category agent-run-retrospective
+(supi-agent, supi-review) or tooling-retrospective (supi-debug) are collected.
+Quoted tool results and /supi-tooling-retro reports written before that command
+stored them are excluded. Stdout is bounded to
 16 KB. Follow nextCommand until display.complete; oversized text is continued
 with explicit textRange offsets. coverage.complete describes the scan, not display.
 Storage precedence: flag, PI_CODING_AGENT_SESSION_DIR, project/global sessionDir,
@@ -85,9 +95,9 @@ function validateCollection(values) {
     throw new Error("Choose --workspace or --all-workspaces, not both.");
   if (values.since && values["since-last"])
     throw new Error("Choose --since or --since-last, not both.");
-  if (values.source && !["supi-agent", "supi-review"].includes(values.source)) {
+  if (values.source && !isProducer(values.source)) {
     throw new Error(
-      "--source must be supi-agent or supi-review; topic relevance is assessed separately.",
+      `--source must be one of ${PRODUCER_NAMES.join(", ")}; topic relevance is assessed separately.`,
     );
   }
 }
@@ -146,10 +156,10 @@ async function options() {
 function assessment(entry) {
   if (entry?.type !== "custom" || entry.customType !== "supi-debug-event") return null;
   const event = entry.data;
-  if (event?.category !== "agent-run-retrospective") return null;
+  if (!isRetrospectiveCategory(event?.category)) return null;
   const data = event.data;
   if (
-    !["supi-agent", "supi-review"].includes(event.source) ||
+    !isProducerEvent(event.source, event.category) ||
     !Number.isFinite(event.timestamp) ||
     Math.abs(event.timestamp) > 8.64e15 ||
     !["completed", "failed"].includes(data?.status) ||
@@ -195,7 +205,7 @@ function collectEntry(entry, context, state) {
   if (
     entry?.type !== "custom" ||
     entry.customType !== "supi-debug-event" ||
-    entry.data?.category !== "agent-run-retrospective"
+    !isRetrospectiveCategory(entry.data?.category)
   )
     return;
   const { raw: _raw, ...location } = context;
@@ -244,7 +254,7 @@ async function collect(config) {
       uniqueReports: sorted.length,
     },
     limitations: [
-      "Structured persisted retrospectives only; interactive reports are excluded.",
+      "Persisted retrospectives only; /supi-tooling-retro reports from before they were stored are excluded.",
       "Stored text is best-effort sanitized, not guaranteed free of sensitive task details.",
       "Successful-task selection and optional logging prevent population failure-rate estimates.",
       "Source identifies the producer, not the topic; suggestions are not verified improvements.",

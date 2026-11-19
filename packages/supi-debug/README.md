@@ -34,7 +34,7 @@ After install, this package wires the shared debug registry into three user-faci
 - `/supi-settings` integration — configure whether events are captured and how much data is exposed
 - `/supi-cache-history`, `/supi-cache-forensics`, and `cache_forensics` — prompt-cache history and cross-session regression forensics (see [below](#prompt-cache-history-and-forensics))
 
-It also registers a **Debug** provider section for `/supi-context`, ships a `/supi-tooling-retro` prompt template for feedback on the task just completed, and discovers two skills over past sessions: **`gather-retrospectives`** collects feedback, and **`session-analytics`** (command only) measures tool usage, failures, and debug-log volume.
+It also registers a **Debug** provider section for `/supi-context`, provides a `/supi-tooling-retro` command for feedback on the task just completed (see [below](#tooling-retrospectives)), and discovers two skills over past sessions: **`gather-retrospectives`** collects feedback, and **`session-analytics`** (command only) measures tool usage, failures, and debug-log volume.
 
 ### Gather past retrospectives
 
@@ -44,9 +44,9 @@ Ask naturally, for example “gather retrospective feedback about `packages/supi
 /skill:gather-retrospectives collect feedback from delegated runs in this workspace
 ```
 
-The skill uses a bundled Node.js collector to read existing structured Agent Run assessments. It defaults to the current workspace directory tree and all dates, preserves source references, deduplicates cloned runs, and saves paginated evidence in temporary files. Other projects and sibling worktrees require explicit scope. Source filters identify who produced an assessment, not which package it concerns. The collector displays complete assessments within a 16 KB stdout budget; `omittedRefs` identifies assessments that need a targeted read from the full evidence file.
+The skill uses a bundled Node.js collector to read stored Agent Run assessments and `/supi-tooling-retro` reports. It defaults to the current workspace directory tree and all dates, preserves source references, deduplicates cloned runs, and saves paginated evidence in temporary files. Other projects and sibling worktrees require explicit scope. Source filters identify who produced an assessment, not which package it concerns. The collector displays complete assessments within a 16 KB stdout budget; `omittedRefs` identifies assessments that need a targeted read from the full evidence file.
 
-The collector excludes older interactive `/supi-tooling-retro` reports. It does not enable capture, execute new assessments, or verify historical claims. Stored prose may still contain sensitive task details. Run the bundled `skills/gather-retrospectives/scripts/collect.mjs` with `--help` for storage overrides and filters. Node and shell access are required; no extra runtime dependencies are needed.
+`/supi-tooling-retro` reports written before the command stored them are not collected. The collector does not enable capture, execute new assessments, or verify historical claims. Stored prose may still contain sensitive task details. Run the bundled `skills/gather-retrospectives/scripts/collect.mjs` with `--help` for storage overrides and filters. Node and shell access are required; no extra runtime dependencies are needed.
 
 ### Measure past tool usage
 
@@ -181,6 +181,14 @@ Available settings:
 - `agentRunRetrospectivesEnabled` — opt in to Agent Run retrospectives; off by default and eligible only while Debug capture and its session persistence sink are active and `persistLevel` admits `info` events. Retrospective prose is stored in the sanitized event data using the existing Debug session-entry path.
 
 With retrospective collection enabled, completed Delegation and Reviewer Runs publish their task results before performing one tool-free assessment. Find the reports using category `agent-run-retrospective` and source `supi-agent` or `supi-review`. Reports include their own Usage, separate from task Usage, plus `runKey`, `batchId`, `taskId`, and a readable `label`. Delegation reports also include `conversationId` to match saved conversations and follow-ups. Collection is best effort and stops on cancellation or session shutdown. Assessment prose can still contain sensitive task details despite best-effort secret redaction; it is self-reported feedback, not verified savings.
+
+### Tooling Retrospectives
+
+After a task, run `/supi-tooling-retro`. It asks the agent for a compact retrospective of the SuPi surfaces used in the preceding task: what helped, what fell short, what was missing, and what was noisy. If the agent is still working, the command waits until it is idle.
+
+The retrospective runs on a side branch of the session tree. When it ends, successful or not, the command returns to the point where it started and shows the report there as a display-only entry. The next prompt therefore continues the task without the retrospective prompt or answer in the agent's context. The command finishes only after the report, and steering messages sent during it stay on the side branch. To discuss the report with the agent, open the side branch with `/tree`.
+
+When Debug capture is enabled, its session persistence sink is active, and `persistLevel` admits `info` events, a normally completed report is stored as a Debug event with category `tooling-retrospective` and source `supi-debug`, so `gather-retrospectives` can collect it (`--source supi-debug`). The event data holds `text`, `status`, `promptRevision`, and a `runKey` for deduplication across forks. Aborted, failed, or truncated answers are not stored, and the command says so. Without active persistence, the command still runs and states that the report is not stored. No separate setting exists.
 
 Historical inspection works for events captured after this extension is loaded. For example, an
 agent can call `debug` with `sessionFile` set to a PI session JSONL path.

@@ -1,6 +1,6 @@
 # Changelog
 
-## [13.1.0]
+## [14.0.0]
 
 - The SuPi footer shows the Consulting icon (`✦`, or its spinner while checking) before the model name instead of at the end of the stats line.
 

@@ -29,7 +29,6 @@
   "files": [
     "CHANGELOG.md",
     "src/**/*.ts",
-    "prompts",
     "skills/**/SKILL.md",
     "skills/**/scripts/*.mjs",
     "README.md"

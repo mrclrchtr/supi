@@ -1,9 +1,10 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { isAbsolute, relative } from "node:path";
+import { isProducer, PRODUCER_NAMES } from "./producers.mjs";
 
 /** Count deduplicated reports, not independent experiments or all sessions scanned. */
 export function summarize(records) {
-  const bySource = { "supi-agent": 0, "supi-review": 0 };
+  const bySource = Object.fromEntries(PRODUCER_NAMES.map((name) => [name, 0]));
   const byStatus = { completed: 0, failed: 0 };
   let earliest = Infinity;
   let latest = -Infinity;
@@ -35,7 +36,7 @@ export async function readEvidence(path) {
     !evidence.records.every(
       (record) =>
         /^R-[a-f0-9]{16}$/.test(record.ref) &&
-        ["supi-agent", "supi-review"].includes(record.source) &&
+        isProducer(record.source) &&
         ["completed", "failed"].includes(record.status) &&
         Number.isFinite(record.timestamp) &&
         Math.abs(record.timestamp) <= 8.64e15 &&

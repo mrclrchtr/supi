@@ -19,6 +19,7 @@ const mockFns = vi.hoisted(() => ({
   subscribeDebugPersistence: vi.fn<(sink: (event: unknown) => void) => () => void>(() => vi.fn()),
   maybeLogLoadStatus: vi.fn(),
   isDebugRegistryEnabled: vi.fn(() => true),
+  canPersistDebugEvent: vi.fn(() => true),
   recordDebugEvent: vi.fn(),
   collectRuntimeProvenance: vi.fn(async () => ({ version: "1.2.3", commit: "abc" })),
 }));
@@ -59,6 +60,7 @@ vi.mock("@mrclrchtr/supi-core/debug", () => ({
   getDebugEvents: mockFns.getDebugEvents,
   getDebugSummary: mockFns.getDebugSummary,
   isDebugRegistryEnabled: mockFns.isDebugRegistryEnabled,
+  canPersistDebugEvent: mockFns.canPersistDebugEvent,
   recordDebugEvent: mockFns.recordDebugEvent,
   isDebugLevel: mockFns.isDebugLevel,
   isDebugOperationId: mockFns.isDebugOperationId,
@@ -268,16 +270,15 @@ describe("supi-debug extension setup", () => {
     expect(mockFns.maybeLogLoadStatus).toHaveBeenCalledWith(pi, "/repo", "resources_discover");
   });
 
-  it("self-registers the tooling-retro prompt and the session-history skills", async () => {
+  it("self-registers the session-history skills and the tooling-retro command", async () => {
     const pi = setup();
     const result = (await pi.handlers.get("resources_discover")?.[0]?.({}, { cwd: "/repo" })) as
       | { promptPaths?: string[]; skillPaths?: string[] }
       | undefined;
 
-    expect(result?.promptPaths).toHaveLength(1);
-    const promptDir = result?.promptPaths?.[0] ?? "";
-    expect(promptDir).toMatch(/^\//);
-    expect(existsSync(join(promptDir, "supi-tooling-retro.md"))).toBe(true);
+    // The command replaced the prompt template; a template would be shadowed and duplicated.
+    expect(result?.promptPaths).toBeUndefined();
+    expect(pi.commands.has("supi-tooling-retro")).toBe(true);
     expect(result?.skillPaths).toHaveLength(1);
     const skillDir = result?.skillPaths?.[0] ?? "";
     expect(skillDir).toMatch(/^\//);

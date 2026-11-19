@@ -62,7 +62,7 @@ Starting wording; not a new structured-output protocol:
 >
 > Do not continue the task, use tools, or repeat sensitive task content unnecessarily.
 
-Adapt the existing [`/supi-tooling-retro` prompt](../../packages/supi-debug/prompts/supi-tooling-retro.md) rather than introducing a reporting framework. Its interactive evidence queries and lengthy output template are not required here.
+Adapt the existing [`/supi-tooling-retro` prompt](../../packages/supi-debug/src/tooling-retro/prompt.ts) rather than introducing a reporting framework. Its interactive evidence queries and lengthy output template are not required here.
 
 ## Debug logging
 
@@ -72,7 +72,7 @@ Adapt the existing [`/supi-tooling-retro` prompt](../../packages/supi-debug/prom
 - Correlation metadata belongs in sanitized Debug `data`, not parent tool results. Include identifiers and display labels only, never task instructions or inspected evidence.
 - Debug capture retains session entries outside automatic model context. Existing Debug access and retention behavior apply; assessment text may still contain sensitive task details.
 - Do not add a new durable transcript copy, replay store, background aggregation, or automatic feedback channel.
-- `supi-debug` supplies the [`gather-retrospectives` skill](../../packages/supi-debug/skills/gather-retrospectives/SKILL.md) for user-requested historical gathering. Its Node collector reads existing structured assessment events, defaults to the current workspace tree, requires explicit cross-workspace scope, and writes one disposable evidence snapshot with provenance, whole-result counts, and scan coverage. Bounded display and targeted reference reads use that snapshot without rescanning session storage; continuation commands carry stable report/text offsets, including oversized assessments. It excludes interactive retrospectives and never changes capture settings or task results.
+- `supi-debug` supplies the [`gather-retrospectives` skill](../../packages/supi-debug/skills/gather-retrospectives/SKILL.md) for user-requested historical gathering. Its Node collector reads existing structured assessment events, defaults to the current workspace tree, requires explicit cross-workspace scope, and writes one disposable evidence snapshot with provenance, whole-result counts, and scan coverage. Bounded display and targeted reference reads use that snapshot without rescanning session storage; continuation commands carry stable report/text offsets, including oversized assessments. It also collects interactive Tooling Retrospectives stored by `/supi-tooling-retro` (category `tooling-retrospective`, source `supi-debug`), but not reports written before that command stored them, and never changes capture settings or task results.
 
 ## Implementation verification targets
 

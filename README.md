@@ -203,7 +203,7 @@ Run `/reload` or restart Pi after removing extensions.
 
 ## Give feedback
 
-SuPi improves with your feedback. After a task, run `/supi-tooling-retro` to produce a compact retrospective of the SuPi surfaces you used — what helped, what fell short, what was missing, and what was noisy. This prompt template ships with the `supi-debug` DevTool package:
+SuPi improves with your feedback. After a task, run `/supi-tooling-retro` to produce a compact retrospective of the SuPi surfaces you used — what helped, what fell short, what was missing, and what was noisy. This command ships with the `supi-debug` DevTool package; with Debug persistence enabled, it also stores each report for later gathering with `/skill:gather-retrospectives`:
 
 ```bash
 pi install npm:@mrclrchtr/supi-debug

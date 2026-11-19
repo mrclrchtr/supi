@@ -1,6 +1,6 @@
 # Changelog
 
-## [13.1.0]
+## [14.0.0]
 
 - `web_fetch_md` now reads PDFs. It returns the text layer as Markdown with one `## Page N` section per page, instead of the raw PDF bytes. A PDF without a text layer (such as a scan), a password-protected or unreadable PDF, or one over 32 MB fails the call with a message that names the cause.
 - `web_fetch_md` now saves PNG, JPEG, GIF, WebP, and BMP images to a temporary file and returns the path, so the agent can view the image with the `read` tool. Other binary content, such as archives, fails the call instead of returning bytes as text.

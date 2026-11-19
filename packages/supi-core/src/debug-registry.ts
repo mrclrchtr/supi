@@ -268,18 +268,22 @@ export function isDebugRegistryEnabled(): boolean {
 }
 
 /**
- * Return whether a retrospective can be captured: Debug and its explicit opt-in
+ * Return whether an event at `level` would reach the session file now: Debug
  * must be enabled, at least one persistence sink must be registered, and the
- * persistence threshold must admit `info` events.
+ * persistence threshold must admit the level.
+ */
+export function canPersistDebugEvent(level: DebugLevel = "info"): boolean {
+  const state = getState();
+  return state.config.enabled && state.persistenceSinks.size > 0 && shouldPersist(state, level);
+}
+
+/**
+ * Return whether a retrospective can be captured: an `info` event must be
+ * persistable (see {@link canPersistDebugEvent}) and the explicit Agent Run
+ * retrospective opt-in must be enabled.
  */
 export function canRecordAgentRunRetrospective(): boolean {
-  const state = getState();
-  return (
-    state.config.enabled &&
-    state.config.agentRunRetrospectivesEnabled &&
-    state.persistenceSinks.size > 0 &&
-    shouldPersist(state, "info")
-  );
+  return getState().config.agentRunRetrospectivesEnabled && canPersistDebugEvent("info");
 }
 
 /** Best-effort redaction helper for data exposed through sanitized debug views. */

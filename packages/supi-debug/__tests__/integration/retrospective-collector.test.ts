@@ -126,7 +126,7 @@ describe("retrospective collector CLI", () => {
     expect(preview.summary).toEqual({
       reports: 2,
       containingSessions: 1,
-      bySource: { "supi-agent": 1, "supi-review": 1 },
+      bySource: { "supi-agent": 1, "supi-review": 1, "supi-debug": 0 },
       byStatus: { completed: 2, failed: 0 },
       earliest: "1970-01-01T00:00:00.500Z",
       latest: "1970-01-01T00:00:01.000Z",
@@ -295,13 +295,54 @@ describe("retrospective collector CLI", () => {
     expect(preview.summary).toEqual({
       reports: 0,
       containingSessions: 0,
-      bySource: { "supi-agent": 0, "supi-review": 0 },
+      bySource: { "supi-agent": 0, "supi-review": 0, "supi-debug": 0 },
       byStatus: { completed: 0, failed: 0 },
       earliest: null,
       latest: null,
     });
     expect(preview.display).toMatchObject({ complete: true, remainingReports: 0 });
     expect(preview.nextCommand).toBeNull();
+  });
+
+  it("collects stored /supi-tooling-retro reports as the supi-debug source", async () => {
+    const tooling = (runKey: string, source = "supi-debug", category = "tooling-retrospective") => {
+      const event = withData(retrospective(runKey, `Tooling ${runKey}.`, source, 2000), {
+        promptRevision: 1,
+      });
+      return { ...event, data: { ...event.data, category } };
+    };
+    await session("a.jsonl", workspace, [
+      retrospective("agent", "Agent."),
+      tooling("retro"),
+      // A producer is admitted only with its own category.
+      tooling("wrong-category", "supi-debug", "agent-run-retrospective"),
+      tooling("wrong-source", "supi-agent", "tooling-retrospective"),
+    ]);
+
+    const all = await collect();
+    expect(all.evidence.coverage.malformedEntries).toBe(2);
+    expect(all.preview.summary.bySource).toEqual({
+      "supi-agent": 1,
+      "supi-review": 0,
+      "supi-debug": 1,
+    });
+
+    await rm(output);
+    const { preview, evidence } = await collect(["--source", "supi-debug"]);
+    expect(evidence.records).toHaveLength(1);
+    expect(preview.records[0]).toMatchObject({
+      source: "supi-debug",
+      text: "Tooling retro.",
+      promptRevision: 1,
+      file: "a.jsonl",
+      line: 3,
+    });
+    // Snapshot reads accept the new producer.
+    const reread = await execute(process.execPath, [script.pathname, "--read", output]);
+    expect(JSON.parse(reread.stdout).records[0].source).toBe("supi-debug");
+
+    await rm(output);
+    await expect(collect(["--source", "supi-tooling"])).rejects.toMatchObject({ code: 1 });
   });
 
   it("supports explicit cross-workspace access and source/date filters", async () => {

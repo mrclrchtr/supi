@@ -1,6 +1,6 @@
 # Changelog
 
-## [13.1.0]
+## [14.0.0]
 
 - The footer is organized in sections with one separator. The path line now holds workspace state: path and Git on the left, the LSP status on the right. The session line holds metrics on the left and the model on the right, with status icons such as Consulting `✦` and Session Capabilities `◈` before the model name. Sections are separated by a dim ` · ` everywhere, including between model and thinking level (formerly `•`). A subscription shows as `$3.113 sub` instead of `$3.113 (sub)`. When the window is narrow, the right side of each line shortens first. Nerd Font icons now come from one Material Design outline set: folder (U+F0256), branch (U+F062C), session name (U+F00C3), and stash (U+F120E), with one space after the folder icon instead of two.
 - Extension statuses set through Pi's `setStatus()` still appear on the status line; a status with the same key as a SuPi footer contribution is shown only once.

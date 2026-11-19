@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  canPersistDebugEvent,
   canRecordAgentRunRetrospective,
   configureDebugRegistry,
   DEBUG_REGISTRY_DEFAULTS,
@@ -76,6 +77,19 @@ describe("debug persistence sink", () => {
     expect(persisted.mock.calls.map(([event]) => event.level)).toEqual(["warning"]);
     // Retrospectives are info-level, so a stricter threshold makes them ineligible.
     expect(canRecordAgentRunRetrospective()).toBe(false);
+    expect(canPersistDebugEvent("info")).toBe(false);
+    expect(canPersistDebugEvent("warning")).toBe(true);
+  });
+
+  it("reports persistability without the retrospective opt-in", () => {
+    expect(canPersistDebugEvent()).toBe(false);
+    configureDebugRegistry({ enabled: true });
+    expect(canPersistDebugEvent()).toBe(false);
+    const unsubscribe = subscribeDebugPersistence(vi.fn());
+    expect(canPersistDebugEvent()).toBe(true);
+    expect(canRecordAgentRunRetrospective()).toBe(false);
+    unsubscribe();
+    expect(canPersistDebugEvent()).toBe(false);
   });
 
   it("sends best-effort-redacted retrospective prose to persistence sinks", () => {
