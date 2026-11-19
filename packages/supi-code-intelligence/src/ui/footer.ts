@@ -21,8 +21,10 @@ export function buildLspStatusText(lspState: LspAdapterState): string | undefine
   const openFiles = servers.reduce((sum, s) => sum + s.openFiles.length, 0);
 
   // Aggregate server states
-  const ready = servers.filter((s) => s.status === "running" && s.ready).length;
-  const starting = servers.filter((s) => s.status === "running" && !s.ready).length;
+  // A route that still loads its projects answers queries but is not done yet.
+  const settled = (s: (typeof servers)[number]) => s.ready && !s.loadingProjects;
+  const ready = servers.filter((s) => s.status === "running" && settled(s)).length;
+  const starting = servers.filter((s) => s.status === "running" && !settled(s)).length;
   const routeCounts = countProjectServerRouteStatuses(servers);
 
   const hasServers =

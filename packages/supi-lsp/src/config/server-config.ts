@@ -70,6 +70,11 @@ export interface ProjectServerInfo extends DetectedProjectServer {
   openFiles: string[];
   /** Whether the LSP server is currently not indexing and ready to serve queries. */
   ready: boolean;
+  /**
+   * Present while the background warm-up loads the route's projects. The route
+   * answers queries; a symbol query waits for the pass.
+   */
+  loadingProjects?: true;
   /** Negotiated operation support, when the route has a capability snapshot. */
   operationSupport?: ServerOperationSupportMap;
 }

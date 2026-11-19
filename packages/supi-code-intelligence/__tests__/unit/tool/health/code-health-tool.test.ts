@@ -305,6 +305,41 @@ describe("code_health tool", () => {
     expect(result.content[0].text).toContain("Diagnostics unavailable");
   });
 
+  it("marks a running route that still loads its projects", async () => {
+    registerMockProvider(tmpDir);
+    mockReadyLsp({
+      getProjectServers: vi.fn(() => [
+        {
+          name: "typescript",
+          root: tmpDir,
+          fileTypes: ["ts"],
+          status: "running",
+          openFiles: [],
+          ready: true,
+          loadingProjects: true,
+        },
+      ]),
+    });
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const result = (await getTool(pi, "code_health").execute(
+      "loading-projects",
+      { include: ["servers"] },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as {
+      content: Array<{ text: string }>;
+      structuredContent: { servers: Array<{ loadingProjects?: boolean }> };
+    };
+
+    expect(result.content[0]?.text).toContain(
+      "(ts) — running, loading projects (symbol queries wait)",
+    );
+    expect(result.structuredContent.servers[0]?.loadingProjects).toBe(true);
+  });
+
   it("keeps file-scoped server-only health passive", async () => {
     registerMockProvider(tmpDir);
     const file = path.join(tmpDir, "src", "index.ts");

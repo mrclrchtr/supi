@@ -421,7 +421,9 @@ function renderServersSection(
       const statusIcon = server.status === "running" ? "✓" : "✗";
       const reason = server.statusReason
         ? ` — ${formatProjectServerStatusReason(server.statusReason)}`
-        : "";
+        : server.loadingProjects
+          ? ", loading projects (symbol queries wait)"
+          : "";
       lines.push(
         `- ${statusIcon} **${server.name}** @ \`${formatProjectServerRoot(cwd, server.root)}\` (${server.fileTypes.join(", ")}) — ${server.status}${reason}`,
       );

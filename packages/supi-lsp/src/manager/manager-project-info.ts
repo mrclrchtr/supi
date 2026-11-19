@@ -16,6 +16,8 @@ interface ProjectServerInfoInput {
   statusReason?: ProjectServerStatusReason;
   typescript?: TypeScriptSelection;
   failureMessage?: string;
+  /** The background warm-up is loading this route's projects. */
+  loadingProjects?: boolean;
   /** Filter files from ambient project status without changing explicit routing. */
   includeOpenFile?: (file: string) => boolean;
 }
@@ -51,6 +53,7 @@ export function buildProjectServerInfo(
         .filter((file) => input.includeOpenFile?.(file) ?? true)
         .map((file) => displayRelativeFilePath(file, cwd)) ?? [],
     ready: input.client?.ready ?? false,
+    ...(input.loadingProjects ? { loadingProjects: true as const } : {}),
     operationSupport: getServerOperationSupport(input.client?.serverCapabilities ?? null),
   };
 }

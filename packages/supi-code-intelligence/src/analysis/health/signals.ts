@@ -19,6 +19,7 @@ export function collectServers(
     ...(server.typescript ? { typescript: server.typescript } : {}),
     ...(server.failureMessage ? { failureMessage: server.failureMessage } : {}),
     ready: server.ready,
+    ...(server.loadingProjects ? { loadingProjects: true as const } : {}),
     ...(server.operationSupport ? { operationSupport: server.operationSupport } : {}),
   }));
 }

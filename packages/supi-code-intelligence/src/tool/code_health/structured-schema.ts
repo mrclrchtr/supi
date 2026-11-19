@@ -113,6 +113,7 @@ const server = object({
     ),
   ),
   ready: Type.Boolean(),
+  loadingProjects: Type.Optional(Type.Literal(true)),
   operationSupport: Type.Optional(support),
   typescript: Type.Optional(
     object({

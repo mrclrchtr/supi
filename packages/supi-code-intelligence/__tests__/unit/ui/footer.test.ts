@@ -29,6 +29,35 @@ describe("LSP footer lifecycle adapter", () => {
     expect(buildLspStatusText(state)).toBe("λ lsp • 1 ✓ • 1 open file");
   });
 
+  it("counts a ready route that still loads projects as in progress", () => {
+    const state = createLspAdapterState();
+    state.controller = {
+      workspaceRuntime: {
+        getProjectServers: () => [
+          {
+            name: "typescript",
+            root: "/project",
+            fileTypes: ["ts"],
+            status: "running",
+            openFiles: ["/project/src/a.ts"],
+            ready: true,
+            loadingProjects: true,
+          },
+          {
+            name: "bash",
+            root: "/project",
+            fileTypes: ["sh"],
+            status: "running",
+            openFiles: [],
+            ready: true,
+          },
+        ],
+      },
+    } as never;
+
+    expect(buildLspStatusText(state)).toBe("λ lsp • 1 ✓ • 1 ⟳ • 1 open file");
+  });
+
   it("shows process-crash recovery state separately from plain errors", () => {
     const state = createLspAdapterState();
     state.controller = {

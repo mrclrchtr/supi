@@ -406,17 +406,20 @@ export class CiStatusDialog {
     const t = this.deps.theme;
     if (this.refreshError) return t.fg("error", this.refreshFailure());
     const ready = this.data.servers.filter(
-      (server) => server.status === "running" && server.ready,
+      (server) => server.status === "running" && server.ready && !server.loadingProjects,
     ).length;
     const starting = this.data.servers.filter(
       (server) => server.status === "running" && !server.ready,
+    ).length;
+    const loading = this.data.servers.filter(
+      (server) => server.status === "running" && server.ready && server.loadingProjects,
     ).length;
     const counts = countProjectServerRouteStatuses(this.data.servers);
     const entries = this.data.diagnostics.entries;
     const errors = entries.reduce((sum, entry) => sum + entry.errors, 0);
     const warnings = entries.reduce((sum, entry) => sum + entry.warnings, 0);
     return [
-      `${ready} ready${starting ? ` · ${starting} starting` : ""}`,
+      `${ready} ready${starting ? ` · ${starting} starting` : ""}${loading ? ` · ${loading} loading projects` : ""}`,
       errors ? t.fg("error", countLabel(errors, "error")) : "",
       warnings ? t.fg("warning", countLabel(warnings, "warning")) : "",
       counts.recovering
@@ -585,7 +588,13 @@ export class CiStatusDialog {
   private addServer(server: ProjectServerInfo, text: (value: string) => void): void {
     const t = this.deps.theme;
     const state =
-      server.status === "running" ? (server.ready ? "ready" : "starting") : server.status;
+      server.status !== "running"
+        ? server.status
+        : !server.ready
+          ? "starting"
+          : server.loadingProjects
+            ? "loading projects"
+            : "ready";
     text(
       t.fg(
         state === "ready" ? "success" : state === "error" ? "error" : "warning",

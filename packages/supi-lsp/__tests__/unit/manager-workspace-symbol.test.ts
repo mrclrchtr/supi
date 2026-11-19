@@ -681,7 +681,7 @@ describe("LspManager.workspaceSymbol cold warm-up", () => {
 
 describe("LspManager.startWorkspaceSymbolWarmup", () => {
   /** A TypeScript route with three project roots; `releaseOpens` unblocks the gated opens. */
-  function makeGatedWorkspace() {
+  function makeGatedWorkspace(onTransition?: (loadingProjects: boolean) => void) {
     const root = makeTempRoot();
     const declare = (name: string) => {
       const file = join(root, "packages", name, "src", "index.ts");
@@ -707,6 +707,7 @@ describe("LspManager.startWorkspaceSymbolWarmup", () => {
         },
       },
       root,
+      (transition) => onTransition?.(transition.projectServers[0]?.loadingProjects === true),
     );
     // Like tsserver, the client answers only from projects with an open file.
     const opened = new Set<string>();
@@ -766,6 +767,25 @@ describe("LspManager.startWorkspaceSymbolWarmup", () => {
       data: symbols,
     });
     expect(ensureFileOpen).toHaveBeenCalledTimes(3);
+  });
+
+  it("publishes the route as loading projects for the duration of the pass", async () => {
+    const published: boolean[] = [];
+    const { manager, ensureFileOpen, releaseOpens } = makeGatedWorkspace((loading) =>
+      published.push(loading),
+    );
+    const loading = () => manager.getKnownProjectServers([])[0]?.loadingProjects === true;
+
+    const warmup = manager.startWorkspaceSymbolWarmup();
+    await vi.waitFor(() => expect(ensureFileOpen).toHaveBeenCalledTimes(1));
+    expect(loading()).toBe(true);
+    releaseOpens();
+    await warmup;
+
+    expect(loading()).toBe(false);
+    // Consumers such as the footer learn about both ends of the pass.
+    expect(published[0]).toBe(true);
+    expect(published.at(-1)).toBe(false);
   });
 
   it("collects again when the pass ends unrecorded while a query's first rows are in flight", async () => {

@@ -41,6 +41,8 @@ export interface HealthServerInfo {
   /** Actionable launch failure, distinct from process recovery status. */
   readonly failureMessage?: string;
   readonly ready: boolean;
+  /** Present while the background warm-up loads the route's projects; a symbol query waits for it. */
+  readonly loadingProjects?: true;
   /** Negotiated operation support and SuPi planning limitations. */
   readonly operationSupport?: ServerOperationSupportMap;
 }

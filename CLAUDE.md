@@ -73,7 +73,7 @@ Register a `SettingsModule` with `registerSettings()` from `@mrclrchtr/supi-core
 - `session_info_changed` fires on display-name changes via `/name`, RPC, or `pi.setSessionName()`; use it for reactive titles.
 - Use `pi.events` for extension-to-extension communication; prefer `pi.on()` for Pi lifecycle events.
 - `createAgentSession()` children do not bubble `agent_start`/`agent_end` to parent handlers; signal activity through `pi.events`.
-- Emit `supi:working:start` / `supi:working:end` via `pi.events.emit(name, { source: "supi-<pkg>" })` for long-running work; `tab-spinner` listens. Always emit `end`, including on failure, cancel, and timeout.
+- Emit `supi:working:start` / `supi:working:end` via `pi.events.emit(name, { source: "supi-<pkg>" })` for long-running work; `tab-spinner` listens. Always emit `end`, including on failure, cancel, and timeout. Background language-server work with no caller (the TypeScript project warm-up) is shown in the LSP footer through `ProjectServerInfo`, not through `supi:working`.
 
 ### UI & rendering
 - `ctx.ui.theme` has no `"info"` color; use `"accent"` / `"dim"` for info-level UI.

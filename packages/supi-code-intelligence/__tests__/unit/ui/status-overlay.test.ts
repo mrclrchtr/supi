@@ -637,6 +637,13 @@ describe("Code intelligence inspector", () => {
     expect(render()).not.toContain("✓ no issues");
   });
 
+  it("names a ready route that still loads its projects", () => {
+    const { render } = setup(data({ servers: [{ ...server, loadingProjects: true }] }));
+
+    expect(render()).toContain("typescript: loading projects");
+    expect(render()).toContain("0 ready · 1 loading projects");
+  });
+
   it("preserves disabled capability state and does not infer refactor support from provider presence", () => {
     const { render } = setup(
       data({

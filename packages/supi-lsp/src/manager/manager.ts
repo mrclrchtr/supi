@@ -1831,6 +1831,7 @@ export class LspManager {
         client: this.clients.get(key),
         unavailableReason: this.getUnavailableReason(key, serverName, root) ?? undefined,
         statusReason: this.processCrashRecoveries.get(key)?.statusReason,
+        loadingProjects: this.backgroundWorkspaceSymbolWarmups.has(key),
         includeOpenFile: (file) => this.isAutomaticScopePath(file),
       },
       this.cwd,
@@ -3138,6 +3139,7 @@ export class LspManager {
       routes.map(async ([key, client]) => {
         const abort = new AbortController();
         this.backgroundWorkspaceSymbolWarmups.set(key, abort);
+        this.publishLifecycle("readiness");
         const control = { signal: abort.signal };
         try {
           await client.getReady(control);
@@ -3166,6 +3168,7 @@ export class LspManager {
         } finally {
           if (this.backgroundWorkspaceSymbolWarmups.get(key) === abort) {
             this.backgroundWorkspaceSymbolWarmups.delete(key);
+            if (!this.shuttingDown) this.publishLifecycle("readiness");
           }
         }
       }),
