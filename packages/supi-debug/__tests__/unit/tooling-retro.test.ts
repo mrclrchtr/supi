@@ -5,6 +5,7 @@ import {
   resetDebugRegistry,
   subscribeDebugPersistence,
 } from "@mrclrchtr/supi-core/debug";
+import { SIDE_RUN_END_EVENT, SIDE_RUN_START_EVENT } from "@mrclrchtr/supi-core/session";
 import { createPiMock, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TOOLING_RETRO_PROMPT } from "../../src/tooling-retro/prompt.ts";
@@ -210,6 +211,63 @@ describe("/supi-tooling-retro", () => {
     });
     await command.handler("", ctx);
     expect(order.slice(0, 3)).toEqual(["idle", "anchor", "idle"]);
+  });
+
+  describe("side-run signal", () => {
+    function track(pi: ReturnType<typeof setup>["pi"], order: string[]) {
+      pi.events.on(SIDE_RUN_START_EVENT, (data) => order.push(`start:${JSON.stringify(data)}`));
+      pi.events.on(SIDE_RUN_END_EVENT, () => order.push("end"));
+    }
+
+    it("spans the run and the return to the anchor", async () => {
+      const order: string[] = [];
+      const { pi, ctx, command, navigateTree } = setup(report("Report"), () => order.push("send"));
+      track(pi, order);
+      navigateTree.mockImplementationOnce(async () => {
+        order.push("navigate");
+        return { cancelled: false };
+      });
+
+      await command.handler("", ctx);
+
+      expect(order).toEqual(['start:{"source":"supi-debug"}', "send", "navigate", "end"]);
+    });
+
+    it("ends when the session changed during the run", async () => {
+      const order: string[] = [];
+      const { pi, ctx, command, getSessionFile } = setup(report("Report"));
+      track(pi, order);
+      getSessionFile.mockReturnValueOnce("/sessions/a.jsonl").mockReturnValue("/sessions/b.jsonl");
+
+      await command.handler("", ctx);
+
+      expect(order.at(-1)).toBe("end");
+      expect(order).toHaveLength(2);
+    });
+
+    it("ends and rethrows when navigation fails", async () => {
+      const order: string[] = [];
+      const { pi, ctx, command, navigateTree } = setup(report("Report"));
+      track(pi, order);
+      navigateTree.mockRejectedValueOnce(new Error("navigation failed"));
+
+      await expect(command.handler("", ctx)).rejects.toThrow("navigation failed");
+
+      expect(order).toHaveLength(2);
+      expect(order.at(-1)).toBe("end");
+    });
+
+    it("keeps the run result when the end signal hits a stale extension instance", async () => {
+      const { pi, ctx, command, appended } = setup(report("Report"));
+      const emit = pi.events.emit as ReturnType<typeof vi.fn>;
+      emit.mockImplementation((channel: string) => {
+        if (channel === SIDE_RUN_END_EVENT) throw new Error("This extension ctx is stale");
+      });
+
+      await command.handler("", ctx);
+
+      expect(appended.map((entry) => entry.type)).toContain(TOOLING_RETRO_REPORT_TYPE);
+    });
   });
 
   it("omits only a leading report heading when rendering", () => {

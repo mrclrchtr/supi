@@ -1,4 +1,9 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
+import {
+  configureDebugRegistry,
+  getDebugEvents,
+  resetDebugRegistry,
+} from "@mrclrchtr/supi-core/debug";
 import { makeCtx } from "@mrclrchtr/supi-test-utils";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { GhostTextEditor } from "../../src/editor/editor.ts";
@@ -26,12 +31,15 @@ class ControlledGenerator {
 function makeFixture() {
   const generator = new ControlledGenerator();
   const baseContext = makeCtx();
+  let editorFactory: EditorFactory | undefined;
   const ctx = makeCtx({
     hasUI: true,
     mode: "tui",
     ui: {
       ...baseContext.ui,
-      setEditorComponent: vi.fn(),
+      setEditorComponent: vi.fn((factory: EditorFactory | undefined) => {
+        editorFactory = factory;
+      }),
     },
     sessionManager: {
       getBranch: () => [
@@ -49,18 +57,48 @@ function makeFixture() {
   }) as unknown as ExtensionContext;
   const lifecycle = new SessionLifecycle(generator as unknown as SuggestionGenerator);
   lifecycle.onStart(ctx);
+  if (!editorFactory) throw new Error("Missing custom editor factory");
+  const editor = createEditor(editorFactory);
+  editor.focused = true;
   lifecycle.onAgentSettled(ctx);
   if (!generator.callbacks) throw new Error("Missing generator callbacks");
-  return { ctx, generator, lifecycle, callbacks: generator.callbacks };
+  return { ctx, editor, generator, lifecycle, callbacks: generator.callbacks };
 }
 
 function emit(callbacks: SuggestionCallbacks, status: GenerationStatus): void {
   callbacks.onStatus(status);
 }
 
+/** Create an editor through the installed factory with minimal TUI collaborators. */
+function createEditor(factory: EditorFactory): GhostTextEditor {
+  const tui = { terminal: { rows: 40 }, requestRender: vi.fn() };
+  const editorTheme = {
+    borderColor: (text: string) => text,
+    selectList: {
+      selectedPrefix: (text: string) => text,
+      selectedText: (text: string) => text,
+      description: (text: string) => text,
+      scrollInfo: (text: string) => text,
+      noMatch: (text: string) => text,
+      selectedDescription: (text: string) => text,
+      selectedScrollInfo: (text: string) => text,
+      cursor: ">",
+      paddingLeft: 2,
+    },
+  };
+  const keybindings = { matches: () => false, getKeys: () => [] };
+  return factory(tui as never, editorTheme as never, keybindings as never) as GhostTextEditor;
+}
+
 afterEach(() => {
   vi.restoreAllMocks();
+  resetDebugRegistry();
 });
+
+function treeInvalidations() {
+  return getDebugEvents({ source: "prompt-suggestions", category: "generation.invalidated" })
+    .events;
+}
 
 describe("SessionLifecycle suggestion notifications", () => {
   it("keeps ghost ownership and history on the main editor when a form creates an editor", () => {
@@ -102,32 +140,8 @@ describe("SessionLifecycle suggestion notifications", () => {
     lifecycle.onStart(ctx);
     if (!editorFactory) throw new Error("Missing custom editor factory");
 
-    const tui = { terminal: { rows: 40 }, requestRender: vi.fn() };
-    const editorTheme = {
-      borderColor: (text: string) => text,
-      selectList: {
-        selectedPrefix: (text: string) => text,
-        selectedText: (text: string) => text,
-        description: (text: string) => text,
-        scrollInfo: (text: string) => text,
-        noMatch: (text: string) => text,
-        selectedDescription: (text: string) => text,
-        selectedScrollInfo: (text: string) => text,
-        cursor: ">",
-        paddingLeft: 2,
-      },
-    };
-    const keybindings = { matches: () => false, getKeys: () => [] };
-    const mainEditor = editorFactory(
-      tui as never,
-      editorTheme as never,
-      keybindings as never,
-    ) as GhostTextEditor;
-    const embeddedEditor = editorFactory(
-      tui as never,
-      editorTheme as never,
-      keybindings as never,
-    ) as GhostTextEditor;
+    const mainEditor = createEditor(editorFactory);
+    const embeddedEditor = createEditor(editorFactory);
     lifecycle.onAgentSettled(ctx);
     generator.callbacks?.onStatus({ kind: "ready", suggestion: "main editor suggestion" });
 
@@ -205,6 +219,64 @@ describe("SessionLifecycle suggestion notifications", () => {
     });
 
     expect(fixture.ctx.ui.notify).not.toHaveBeenCalled();
+  });
+
+  it("never delivers a suggestion started before tree navigation", () => {
+    configureDebugRegistry({ enabled: true, persistLevel: "debug" });
+    const fixture = makeFixture();
+    emit(fixture.callbacks, { kind: "generating" });
+
+    fixture.lifecycle.onTreeNavigated(fixture.ctx);
+    emit(fixture.callbacks, { kind: "ready", suggestion: "answer to the left branch" });
+
+    expect(fixture.generator.dismiss).toHaveBeenCalledOnce();
+    expect(fixture.editor.render(80).join("\n")).not.toContain("answer to the left branch");
+    expect(treeInvalidations().map((event) => event.data)).toEqual([
+      { reason: "tree-navigation", pending: true, shown: false },
+    ]);
+  });
+
+  it("clears a shown suggestion on tree navigation", () => {
+    const fixture = makeFixture();
+    emit(fixture.callbacks, { kind: "ready", suggestion: "answer to the left branch" });
+    expect(fixture.editor.render(80).join("\n")).toContain("answer to the left branch");
+
+    configureDebugRegistry({ enabled: true, persistLevel: "debug" });
+    fixture.lifecycle.onTreeNavigated(fixture.ctx);
+
+    expect(fixture.editor.render(80).join("\n")).not.toContain("answer to the left branch");
+    expect(treeInvalidations().map((event) => event.data)).toEqual([
+      { reason: "tree-navigation", pending: false, shown: true },
+    ]);
+
+    // A second navigation has nothing left to invalidate and records nothing.
+    fixture.lifecycle.onTreeNavigated(fixture.ctx);
+    expect(treeInvalidations()).toHaveLength(1);
+  });
+
+  it("starts no generation on agent_settled during an active side run", () => {
+    const fixture = makeFixture();
+    fixture.generator.start.mockClear();
+
+    fixture.lifecycle.onSideRunStart();
+    fixture.lifecycle.onAgentSettled(fixture.ctx);
+    expect(fixture.generator.start).not.toHaveBeenCalled();
+
+    fixture.lifecycle.onSideRunEnd();
+    fixture.lifecycle.onAgentSettled(fixture.ctx);
+    expect(fixture.generator.start).toHaveBeenCalledOnce();
+  });
+
+  it("clears side runs whose end was lost on session replacement", () => {
+    const fixture = makeFixture();
+    fixture.generator.start.mockClear();
+
+    fixture.lifecycle.onSideRunStart();
+    fixture.lifecycle.onShutdown();
+    fixture.lifecycle.onStart(fixture.ctx);
+    fixture.lifecycle.onAgentSettled(fixture.ctx);
+
+    expect(fixture.generator.start).toHaveBeenCalledOnce();
   });
 
   it("resets the generator on session start, shutdown, and settings change", () => {

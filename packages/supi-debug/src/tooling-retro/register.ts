@@ -4,6 +4,7 @@ import type {
   SessionEntry,
 } from "@earendil-works/pi-coding-agent";
 import { canPersistDebugEvent, recordDebugEvent } from "@mrclrchtr/supi-core/debug";
+import { runSideRun } from "@mrclrchtr/supi-core/session";
 import {
   TOOLING_RETRO_DESCRIPTION,
   TOOLING_RETRO_PROMPT,
@@ -109,18 +110,25 @@ async function runToolingRetro(pi: ExtensionAPI, ctx: ExtensionCommandContext): 
   const sessionFile = ctx.sessionManager.getSessionFile();
   if (!anchorId) return;
 
-  pi.sendMessage(
-    { customType: TOOLING_RETRO_PROMPT_TYPE, content: TOOLING_RETRO_PROMPT, display: true },
-    { triggerTurn: true },
-  );
-  // Pi marks the triggered run active synchronously, so this waits for the whole run,
-  // including retries; if the run could not start, it returns at once without a report.
-  await ctx.waitForIdle();
-  // A session switch during the run leaves nothing to restore here.
-  if (ctx.sessionManager.getSessionFile() !== sessionFile) return;
+  // The side-run signal spans the run and the return to the anchor, so listeners such as
+  // prompt suggestions skip the abandoned report on `agent_settled`.
+  const result = await runSideRun(pi, "supi-debug", async () => {
+    pi.sendMessage(
+      { customType: TOOLING_RETRO_PROMPT_TYPE, content: TOOLING_RETRO_PROMPT, display: true },
+      { triggerTurn: true },
+    );
+    // Pi marks the triggered run active synchronously, so this waits for the whole run,
+    // including retries; if the run could not start, it returns at once without a report.
+    await ctx.waitForIdle();
+    // A session switch during the run leaves nothing to restore here.
+    if (ctx.sessionManager.getSessionFile() !== sessionFile) return undefined;
 
-  const report = findRetroReport(ctx.sessionManager.getBranch(), anchorId);
-  await ctx.navigateTree(anchorId, { summarize: false });
+    const found = findRetroReport(ctx.sessionManager.getBranch(), anchorId);
+    await ctx.navigateTree(anchorId, { summarize: false });
+    return { report: found };
+  });
+  if (!result) return;
+  const { report } = result;
 
   if (report?.stopReason !== "stop" || !report.text.trim()) {
     ctx.ui.notify("Tooling Retrospective did not complete; nothing was stored.", "warning");

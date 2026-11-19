@@ -59,6 +59,11 @@ export class GhostTextEditor extends CustomEditor {
     this.tui.requestRender();
   }
 
+  /** Whether a suggestion is set, including one suppressed by editor text. */
+  hasSuggestion(): boolean {
+    return this.suggestion !== null;
+  }
+
   clearGhost(): void {
     this.suggestion = null;
     this.isSuppressed = false;

@@ -52,6 +52,8 @@ export class SessionLifecycle {
   private statusSpinner: StatusSpinner | null = null;
   private generationInFlight = false;
   private lifecycleId = 0;
+  /** Active side runs (`supi:side-run:*`); their results are not suggested from. */
+  private activeSideRuns = 0;
 
   constructor(private generator: SuggestionGenerator) {}
 
@@ -60,6 +62,7 @@ export class SessionLifecycle {
   /** Install the ghost editor wrapper, seed UP-arrow history, and recreate the spinner. */
   onStart(ctx: ExtensionContext): void {
     this.lifecycleId++;
+    this.activeSideRuns = 0;
     this.generator.reset();
     this.statusSpinner?.stop();
     this.statusSpinner = null;
@@ -73,6 +76,20 @@ export class SessionLifecycle {
   /** Extract the last settled assistant message and fire suggestion generation. */
   onAgentSettled(ctx: ExtensionContext): void {
     if (ctx.mode !== "tui") return;
+
+    if (this.activeSideRuns > 0) {
+      recordDebugEvent({
+        source: "prompt-suggestions",
+        level: "debug",
+        category: "generation.skipped",
+        message: "Prompt suggestion generation skipped: side run active",
+        cwd: ctx.cwd,
+        data: { reason: "side-run" },
+      });
+      this.statusSpinner?.stop();
+      this.generationInFlight = false;
+      return;
+    }
 
     const lifecycleId = this.lifecycleId;
     const lastAssistant = extractLastAssistantText(ctx.sessionManager.getBranch());
@@ -116,16 +133,42 @@ export class SessionLifecycle {
 
   /** Dismiss in-flight generation, stop spinner, clear ghost text. */
   onAgentStart(): void {
-    this.lifecycleId++;
-    this.statusSpinner?.stop();
-    this.generationInFlight = false;
-    this.generator.dismiss();
-    this.ghostEditor?.clearGhost();
+    this.invalidateSuggestion();
+  }
+
+  /**
+   * Drop a pending or shown suggestion after tree navigation: it answers the
+   * branch that was left. No new suggestion is generated for the target branch.
+   */
+  onTreeNavigated(ctx: ExtensionContext): void {
+    const pending = this.generationInFlight;
+    const shown = this.ghostEditor?.hasSuggestion() ?? false;
+    this.invalidateSuggestion();
+    if (!pending && !shown) return;
+    recordDebugEvent({
+      source: "prompt-suggestions",
+      level: "debug",
+      category: "generation.invalidated",
+      message: "Prompt suggestion invalidated: session tree navigation",
+      cwd: ctx.cwd,
+      data: { reason: "tree-navigation", pending, shown },
+    });
+  }
+
+  /** Count a started side run; `agent_settled` skips generation while any is active. */
+  onSideRunStart(): void {
+    this.activeSideRuns++;
+  }
+
+  /** Count an ended side run. Unpaired ends are ignored. */
+  onSideRunEnd(): void {
+    this.activeSideRuns = Math.max(0, this.activeSideRuns - 1);
   }
 
   /** Full cleanup on session shutdown. */
   onShutdown(): void {
     this.lifecycleId++;
+    this.activeSideRuns = 0;
     this.statusSpinner?.stop();
     this.generationInFlight = false;
     this.generator.reset();
@@ -142,6 +185,14 @@ export class SessionLifecycle {
   }
 
   // ── Private helpers ──────────────────────────────────────────────
+
+  private invalidateSuggestion(): void {
+    this.lifecycleId++;
+    this.statusSpinner?.stop();
+    this.generationInFlight = false;
+    this.generator.dismiss();
+    this.ghostEditor?.clearGhost();
+  }
 
   private handleStatus(status: GenerationStatus, ctx: ExtensionContext): void {
     switch (status.kind) {

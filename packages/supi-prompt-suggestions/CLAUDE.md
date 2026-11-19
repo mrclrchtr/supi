@@ -21,8 +21,18 @@ generator emits one bounded warning for the first failure of each model/session 
 suppresses repeated failures until success, a settings change, or a new session. It emits no warning
 for cancellation, stale results, disabled suggestions, or empty successful output. `SessionLifecycle`
 renders warnings and clears the spinner; no persistent footer error status is used. Quiet no-ghost
-outcomes (no assistant text, editor not empty at settle, editor not empty at delivery) emit debug
-`generation.skipped` events with a `reason` and lengths only — never suggestion or editor text.
+outcomes (no assistant text, editor not empty at settle, editor not empty at delivery, side run
+active) emit debug `generation.skipped` events with a `reason` and lengths only — never suggestion
+or editor text.
+
+### Tree navigation and side runs
+
+`session_tree` invalidates like `agent_start` and does not regenerate: the last assistant message
+may belong to the branch the user left. When a suggestion was pending or shown, it records a debug
+`generation.invalidated` event with `reason: "tree-navigation"` and `pending`/`shown` flags. `SessionLifecycle` counts `supi:side-run:*` events from
+`@mrclrchtr/supi-core/session`; while the count is positive, `agent_settled` skips generation. The
+count resets on `session_start` and `session_shutdown`, because an emitter's end signal is lost when
+its `pi` is stale after session replacement.
 
 ### Suggestion model via PI registry
 

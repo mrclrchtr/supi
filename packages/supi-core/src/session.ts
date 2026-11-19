@@ -57,3 +57,5 @@ export {
   getActiveBranchEntries,
 } from "./session-utils.ts";
 export { BSD_SED_HINT, BSD_SED_HINT_MARKER, registerShellHints } from "./shell-hints.ts";
+export type { SideRunEvent } from "./side-run.ts";
+export { runSideRun, SIDE_RUN_END_EVENT, SIDE_RUN_START_EVENT } from "./side-run.ts";

@@ -89,6 +89,7 @@ function setup() {
       list.push(handler);
       handlers.set(event, list);
     },
+    events: { on: vi.fn(() => () => {}), emit: vi.fn() },
   };
 
   const ctx = {

@@ -74,6 +74,7 @@ Register a `SettingsModule` with `registerSettings()` from `@mrclrchtr/supi-core
 - Use `pi.events` for extension-to-extension communication; prefer `pi.on()` for Pi lifecycle events.
 - `createAgentSession()` children do not bubble `agent_start`/`agent_end` to parent handlers; signal activity through `pi.events`.
 - Emit `supi:working:start` / `supi:working:end` via `pi.events.emit(name, { source: "supi-<pkg>" })` for long-running work; `tab-spinner` listens. Always emit `end`, including on failure, cancel, and timeout. Background language-server work with no caller (the TypeScript project warm-up) is shown in the LSP footer through `ProjectServerInfo`, not through `supi:working`.
+- Wrap agent runs whose result the session abandons (such as side branches left with `navigateTree`) in `runSideRun()` from `@mrclrchtr/supi-core/session`; it pairs `supi:side-run:start`/`end` so listeners such as prompt suggestions skip that run.
 
 ### UI & rendering
 - `ctx.ui.theme` has no `"info"` color; use `"accent"` / `"dim"` for info-level UI.
