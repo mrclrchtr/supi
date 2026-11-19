@@ -37,6 +37,7 @@
     }
   },
   "debug": {
-    "tuiRenderTool": true
+    "tuiRenderTool": true,
+    "persistLevel": "debug"
   }
 }
