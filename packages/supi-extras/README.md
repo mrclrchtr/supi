@@ -106,11 +106,18 @@ While the agent is working, the package animates a spinner in the terminal tab t
 
 ### Footer replacement
 
-The package replaces pi's default footer. It shows the model and thinking level with theme colors.
+The package replaces pi's default footer with two lines, each split into sections separated by a dim ` · `:
 
-The path line shows the Git branch with ahead/behind and file counts, for example `main ⇡2 +1 !3 ?1`. Counts refresh after tool runs, at most once per second. The stash count includes only stashes created on the current branch, because all worktrees of a repository share one stash stack.
+```text
+~/Development/supi  main !9                                       λ 3✓ ◫43
+↑112 ↓52k · R4.5M W146k CH96.9% · $3.113 sub · ▰▱▱▱▱ 11.8%/1.0M   ✦ (anthropic) claude · high
+```
 
-The stats line groups token totals, cache totals with the session cache-hit rate, cost, and context usage. Cache-hit and context values change color at their thresholds; context usage also shows a small bar unless icons are set to `ascii`.
+The path line holds workspace state. It shows the Git branch with ahead/behind and file counts, for example `main ⇡2 +1 !3 ?1`. Counts refresh after tool runs, at most once per second. The stash count includes only stashes created on the current branch, because all worktrees of a repository share one stash stack. Workspace status from other SuPi packages, such as the LSP status, appears on the right.
+
+The session line groups token totals, cache totals with the session cache-hit rate, cost, and context usage. Cache-hit and context values change color at their thresholds; context usage also shows a small bar unless icons are set to `ascii`. The model and thinking level appear on the right in theme colors, after status icons from other SuPi packages. When the window is narrow, the right side of each line shortens first.
+
+Statuses that other extensions set with Pi's `setStatus()` appear on a third line.
 
 Configure the footer under `/supi-settings` → **Footer**:
 

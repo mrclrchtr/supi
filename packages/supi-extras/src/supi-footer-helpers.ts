@@ -224,7 +224,7 @@ export function buildStatsLeft(
     [...cacheGroup(usage, style), ...dimParts(params.extraParts, style)],
   ];
   if (usage.totalCost || useSubscription) {
-    const sub = useSubscription ? style("dim", " (sub)") : "";
+    const sub = useSubscription ? style("dim", " sub") : "";
     groups.push([style("text", `$${usage.totalCost.toFixed(3)}`) + sub]);
   }
   groups.push([
@@ -238,15 +238,22 @@ export function buildStatsLeft(
   return [...groups, ...suffix]
     .filter((group) => group.length > 0)
     .map((group) => group.join(" "))
-    .join(style("dim", " · "));
+    .join(sectionSeparator(style));
 }
+
+/** The one separator between footer sections: a dim ` · `. Parts inside a section use a space. */
+export function sectionSeparator(style: FooterStyle = plainStyle): string {
+  return style("dim", SECTION_SEPARATOR);
+}
+
+const SECTION_SEPARATOR = " · ";
 
 /**
  * Contributions keep the former dim base color; their own styles still apply.
  * A leading `|` separator from older contributions is dropped because the
  * footer now owns separators.
  */
-function dimParts(parts: string[] | undefined, style: FooterStyle): string[] {
+export function dimParts(parts: string[] | undefined, style: FooterStyle): string[] {
   return (parts ?? [])
     .map((part) => part.replace(/^\|\s*/, ""))
     .filter(Boolean)
@@ -255,71 +262,63 @@ function dimParts(parts: string[] | undefined, style: FooterStyle): string[] {
 
 // ---- right-side builders ----
 
-/** Build the styled right portion (model name + effort level). */
-export function styleRightSide(params: {
+/**
+ * Build the model side of the session line, for example `✦ (anthropic) claude · high`.
+ *
+ * `prefixParts` (`model-start` contributions) come first, separated by a space.
+ * The provider is dropped first when the model side does not fit `maxWidth`.
+ */
+export function buildModelSide(params: {
   model: ModelInfo | undefined;
   thinkingLevel: string;
   theme: FooterTheme;
-  statsLeftWidth: number;
-  availableWidth: number;
-}): { plain: string; styled: string } {
-  const { model, thinkingLevel, theme, statsLeftWidth, availableWidth } = params;
-
+  prefixParts?: string[];
+  /** Width available for the whole model side. */
+  maxWidth: number;
+}): string {
+  const { model, thinkingLevel, theme } = params;
+  const style: FooterStyle = (color, text) => theme.fg(color, text);
   const modelName = model?.id ?? "no-model";
   const effortLabel = thinkingLevel === "off" ? "thinking off" : thinkingLevel.toLowerCase();
 
-  let plain = modelName;
+  let core = style(providerThemeToken(model?.provider), modelName);
   if (model?.reasoning) {
-    plain = `${modelName} • ${effortLabel}`;
+    core += sectionSeparator(style) + style(thinkingThemeToken(thinkingLevel), effortLabel);
   }
+  const prefix = (params.prefixParts ?? []).filter(Boolean).join(" ");
+  const withPrefix = (text: string) => (prefix ? `${prefix} ${text}` : text);
+
   if (model?.provider) {
-    const withProvider = `(${model.provider}) ${plain}`;
-    if (statsLeftWidth + 2 + visibleWidth(withProvider) <= availableWidth) {
-      plain = withProvider;
-    }
+    const withProvider = withPrefix(`${style("dim", `(${model.provider})`)} ${core}`);
+    if (visibleWidth(withProvider) <= params.maxWidth) return withProvider;
   }
-
-  const providerToken = providerThemeToken(model?.provider);
-  const thinkingToken = thinkingThemeToken(thinkingLevel);
-  const providerPrefix = model?.provider ? `(${model.provider}) ` : "";
-
-  let styled = "";
-  if (providerPrefix) styled += theme.fg("dim", providerPrefix);
-  styled += theme.fg(providerToken, modelName);
-
-  if (model?.reasoning) {
-    styled += theme.fg("dim", " • ");
-    styled += theme.fg(thinkingToken, effortLabel);
-  }
-
-  return { plain, styled };
+  return withPrefix(core);
 }
 
-/** Apply right-justified padding between stats and right side. */
-export function layoutRightSide(params: {
-  plain: string;
-  styled: string;
-  statsLeftWidth: number;
-  availableWidth: number;
-}): { styled: string; padding: string } {
-  const { plain, styled, statsLeftWidth, availableWidth } = params;
-  const rightWidth = visibleWidth(plain);
-  const minPadding = 2;
+/** Minimum gap between a footer line's left and right sides. */
+const MIN_SIDE_GAP = 2;
 
-  if (statsLeftWidth + minPadding + rightWidth <= availableWidth) {
-    return { styled, padding: " ".repeat(availableWidth - statsLeftWidth - rightWidth) };
-  }
-
-  const avail = availableWidth - statsLeftWidth - minPadding;
-  if (avail <= 0) {
-    return { styled: "", padding: "" };
-  }
-
-  const finalStyled = truncateToWidth(styled, avail, "");
-  const padding = " ".repeat(
-    Math.max(0, availableWidth - statsLeftWidth - visibleWidth(finalStyled)),
-  );
-  return { styled: finalStyled, padding };
+/**
+ * Join a line's left and right sides with right-justified padding.
+ *
+ * The left side keeps priority: it is truncated to `width` first, then the
+ * right side is truncated into the remaining space or dropped.
+ */
+export function joinLeftRight(
+  left: string,
+  right: string,
+  width: number,
+  ellipsis: string,
+): string {
+  const fittedLeft = visibleWidth(left) > width ? truncateToWidth(left, width, ellipsis) : left;
+  const leftWidth = visibleWidth(fittedLeft);
+  if (!right) return fittedLeft;
+  const available = width - leftWidth - MIN_SIDE_GAP;
+  if (available <= 0) return fittedLeft;
+  const fittedRight =
+    visibleWidth(right) > available ? truncateToWidth(right, available, "") : right;
+  const padding = " ".repeat(Math.max(0, width - leftWidth - visibleWidth(fittedRight)));
+  return fittedLeft + padding + fittedRight;
 }
 
 // ---- path line ----
@@ -336,7 +335,7 @@ export function buildPwdLine(
     sessionName: string | undefined;
     /** Pre-styled Git counts appended after the branch. */
     gitStatus?: string;
-    glyphs?: Pick<FooterGlyphs, "cwd" | "branch" | "session" | "iconGap">;
+    glyphs?: Pick<FooterGlyphs, "cwd" | "branch" | "session">;
   },
   style: FooterStyle = plainStyle,
 ): string {
@@ -346,9 +345,8 @@ export function buildPwdLine(
     path = `~${path.slice(home.length)}`;
   }
   const glyphs = params.glyphs;
-  const gap = glyphs?.iconGap ?? " ";
   const parts: string[] = [];
-  parts.push((glyphs?.cwd ? style("accent", glyphs.cwd) + gap : "") + style("muted", path));
+  parts.push((glyphs?.cwd ? `${style("accent", glyphs.cwd)} ` : "") + style("muted", path));
   if (params.gitBranch) {
     const status = params.gitStatus ? ` ${params.gitStatus}` : "";
     parts.push(
@@ -358,7 +356,7 @@ export function buildPwdLine(
     );
   }
   if (params.sessionName) {
-    parts.push(`${style("dim", glyphs?.session ?? "•")}${gap}${style("text", params.sessionName)}`);
+    parts.push(`${style("dim", glyphs?.session ?? "•")} ${style("text", params.sessionName)}`);
   }
   return parts.join(" ");
 }

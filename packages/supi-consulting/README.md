@@ -35,7 +35,7 @@ The Antigravity adapter never uses the normal Antigravity profile. It creates th
 <PI agent dir>/supi/consulting/antigravity/consultation-workspace/
 ```
 
-After Pi starts, the package checks availability without making startup wait. The footer shows a spinning icon during the check. The tool appears only after discovery succeeds. The ready footer uses the terminal-safe `✦` icon; the SuPi footer shows it on the stats line as `| ✦`.
+After Pi starts, the package checks availability without making startup wait. The footer shows a spinning icon during the check. The tool appears only after discovery succeeds. The ready footer uses the terminal-safe `✦` icon; the SuPi footer shows it before the model name.
 
 When sign-in is needed, Pi shows a command with the resolved paths:
 

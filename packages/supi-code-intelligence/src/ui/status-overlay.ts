@@ -22,6 +22,7 @@ import type {
   WorkspaceDiagnosticCheckReport,
 } from "../analysis/health/check.ts";
 import {
+  classifyProjectServerRoute,
   countProjectServerRouteStatuses,
   formatProjectServerCompiler,
   formatProjectServerRoot,
@@ -405,15 +406,10 @@ export class CiStatusDialog {
   private summaryLine(): string {
     const t = this.deps.theme;
     if (this.refreshError) return t.fg("error", this.refreshFailure());
-    const ready = this.data.servers.filter(
-      (server) => server.status === "running" && server.ready && !server.loadingProjects,
-    ).length;
-    const starting = this.data.servers.filter(
-      (server) => server.status === "running" && !server.ready,
-    ).length;
-    const loading = this.data.servers.filter(
-      (server) => server.status === "running" && server.ready && server.loadingProjects,
-    ).length;
+    const states = this.data.servers.map(classifyProjectServerRoute);
+    const ready = states.filter((state) => state === "ready").length;
+    const starting = states.filter((state) => state === "starting").length;
+    const loading = states.filter((state) => state === "loading").length;
     const counts = countProjectServerRouteStatuses(this.data.servers);
     const entries = this.data.diagnostics.entries;
     const errors = entries.reduce((sum, entry) => sum + entry.errors, 0);

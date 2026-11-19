@@ -175,7 +175,7 @@ describe("capability profile actions", () => {
     session.selector()?.handleInput("\u001b[B");
     session.selector()?.handleInput(" ");
     expect(session.selector()?.render(180).join("\n")).toContain("Modified");
-    expect(footerContributions.getByPlacement("stats-end")[0]?.render()).toContain(
+    expect(footerContributions.getByPlacement("model-start")[0]?.render()).toContain(
       "research Modified",
     );
     session.selector()?.handleInput(" ");

@@ -179,6 +179,29 @@ describe("LspManager lifecycle aggregation", () => {
     expectServerReady(transitions[1]?.projectServers ?? [], true);
   });
 
+  it("publishes a failed route when its server command is missing", async () => {
+    const transitions: ManagerLifecycleTransition[] = [];
+    const manager = new LspManager(
+      {
+        servers: {
+          typescript: { ...config.servers.typescript, command: "supi-missing-server-command" },
+        },
+      },
+      "/project",
+      (transition) => transitions.push(transition),
+    );
+
+    await manager.startServerForRoot("typescript", "/project");
+
+    expect(mocks.clients).toHaveLength(0);
+    expect(transitions.at(-1)?.projectServers).toMatchObject([
+      {
+        status: "error",
+        failureMessage: "Configured server command is not available: supi-missing-server-command",
+      },
+    ]);
+  });
+
   it("stays semantically ready until the final concrete client is lost", async () => {
     const transitions: ManagerLifecycleTransition[] = [];
     const manager = createManager(transitions);

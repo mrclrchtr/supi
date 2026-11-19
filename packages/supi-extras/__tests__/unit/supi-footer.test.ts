@@ -613,47 +613,88 @@ describe("supiFooter extension", () => {
       expect(costIdx).toBeGreaterThan(extraIdx);
     });
 
-    it("places stats-end contributions after the context value", async () => {
+    it("places workspace state on the path line and status icons before the model", async () => {
       const pi = createPiMock();
       supiFooter(pi as unknown as Parameters<typeof supiFooter>[0]);
+      const glyphModes: unknown[] = [];
       footerContributions.register({
         key: "lsp-status",
-        placement: "stats-end",
-        priority: 100,
-        render: () => "| λ lsp • 3 ✓",
+        placement: "path-end",
+        render: (renderCtx) => {
+          glyphModes.push(renderCtx?.glyphMode);
+          return "λ 3✓";
+        },
       });
       footerContributions.register({
         key: "supi-consulting",
-        placement: "stats-end",
+        placement: "model-start",
         priority: 110,
-        render: () => "| ✦",
+        render: () => "✦",
       });
+      footerContributions.register({ key: "cap", placement: "model-start", render: () => "◈2" });
 
       let footerFactory: FooterFactory | undefined;
       const ctx = makeFooterCtx({
-        model: { provider: "openai", id: "gpt-4", reasoning: false, contextWindow: 128000 },
+        model: { provider: "openai", id: "gpt-4", reasoning: true, contextWindow: 128000 },
         ui: uiCapturingFooter((f) => {
           footerFactory = f;
         }),
       });
-
       const startHandler = pi.handlers.get("session_start")?.[0] as (
         _e: unknown,
         c: unknown,
       ) => Promise<unknown>;
       await startHandler?.({}, ctx);
 
-      const factory = footerFactory as FooterFactory;
-      const renderer = factory(
+      const renderer = (footerFactory as FooterFactory)(
         mockTui,
         mockTheme,
         makeFooterData({
-          getExtensionStatuses: vi.fn(() => new Map([["supi-consulting", "✦"]])),
+          // Same-key statuses are built-in-footer fallbacks and must not repeat.
+          getExtensionStatuses: vi.fn(
+            () =>
+              new Map([
+                ["supi-consulting", "✦"],
+                ["lsp-status", "λ 3✓"],
+              ]),
+          ),
         }),
       );
-      const lines = renderer.render(200);
+      const lines = renderer.render(120);
+
       expect(lines).toHaveLength(2);
-      expect(lines[1]).toContain("λ lsp • 3 ✓ · ✦");
+      expect(lines[0]).toMatch(/project.* {2,}λ 3✓$/);
+      expect(lines[0]).toHaveLength(120);
+      expect(lines[1]).toMatch(/ {2,}◈2 ✦ \(openai\) gpt-4 · thinking off$/);
+      expect(lines[1]).not.toContain("•");
+      expect(glyphModes.length).toBeGreaterThan(0);
+    });
+
+    it("drops the path-end side before truncating the path", async () => {
+      const pi = createPiMock();
+      supiFooter(pi as unknown as Parameters<typeof supiFooter>[0]);
+      footerContributions.register({
+        key: "lsp-status",
+        placement: "path-end",
+        render: () => "λ 3✓ ◫43",
+      });
+      let footerFactory: FooterFactory | undefined;
+      const ctx = makeFooterCtx({
+        ui: uiCapturingFooter((f) => {
+          footerFactory = f;
+        }),
+      });
+      const startHandler = pi.handlers.get("session_start")?.[0] as (
+        _e: unknown,
+        c: unknown,
+      ) => Promise<unknown>;
+      await startHandler?.({}, ctx);
+
+      const lines = (footerFactory as FooterFactory)(mockTui, mockTheme, makeFooterData()).render(
+        16,
+      );
+      expect(lines[0]).toMatch(/project/);
+      expect(lines[0]).not.toContain("◫");
     });
 
     it("renders TCH from real registry after CH", async () => {

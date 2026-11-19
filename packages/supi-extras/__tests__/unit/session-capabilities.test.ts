@@ -348,7 +348,7 @@ describe("session capability controls", () => {
     selector?.handleInput?.("\u001b[B");
     selector?.handleInput?.(" ");
 
-    expect(footerContributions.getByPlacement("stats-end")[0]?.render()).toContain("◈1");
+    expect(footerContributions.getByPlacement("model-start")[0]?.render()).toContain("◈1");
     expect(session.ctx.ui.theme.fg).toHaveBeenCalledWith("accent", "◈1");
     const statusCall = vi.mocked(session.ctx.ui.setStatus).mock.lastCall;
     expect(statusCall?.[0]).toBe("supi-capabilities");
@@ -360,7 +360,7 @@ describe("session capability controls", () => {
     resetSelector?.handleInput?.("\r");
     resetSelector?.handleInput?.("\r");
 
-    expect(footerContributions.getByPlacement("stats-end")).toEqual([]);
+    expect(footerContributions.getByPlacement("model-start")).toEqual([]);
     expect(session.ctx.ui.setStatus).toHaveBeenLastCalledWith("supi-capabilities", undefined);
   });
 });

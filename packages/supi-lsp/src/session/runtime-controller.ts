@@ -211,6 +211,14 @@ export class LspRuntimeController {
   }
 
   /**
+   * Latest published aggregate transition, including transitions published while pending.
+   * Read this snapshot instead of recomputing project-server status on every render.
+   */
+  get latestLifecycleTransition(): LspRuntimeTransition | null {
+    return this.#latestLifecycleTransition;
+  }
+
+  /**
    * Subscribe to aggregate runtime transitions.
    *
    * A late subscriber immediately receives the latest transition. The returned

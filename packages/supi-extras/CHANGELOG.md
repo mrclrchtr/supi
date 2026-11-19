@@ -1,5 +1,10 @@
 # Changelog
 
+## [13.1.0]
+
+- The footer is organized in sections with one separator. The path line now holds workspace state: path and Git on the left, the LSP status on the right. The session line holds metrics on the left and the model on the right, with status icons such as Consulting `✦` and Session Capabilities `◈` before the model name. Sections are separated by a dim ` · ` everywhere, including between model and thinking level (formerly `•`). A subscription shows as `$3.113 sub` instead of `$3.113 (sub)`. When the window is narrow, the right side of each line shortens first. Nerd Font icons now come from one Material Design outline set: folder (U+F0256), branch (U+F062C), session name (U+F00C3), and stash (U+F120E), with one space after the folder icon instead of two.
+- Extension statuses set through Pi's `setStatus()` still appear on the status line; a status with the same key as a SuPi footer contribution is shown only once.
+
 ## [13.0.0]
 
 - **Breaking:** Absorbs the former `@mrclrchtr/supi-bash-timeout` package: `bash` calls without `timeout` get the configured default, now 600 seconds instead of 120 so test and check runs are no longer cut off, configurable under `/supi-settings` → **Bash Timeout**. Migration: run `pi remove npm:@mrclrchtr/supi-bash-timeout`; the `bash-timeout` config section is unchanged. While `@mrclrchtr/supi-bash-timeout` is still declared in user or trusted project settings, SuPi Extras shows one warning per Pi process with the exact `pi remove` command, adding `--local` for project declarations ([#596](https://github.com/mrclrchtr/supi/issues/596)).

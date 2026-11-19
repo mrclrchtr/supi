@@ -222,9 +222,9 @@ describe("supi-consulting extension", () => {
     );
     expect(pi.tools).toHaveLength(0);
     const contribution = footerContributions
-      .getByPlacement("stats-end")
+      .getByPlacement("model-start")
       .find((item) => item.key === CONSULTING_FOOTER_KEY);
-    expect(contribution).toMatchObject({ placement: "stats-end", priority: 110 });
+    expect(contribution).toMatchObject({ placement: "model-start", priority: 110 });
     expect(BRAILLE_SPINNER_FRAMES).toContain(contribution?.render());
 
     const tool = await waitForTool(pi);

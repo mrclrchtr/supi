@@ -8,7 +8,12 @@
  */
 import type { ExtensionAPI, ThemeColor } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
-import { FOOTER_INVALIDATE_EVENT, footerContributions } from "@mrclrchtr/supi-core/footer-registry";
+import {
+  FOOTER_INVALIDATE_EVENT,
+  type FooterPlacement,
+  type FooterRenderContext,
+  footerContributions,
+} from "@mrclrchtr/supi-core/footer-registry";
 import { formatGitCounts, GitCountsRefresher } from "./footer-git-status.ts";
 import { type FooterGlyphs, getFooterGlyphs, resolveIconMode } from "./footer-icons.ts";
 import {
@@ -17,16 +22,17 @@ import {
   registerFooterSettings,
 } from "./supi-footer-config.ts";
 import {
+  buildModelSide,
   buildPwdLine,
   buildStatsLeft,
   type FooterData,
   type FooterTheme,
   gatherUsage,
+  joinLeftRight,
   latestThinkingLevel,
-  layoutRightSide,
   type ModelInfo,
   sanitizeStatusText,
-  styleRightSide,
+  sectionSeparator,
   type UsageEntry,
 } from "./supi-footer-helpers.ts";
 
@@ -105,18 +111,20 @@ export default function supiFooter(pi: ExtensionAPI) {
                 )
               : false;
 
-            // Stats
-            const statContribs = footerContributions
-              .getByPlacement("stats")
-              .map((c) => c.render())
-              .filter(Boolean);
-            const suffixContribs = footerContributions
-              .getByPlacement("stats-end")
-              .map((c) => c.render())
-              .filter(Boolean);
-
             const style = (color: ThemeColor, text: string) => theme.fg(color, text);
+            const ellipsis = theme.fg("dim", "...");
             const decorParts = decor.pwdParts(style);
+            const renderContext: FooterRenderContext = {
+              style,
+              glyphMode: decorParts.glyphs?.mode ?? "unicode",
+            };
+            const contributions = (placement: FooterPlacement) =>
+              footerContributions
+                .getByPlacement(placement)
+                .map((c) => c.render(renderContext))
+                .filter(Boolean);
+
+            // Session line: metrics left, model side right.
             let statsLeft = buildStatsLeft(
               {
                 contextWindow,
@@ -124,42 +132,30 @@ export default function supiFooter(pi: ExtensionAPI) {
                 usage,
                 useSubscription,
                 contextBar: decorParts.glyphs !== undefined && decorParts.glyphs.mode !== "ascii",
-                extraParts: statContribs,
-                suffixParts: suffixContribs,
+                extraParts: contributions("stats"),
+                suffixParts: contributions("stats-end"),
               },
               style,
             );
-            let statsLeftWidth = visibleWidth(statsLeft);
-            if (statsLeftWidth > width) {
-              statsLeft = truncateToWidth(statsLeft, width, theme.fg("dim", "..."));
-              statsLeftWidth = visibleWidth(statsLeft);
+            if (visibleWidth(statsLeft) > width) {
+              statsLeft = truncateToWidth(statsLeft, width, ellipsis);
             }
-
-            // Right side
-            const right = styleRightSide({
+            const modelSide = buildModelSide({
               model,
               thinkingLevel,
               theme,
-              statsLeftWidth,
-              availableWidth: width,
-            });
-            const laidOut = layoutRightSide({
-              plain: right.plain,
-              styled: right.styled,
-              statsLeftWidth,
-              availableWidth: width,
+              prefixParts: contributions("model-start"),
+              maxWidth: width - visibleWidth(statsLeft) - 2,
             });
 
-            // Path line + assembly
-            const pwdLine = truncateToWidth(
-              buildPwdLine({ ...pwdSource(ctx, footerData), ...decorParts }, style),
-              width,
-              theme.fg("dim", "..."),
-            );
+            // Workspace line: path and Git left, workspace state right.
+            const pwdLeft = buildPwdLine({ ...pwdSource(ctx, footerData), ...decorParts }, style);
+            const pwdRight = contributions("path-end").join(sectionSeparator(style));
 
-            const statsLine = statsLeft + laidOut.padding + laidOut.styled;
-
-            const lines = [pwdLine, truncateToWidth(statsLine, width, theme.fg("dim", "..."))];
+            const lines = [
+              joinLeftRight(pwdLeft, pwdRight, width, ellipsis),
+              joinLeftRight(statsLeft, modelSide, width, ellipsis),
+            ];
             buildStatusLine(lines, footerData, width, theme);
 
             return lines;
@@ -227,6 +223,8 @@ function createFooterDecor(pi: ExtensionAPI, rerender: () => void) {
 
 function registerFooterInvalidations(pi: ExtensionAPI, invalidate: () => void): Array<() => void> {
   return [
+    // Deprecated: Code Intelligence 13.0 and earlier emit this LSP-specific event.
+    // Remove once mixed installs with those versions are no longer supported.
     pi.events.on("supi:lsp:invalidate", invalidate),
     pi.events.on(FOOTER_INVALIDATE_EVENT, invalidate),
   ];
@@ -253,11 +251,11 @@ function resolveThinkingLevel(
   if (!model?.reasoning) return "off";
   return getThinkingLevel?.() ?? latestThinkingLevel(entries);
 }
-function isStatsLineContribution(key: string): boolean {
-  return (
-    footerContributions.getByPlacement("stats").some((item) => item.key === key) ||
-    footerContributions.getByPlacement("stats-end").some((item) => item.key === key)
-  );
+/** A contribution outside the status line may use the same key for its built-in-footer fallback. */
+function isFooterLineContribution(key: string): boolean {
+  return footerContributions
+    .getAll()
+    .some((item) => item.key === key && item.placement !== "status");
 }
 
 function buildStatusLine(
@@ -267,11 +265,10 @@ function buildStatusLine(
   theme: FooterTheme,
 ): void {
   const statuses = footerData.getExtensionStatuses();
-  // A stats-line contribution may use the same key for the built-in footer fallback.
   const legacyEntries =
     statuses.size > 0
       ? (Array.from(statuses.entries()) as Array<[string, string]>)
-          .filter(([key]) => !isStatsLineContribution(key))
+          .filter(([key]) => !isFooterLineContribution(key))
           .sort((a, b) => a[0].localeCompare(b[0]))
           .map(([, text]) => sanitizeStatusText(text))
       : [];

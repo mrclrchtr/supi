@@ -5,6 +5,31 @@ import type {
   ServerOperationSupportMap,
 } from "@mrclrchtr/supi-lsp/api";
 
+/**
+ * Display state of one LSP route.
+ *
+ * `loading` means the route answers queries while the background warm-up still
+ * loads its projects; symbol queries wait for that pass.
+ */
+export type ProjectServerRouteState =
+  | "ready"
+  | "starting"
+  | "loading"
+  | "recovering"
+  | "error"
+  | "unavailable";
+
+/** Classify one route for status surfaces without changing semantic readiness. */
+export function classifyProjectServerRoute(
+  server: Pick<ProjectServerInfo, "status" | "statusReason" | "ready" | "loadingProjects">,
+): ProjectServerRouteState {
+  if (server.statusReason === "process-crash-recovery-pending") return "recovering";
+  if (server.status === "error") return "error";
+  if (server.status === "unavailable") return "unavailable";
+  if (!server.ready) return "starting";
+  return server.loadingProjects ? "loading" : "ready";
+}
+
 /** Workspace-wide counts for non-running LSP routes. */
 export interface ProjectServerRouteStatusCounts {
   recovering: number;
@@ -16,15 +41,13 @@ export interface ProjectServerRouteStatusCounts {
 export function countProjectServerRouteStatuses(
   servers: readonly Pick<ProjectServerInfo, "status" | "statusReason">[],
 ): ProjectServerRouteStatusCounts {
-  return {
-    recovering: servers.filter((server) => server.statusReason === "process-crash-recovery-pending")
-      .length,
-    error: servers.filter(
-      (server) =>
-        server.status === "error" && server.statusReason !== "process-crash-recovery-pending",
-    ).length,
-    unavailable: servers.filter((server) => server.status === "unavailable").length,
-  };
+  const counts = { recovering: 0, error: 0, unavailable: 0 };
+  for (const server of servers) {
+    // `ready` does not affect these three states.
+    const state = classifyProjectServerRoute({ ...server, ready: false });
+    if (state === "recovering" || state === "error" || state === "unavailable") counts[state]++;
+  }
+  return counts;
 }
 
 /** Render nonzero workspace route counts for an aggregate status surface. */

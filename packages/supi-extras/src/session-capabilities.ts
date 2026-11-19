@@ -73,7 +73,7 @@ function updateFooter(
       ? ` ${profile.id}${isSessionCapabilityProfileModified(state) ? " Modified" : ""}`
       : "";
     const render = (): string => ctx.ui.theme.fg("accent", `${FOOTER_ICON}${count}${label}`);
-    footerContributions.register({ key: FOOTER_KEY, placement: "stats-end", render });
+    footerContributions.register({ key: FOOTER_KEY, placement: "model-start", render });
     ctx.ui.setStatus(FOOTER_KEY, render());
   }
   pi.events.emit(FOOTER_INVALIDATE_EVENT, {});

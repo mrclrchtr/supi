@@ -1620,7 +1620,11 @@ export class LspManager {
   private async performStart(route: FileRoute, routeGeneration: number): Promise<LspClient | null> {
     const { serverName, serverConfig, root, key } = route;
     // Client.start resolves again at actual spawn time, including every retry.
-    if (this.recordUnavailableLaunch(route)) return null;
+    if (this.recordUnavailableLaunch(route)) {
+      // No client lifecycle runs for an unlaunchable route; publish its new status here.
+      this.publishLifecycle("startup");
+      return null;
+    }
 
     // Spawn new client
     const client = this.createClient(serverName, serverConfig, root, key);
@@ -1652,6 +1656,7 @@ export class LspManager {
         ...(error instanceof Error && error.message ? { failureMessage: error.message } : {}),
       });
       if (this.clients.get(key) === client) this.clients.delete(key);
+      this.publishLifecycle("startup");
       return null;
     }
   }

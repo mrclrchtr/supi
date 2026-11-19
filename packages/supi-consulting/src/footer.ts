@@ -2,13 +2,13 @@ import { footerContributions } from "@mrclrchtr/supi-core/footer-registry";
 import { CONSULTING_FOOTER_KEY } from "./footer-constants.ts";
 import type { ConsultingRuntime } from "./runtime.ts";
 
-/** Register the Consulting checking spinner and ready icon on the footer stats line. */
+/** Register the Consulting checking spinner and ready icon before the footer model name. */
 export function registerConsultingFooterContribution(runtime: ConsultingRuntime): {
   dispose: () => void;
 } {
   footerContributions.register({
     key: CONSULTING_FOOTER_KEY,
-    placement: "stats-end",
+    placement: "model-start",
     priority: 110,
     render: () => {
       return runtime.footerIcon ?? "";

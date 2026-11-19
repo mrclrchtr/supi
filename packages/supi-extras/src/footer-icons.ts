@@ -12,11 +12,6 @@ export type ResolvedIconMode = Exclude<IconMode, "auto">;
 
 export interface FooterGlyphs {
   mode: ResolvedIconMode;
-  /**
-   * Separator after the folder icon. The Nerd Font folder glyph renders two
-   * cells wide while counting as one, so it needs an extra space.
-   */
-  iconGap: string;
   /** Prefix for the working directory; empty means no icon. */
   cwd: string;
   /** Prefix for the Git branch; empty means the legacy `(branch)` format. */
@@ -35,10 +30,9 @@ export interface FooterGlyphs {
 
 const NERD: FooterGlyphs = {
   mode: "nerd",
-  iconGap: "  ",
-  cwd: "\uF07B", // nf-fa-folder
-  branch: "\uF418", // nf-oct-git_branch
-  session: "\uF02E", // nf-fa-bookmark
+  cwd: "\u{F0256}", // nf-md-folder_outline
+  branch: "\u{F062C}", // nf-md-source_branch
+  session: "\u{F00C3}", // nf-md-bookmark_outline
   ahead: "⇡",
   behind: "⇣",
   staged: "+",
@@ -47,13 +41,12 @@ const NERD: FooterGlyphs = {
   deleted: "✘",
   renamed: "»",
   conflicted: "=",
-  stashed: "\uF01C", // nf-fa-inbox
+  stashed: "\u{F120E}", // nf-md-archive_outline
 };
 
 const UNICODE: FooterGlyphs = {
   ...NERD,
   mode: "unicode",
-  iconGap: " ",
   cwd: "▸",
   branch: "⎇",
   session: "•",
@@ -64,7 +57,6 @@ const UNICODE: FooterGlyphs = {
 
 const ASCII: FooterGlyphs = {
   mode: "ascii",
-  iconGap: " ",
   cwd: "",
   branch: "",
   session: "•",
