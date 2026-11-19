@@ -788,6 +788,26 @@ describe("LspManager.startWorkspaceSymbolWarmup", () => {
     expect(published.at(-1)).toBe(false);
   });
 
+  it("does not publish a route as loading projects while its server still starts", async () => {
+    const { manager, client, ensureFileOpen, releaseOpens } = makeGatedWorkspace();
+    let releaseReady = () => {};
+    client.getReady.mockReturnValue(
+      new Promise<void>((resolve) => {
+        releaseReady = resolve;
+      }),
+    );
+    const loading = () => manager.getKnownProjectServers([])[0]?.loadingProjects === true;
+
+    const warmup = manager.startWorkspaceSymbolWarmup();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(loading()).toBe(false);
+    releaseReady();
+    await vi.waitFor(() => expect(ensureFileOpen).toHaveBeenCalledTimes(1));
+    expect(loading()).toBe(true);
+    releaseOpens();
+    await warmup;
+  });
+
   it("collects again when the pass ends unrecorded while a query's first rows are in flight", async () => {
     const { manager, root, client, symbols, ensureFileOpen, releaseOpens } = makeGatedWorkspace();
     let releaseRows = () => {};

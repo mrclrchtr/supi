@@ -436,7 +436,11 @@ export class LspManager {
    * Background all-roots passes by client key (`clientKey`, not the warm-pass
    * route key); no caller owns them, so shutdown and route restart abort them.
    */
-  private backgroundWorkspaceSymbolWarmups = new Map<string, AbortController>();
+  private backgroundWorkspaceSymbolWarmups = new Map<
+    string,
+    /** `loading` turns true once the client is ready and the pass opens files. */
+    { abort: AbortController; loading: boolean }
+  >();
   /**
    * Advances when a warm-up opens a file on any route. Rows collected across
    * an advance may miss the project that open loaded.
@@ -1831,7 +1835,7 @@ export class LspManager {
         client: this.clients.get(key),
         unavailableReason: this.getUnavailableReason(key, serverName, root) ?? undefined,
         statusReason: this.processCrashRecoveries.get(key)?.statusReason,
-        loadingProjects: this.backgroundWorkspaceSymbolWarmups.has(key),
+        loadingProjects: this.backgroundWorkspaceSymbolWarmups.get(key)?.loading === true,
         includeOpenFile: (file) => this.isAutomaticScopePath(file),
       },
       this.cwd,
@@ -3137,13 +3141,14 @@ export class LspManager {
     );
     await Promise.all(
       routes.map(async ([key, client]) => {
-        const abort = new AbortController();
-        this.backgroundWorkspaceSymbolWarmups.set(key, abort);
-        this.publishLifecycle("readiness");
-        const control = { signal: abort.signal };
+        const warmup = { abort: new AbortController(), loading: false };
+        this.backgroundWorkspaceSymbolWarmups.set(key, warmup);
+        const control = { signal: warmup.abort.signal };
         try {
           await client.getReady(control);
           if (this.clients.get(key) !== client) return;
+          warmup.loading = true;
+          this.publishLifecycle("readiness");
           await this.warmWorkspaceSymbolProjectsUntilResult({
             findWarmTargets: (root, rootMarkers, fileTypes) =>
               findWorkspaceSymbolWarmTargets(root, rootMarkers, fileTypes, {
@@ -3166,9 +3171,9 @@ export class LspManager {
         } catch {
           // The first symbol query runs the pass when the background one fails or is aborted.
         } finally {
-          if (this.backgroundWorkspaceSymbolWarmups.get(key) === abort) {
+          if (this.backgroundWorkspaceSymbolWarmups.get(key) === warmup) {
             this.backgroundWorkspaceSymbolWarmups.delete(key);
-            if (!this.shuttingDown) this.publishLifecycle("readiness");
+            if (warmup.loading && !this.shuttingDown) this.publishLifecycle("readiness");
           }
         }
       }),
@@ -3824,7 +3829,7 @@ export class LspManager {
   }
 
   private abortBackgroundWorkspaceSymbolWarmup(key: string): void {
-    this.backgroundWorkspaceSymbolWarmups.get(key)?.abort();
+    this.backgroundWorkspaceSymbolWarmups.get(key)?.abort.abort();
     this.backgroundWorkspaceSymbolWarmups.delete(key);
   }
 
