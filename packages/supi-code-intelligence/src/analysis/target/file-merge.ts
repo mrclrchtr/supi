@@ -14,6 +14,7 @@ import {
   canonicalFileDeclarationKind,
   canonicalFileDeclarationName,
   declarationOccurrencesFor,
+  TYPE_ALIAS_PROVIDER_KINDS,
 } from "./identity.ts";
 import type { ResolvedTargetData } from "./types.ts";
 
@@ -36,6 +37,9 @@ export function mergeDiscoveries(
       {
         ...refinedSemantic,
         provenance: ["semantic", "structural"] as const,
+        ...(isTypeAliasPair(semanticTarget, structuralTarget)
+          ? { identityKind: declarationIdentityKind(structuralTarget) }
+          : {}),
         nativeKind: structuralTarget.nativeKind ?? semanticTarget.nativeKind,
         container: reconcileContainer(semanticTarget, structuralTarget),
         level: reconcileLevel(semanticTarget.level, structuralTarget.level),
@@ -80,7 +84,48 @@ function sameDeclaration(
       canonicalFileDeclarationName(structural.file, structural.kind, structural.name) &&
     compatibleContainerEvidence(semantic, structural) &&
     sameDeclarationLine(semantic, structural) &&
-    declarationIdentityKind(semantic) === declarationIdentityKind(structural)
+    sameIdentityKind(semantic, structural)
+  );
+}
+
+/**
+ * Equal identity kinds, or one of two declaration forms that language servers
+ * and the syntax parser classify differently.
+ */
+function sameIdentityKind(
+  semantic: DiscoveredTargetData,
+  structural: DiscoveredTargetData,
+): boolean {
+  return (
+    declarationIdentityKind(semantic) === declarationIdentityKind(structural) ||
+    isTypeAliasPair(semantic, structural) ||
+    isAccessorPair(semantic, structural)
+  );
+}
+
+/**
+ * Language servers report a type alias as `Variable` (tsserver) or `Class`
+ * (native TypeScript server). The per-symbol syntax lookup that refines this
+ * kind can fail under load, so the parser's own declaration decides here and
+ * the merged declaration takes its `type` identity.
+ */
+function isTypeAliasPair(
+  semantic: DiscoveredTargetData,
+  structural: DiscoveredTargetData,
+): boolean {
+  return (
+    declarationIdentityKind(structural) === "type" &&
+    TYPE_ALIAS_PROVIDER_KINDS.has(semantic.kind?.toLowerCase() ?? "")
+  );
+}
+
+/**
+ * Language servers report `get x()` and `set x()` as a `Property`, the syntax
+ * parser as a method. The merged declaration keeps the semantic identity.
+ */
+function isAccessorPair(semantic: DiscoveredTargetData, structural: DiscoveredTargetData): boolean {
+  return (
+    semantic.kind?.toLowerCase() === "property" && declarationIdentityKind(structural) === "member"
   );
 }
 

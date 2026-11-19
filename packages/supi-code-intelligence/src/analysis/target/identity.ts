@@ -148,9 +148,15 @@ function compareDeclarationOccurrenceCandidates(
 }
 
 /**
+ * LSP kinds that language servers report for a type alias: typescript-language-server
+ * (tsserver) sends `Variable`, the native TypeScript server sends `Class`.
+ */
+export const TYPE_ALIAS_PROVIDER_KINDS = new Set(["variable", "class"]);
+
+/**
  * Resolve an identity kind without rewriting the provider-reported display kind.
- * An LSP `Variable` becomes `type` only when Tree-sitter reports the exact name
- * anchor inside a type-alias declaration.
+ * An LSP `Variable` or `Class` becomes `type` only when Tree-sitter reports the
+ * exact name anchor inside a type-alias declaration.
  */
 export async function resolveDeclarationIdentityKind(
   observation: DeclarationIdentityObservation,
@@ -160,7 +166,7 @@ export async function resolveDeclarationIdentityKind(
   const identityKind = canonicalDeclarationKind(observation.providerKind);
   if (
     !structural ||
-    observation.providerKind?.toLowerCase() !== "variable" ||
+    !TYPE_ALIAS_PROVIDER_KINDS.has(observation.providerKind?.toLowerCase() ?? "") ||
     !observation.nameAnchor
   ) {
     return { identityKind, structuralEvidence: false };
