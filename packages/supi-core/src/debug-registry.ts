@@ -149,19 +149,48 @@ function normalizeMaxEvents(value: number): number {
   return Math.floor(value);
 }
 
+function isSummary(event: DebugEvent): boolean {
+  return event.level !== "debug";
+}
+
+function groupKey(event: DebugEvent): string {
+  return `${event.source}\u0000${event.category}`;
+}
+
 /**
- * Evict down to `maxEvents`. The oldest `debug` event goes first, so
- * high-volume timings cannot push out a summary recorded moments earlier.
- * Higher-level events keep at most half the buffer; past that the oldest of
- * them goes instead, so recent `debug` events stay visible too.
+ * Return the index of the oldest event in the largest source/category group of
+ * one tier, so a high-volume category evicts its own events before rare ones.
+ */
+function evictionIndex(events: readonly DebugEvent[], summaryTier: boolean): number {
+  const counts = new Map<string, number>();
+  let largest = 0;
+  for (const event of events) {
+    if (isSummary(event) !== summaryTier) continue;
+    const key = groupKey(event);
+    const count = (counts.get(key) ?? 0) + 1;
+    counts.set(key, count);
+    largest = Math.max(largest, count);
+  }
+  return events.findIndex(
+    (event) => isSummary(event) === summaryTier && counts.get(groupKey(event)) === largest,
+  );
+}
+
+/**
+ * Evict down to `maxEvents`. A `debug` event goes first, so high-volume
+ * timings cannot push out a summary recorded moments earlier. Higher-level
+ * events keep at most half the buffer; past that one of them goes instead, so
+ * recent `debug` events stay visible too. Within the chosen tier, the oldest
+ * event of the largest source/category group goes, so one flooding category
+ * such as `request.timing` cannot push out every other category.
  */
 function trimToMaxEvents(state: DebugRegistryState): void {
   const maxEvents = normalizeMaxEvents(state.config.maxEvents);
   const summaryShare = Math.floor(maxEvents / 2);
-  let summaries = state.events.filter((event) => event.level !== "debug").length;
+  let summaries = state.events.filter(isSummary).length;
   while (state.events.length > maxEvents) {
     const evictSummary = summaries > summaryShare;
-    const index = state.events.findIndex((event) => (event.level !== "debug") === evictSummary);
+    const index = evictionIndex(state.events, evictSummary);
     if (evictSummary) summaries--;
     state.events.splice(Math.max(index, 0), 1);
   }

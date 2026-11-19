@@ -164,6 +164,27 @@ describe("debug registry", () => {
     ]);
   });
 
+  it("keeps other debug categories while one high-volume category floods the buffer", () => {
+    configureDebugRegistry({ enabled: true, maxEvents: 6 });
+
+    for (const n of [1, 2, 3]) {
+      recordDebugEvent({ source: "lsp", level: "debug", category: "probe", message: `p${n}` });
+    }
+    for (let n = 1; n <= 20; n++) {
+      recordDebugEvent({ source: "lsp", level: "debug", category: "timing", message: `t${n}` });
+    }
+
+    // The flooding category evicts its own oldest events, not the other category.
+    expect(getDebugEvents().events.map((event) => event.message)).toEqual([
+      "t20",
+      "t19",
+      "t18",
+      "p3",
+      "p2",
+      "p1",
+    ]);
+  });
+
   it("keeps recent debug events when summary events alone would fill the buffer", () => {
     configureDebugRegistry({ enabled: true, maxEvents: 4 });
 
