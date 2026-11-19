@@ -109,16 +109,16 @@
       },
       "code": {
         "calls": 1,
-        "tokens": 375,
-        "precision": 0.6,
+        "tokens": 913,
+        "precision": 0.12,
         "recall": 1,
-        "tokensPerHit": 63,
+        "tokensPerHit": 152,
         "complete": {
           "calls": 2,
-          "tokens": 1375,
+          "tokens": 1913,
           "precision": 0.105,
           "recall": 1,
-          "tokensPerHit": 229
+          "tokensPerHit": 319
         }
       }
     },

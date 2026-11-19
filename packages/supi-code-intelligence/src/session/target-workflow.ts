@@ -41,6 +41,12 @@ import {
   type TargetStoreEntry,
 } from "./target-store.ts";
 
+/**
+ * File outline rows shown when the caller sets no `maxResults`. Top-level
+ * declarations rank first, so this shows all of them in ordinary source files.
+ */
+const DEFAULT_OUTLINE_MAX_RESULTS = 50;
+
 export type { TargetInput } from "./target-input.ts";
 
 /** Target workflow policy selected by the intent-level session entry. */
@@ -129,7 +135,12 @@ export async function resolveTargetWorkflow(
       message: "This workflow requires a handle, anchored point, or symbol target.",
     };
   }
-  return resolveFileOnlyWorkflow(target.file, policy.maxResults ?? 10, deps, control);
+  return resolveFileOnlyWorkflow(
+    target.file,
+    policy.maxResults ?? DEFAULT_OUTLINE_MAX_RESULTS,
+    deps,
+    control,
+  );
 }
 
 function resolveHandle(
@@ -325,7 +336,11 @@ function toWorkflowOutcome(
   }
 
   if (outcome.kind === "file-outline") {
-    return registerFileOutline(outcome.outline, deps, policy.maxResults ?? 10);
+    return registerFileOutline(
+      outcome.outline,
+      deps,
+      policy.maxResults ?? DEFAULT_OUTLINE_MAX_RESULTS,
+    );
   }
 
   const candidates = registerTargetCandidates(outcome.candidates, deps.registerTarget);
