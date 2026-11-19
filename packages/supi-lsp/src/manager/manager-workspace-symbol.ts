@@ -20,6 +20,7 @@ import {
   createDefaultAutomaticLspPathPolicy,
   walkAutomaticLspTree,
 } from "../workspace-path-policy.ts";
+import { nativeTypeScriptLimitReason } from "./workspace-symbol-row-limit.ts";
 
 type WorkspaceSymbolLike = SymbolInformation | WorkspaceSymbol;
 
@@ -111,13 +112,17 @@ export function limitWorkspaceSymbolWarmRoots(targets: readonly WorkspaceSymbolW
   };
 }
 
-/** Rows typescript-language-server and the native TypeScript server return at most per query. */
-const TYPESCRIPT_WORKSPACE_SYMBOL_LIMIT = 256;
-
+/**
+ * Collect workspace symbols from every running client that supports them.
+ *
+ * @param scoped - the caller already limits results to a scope, so the
+ *   row-limit advice must not suggest adding one.
+ */
 export async function collectWorkspaceSymbols(
   clients: Iterable<LspClient>,
   query: string,
   control?: CodeRequestControl,
+  scoped = false,
 ): Promise<WorkspaceSymbolCollection> {
   const results: WorkspaceSymbolLike[] = [];
   const failures: string[] = [];
@@ -136,18 +141,26 @@ export async function collectWorkspaceSymbols(
     completedClientCount++;
     results.push(...(result.data ?? []));
     if (result.kind === "partial") failures.push(result.reason);
-    if (
-      client.name === "typescript" &&
-      (result.data?.length ?? 0) >= TYPESCRIPT_WORKSPACE_SYMBOL_LIMIT
-    ) {
-      failures.push(
-        `The TypeScript server returned its limit of ${TYPESCRIPT_WORKSPACE_SYMBOL_LIMIT} ` +
-          "workspace symbols; more matches may exist. Use a more specific query or a scope.",
-      );
-    }
+    const limitReason = nativeTypeScriptLimitReason(client, result.data?.length ?? 0, scoped);
+    if (limitReason) failures.push(limitReason);
   }
 
   return { results, hasSupport, completedClientCount, failures };
+}
+
+/**
+ * Join partial-result reasons into one message. A reason that already ends a
+ * sentence is followed by a space, so the message never reads `.;`.
+ */
+export function joinWorkspaceSymbolReasons(
+  reasons: readonly (string | null | undefined)[],
+): string {
+  return reasons
+    .filter((reason): reason is string => Boolean(reason))
+    .reduce((joined, reason) => {
+      if (!joined) return reason;
+      return `${joined}${/[.!?]$/.test(joined) ? " " : "; "}${reason}`;
+    }, "");
 }
 
 function workspaceSymbolExclusionReason(collection: WorkspaceSymbolCollection): string | null {
@@ -167,7 +180,7 @@ export function workspaceSymbolCollectionResult(
   }
   if (collection.completedClientCount === 0) {
     return unavailableCodeQuery(
-      collection.failures.join("; ") || "No workspace-symbol request completed.",
+      joinWorkspaceSymbolReasons(collection.failures) || "No workspace-symbol request completed.",
     );
   }
   const exclusion = workspaceSymbolExclusionReason(collection);
@@ -186,9 +199,7 @@ export function workspaceSymbolCollectionResult(
         : undefined;
     return partialCodeQuery(
       collection.results,
-      [collection.failures.join("; "), collection.coverageGap, exclusion]
-        .filter(Boolean)
-        .join("; "),
+      joinWorkspaceSymbolReasons([...collection.failures, collection.coverageGap, exclusion]),
       metadata,
     );
   }

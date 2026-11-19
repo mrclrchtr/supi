@@ -55,16 +55,19 @@ function renderSemantic(assembly: FindResultAssembly, evidence: EvidenceListMeta
   }
   const disclosure = renderEvidenceListMetadataDisclosure(evidence);
   if (disclosure) lines.push(disclosure);
-  const exclusionDisclosure = renderAutomaticPathExclusionDisclosure(
-    assembly.details.automaticPathExclusion,
-  );
+  const exclusionDisclosure = renderAutomaticPathExclusionDisclosure(assembly, evidence);
   if (exclusionDisclosure) lines.push(exclusionDisclosure);
   return lines.join("\n");
 }
 
 function renderAutomaticPathExclusionDisclosure(
-  exclusion: AutomaticPathExclusionDisplay | undefined,
+  assembly: FindResultAssembly,
+  evidence: EvidenceListMetadata,
 ): string | null {
+  // A provider-limited disclosure already carries the provider's exclusion sentence.
+  if (evidence.partialMessage) return null;
+  const exclusion: AutomaticPathExclusionDisplay | undefined =
+    assembly.details.automaticPathExclusion;
   if (!exclusion || exclusion.excludedCount <= 0) return null;
   const noun = `workspace-symbol result${exclusion.excludedCount === 1 ? "" : "s"}`;
   const examples = describeExcludedPathExamples(exclusion);
@@ -83,9 +86,7 @@ function renderEmptySemantic(assembly: FindResultAssembly, evidence: EvidenceLis
   ];
   const disclosure = renderEvidenceListMetadataDisclosure(evidence);
   if (disclosure) lines.push("", disclosure);
-  const exclusionDisclosure = renderAutomaticPathExclusionDisclosure(
-    assembly.details.automaticPathExclusion,
-  );
+  const exclusionDisclosure = renderAutomaticPathExclusionDisclosure(assembly, evidence);
   if (exclusionDisclosure) lines.push("", exclusionDisclosure);
   lines.push("", "Document-level semantic symbols can differ from the workspace index.");
   const fileQuery = assembly.assembled.actions.find(

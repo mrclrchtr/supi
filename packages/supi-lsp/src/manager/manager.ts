@@ -146,6 +146,7 @@ import {
   findWorkspaceSymbolWarmTargets,
   getWorkspaceSymbolWarmPosition,
   isWithinAnyScope,
+  joinWorkspaceSymbolReasons,
   limitWorkspaceSymbolWarmRoots,
   type WorkspaceSymbolCollection,
   workspaceSymbolCollectionResult,
@@ -3082,6 +3083,8 @@ export class LspManager {
           Array.from(clients).filter((client) => routeMatches(client)),
           value,
           control,
+          // A scope equal to the session root narrows nothing, so advising a scope still helps.
+          resolvedScopes?.some((scope) => path.resolve(scope) !== path.resolve(this.cwd)) ?? false,
         ),
         demand,
       );
@@ -3136,7 +3139,7 @@ export class LspManager {
     if (warmed.coverageGaps.length > 0) {
       collection = {
         ...collection,
-        coverageGap: [collection.coverageGap, ...warmed.coverageGaps].filter(Boolean).join("; "),
+        coverageGap: joinWorkspaceSymbolReasons([collection.coverageGap, ...warmed.coverageGaps]),
       };
     }
     return workspaceSymbolCollectionResult(collection);

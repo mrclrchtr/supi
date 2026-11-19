@@ -616,10 +616,27 @@ describe("LspManager.workspaceSymbol cold warm-up", () => {
     const result = await manager.workspaceSymbol("Widget");
     expect(result).toMatchObject({
       kind: "partial",
-      reason: expect.stringContaining("limit of 256 workspace symbols"),
+      reason: expect.stringContaining("Use a more specific query or a scope."),
     });
     // A truncated list must block automatic target selection.
     expect(result).not.toHaveProperty("metadata.exclusionOnly");
+
+    // The limit applies before scope filtering: do not advise a scope the caller already set.
+    const scoped = await manager.workspaceSymbol("Widget", undefined, [join(root, "src")]);
+    expect(scoped).toMatchObject({
+      kind: "partial",
+      reason: expect.stringContaining("resolve the declaration by its file or position"),
+    });
+    expect(scoped).not.toMatchObject({ reason: expect.stringContaining("or a scope") });
+
+    // A scope equal to the session root narrows nothing; code_find passes it by default.
+    expect(await manager.workspaceSymbol("Widget", undefined, [root])).toMatchObject({
+      reason: expect.stringContaining("Use a more specific query or a scope."),
+    });
+
+    // tsserver has no row limit, so the same row count is a complete answer.
+    Object.assign(client, { typescriptSelection: { backend: "tsserver" } });
+    expect(await manager.workspaceSymbol("Widget")).toMatchObject({ kind: "completed" });
   });
 
   it("warms a cold workspace-symbol client and returns warmed results", async () => {

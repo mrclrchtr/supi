@@ -85,6 +85,12 @@ export interface CandidateSelection<C extends SelectionCandidate> {
 const CANDIDATE_NOUN: EvidenceNoun = { one: "candidate", other: "candidates" };
 const DISAMBIGUATION_RECOVERY =
   "Choose one candidate handle, or narrow the symbol selector with scope or symbolKind";
+/**
+ * An incomplete list discloses its cause and the step that applies to it.
+ * Generic narrowing advice can contradict that step, for example by suggesting
+ * a scope the caller already set.
+ */
+const INCOMPLETE_DISAMBIGUATION_RECOVERY = "Choose one candidate handle";
 const MISMATCH_RECOVERY =
   "Retry without symbolKind, use an observed provider kind, or choose a near-match handle";
 
@@ -99,7 +105,13 @@ export function assembleCandidateSelection<C extends SelectionCandidate>(
     file: toDisplayPath(cwd, candidate.file),
   }));
   const evidence = rekeyEvidence(outcome.candidateEvidence, key);
-  const recovery = input.recovery ?? (mismatch ? MISMATCH_RECOVERY : DISAMBIGUATION_RECOVERY);
+  const recovery =
+    input.recovery ??
+    (mismatch
+      ? MISMATCH_RECOVERY
+      : evidence.partialReason === null
+        ? DISAMBIGUATION_RECOVERY
+        : INCOMPLETE_DISAMBIGUATION_RECOVERY);
   const title = mismatch ? "Near matches" : "Candidates";
 
   const lines = mismatch

@@ -160,6 +160,9 @@ describe("candidate selection", () => {
     expect(selection.content).toContain(
       "_(showing 2 candidates; more may exist — provider-limited; workspace symbols capped)_",
     );
+    // The disclosure names the applicable step; generic narrowing advice could contradict it.
+    expect(selection.content.split("\n").at(-1)).toBe("Choose one candidate handle.");
+    expect(selection.nextQueries).toEqual(["Choose one candidate handle"]);
   });
 
   it.each([

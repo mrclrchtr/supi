@@ -1145,9 +1145,11 @@ describe("code_find tool", () => {
 
       const text = result.content[0].text;
       expect(text).toContain("No LSP workspace-symbol results were collected");
-      expect(text).toContain("more may exist — provider-limited");
+      // The provider's reason names the cause and the next step, as code_resolve shows it.
+      expect(text).toContain(
+        "more may exist — provider-limited; One project server did not respond.",
+      );
       expect(text).not.toContain("No LSP workspace-symbol results found");
-      expect(text).not.toContain("One project server did not respond");
       const details = result as TextToolResult & {
         details?: {
           type: "search";

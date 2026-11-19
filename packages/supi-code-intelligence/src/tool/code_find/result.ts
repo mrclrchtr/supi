@@ -176,7 +176,12 @@ function createFindEvidence(outcome: Extract<FindWorkflowOutcome, { kind: "compl
     const providerLimited =
       outcome.data.partialReason !== null && outcome.data.partialMetadata?.exclusionOnly !== true;
     const evidence = providerLimited
-      ? createPartialEvidenceList({ ...params, partialReason: "provider-limited" })
+      ? createPartialEvidenceList({
+          ...params,
+          partialReason: "provider-limited",
+          // Names the provider's cause and next step, as target selection does.
+          ...(outcome.data.partialReason ? { partialMessage: outcome.data.partialReason } : {}),
+        })
       : createEvidenceList(params);
     return { total: outcome.data.symbols.length, metadata: evidence.metadata };
   }
