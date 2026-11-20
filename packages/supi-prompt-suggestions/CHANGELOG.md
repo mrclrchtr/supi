@@ -1,5 +1,9 @@
 # Changelog
 
+## [14.1.0]
+
+- Suggestions are shorter and read like a message you would type: no lead-ins such as "I'd say:", no copied long commands, and no steps the assistant did not mention. They follow the language of the assistant's message. Suggestions no longer announce what you are about to do, such as "I'll check…", and appear more often instead of being dropped.
+
 ## [14.0.0]
 
 - Navigating the session tree, with `/tree` or from an extension command, now clears a pending or shown suggestion; it answered the branch you left. No new suggestion is generated after navigation. Runs whose result the session abandons, such as `/supi-tooling-retro`, no longer request a suggestion, so no ghost text answering the retrospective report appears afterwards ([#623](https://github.com/mrclrchtr/supi/issues/623)).
