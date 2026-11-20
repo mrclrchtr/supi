@@ -1,6 +1,6 @@
 [tools]
 node = "lts"
-pnpm = "12.20.0"
+pnpm = "12.21.0"
 hk = "2.13.0"
 pkl = "0.33.1"
 
