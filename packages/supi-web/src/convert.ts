@@ -76,9 +76,10 @@ export async function htmlToMarkdown(
  */
 export function wrapAsCodeBlock(text: string, url: string, contentType = ""): string {
   const lang = languageForContentType(contentType) || guessLanguage(url);
-  const normalized = String(text || "")
+  const unix = String(text || "")
     .replace(/\r\n/g, "\n")
     .replace(/\r/g, "\n");
+  const normalized = lang === "json" ? reindentLongLineJson(unix) : unix;
 
   // Find longest backtick sequence so we can choose a fence that won't conflict
   const backticks = normalized.match(/`+/g) || [];
@@ -90,6 +91,64 @@ export function wrapAsCodeBlock(text: string, url: string, contentType = ""): st
   const body = normalized.endsWith("\n") ? normalized : `${normalized}\n`;
   const prefix = lang ? `${fence}${lang}\n` : `${fence}\n`;
   return normalizeWhitespace(`${prefix}${body}${fence}\n`);
+}
+
+/** Lines longer than this are cut by line-based readers such as `read` and grep output. */
+const READABLE_LINE_CHARS = 500;
+
+/**
+ * Put each member of minified JSON on its own line so line-based tools can read and search it.
+ * Only whitespace between tokens changes: values are copied character by character, never
+ * parsed and re-serialized, so large integers and escape sequences stay exact. Text that
+ * already has short lines, or is not valid JSON, is returned unchanged.
+ */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: one linear token scan
+function reindentLongLineJson(text: string): string {
+  if (!text.split("\n").some((line) => line.length > READABLE_LINE_CHARS)) return text;
+  try {
+    JSON.parse(text);
+  } catch {
+    return text;
+  }
+  const out: string[] = [];
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  let emptyContainer = false;
+  const newline = () => out.push("\n", "  ".repeat(depth));
+  for (const char of text) {
+    if (inString) {
+      out.push(char);
+      if (escaped) escaped = false;
+      else if (char === "\\") escaped = true;
+      else if (char === '"') inString = false;
+      continue;
+    }
+    if (char === " " || char === "\n" || char === "\t") continue;
+    if (char === "}" || char === "]") {
+      depth--;
+      if (!emptyContainer) newline();
+      out.push(char);
+      emptyContainer = false;
+      continue;
+    }
+    if (emptyContainer) newline();
+    emptyContainer = false;
+    if (char === "{" || char === "[") {
+      depth++;
+      out.push(char);
+      emptyContainer = true;
+    } else if (char === ",") {
+      out.push(char);
+      newline();
+    } else if (char === ":") {
+      out.push(": ");
+    } else {
+      out.push(char);
+      if (char === '"') inString = true;
+    }
+  }
+  return out.join("");
 }
 
 function createDocument(html: string, url: string): Document {

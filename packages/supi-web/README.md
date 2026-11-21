@@ -162,6 +162,8 @@ Firecrawl results retain the requested source URL and include `retrieval.provide
 
 The default `auto` mode returns content inline up to 15,000 characters and writes larger pages to a temporary Markdown file. You can ask Pi to force inline or file output.
 
+When a fetch succeeds but the content is probably not the page, the result starts with a notice and the structured result has a `notice` field. This covers an empty response body and HTML that yields almost no text, which is typical for JavaScript-rendered pages; `fetchMode: "firecrawl"` is the usual retry. Minified JSON is written with one member per line so that line-based tools can read it.
+
 All tools cap model-visible inline output at Pi's 2,000-line / 50KB limit. If output is truncated, the complete result is saved to a temporary file for follow-up reads.
 
 Tool rows stay collapsed in Pi's TUI by default. Press `Ctrl+O` to expand their inline output.

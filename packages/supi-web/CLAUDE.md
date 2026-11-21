@@ -34,6 +34,9 @@ The tool registers only when Web Search is enabled and `bx` is available on `PAT
 
 - `web_fetch_md` accepts only HTTP(S). Auto mode returns content inline up to 15,000 characters, otherwise a temporary-file path. Inline model-visible output also respects Pi's line/byte limits; retain the full output when truncating.
 - Preserve native Markdown unchanged. For HTML conversion, `absLinks` defaults to true; false preserves original destinations. Filter unsafe URL schemes in both HTML modes. Wrap plain-text responses in fenced code blocks with a language hint from the content type when it names one (JSON, XML, YAML, JavaScript, CSS, CSV), otherwise from the URL extension.
+- A direct fetch that succeeds without usable content sets `notice` (shown before the content, never written into `markdown` or the file): an empty body, or converted HTML with under 100 characters of text. Short Markdown, plain text, and JSON are what the server sent and get no notice. Firecrawl rejects empty content itself.
+- Decode bodies with `readBodyText`, not `Response.text()`, which ignores the declared charset.
+- Minified JSON (a line over 500 characters) is re-indented by copying tokens, not by `JSON.parse` + `stringify`, so large integers and escapes stay exact.
 - Search preserves provider sources and excerpts rather than generating an answer. Valid empty searches are successful results, not failures.
 - Context7 execution propagates authentication, network, rate-limit, cancellation, and API failures as failed tool calls. The SDK returns every HTTP 404 from library search as an empty successful search. Other search errors, documentation 404s, and library redirects remain failures.
 

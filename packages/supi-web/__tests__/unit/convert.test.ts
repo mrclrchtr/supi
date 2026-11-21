@@ -3,6 +3,42 @@ import { htmlToMarkdown, wrapAsCodeBlock } from "../../src/convert.ts";
 
 // biome-ignore lint/security/noSecrets: false positive on test describe name
 describe("wrapAsCodeBlock", () => {
+  it("puts each member of minified JSON on its own line without changing any value", () => {
+    const value = {
+      name: "pi-sandbox",
+      // Exceeds Number.MAX_SAFE_INTEGER after the edit below; a parse round trip would alter it.
+      id: 1,
+      text: 'braces { } [ ] , : and "quotes" \\ stay inside strings',
+      versions: Array.from({ length: 60 }, (_, index) => ({ version: `1.0.${index}`, tags: [] })),
+      empty: {},
+    };
+    // biome-ignore lint/security/noSecrets: static test fixture, not a credential
+    const minified = JSON.stringify(value).replace('"id":1', '"id":12345678901234567890');
+    expect(minified.length).toBeGreaterThan(500);
+
+    const fenced = wrapAsCodeBlock(
+      minified,
+      "https://registry.example.com/pkg",
+      "application/json",
+    );
+    const body = fenced.replace(/^```json\n/, "").replace(/```\n$/, "");
+
+    expect(Math.max(...body.split("\n").map((line) => line.length))).toBeLessThan(100);
+    // biome-ignore lint/security/noSecrets: static test fixture, not a credential
+    expect(body).toContain('"id": 12345678901234567890');
+    expect(body).toContain('"empty": {}');
+    expect(body).toContain('"tags": []');
+    expect(JSON.parse(body)).toEqual(JSON.parse(minified));
+  });
+
+  it("keeps long-line text that is not valid JSON unchanged", () => {
+    const broken = `{"a": "${"x".repeat(600)}"`;
+
+    expect(wrapAsCodeBlock(broken, "https://example.com/data.json")).toBe(
+      `\`\`\`json\n${broken}\n\`\`\`\n`,
+    );
+  });
+
   it("wraps plain text in fenced code", () => {
     const result = wrapAsCodeBlock("hello world", "https://example.com/file.txt");
     expect(result).toContain("```\nhello world\n```");

@@ -65,6 +65,7 @@ function buildWebFetchSummary(
         ` (${details.chars.toLocaleString()} chars, ${details.lines.toLocaleString()} lines)`,
       ),
       theme.fg("dim", retrievalSummary(details)),
+      noticeSummary(details, theme),
     ].join("");
   }
 
@@ -82,7 +83,15 @@ function buildWebFetchSummary(
     summary += theme.fg("warning", " [truncated]");
   }
 
-  return summary;
+  return summary + noticeSummary(details, theme);
+}
+
+/** Flag a result whose content is probably not the page; the expanded output states why. */
+function noticeSummary(
+  details: WebFetchDetails,
+  theme: { fg: (color: "warning", text: string) => string },
+): string {
+  return details.notice ? theme.fg("warning", " [content notice]") : "";
 }
 
 function retrievalSummary(details: WebFetchDetails): string {

@@ -1,5 +1,11 @@
 # Changelog
 
+## [14.1.0]
+
+- `web_fetch_md` now says when a successful fetch probably did not return the page: an empty response body, or HTML that yields almost no text, as JavaScript-rendered pages do. The result starts with a notice that suggests `fetchMode: "firecrawl"`, and the structured result carries it as `notice`. Before, such a fetch looked like a short but valid page.
+- `web_fetch_md` decodes pages with the charset their `Content-Type` header declares. Pages served as ISO-8859-1 or windows-1252 showed `�` in place of every umlaut and `§`.
+- Minified JSON from `web_fetch_md` is written with one member per line, so `read` and grep can use it. A 106,000-character npm registry document on 4 lines was unreadable before. Values are not changed.
+
 ## [14.0.0]
 
 - `web_fetch_md` now reads PDFs. It returns the text layer as Markdown with one `## Page N` section per page, instead of the raw PDF bytes. A PDF without a text layer (such as a scan), a password-protected or unreadable PDF, or one over 32 MB fails the call with a message that names the cause.

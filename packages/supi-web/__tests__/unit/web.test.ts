@@ -277,6 +277,81 @@ describe("webExtension", () => {
     }
   });
 
+  it.each([
+    {
+      name: "an empty successful body",
+      response: () => new Response("", { status: 202, headers: { "content-type": "text/html" } }),
+      expected: "empty body (HTTP 202)",
+    },
+    {
+      name: "an HTML shell without content",
+      response: () =>
+        new Response(
+          // biome-ignore lint/security/noSecrets: static test fixture, not a credential
+          `<html><head><title>App</title></head><body><h1>Docs</h1><div id="root"></div>${"<script>render()</script>".repeat(20)}</body></html>`,
+          { headers: { "content-type": "text/html" } },
+        ),
+      expected: "may render its content with JavaScript",
+    },
+  ])("flags $name instead of returning it as an ordinary page", async ({ response, expected }) => {
+    const pi = createPiMock();
+    webExtension(pi as never);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => response()),
+    );
+    const tool = pi.tools[0] as RenderableTool;
+
+    try {
+      const result = (await tool.execute(
+        "tc-1",
+        { url: "https://example.com/app" },
+        undefined,
+        undefined,
+        makeCtx(),
+      )) as { content: { text: string }[] };
+
+      expect(result.content[0].text).toContain(expected);
+      expect(result.content[0].text).toContain('fetchMode: "firecrawl"');
+      const data = expectStructuredContent<WebFetchMdOutput>(tool, result);
+      expect(data.notice).toContain(expected);
+      // The notice is reported beside the content, not written into it.
+      if (data.mode !== "inline") throw new Error("Expected inline payload");
+      expect(data.markdown).not.toContain("Notice");
+      expect(renderToolResult(tool, result, false)).toContain("[content notice]");
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("does not flag short content that is what the server sent", async () => {
+    const pi = createPiMock();
+    webExtension(pi as never);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response('{"ok":true}', { headers: { "content-type": "application/json" } }),
+      ),
+    );
+    const tool = pi.tools[0] as RenderableTool;
+
+    try {
+      const result = (await tool.execute(
+        "tc-1",
+        { url: "https://example.com/api/status" },
+        undefined,
+        undefined,
+        makeCtx(),
+      )) as { content: { text: string }[] };
+
+      expect(result.content[0].text).toBe('```json\n{"ok":true}\n```\n');
+      expect(expectStructuredContent<WebFetchMdOutput>(tool, result).notice).toBeUndefined();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("truncates model-visible inline output and saves full content", async () => {
     const pi = createPiMock();
     webExtension(pi as never);

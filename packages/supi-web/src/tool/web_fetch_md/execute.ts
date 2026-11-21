@@ -1,9 +1,9 @@
 import type { AgentToolUpdateCallback, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { loadWebConfig } from "../../config.ts";
 import { htmlToMarkdown, wrapAsCodeBlock } from "../../convert.ts";
-import { isValidHttpUrl } from "../../fetch.ts";
+import { isHtml, isValidHttpUrl } from "../../fetch.ts";
 import { writeImageFile, writeTempFile } from "../../temp-file.ts";
-import { fetchPage } from "./fetch.ts";
+import { fetchPage, type PageFetchResult } from "./fetch.ts";
 import {
   WEB_FETCH_INLINE_MAX_CHARS,
   type WebFetchMdInput,
@@ -55,11 +55,12 @@ async function fetchAsMarkdown(
     details: { url, outputMode },
   });
 
+  const firecrawlEnabled = loadWebConfig(configCwd).firecrawlEnabled;
   const result = await fetchPage(url, {
     timeoutMs,
     signal,
     fetchMode: input.fetchMode,
-    firecrawlEnabled: loadWebConfig(configCwd).firecrawlEnabled,
+    firecrawlEnabled,
   });
   if (result.image) {
     const { data, extension, mediaType } = result.image;
@@ -72,12 +73,14 @@ async function fetchAsMarkdown(
   const markdown = await resolveMarkdown(result, absLinks);
   const lines = markdown.split("\n").length;
   const chars = markdown.length;
+  const notice = contentNotice(result, markdown, firecrawlEnabled);
   const base = {
     chars,
     lines,
     url: result.url,
     outputMode,
     ...(result.retrieval ? { retrieval: result.retrieval } : {}),
+    ...(notice ? { notice } : {}),
   };
 
   if (shouldReturnFile(outputMode, chars)) {
@@ -86,6 +89,32 @@ async function fetchAsMarkdown(
   }
 
   return buildInlineResult(base, markdown);
+}
+
+/** HTML that yields less text than this is reported as probably not the page. */
+const SPARSE_HTML_TEXT_CHARS = 100;
+
+/**
+ * Explain a successful direct fetch whose content is probably not the page. A bot challenge can
+ * answer with an empty 2xx body, and a JavaScript-rendered page yields only its static shell;
+ * both otherwise look like a short but valid result. Firecrawl rejects such content itself.
+ */
+function contentNotice(
+  result: PageFetchResult,
+  markdown: string,
+  firecrawlEnabled: boolean,
+): string | undefined {
+  if (result.retrieval) return undefined;
+  const retry = `Retry with fetchMode: "firecrawl" (${firecrawlEnabled ? "" : "requires Firecrawl enabled in /supi-settings and FIRECRAWL_API_KEY; "}shares the URL and may consume credits) or use another source.`;
+  if (!result.text.trim()) {
+    const status = result.status === undefined ? "" : ` (HTTP ${result.status})`;
+    return `The server returned an empty body${status}; no page content was fetched. ${retry}`;
+  }
+  const extracted = markdown.trim().length;
+  // Only converted HTML can lose its content; short Markdown, text, or JSON is what was served.
+  if (result.isMarkdown || result.isPlainText || !isHtml(result.text)) return undefined;
+  if (extracted >= SPARSE_HTML_TEXT_CHARS) return undefined;
+  return `Only ${extracted.toLocaleString()} characters of text were extracted from ${result.text.length.toLocaleString()} characters of HTML; the page may render its content with JavaScript. ${retry}`;
 }
 
 function shouldReturnFile(outputMode: WebFetchOutputMode, chars: number): boolean {

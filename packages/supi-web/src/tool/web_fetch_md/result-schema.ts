@@ -18,6 +18,12 @@ const metrics = {
   retrieval: Type.Optional(firecrawlRetrievalSchema),
   chars: Type.Integer({ minimum: 0 }),
   lines: Type.Integer({ minimum: 0 }),
+  notice: Type.Optional(
+    Type.String({
+      description:
+        "Set when the fetch succeeded but the content is probably not the page: an empty body, or almost no text extracted from HTML.",
+    }),
+  ),
 };
 
 /** Page payload, or a file reference when auto/file delivery selects a file. */

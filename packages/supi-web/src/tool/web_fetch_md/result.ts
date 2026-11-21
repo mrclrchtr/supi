@@ -14,6 +14,8 @@ export interface WebFetchDetails extends Record<string, unknown> {
   url: string;
   outputMode: WebFetchOutputMode;
   retrieval?: FirecrawlRetrieval;
+  /** Why the fetched content is probably not the page; see {@link WebFetchResultBase.notice}. */
+  notice?: string;
   filePath?: string;
   /** Set when the file is a saved image, not Markdown. */
   mediaType?: string;
@@ -29,6 +31,11 @@ export interface WebFetchResultBase {
   url: string;
   outputMode: WebFetchOutputMode;
   retrieval?: FirecrawlRetrieval;
+  /**
+   * Set when the request succeeded but the content is probably not the page (empty body, or
+   * almost no text extracted from HTML). Shown before the content and kept out of `markdown`.
+   */
+  notice?: string;
 }
 
 /** Assemble the file-mode result for one fetch. */
@@ -37,7 +44,7 @@ export function buildFileResult(base: WebFetchResultBase, filePath: string): Web
     content: [
       {
         type: "text",
-        text: `${retrievalNotice(base)}Content written to ${filePath} (${base.chars.toLocaleString()} chars, ${base.lines.toLocaleString()} lines). Use the read tool to access it.`,
+        text: `${contentNotice(base)}${retrievalNotice(base)}Content written to ${filePath} (${base.chars.toLocaleString()} chars, ${base.lines.toLocaleString()} lines). Use the read tool to access it.`,
       },
     ],
     structuredContent: {
@@ -47,6 +54,7 @@ export function buildFileResult(base: WebFetchResultBase, filePath: string): Web
       lines: base.lines,
       filePath,
       ...(base.retrieval ? { retrieval: base.retrieval } : {}),
+      ...(base.notice ? { notice: base.notice } : {}),
     },
     details: { ...base, filePath },
   };
@@ -74,10 +82,13 @@ export async function buildInlineResult(
   base: WebFetchResultBase,
   markdown: string,
 ): Promise<WebFetchResult> {
-  const output = await limitModelVisibleOutput(retrievalNotice(base) + markdown, {
-    tempPrefix: "web-fetch-md",
-    suffix: ".md",
-  });
+  const output = await limitModelVisibleOutput(
+    contentNotice(base) + retrievalNotice(base) + markdown,
+    {
+      tempPrefix: "web-fetch-md",
+      suffix: ".md",
+    },
+  );
   return {
     content: [{ type: "text", text: output.text }],
     structuredContent: {
@@ -88,6 +99,7 @@ export async function buildInlineResult(
       markdown,
       modelOutput: modelOutputMetadata(output),
       ...(base.retrieval ? { retrieval: base.retrieval } : {}),
+      ...(base.notice ? { notice: base.notice } : {}),
     },
     details: {
       ...base,
@@ -95,6 +107,10 @@ export async function buildInlineResult(
       fullOutputPath: output.fullOutputPath,
     },
   };
+}
+
+function contentNotice(base: WebFetchResultBase): string {
+  return base.notice ? `[Notice: ${base.notice}]\n\n` : "";
 }
 
 function retrievalNotice(base: WebFetchResultBase): string {

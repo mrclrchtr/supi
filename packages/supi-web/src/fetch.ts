@@ -27,6 +27,8 @@ export interface FetchResult {
   isPlainText: boolean;
   /** An image body to save as a file; `text` is empty when set. */
   image?: FetchedImage;
+  /** HTTP status of the response that supplied the body, when one direct response did. */
+  status?: number;
 }
 
 /** Image bytes with the media type and the extension for the saved file. */
@@ -112,10 +114,11 @@ async function tryHeadNegotiation(
       });
     return {
       url: getRes.url || url,
-      text: await getRes.text(),
+      text: await readBodyText(getRes),
       contentType: ct,
       isMarkdown: true,
       isPlainText: false,
+      status: getRes.status,
     };
   } catch (err) {
     if (signal?.aborted) throw err;
@@ -281,10 +284,11 @@ async function buildFetchResult(
 ): Promise<FetchResult> {
   return {
     url: response.url || fallbackUrl,
-    text: await response.text(),
+    text: await readBodyText(response),
     contentType,
     isMarkdown: kind.isMarkdown,
     isPlainText: kind.isPlainText,
+    status: response.status,
   };
 }
 
@@ -410,7 +414,7 @@ async function fetchAsHtml(
   // Reached when the sniff request failed, so non-text content was not detected earlier.
   const typedKind = nonTextKind(contentType, "");
   if (typedKind) return buildNonTextResult(typedKind, res, url);
-  const text = await res.text();
+  const text = await readBodyText(res);
   if (looksBinary(text.slice(0, SNIFF_BYTES))) return buildNonTextResult("binary", res, url);
   return {
     url: res.url || url,
@@ -418,7 +422,25 @@ async function fetchAsHtml(
     contentType,
     isMarkdown: false,
     isPlainText: false,
+    status: res.status,
   };
+}
+
+/**
+ * Decode a response body with the charset its `Content-Type` header declares. `Response.text()`
+ * always decodes as UTF-8, which turns every non-ASCII character of an ISO-8859-1 or
+ * windows-1252 page into U+FFFD. An absent or unknown charset keeps the UTF-8 default.
+ */
+async function readBodyText(res: Response): Promise<string> {
+  const charset = /charset\s*=\s*"?([^";\s]+)/i.exec(res.headers.get("content-type") || "")?.[1];
+  if (!charset || /^utf-?8$/i.test(charset)) return res.text();
+  let decoder: TextDecoder;
+  try {
+    decoder = new TextDecoder(charset);
+  } catch {
+    return res.text();
+  }
+  return decoder.decode(await res.arrayBuffer());
 }
 
 /** Error thrown on fetch failures. */

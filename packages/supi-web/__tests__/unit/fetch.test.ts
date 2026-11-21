@@ -326,6 +326,30 @@ describe("fetchWithNegotiation with other non-text content", () => {
   );
 });
 
+describe("fetchWithNegotiation with a declared charset", () => {
+  it("decodes an ISO-8859-1 page with the charset from its content type", async () => {
+    const body = Buffer.from(
+      // biome-ignore lint/security/noSecrets: static test fixture, not a credential
+      "<html><body><h1>\u00a7 307 Gesch\u00e4ftsbedingungen</h1></body></html>",
+      "latin1",
+    );
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string | URL | Request) =>
+        String(url) === "https://example.com/law"
+          ? new Response(body, { headers: { "content-type": "text/html; charset=ISO-8859-1" } })
+          : new Response("Not Found", { status: 404 }),
+      ),
+    );
+
+    const result = await fetchWithNegotiation("https://example.com/law");
+
+    // biome-ignore lint/security/noSecrets: static test fixture, not a credential
+    expect(result.text).toContain("\u00a7 307 Gesch\u00e4ftsbedingungen");
+    expect(result.text).not.toContain("\ufffd");
+  });
+});
+
 describe("fetchWithNegotiation with XML data", () => {
   it.each([
     ["image/svg+xml", '<?xml version="1.0"?>\n<svg xmlns="http://www.w3.org/2000/svg"/>'],
