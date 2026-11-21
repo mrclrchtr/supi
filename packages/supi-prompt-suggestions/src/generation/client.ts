@@ -14,39 +14,27 @@ import {
 export const GENERATION_TIMEOUT_MS = 20_000;
 
 /**
- * System prompt instructs the model to predict the user's next message,
- * preferably an imperative command to the assistant, or return the
- * NO_SUGGESTION sentinel when none is useful.
+ * System prompt instructs the model to write the user's next message:
+ * a direct answer to an assistant question, or the obvious next
+ * instruction, or the NO_SUGGESTION sentinel when none is plausible.
+ *
+ * Kept short on purpose: small suggestion models followed a long rule list
+ * less reliably and echoed yes/no questions back ("Darf ich …?").
  *
  * The model receives no PI, SuPi, project, or conversation context —
  * only the last assistant message text is sent.
  */
-const SYSTEM_PROMPT = `You predict the next message a developer types to their coding assistant.
-You receive the assistant's last message. Write the single line the USER would send next.
+const SYSTEM_PROMPT = `You write the next message the user sends to their coding assistant, given the assistant's last message.
 
-Rules:
-- Write as the user talking to the assistant. Never write in the assistant's voice and never ask the user anything (no "Should I…?", "Do you want…?", "Shall we…?").
-- Write in the language of the assistant's message.
-- Start directly with the message itself. Never add a lead-in or framing in any language, such as "Suggestion:", "I'd say:", "Ich würde sagen:", or "Next:".
-- Prefer a short imperative command that moves the work forward: "Push the branch.", "Run the tests.", "Fix the lint errors."
-- If the assistant asks a question or offers options, answer it as a command that picks the most sensible option, e.g. "Yes, push it to origin." or "Use option 2."
-- If the assistant tells the user to run or check something, the user usually delegates it: "Run the test yourself."
-- Never announce or narrate what the user is about to do ("I'll check…", "Let me try…", "Ich schau mal…"). If the user must check something first, write the reply they send afterwards, assuming it worked: "Works.", "Passt."
-- Only reference steps, commands, and options that appear in the assistant's message. Never invent extra steps.
-- Refer to commands briefly by name or purpose; do not copy long commands, paths, or code. The assistant already knows them.
-- No greetings, thanks, politeness, explanations, quotes, or markdown.
-- Be terse like a real developer: usually 2–8 words, never more than 80 characters.
-- Almost always suggest something. If the assistant only reports status or asks for feedback, suggest the most likely short reply, such as "Looks good, commit it." or "Try it again."
-- Respond with exactly NO_SUGGESTION only when the message gives no hint at all about what the user might say next.
+- Write as the user, always in the language of the assistant's message. Never ask the assistant anything, never repeat its question back, and never announce what you will do yourself.
+- If the assistant asks a question, answer it directly and decisively: "Ja, mach.", "Nein, committe direkt.", "Option 2."
+- If the assistant asks the user to run or check something, delegate it back: "Führ das selbst aus.", "Run it yourself."
+- Otherwise give the obvious next instruction: "Push.", "Commit.", "Tests laufen lassen."
+- Terse like a real developer: 1–8 words. No lead-ins, quotes, markdown, politeness, explanations, or copied commands.
+- Only reference options from the assistant's message.
+- Output NO_SUGGESTION if there is no plausible reply.
 
-Examples (assistant message → your output):
-"Committed as abc123. Not pushed: the branch is 3 commits ahead of origin." → Push the branch.
-"Should I also update the README, or keep the change code-only?" → Update the README too.
-"Two options: A) add a cache, B) batch the requests. Which do you prefer?" → Go with B.
-"To verify, run \`npm ci && npm test -- --coverage\` and check the report." → Run the tests yourself.
-"Fertig. Zum Prüfen: \`brew uninstall foo && chezmoi apply\` ausführen." → Führ den Test selbst aus.
-
-Output only the message text.`;
+Output only the message.`;
 
 // ── Prompt building ────────────────────────────────────────────────────────
 

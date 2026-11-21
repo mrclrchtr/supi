@@ -41,9 +41,12 @@ Suggestions use `completeSimpleModelRequest` from `@mrclrchtr/supi-core/llm`, ba
 headers, provider environment, and the effective endpoint. The request uses the stable
 `prompt-suggestions` affinity scope. PI's simple path supplies model output limits and context
 guards; the extension does not import Pi AI implementation subpaths. Only the last 8,000
-characters of the final assistant message are sent. The system prompt instructs the model to predict the user's next line in the user's voice,
-preferring imperative commands (answering assistant questions as commands) over questions, or to
-return the `NO_SUGGESTION` sentinel. The user message wraps the assistant text in
+characters of the final assistant message are sent. The system prompt is deliberately short: it asks for the user's next message in the user's voice
+and the assistant's language, answering assistant questions directly, delegating check commands
+back, or giving the obvious next instruction; otherwise the `NO_SUGGESTION` sentinel. Long rule
+lists made small suggestion models echo yes/no questions back ("Darf ich …?"). Probe prompt changes
+against the configured model with `pi -p --no-session -nt --system-prompt …` on several assistant
+messages (question, options, status, check command, German and English). The user message wraps the assistant text in
 `<assistant_message>...</assistant_message>` tags and appends `User's next message:` — no
 PI, SuPi, project, or conversation context is included. `buildPrompt` puts a zero-width space
 before every `@`: the `claude-code` provider's CLI otherwise reads `@name` as a file mention and
