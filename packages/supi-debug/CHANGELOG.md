@@ -1,5 +1,10 @@
 # Changelog
 
+## [14.1.0]
+
+- `gather-retrospectives` accepts `--workspace` more than once to collect several directory trees, such as a repository and its sibling Git worktrees, into one snapshot. The combined set has one last-gather marker, regardless of argument order. The skill now checks `git worktree list` before asking for scope and recommends including sibling worktrees when they exist, since delegated and review sessions often run there.
+- The `gather-retrospectives` summary now reports every theme with at least two hits and exact counts, cites reports with a readable session timestamp and line instead of truncated file names, and is written directly in the reply language.
+
 ## [14.0.0]
 
 - **Breaking:** `/supi-tooling-retro` is now an extension command instead of a prompt template. With Debug capture enabled and persisted (`persistLevel` at `info` or lower), each normally completed report is stored as a `tooling-retrospective` Debug event, and `gather-retrospectives` collects it as a third source, `--source supi-debug`; the default still gathers all sources. Aborted, failed, or truncated reports are not stored. Without active persistence the command still runs and says the report is not stored. If the agent is busy, the command waits until it is idle. The retrospective now runs on a side branch: afterwards the session returns to where it was, the report stays visible as a display-only entry, and the next prompt continues without the retrospective in the agent's context; use `/tree` to revisit the side branch. Reports written before this release are not collected ([#608](https://github.com/mrclrchtr/supi/issues/608)). Migration: a prompt-template override named `supi-tooling-retro.md` no longer applies, because extension commands take precedence over templates. Rename the override, for example to `my-tooling-retro.md`, and invoke it as `/my-tooling-retro`; its reports are not stored.

@@ -3,8 +3,9 @@ import { dirname, join } from "node:path";
 
 /**
  * Last-gather markers live outside session storage so collection never modifies sessions.
- * One marker per scope: session storage, workspace (null = all), and source (null = all
- * producers). Markers recorded before a producer was added stay valid: its events are newer.
+ * One marker per scope: session storage, workspace (a path, a sorted path list for combined
+ * trees such as sibling worktrees, or null = all), and source (null = all producers). Markers
+ * recorded before a producer was added stay valid: its events are newer.
  */
 export function gatherStatePath(agentDir) {
   return join(agentDir, "supi", "retrospectives", "last-gather.json");

@@ -24,7 +24,8 @@ const help = `Collect stored retrospectives without modifying sessions.
 Usage: node collect.mjs --output <new-file.json> [collection options]
        node collect.mjs --read <evidence.json> [display options]
        node collect.mjs --read <evidence.json> --export <new-file.jsonl> [--refs]
-  --workspace <path>     Include sessions in this directory tree (default: cwd)
+  --workspace <path>     Include sessions in this directory tree (default: cwd);
+                         repeat to combine trees, such as sibling Git worktrees
   --all-workspaces       Explicitly include other projects; replaces --workspace
   --sessions-dir <path>  Override PI storage discovery
   --source <name>        supi-agent (delegated runs), supi-review (Reviewer Runs), or
@@ -102,10 +103,21 @@ function validateCollection(values) {
   }
 }
 
+/**
+ * One tree stays a string so existing last-gather markers keep their scope key; several trees
+ * become a sorted, deduplicated array so argument order does not split markers.
+ */
+async function workspaces(paths = [process.cwd()]) {
+  const unique = [...new Set(await Promise.all(paths.map(canonicalPath)))].sort((a, b) =>
+    a < b ? -1 : a > b ? 1 : 0,
+  );
+  return unique.length === 1 ? unique[0] : unique;
+}
+
 async function options() {
   const { values } = parseArgs({
     options: {
-      workspace: { type: "string" },
+      workspace: { type: "string", multiple: true },
       "all-workspaces": { type: "boolean" },
       "sessions-dir": { type: "string" },
       source: { type: "string" },
@@ -134,9 +146,7 @@ async function options() {
   if (values.read) return readOptions(values, display);
   validateCollection(values);
   const scope = {
-    workspace: values["all-workspaces"]
-      ? null
-      : await canonicalPath(values.workspace || process.cwd()),
+    workspace: values["all-workspaces"] ? null : await workspaces(values.workspace),
     sessionsDir: await sessionDirectory(values["sessions-dir"]),
     source: values.source ?? null,
   };

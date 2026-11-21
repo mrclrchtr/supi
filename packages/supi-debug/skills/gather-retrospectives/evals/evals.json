@@ -58,6 +58,7 @@
         "Asks one combined question covering workspace, time range, and source before any collector run.",
         "Offers recommended defaults, offers since-last-gather when a marker exists or says that none exists, and does not treat the supi-agent topic as a --source filter.",
         "Does not widen scope to other workspaces without explicit approval.",
+        "Checks for sibling Git worktrees before asking and offers them as a workspace option only when they exist.",
         "Ends the turn after the question without running the collector, and states what it will do with the recommended defaults, including whether this gather updates the last-gather marker."
       ]
     }

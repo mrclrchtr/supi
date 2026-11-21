@@ -120,7 +120,8 @@ async function readHeader(line, path, config, coverage) {
     return null;
   }
   const cwd = await canonicalPath(session.cwd);
-  if (config.workspace && !within(config.workspace, cwd)) return null;
+  const workspaces = config.workspace === null ? null : [config.workspace].flat();
+  if (workspaces && !workspaces.some((workspace) => within(workspace, cwd))) return null;
   coverage.scopedSessions++;
   return session;
 }
@@ -177,10 +178,11 @@ async function scanSession(path, config, coverage, visitor) {
 
 /**
  * Stream every in-scope session under `config.sessionsDir` (at most `config.maxSessions` files,
- * filtered by `config.workspace` unless null). Calls `visitor.startSession(context)`, then
- * `visitor.entry(entry, { ...context, line, raw })` for each parsed entry after the header, then
- * `visitor.endSession(context)`. Optional `visitor.accept(raw)` skips lines before parsing (a
- * cheap prefilter; skipped lines are not checked for malformed JSON). Malformed lines count in
+ * filtered by `config.workspace`, a path or path array, unless null). Calls
+ * `visitor.startSession(context)`, then `visitor.entry(entry, { ...context, line, raw })` for
+ * each parsed entry after the header, then `visitor.endSession(context)`. Optional
+ * `visitor.accept(raw)` skips lines before parsing (a cheap prefilter; skipped lines are not
+ * checked for malformed JSON). Malformed lines count in
  * `coverage.malformedEntries` and are skipped. Symlinks are not followed.
  */
 export async function scanSessions(config, coverage, visitor) {

@@ -366,6 +366,35 @@ describe("retrospective collector CLI", () => {
     expect(JSON.parse(await readFile(output, "utf8")).records[0].runKey).toBe("new");
   });
 
+  it("combines repeated --workspace trees under one order-independent marker", async () => {
+    const sibling = `${workspace}-wt1`;
+    await mkdir(sibling);
+    await session("a.jsonl", workspace, [retrospective("main", "Main.")]);
+    await session("b.jsonl", sibling, [retrospective("wt1", "Sibling.")]);
+    await session("c.jsonl", `${workspace}-wt2`, [retrospective("wt2", "Excluded.")]);
+
+    const first = await collect(["--workspace", sibling]);
+    expect(first.evidence.records.map((r: { runKey: string }) => r.runKey).sort()).toEqual([
+      "main",
+      "wt1",
+    ]);
+    await rm(output);
+    const reordered = await execute(process.execPath, [
+      script.pathname,
+      "--sessions-dir",
+      sessions,
+      "--workspace",
+      sibling,
+      "--workspace",
+      workspace,
+      "--output",
+      output,
+    ]);
+    expect(JSON.parse(reordered.stdout).scope.previousGather).toBe(
+      first.preview.scope.recordedGather,
+    );
+  });
+
   it("--since-last collects only reports after the previous gather of the same scope", async () => {
     const now = Date.now();
     await session("a.jsonl", workspace, [retrospective("old", "Old.", "supi-agent", now - 60_000)]);
