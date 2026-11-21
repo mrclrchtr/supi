@@ -1,5 +1,41 @@
 # Changelog
 
+## [14.1.0](https://github.com/mrclrchtr/supi/compare/v14.0.0...v14.1.0) (2026-11-21)
+
+This release makes Code Intelligence results more self-contained, with source lines in `code_graph`, larger default result limits, shorter handles, and sharper tool guidelines. It also improves prompt suggestions, `web_fetch_md` robustness, Review packets, and retrospective gathering.
+
+### Code Intelligence & LSP
+
+* `code_graph` shows the source line of each reference and implementation site, so a result shows how a symbol is used without a follow-up `read`.
+* `code_graph` and `code_find` show up to 50 results by default instead of 8, and `code_resolve` file outlines show up to 50 declarations instead of 10, top-level declarations first. `maxResults` still overrides the default.
+* Target handles are 12 decimal digits (`676397776155`) instead of `tg-` plus 28 hex characters, which takes about a quarter of the tokens. Handles from earlier sessions are not found; resolve the target again.
+* File outlines list TypeScript type aliases and `get`/`set` accessors once instead of twice.
+* The code tools accept a nested argument that a model sent as a JSON string, such as `target: "{\"symbol\":{…}}"`, instead of failing validation.
+* The code tool guidelines name the action that calls for each tool: `code_graph` before changing an exported symbol and once per symbol for several symbols, `code_refactor_plan` for renames, `code_resolve` for one declaration, and `code_find` with AST kind `definition` for name fragments.
+
+### Prompt Suggestions
+
+* Suggestions are shorter, read like a message you would type, follow the assistant's language, and answer yes/no questions directly instead of echoing them.
+* `@name` text in the assistant's message, such as `@mixin`, no longer makes suggestions answer in the assistant's voice.
+
+### Web
+
+* `web_fetch_md` flags empty or JavaScript-rendered pages with a notice that suggests `fetchMode: "firecrawl"`, decodes pages with their declared charset, and writes minified JSON one member per line.
+
+### Agents & Review
+
+* The `review_run` Reviewer Packet lists up to 200 changed paths and names the Git command for the rest; `review_run` warns when `from` is not an ancestor of the reviewed state, such as a base branch tip instead of the merge base.
+* Reviewers keep separate findings under a length limit, and the `explore` prompt says that a length limit covers the prose while sources go into one list after it.
+* Agent Runs and Reviewer Sessions use the bundled Code Intelligence 14.1.0.
+
+### Debug
+
+* `gather-retrospectives` accepts `--workspace` more than once to collect sibling Git worktrees into one snapshot, reads answers under headings every report shares, and reports themes with exact counts and readable citations.
+
+### Dependencies
+
+* Routine dependency updates, including `jsdom`, `fast-xml-parser`, and `unpdf`.
+
 ## [14.0.0](https://github.com/mrclrchtr/supi/compare/v13.0.0...v14.0.0) (2026-11-19)
 
 This release makes TypeScript symbol lookups complete across multi-project workspaces, gives delegated agents a read-only `git` tool and better prompts, lets `web_fetch_md` read PDFs and images, and reorganizes the footer.

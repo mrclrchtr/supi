@@ -1,6 +1,6 @@
 {
   "name": "@mrclrchtr/supi-extras",
-  "version": "14.0.0",
+  "version": "14.1.0",
   "description": "Compact codemode rows, session capability controls, prompt stash, shortcuts, and activity indicators",
   "license": "MIT",
   "repository": {

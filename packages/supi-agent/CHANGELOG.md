@@ -3,6 +3,7 @@
 ## [14.1.0]
 
 - The `explore` system prompt says how a length limit applies to a sourced answer: the limit covers the prose, and required sources go once into a numbered list after it. Before, runs asked for "about 900 words" with a URL on every claim could not meet both.
+- Child sessions use the bundled Code Intelligence 14.1.0: `code_graph` shows the source line of each reference, `code_graph` and `code_find` show up to 50 results by default, target handles are 12 decimal digits, and nested arguments sent as JSON strings are accepted.
 
 ## [14.0.0]
 

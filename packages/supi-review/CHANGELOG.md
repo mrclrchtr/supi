@@ -5,6 +5,7 @@
 - The changed-path manifest in a Reviewer Packet now lists up to 200 paths for ordinary path lengths. Before, a character budget cut a 154-file change at 102 paths and hid directories the review focused on. When paths are still omitted, the manifest names the exact Git command that lists them all.
 - `review_run` warns when `from` is not an ancestor of the reviewed state, for example a base branch tip instead of the merge base. The target is unchanged, but the result and the Reviewer Packet name the merge base and say that the change also reverses commits only `from` contains. The `target` description now asks for the merge base for branch work.
 - Reviewers apply a length limit from the Review Task to the summary and keep each finding as its own entry with its evidence. Before, "under 400 words" made Reviewers merge separate findings.
+- Reviewer child sessions use the bundled Code Intelligence 14.1.0: `code_graph` shows the source line of each reference, `code_graph` and `code_find` show up to 50 results by default, target handles are 12 decimal digits, and nested arguments sent as JSON strings are accepted.
 
 ## [14.0.0]
 
