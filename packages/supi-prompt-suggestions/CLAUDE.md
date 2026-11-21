@@ -45,7 +45,10 @@ characters of the final assistant message are sent. The system prompt instructs 
 preferring imperative commands (answering assistant questions as commands) over questions, or to
 return the `NO_SUGGESTION` sentinel. The user message wraps the assistant text in
 `<assistant_message>...</assistant_message>` tags and appends `User's next message:` — no
-PI, SuPi, project, or conversation context is included.
+PI, SuPi, project, or conversation context is included. `buildPrompt` puts a zero-width space
+before every `@`: the `claude-code` provider's CLI otherwise reads `@name` as a file mention and
+appends a "read them with your file tools" note that the model answers instead of predicting.
+Normalization strips zero-width spaces from the result.
 
 ### Settings use the fixed config adapter
 

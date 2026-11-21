@@ -56,6 +56,10 @@ describe("normalizeSuggestion", () => {
     expect(normalizeSuggestion("Fix the /bug in createUser")).toBe("Fix the /bug in createUser");
   });
 
+  it("removes zero-width spaces copied from the guarded prompt", () => {
+    expect(normalizeSuggestion("Use \u200B@variant hover.")).toBe("Use @variant hover.");
+  });
+
   // ── NO_SUGGESTION sentinel ───────────────────────────────
 
   it("rejects exact NO_SUGGESTION", () => {

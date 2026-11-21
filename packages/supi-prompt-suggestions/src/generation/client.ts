@@ -50,9 +50,20 @@ Output only the message text.`;
 
 // ── Prompt building ────────────────────────────────────────────────────────
 
+/**
+ * Zero-width space placed before each `@` in the assistant text.
+ *
+ * CLI-backed providers such as `claude-code` read `@name` in a user message as
+ * a file mention and append "The user @-mentioned name… read them with your
+ * file tools" to the request. The suggestion model then answers that note
+ * ("I'll read the file first…") instead of predicting the user's reply.
+ */
+const MENTION_GUARD = "\u200B";
+
 /** Format the tail text as a completion prompt. */
 export function buildPrompt(tail: string): string {
-  return `<assistant_message>\n${tail}\n</assistant_message>\n\nUser's next message:`;
+  const guarded = tail.replaceAll("@", `${MENTION_GUARD}@`);
+  return `<assistant_message>\n${guarded}\n</assistant_message>\n\nUser's next message:`;
 }
 
 // ── Types ───────────────────────────────────────────────────────────────────

@@ -29,7 +29,8 @@ export interface NormalizedSuggestion {
  * Exported for orchestration and testing.
  */
 export function normalizeSuggestionDetailed(text: string): NormalizedSuggestion | null {
-  let normalized = text.trim();
+  // Drop zero-width spaces: the prompt adds them before `@`, and a model may copy them.
+  let normalized = text.replaceAll("\u200B", "").trim();
 
   // Strip matching outer quotes
   if (

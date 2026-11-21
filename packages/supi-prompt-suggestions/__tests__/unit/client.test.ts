@@ -60,6 +60,12 @@ describe("buildPrompt", () => {
     const prompt = buildPrompt("do X");
     expect(prompt).toBe("<assistant_message>\ndo X\n</assistant_message>\n\nUser's next message:");
   });
+
+  it("guards every @ so CLI-backed providers do not read it as a file mention", () => {
+    const prompt = buildPrompt("Use `@variant hover`:\n  @variant hover {}");
+    expect(prompt).not.toMatch(/(?<!\u200B)@/u);
+    expect(prompt.replaceAll("\u200B", "")).toContain("Use `@variant hover`:\n  @variant hover {}");
+  });
 });
 
 describe("callSuggestionModel", () => {
