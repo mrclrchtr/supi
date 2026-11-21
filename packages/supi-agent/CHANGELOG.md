@@ -1,5 +1,9 @@
 # Changelog
 
+## [14.1.0]
+
+- The `explore` system prompt says how a length limit applies to a sourced answer: the limit covers the prose, and required sources go once into a numbered list after it. Before, runs asked for "about 900 words" with a URL on every claim could not meet both.
+
 ## [14.0.0]
 
 - The `explore` profile gets a read-only `git` tool for diffs, history, and blame, for example `{ "args": ["diff", "main...HEAD", "--stat"] }`. It runs without a shell, admits only `diff`, `log`, `show`, `blame`, `status`, `rev-parse`, and `ls-files`, and rejects options that write files or run configured diff programs. Explorers stay read-only, so they still run in parallel and in the background. Custom profiles can add `git` to their `tools` list.
