@@ -848,8 +848,8 @@ importers:
         specifier: '*'
         version: 1.4.6
       unpdf:
-        specifier: 2.1.0
-        version: 2.1.0
+        specifier: 2.2.0
+        version: 2.2.0
     devDependencies:
       '@mrclrchtr/supi-test-utils':
         specifier: workspace:*
@@ -2734,13 +2734,16 @@ packages:
     resolution: {integrity: sha512-VGXBUVwxKMBUznyffQweQABPRRW1vHZAbadFZud4pLFAqRGvv/96vafgjWFqzourzr8YonlQiPgH0YCJfawoGQ==}
     engines: {node: '>=12'}
 
-  unpdf@2.1.0:
-    resolution: {integrity: sha512-G/Hsrm++g0EoubUhV8TDFItq6oQ+FUu9EMvIRtHUwseKXB0iJoCvaLvBGOpYUBqyvggv/XfxhYYtohL2QpE3xQ==}
+  unpdf@2.2.0:
+    resolution: {integrity: sha512-E33ir6FPxrLuRlhLJ3KbPwcOnHozd6ITe/uhr22+Oiis6e7YQ9N/9K7hfMe1aZ9yoO6eypgI1Cc7UuYP6BkyWw==}
     engines: {node: '>=24'}
     peerDependencies:
       '@napi-rs/canvas': ^0.1.69 || ^1.0.0
+      pdfjs-dist: '*'
     peerDependenciesMeta:
       '@napi-rs/canvas':
+        optional: true
+      pdfjs-dist:
         optional: true
 
   verkit@0.5.0:
@@ -4763,7 +4766,7 @@ snapshots:
     dependencies:
       crypto-random-string: 4.0.0
 
-  unpdf@2.1.0: {}
+  unpdf@2.2.0: {}
 
   verkit@0.5.0: {}
 
