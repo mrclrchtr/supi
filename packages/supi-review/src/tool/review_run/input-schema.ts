@@ -59,7 +59,7 @@ const targetSchema = Type.Object(
     maxProperties: 1,
     additionalProperties: false,
     description:
-      "Omit target or use {} for the current filesystem; otherwise select workingTree or committed. All-state batches must omit from. Endpoints must resolve to commits; ranges, trees, and blobs are invalid.",
+      "Omit target or use {} for the current filesystem; otherwise select workingTree or committed. All-state batches must omit from. Endpoints must resolve to commits; ranges, trees, and blobs are invalid. from is compared directly (two-dot): for branch work pass the merge base with the base branch, not the base branch tip.",
   },
 );
 

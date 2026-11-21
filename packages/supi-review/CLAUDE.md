@@ -14,7 +14,7 @@ Caller-defined code review tasks run in managed, Inspection-only Reviewer Sessio
 
 ## Targets and Review Workspaces
 
-- A Review Target selects at most one `workingTree` or `committed` source object. Omission, or an empty target, selects the current filesystem. The Review Engine resolves endpoint syntax once to exact full commits. It does not compute a merge base in the public resolver.
+- A Review Target selects at most one `workingTree` or `committed` source object. Omission, or an empty target, selects the current filesystem. The Review Engine resolves endpoint syntax once to exact full commits. It never substitutes a merge base for `from`: the target stays the exact two-dot comparison. When `from` is not an ancestor of the after commit, the snapshot records `divergedFrom` (with the merge base, when one exists), and both the Reviewer Packet and the parent-facing result warn about it.
 - A `workingTree` change defaults `from` to captured `HEAD`. Its workspace checks out exact `from` and stages one canonical patch to the frozen filesystem, including non-ignored untracked files. The caller index is not evidence.
 - A committed change requires explicit `from`; `to` defaults to `HEAD`. Its workspace checks out exact `to`.
 - A state task receives only the frozen after state. An all-state batch rejects explicit `from` and can review a root `to`. A change task needs a non-empty canonical change; a committed change rejects a root `to`; a root `from` is valid.

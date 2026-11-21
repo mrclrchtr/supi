@@ -21,6 +21,7 @@ import type {
   ReviewExecutionPartialTaskState,
   ReviewExecutionProgressDetails,
 } from "./execution.ts";
+import { formatTargetDivergence } from "./format.ts";
 import { REVIEW_RUN_TOOL_NAME } from "./spec.ts";
 
 function formatTaskCollapsed(result: ReviewTaskResult, theme: Theme): string {
@@ -261,6 +262,8 @@ function buildExpanded(details: ReviewBatchDetails, theme: Theme): Container {
       0,
     ),
   );
+  const divergence = formatTargetDivergence(details.snapshot);
+  if (divergence) container.addChild(new Text(theme.fg("warning", `target: ${divergence}`), 1, 0));
   if (details.cleanupWarning) {
     container.addChild(new Spacer(1));
     container.addChild(

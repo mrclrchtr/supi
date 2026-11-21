@@ -24,6 +24,21 @@ function formatScopeFocus(scope: ReviewScope | undefined): string {
     : "repository-wide review";
 }
 
+/**
+ * Parent-facing warning for a before commit that is not an ancestor of the after commit. The
+ * caller chose `from`, so it is the one that can correct a wrong base.
+ */
+export function formatTargetDivergence(
+  snapshot: ReviewBatchDetails["snapshot"],
+): string | undefined {
+  const divergence = snapshot.divergedFrom;
+  if (!divergence) return undefined;
+  const from = snapshot.target.fromCommit;
+  return divergence.mergeBase
+    ? `from ${from} is not an ancestor of the reviewed state (merge base ${divergence.mergeBase}). The reviewed change also reverses the commits only from contains; pass the merge base as from to review only this side's own changes.`
+    : `from ${from} has no merge base with the reviewed state; the reviewed change compares unrelated histories.`;
+}
+
 function appendSubmissionRecovery(lines: string[], result: ReviewTaskResult): void {
   const recovery = result.submissionRecovery;
   if (!recovery) return;
@@ -101,6 +116,8 @@ export function formatReviewBatch(details: ReviewBatchDetails): string {
     `Focus: ${formatScopeFocus(details.scope)}`,
     workspaceReceipt,
   ];
+  const divergence = formatTargetDivergence(details.snapshot);
+  if (divergence) lines.push(`Target warning: ${divergence}`);
   if (details.planning) {
     lines.push(
       `Planner: ${details.planning.modelId} (protocol ${details.planning.promptVersion})`,

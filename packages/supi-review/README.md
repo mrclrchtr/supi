@@ -75,6 +75,8 @@ Each task must set `mode` to `change` or `state`.
 
 A committed change cannot use a root commit as `to`. A root commit is valid as `from`. Every Review requires a repository with `HEAD`.
 
+`from` is compared directly with the after state (a two-dot diff). For branch work, pass the merge base with the base branch, for example the output of `git merge-base main HEAD`, not the base branch tip. Otherwise commits that landed on the base branch later appear as reversed changes. When `from` is not an ancestor of the after commit, the review still runs on the exact target; the Reviewer Packet and the result name the merge base and warn about the divergence.
+
 Tasks can include `criteriaSources`. Each source has a `reference` and a `summary`. The summary states the criteria that apply, quoted or closely paraphrased; the reviewer retrieves the authoritative source for anything the summary lacks.
 
 `paths` is an optional top-level Review Scope. Each path is workspace-relative. The Review Engine validates each path in the frozen after state before it starts Reviewer Sessions. Paths are advisory. They focus every task, but they do not restrict inspection, evidence, or findings.
@@ -121,7 +123,7 @@ The Reviewer Protocol owns finding eligibility:
 - `change` permits findings attributable to the selected change. A pre-existing issue is permitted only in a changed file or a directly affected symbol. It stays advisory unless the selected change worsens or newly exposes it.
 - `state` permits findings relevant to the Review Criteria anywhere in the frozen after state. A relevant pre-existing finding can block acceptance.
 
-A change packet gives exact before and after guidance, a changed-path manifest, change statistics, and a compact status breakdown of the complete captured inventory, even when the manifest omits paths. The breakdown reports captured Git statuses; it does not perform additional rename detection or establish behavioral preservation. Planner input uses the same breakdown. A state packet gives only after-state guidance. When it uses a filesystem workspace, staged changes are freeze mechanics and are not Target Evidence.
+A change packet gives exact before and after guidance, a changed-path manifest, change statistics, and a compact status breakdown of the complete captured inventory, even when the manifest omits paths. The manifest lists up to 200 paths; an omission row names the Git command that lists the rest. The breakdown reports captured Git statuses; it does not perform additional rename detection or establish behavioral preservation. Planner input uses the same breakdown. A state packet gives only after-state guidance. When it uses a filesystem workspace, staged changes are freeze mechanics and are not Target Evidence.
 
 Change reviews start with the changed-path inventory and relevant diffs, splitting large changes into bounded groups. Reviewers retrieve surrounding code, callers, and dependencies as needed and avoid rereading evidence unless resolving a specific question; full-file inspection remains appropriate when needed.
 

@@ -70,6 +70,11 @@ export interface ReviewSnapshot {
   requestedTarget: ReviewTargetSpec;
   target: ResolvedReviewTarget;
   title: string;
+  /**
+   * Present only when the before commit is not an ancestor of the after commit. The target stays
+   * the exact two-dot comparison; `mergeBase` is absent when the commits share no history.
+   */
+  divergedFrom?: { mergeBase?: CommitId };
   changes: ReviewChange[];
   /** SHA-256 of the exact canonical target patch bytes. */
   diffHash: string;

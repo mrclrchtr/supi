@@ -4,6 +4,8 @@ import type { ReviewChange } from "../types.ts";
 export interface FileManifestOptions {
   maxFiles?: number;
   maxCharacters?: number;
+  /** Exact command that lists the complete inventory; named in the omission row when given. */
+  inventoryCommand?: string;
 }
 
 function formatLineStats(change: ReviewChange): string {
@@ -59,9 +61,11 @@ export function buildFileManifest(
     size += line.length + 1;
   }
   const omitted = changes.length - lines.length;
-  if (omitted > 0)
-    lines.push(
-      `- … ${omitted} additional change(s) omitted; use Git to inspect the complete inventory.`,
-    );
+  if (omitted > 0) {
+    const recovery = options.inventoryCommand
+      ? `run \`${options.inventoryCommand}\` for the complete inventory`
+      : "use Git to inspect the complete inventory";
+    lines.push(`- … ${omitted} additional change(s) omitted; ${recovery}.`);
+  }
   return lines;
 }

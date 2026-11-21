@@ -32,6 +32,42 @@ function targetLabel(snapshot: ReviewSnapshot, mode: ReviewTask["mode"]): string
     : `Frozen after state at commit ${snapshot.target.toCommit}`;
 }
 
+/**
+ * Character budget for the changed-path manifest of a Reviewer Packet. Sized so the 200-row
+ * bound, not this budget, limits ordinary path lengths: an 8,000-character budget cut a
+ * 154-file change at 102 rows and hid the directories the task focused on.
+ */
+const PACKET_MANIFEST_CHARACTERS = 24_000;
+
+/** Exact command that lists every changed path of the target inside the Review Workspace. */
+function inventoryCommand(target: ResolvedReviewTarget): string {
+  return target.includeUncommittedChanges
+    ? "git diff --name-status HEAD"
+    : `git diff --name-status ${target.fromCommit} ${target.toCommit}`;
+}
+
+/**
+ * Explain a before commit that is not an ancestor of the after state. The target diff is
+ * two-dot, so it then also reverses the commits only the before side contains.
+ */
+function divergenceGuidance(snapshot: ReviewSnapshot): string[] {
+  const divergence = snapshot.divergedFrom;
+  if (!divergence) return [];
+  const { fromCommit, toCommit, includeUncommittedChanges } = snapshot.target;
+  if (!divergence.mergeBase) {
+    return [
+      `Before commit ${fromCommit} has no merge base with the after state, so the target change compares unrelated histories. State this in your summary.`,
+    ];
+  }
+  const ownChanges = includeUncommittedChanges
+    ? `git diff ${divergence.mergeBase}`
+    : `git diff ${divergence.mergeBase} ${toCommit}`;
+  return [
+    `Before commit ${fromCommit} is not an ancestor of the after state; their merge base is ${divergence.mergeBase}. The target change therefore also shows commits that only the before side contains, as reversed changes.`,
+    `\`${ownChanges}\` shows only the after side's own changes. Attribute a change to the after side only when that diff shows it too, and state this divergence in your summary.`,
+  ];
+}
+
 function changeInspectionGuidance(target: ResolvedReviewTarget): string[] {
   const from = target.fromCommit;
   if (!from) throw new Error("Change Review Mode requires an exact before commit.");
@@ -119,14 +155,23 @@ export function buildReviewPacket(
       ...task.criteriaSources.map((source) => `- ${source.reference}: ${source.summary}`),
     );
   }
-  if (change) parts.push("", "## Changed files", ...buildFileManifest(snapshot.changes));
+  if (change) {
+    parts.push(
+      "",
+      "## Changed files",
+      ...buildFileManifest(snapshot.changes, {
+        maxCharacters: PACKET_MANIFEST_CHARACTERS,
+        inventoryCommand: inventoryCommand(snapshot.target),
+      }),
+    );
+  }
   parts.push(
     "",
     "## Inspection",
     "Your cwd is the shared frozen Review Workspace for this batch.",
     "Use the available inspection tools to inspect the repository.",
     ...(change
-      ? changeInspectionGuidance(snapshot.target)
+      ? [...changeInspectionGuidance(snapshot.target), ...divergenceGuidance(snapshot)]
       : stateInspectionGuidance(snapshot.target)),
   );
   const prompt = parts.join("\n");

@@ -175,6 +175,27 @@ async function committedSnapshot(
   return { changes, ...diff.finish(changes.length) };
 }
 
+/**
+ * Report a before commit that is not an ancestor of the after commit, with their merge base when
+ * one exists. The resolver only reports it; the target keeps the exact requested before commit.
+ */
+async function divergedFrom(
+  repositoryRoot: string,
+  target: ReviewSnapshot["target"],
+  signal?: AbortSignal,
+): Promise<ReviewSnapshot["divergedFrom"]> {
+  const { fromCommit, toCommit } = target;
+  if (!fromCommit || fromCommit === toCommit) return undefined;
+  // Exit 1 means the two commits share no history.
+  const mergeBase = (
+    await gitAllowExit(repositoryRoot, ["merge-base", fromCommit, toCommit], [1], { signal })
+  )
+    .trim()
+    .toLowerCase();
+  if (mergeBase === fromCommit) return undefined;
+  return mergeBase ? { mergeBase } : {};
+}
+
 function titleFor(target: ReviewSnapshot["target"]): string {
   if (target.includeUncommittedChanges) {
     return target.fromCommit
@@ -188,7 +209,8 @@ function titleFor(target: ReviewSnapshot["target"]): string {
 
 /**
  * Pin a Review Target to exact commits and capture its canonical patch metadata.
- * This public resolver does not compute a merge base.
+ * This public resolver never substitutes a merge base for `from`; it only reports one in
+ * `divergedFrom` when `from` is not an ancestor of the after commit.
  */
 export async function resolveReviewSnapshot(
   cwd: string,
@@ -218,14 +240,18 @@ export async function resolveReviewSnapshot(
     includeUncommittedChanges,
   };
   const requestedTarget = normalizedTarget;
-  const metadata = includeUncommittedChanges
-    ? await filesystemSnapshot(repositoryRoot, target, signal)
-    : await committedSnapshot(repositoryRoot, target, signal);
+  const [metadata, divergence] = await Promise.all([
+    includeUncommittedChanges
+      ? filesystemSnapshot(repositoryRoot, target, signal)
+      : committedSnapshot(repositoryRoot, target, signal),
+    divergedFrom(repositoryRoot, target, signal),
+  ]);
   return {
     repositoryRoot,
     requestedTarget,
     target,
     title: titleFor(target),
+    ...(divergence ? { divergedFrom: divergence } : {}),
     ...metadata,
   };
 }

@@ -50,6 +50,7 @@ export function buildReviewerSystemPrompt(
     "effort estimates correction size: small, medium, or large.",
     "confidence is a value from 0 to 1; the Review Engine applies no confidence threshold.",
     "Preserve your intended finding order.",
+    "A length limit in the Review Task applies to the summary. Submit every finding as its own entry, each with a concise description that keeps its evidence and needed correction.",
     `Submit one valid result with ${REVIEW_CHILD_TOOL_SPECS.submitReview.name}. If it is rejected, correct the result and retry. Do not return review prose outside that tool.`,
     ...(retrospectiveEnabled
       ? [

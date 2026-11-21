@@ -32,6 +32,7 @@ vi.mock("../../src/tool/review_run/runner.ts", () => ({ runReviewer: mocks.runRe
 
 import type { AgentRunProviderAuthority } from "@mrclrchtr/supi-agent-runtime/api";
 import { isRootCommit, resolveReviewSnapshot } from "../../src/git.ts";
+import { formatReviewBatch } from "../../src/tool/review_run/format.ts";
 import { runReview } from "../../src/tool/review_run/workflow.ts";
 import type { ReviewModelSelection, ReviewTask } from "../../src/types.ts";
 
@@ -486,6 +487,59 @@ describe("runReview exact Review Target workflow", () => {
     const packet = mocks.runReviewer.mock.calls[0]?.[0].prompt;
     expect(packet).toContain("Change summary: 205 added.");
     expect(packet).toContain("5 additional change(s) omitted");
+    // The omission row names the command that lists the rest in the Review Workspace.
+    expect(packet).toContain("`git diff --name-status HEAD`");
+  });
+
+  it("lists every path of a change with long paths below the row bound", async () => {
+    // Regression: an 8,000-character budget cut a 154-file change at 102 rows.
+    const directory = "src/features/customer-management/customers/components";
+    mkdirSync(join(cwd, directory), { recursive: true });
+    for (let index = 0; index < 154; index++) {
+      writeFileSync(join(cwd, directory, `CustomerDetailPanel${index}.stories.tsx`), "new\n");
+    }
+
+    const outcome = await review(cwd, {}, [changeTask]);
+
+    expect(outcome.kind).toBe("completed");
+    const packet = mocks.runReviewer.mock.calls[0]?.[0].prompt;
+    expect(packet).toContain(`${directory}/CustomerDetailPanel153.stories.tsx`);
+    expect(packet).not.toContain("additional change(s) omitted");
+  });
+
+  it("warns the Reviewer and the caller when from is not an ancestor of the after commit", async () => {
+    const base = git(cwd, "rev-parse", "HEAD");
+    const mainBranch = git(cwd, "branch", "--show-current");
+    git(cwd, "checkout", "-q", "-b", "feature");
+    writeFileSync(join(cwd, "feature.txt"), "feature work\n");
+    git(cwd, "add", ".");
+    git(cwd, "commit", "-m", "feature work");
+    git(cwd, "checkout", "-q", mainBranch);
+    writeFileSync(join(cwd, "main-only.txt"), "landed on main later\n");
+    git(cwd, "add", ".");
+    git(cwd, "commit", "-m", "main moves on");
+    const mainTip = git(cwd, "rev-parse", "HEAD");
+    git(cwd, "checkout", "-q", "feature");
+
+    const diverged = await review(cwd, { committed: { from: mainTip } }, [changeTask]);
+
+    if (diverged.kind !== "completed") throw new Error(`unexpected outcome ${diverged.kind}`);
+    // The target stays the exact requested comparison, so main-only work shows as a deletion.
+    expect(diverged.details.snapshot.target.fromCommit).toBe(mainTip);
+    const packet = mocks.runReviewer.mock.calls[0]?.[0].prompt;
+    expect(packet).toContain('D +0 -1 "main-only.txt"');
+    expect(packet).toContain(`is not an ancestor of the after state; their merge base is ${base}`);
+    expect(packet).toContain(`\`git diff ${base} ${git(cwd, "rev-parse", "HEAD")}\``);
+    const report = formatReviewBatch(diverged.details);
+    expect(report).toContain(`Target warning: from ${mainTip} is not an ancestor`);
+    expect(report).toContain(`merge base ${base}`);
+
+    mocks.runReviewer.mockClear();
+    const linear = await review(cwd, { committed: { from: base } }, [changeTask]);
+
+    if (linear.kind !== "completed") throw new Error(`unexpected outcome ${linear.kind}`);
+    expect(mocks.runReviewer.mock.calls[0]?.[0].prompt).not.toContain("not an ancestor");
+    expect(formatReviewBatch(linear.details)).not.toContain("Target warning:");
   });
 
   it("rejects a full batch with an empty change before workspace creation and permits empty state", async () => {
