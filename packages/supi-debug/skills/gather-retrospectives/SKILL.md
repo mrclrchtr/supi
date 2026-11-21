@@ -62,8 +62,8 @@ This selection has its own display completion; `summary` still describes the who
 
 With 10 or more reports, build themes in this order:
 
-1. Extract each report's bold headings in a script and read the list in full.
-2. Group the headings into candidate themes yourself. Write each theme as a concrete criterion, and name the producer it applies to when only one produces it (for example, reviewer submissions concern `supi-review` only).
+1. Extract each report's bold headings in a script and read the list in full. A heading that most reports share comes from the retrospective prompt (for example its Code Intelligence section) and is a question, not a theme: extract the text under it as well and read those answers.
+2. Group the headings and those answers into candidate themes yourself. Write each theme as a concrete criterion, and name the producer it applies to when only one produces it (for example, reviewer submissions concern `supi-review` only).
 3. Count with the Jev classifier: one call per report, one bool question per theme, the report text as state.
 4. Count hits above 0.8 probability. Reread the 0.6–0.8 band yourself; a theme whose hits sit mostly there is cut badly, so rewrite or drop it.
 5. Report every counted theme with at least two hits, using its exact count, not a range. Agent self-misuse themes may share one bullet. Dropping a theme silently hides friction the user asked about; if the word budget forces a cut, name the cut themes with counts in one line.

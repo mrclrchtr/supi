@@ -3,6 +3,7 @@
 ## [14.1.0]
 
 - `gather-retrospectives` accepts `--workspace` more than once to collect several directory trees, such as a repository and its sibling Git worktrees, into one snapshot. The combined set has one last-gather marker, regardless of argument order. The skill now checks `git worktree list` before asking for scope and recommends including sibling worktrees when they exist, since delegated and review sessions often run there.
+- `gather-retrospectives` also reads the answers under headings that every report shares, such as the Code Intelligence section, which the heading-based grouping skipped.
 - The `gather-retrospectives` summary now reports every theme with at least two hits and exact counts, cites reports with a readable session timestamp and line instead of truncated file names, and is written directly in the reply language.
 
 ## [14.0.0]
