@@ -213,6 +213,76 @@ describe("/supi-tooling-retro", () => {
     expect(order.slice(0, 3)).toEqual(["idle", "anchor", "idle"]);
   });
 
+  describe("placement dialog", () => {
+    function withChoice(
+      ctx: ReturnType<typeof setup>["ctx"],
+      pick: (options: string[]) => unknown,
+    ) {
+      const select = vi.fn(async (_title: string, options: string[]) => pick(options));
+      Object.assign(ctx, { hasUI: true, ui: { ...ctx.ui, select } });
+      return select;
+    }
+
+    it("offers the side branch first, so Enter keeps the previous behavior", async () => {
+      const { ctx, command, navigateTree } = setup(report("Report"));
+      const select = withChoice(ctx, (options) => options[0]);
+
+      await command.handler("", ctx);
+
+      expect(select.mock.calls[0]?.[1]?.[0]).toMatch(/^Side branch/);
+      expect(navigateTree).toHaveBeenCalledOnce();
+    });
+
+    it("runs on the main path without anchor, navigation, report entry, or side-run signal", async () => {
+      enablePersistence();
+      const { pi, ctx, command, appended, navigateTree } = setup(report("## Retro\nHelpful."));
+      const order: string[] = [];
+      pi.events.on(SIDE_RUN_START_EVENT, () => order.push("start"));
+      withChoice(ctx, (options) => options.find((option) => option.startsWith("Main path")));
+
+      await command.handler("", ctx);
+
+      expect(pi.sendMessage).toHaveBeenCalledOnce();
+      expect(navigateTree).not.toHaveBeenCalled();
+      expect(appended).toHaveLength(0);
+      expect(order).toHaveLength(0);
+      // The prompt and answer stay on the main path.
+      expect(branch.at(-1)?.id).toBe("a1");
+      expect(persisted).toHaveLength(1);
+      expect(persisted[0]).toMatchObject({ data: { text: "## Retro\nHelpful." } });
+    });
+
+    it("cancels without side effects when the dialog is dismissed", async () => {
+      const { pi, ctx, command, appended } = setup(report("Report"));
+      withChoice(ctx, () => undefined);
+
+      await command.handler("", ctx);
+
+      expect(pi.sendMessage).not.toHaveBeenCalled();
+      expect(appended).toHaveLength(0);
+      expect(ctx.ui.notify).not.toHaveBeenCalled();
+    });
+
+    it("asks before waiting for a busy agent", async () => {
+      const { ctx, command } = setup(report("Report"));
+      const order: string[] = [];
+      withChoice(ctx, (options) => {
+        order.push("select");
+        return options[0];
+      });
+      Object.assign(ctx, {
+        isIdle: () => false,
+        waitForIdle: async () => {
+          order.push("idle");
+        },
+      });
+
+      await command.handler("", ctx);
+
+      expect(order.slice(0, 2)).toEqual(["select", "idle"]);
+    });
+  });
+
   describe("side-run signal", () => {
     function track(pi: ReturnType<typeof setup>["pi"], order: string[]) {
       pi.events.on(SIDE_RUN_START_EVENT, (data) => order.push(`start:${JSON.stringify(data)}`));

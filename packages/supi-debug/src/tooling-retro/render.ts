@@ -1,12 +1,12 @@
 import { type ExtensionAPI, getMarkdownTheme } from "@earendil-works/pi-coding-agent";
 import { Box, Markdown, Text } from "@earendil-works/pi-tui";
 
-/** Custom message type of the retrospective prompt on the side branch. */
+/** Custom message type of the retrospective prompt, on the side branch or the main path. */
 export const TOOLING_RETRO_PROMPT_TYPE = "supi-tooling-retro-prompt";
-/** Custom entry (outside LLM context) that shows the report on the main branch. */
+/** Custom entry (outside LLM context) that shows a side-branch report on the main path. */
 export const TOOLING_RETRO_REPORT_TYPE = "supi-tooling-retro-report";
 
-/** Data of the report entry shown on the main branch after the retrospective. */
+/** Data of the report entry shown on the main path after a side-branch retrospective. */
 export interface ToolingRetroReportData {
   readonly text: string;
   /** Whether the report was also recorded as a Debug event. */
@@ -32,7 +32,7 @@ export function registerToolingRetroRenderers(pi: ExtensionAPI): void {
     const box = new Box(options.outputPad, 0, undefined);
     box.addChild(
       new Text(
-        `${theme.fg("toolTitle", "Tooling Retrospective")} ${theme.fg("dim", "assessing the preceding task on a side branch")}`,
+        `${theme.fg("toolTitle", "Tooling Retrospective")} ${theme.fg("dim", "assessing the preceding task")}`,
         0,
         0,
       ),
