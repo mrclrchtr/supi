@@ -13,6 +13,7 @@ import {
   type AgentSession,
   createAgentSession,
   DefaultResourceLoader,
+  type ExtensionUIContext,
   ModelRuntime,
   SessionManager,
   SettingsManager,
@@ -49,6 +50,7 @@ function contextText(context: TranscriptContext): string {
 
 async function createSession(
   responses: Array<AssistantMessage | ((c: TranscriptContext) => AssistantMessage)>,
+  ui?: Partial<ExtensionUIContext>,
 ) {
   const cwd = await mkdtemp(join(tmpdir(), "supi-tooling-retro-"));
   roots.push(cwd);
@@ -87,13 +89,20 @@ async function createSession(
     sessionManager: SessionManager.inMemory(cwd),
     settingsManager,
   });
-  await bind(session);
+  await bind(session, ui);
   return { session, faux };
 }
 
-async function bind(session: AgentSession) {
+/** Bind print mode; `ui` enables dialogs with only the given methods, other UI calls do nothing. */
+async function bind(session: AgentSession, ui?: Partial<ExtensionUIContext>) {
+  const uiContext = ui
+    ? (new Proxy(ui, {
+        get: (target, key) => target[key as keyof ExtensionUIContext] ?? (() => undefined),
+      }) as ExtensionUIContext)
+    : undefined;
   await session.bindExtensions({
     mode: "print",
+    uiContext,
     commandContextActions: {
       waitForIdle: () => session.waitForIdle(),
       newSession: async () => ({ cancelled: true }),
@@ -165,6 +174,32 @@ it("returns to the anchor without storing a failed retrospective", async () => {
 
     expect(seen[0]).not.toContain("Produce a compact retrospective");
     expect(persisted.filter((event) => event.category === "tooling-retrospective")).toHaveLength(0);
+  } finally {
+    session.dispose();
+  }
+});
+
+it("keeps a main-path retrospective in the next request's context", async () => {
+  const seen: string[] = [];
+  const { session } = await createSession(
+    [
+      fauxAssistantMessage("Task done."),
+      fauxAssistantMessage("## SuPi Tooling Retrospective\nHelpful."),
+      (context) => {
+        seen.push(contextText(context));
+        return fauxAssistantMessage("Next step done.");
+      },
+    ],
+    { select: async (_title, options) => options.find((option) => option.startsWith("Main path")) },
+  );
+  try {
+    await session.prompt("Do the task");
+    await session.prompt("/supi-tooling-retro");
+    await session.prompt("Next step");
+
+    expect(seen[0]).toContain("Produce a compact retrospective");
+    expect(seen[0]).toContain("SuPi Tooling Retrospective");
+    expect(persisted.filter((event) => event.category === "tooling-retrospective")).toHaveLength(1);
   } finally {
     session.dispose();
   }

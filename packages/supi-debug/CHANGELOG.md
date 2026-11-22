@@ -2,6 +2,7 @@
 
 ## [14.2.0]
 
+- `/supi-tooling-retro` now asks where the retrospective runs. **Side branch** keeps the previous behavior and is preselected; without dialog support it is used automatically. **Main path** runs it as a normal turn, so the prompt and report stay in context for follow-up prompts. It stores the report the same way but adds no separate report entry. Dismissing the dialog cancels the command.
 - `/supi-tooling-retro` now also looks for slow navigation, information the agent could not reach, and instructions that did not change its behavior. Each category is reported only when its trigger occurred in the task. Proposals name a mechanism and prefer a deterministic check or a tool change over new guidance text. Reports from this prompt carry `promptRevision` 2.
 
 ## [14.1.0]
