@@ -40,7 +40,7 @@
     "@mozilla/readability": "0.6.0",
     "turndown": "7.2.5",
     "turndown-plugin-gfm": "1.0.2",
-    "unpdf": "2.2.0"
+    "unpdf": "2.2.1"
   },
   "bundledDependencies": [
     "@mrclrchtr/supi-core"
