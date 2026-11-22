@@ -1,5 +1,9 @@
 # Changelog
 
+## [14.2.0]
+
+- `/supi-tooling-retro` now also looks for slow navigation, information the agent could not reach, and instructions that did not change its behavior. Each category is reported only when its trigger occurred in the task. Proposals name a mechanism and prefer a deterministic check or a tool change over new guidance text. Reports from this prompt carry `promptRevision` 2.
+
 ## [14.1.0]
 
 - `gather-retrospectives` accepts `--workspace` more than once to collect several directory trees, such as a repository and its sibling Git worktrees, into one snapshot. The combined set has one last-gather marker, regardless of argument order. The skill now checks `git worktree list` before asking for scope and recommends including sibling worktrees when they exist, since delegated and review sessions often run there.

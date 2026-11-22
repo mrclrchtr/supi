@@ -184,7 +184,7 @@ With retrospective collection enabled, completed Delegation and Reviewer Runs pu
 
 ### Tooling Retrospectives
 
-After a task, run `/supi-tooling-retro`. It asks the agent for a compact retrospective of the SuPi surfaces used in the preceding task: what helped, what fell short, what was missing, and what was noisy. If the agent is still working, the command waits until it is idle.
+After a task, run `/supi-tooling-retro`. It asks the agent for a compact retrospective of the SuPi surfaces used in the preceding task: what helped, what fell short, what was missing, and what was noisy, including slow navigation, unreachable information, and instructions that changed nothing. Each proposal names its mechanism and prefers a deterministic check or a tool change over new guidance text. If the agent is still working, the command waits until it is idle.
 
 The retrospective runs on a side branch of the session tree. When it ends, successful or not, the command returns to the point where it started and shows the report there as a display-only entry. The next prompt therefore continues the task without the retrospective prompt or answer in the agent's context. The command finishes only after the report, and steering messages sent during it stay on the side branch. To discuss the report with the agent, open the side branch with `/tree`.
 

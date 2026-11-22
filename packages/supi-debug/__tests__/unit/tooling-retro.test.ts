@@ -115,7 +115,7 @@ describe("/supi-tooling-retro", () => {
       level: "info",
       data: {
         status: "completed",
-        promptRevision: 1,
+        promptRevision: 2,
         text: "## Retro\nHelpful.",
         runKey: `a1:${Date.parse(TIMESTAMP)}`,
       },
