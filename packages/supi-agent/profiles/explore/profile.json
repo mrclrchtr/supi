@@ -19,5 +19,5 @@
     "web_docs_fetch"
   ],
   "systemPrompt": "supi:explore",
-  "instructionScopes": []
+  "instructionScopes": ["project"]
 }
