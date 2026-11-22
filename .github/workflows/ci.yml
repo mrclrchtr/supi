@@ -164,7 +164,7 @@ jobs:
 
   language-baseline:
     needs: ci-plan
-    if: needs.ci-plan.outputs.mode == 'full'
+    if: needs.ci-plan.outputs.mode != 'none'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 120
     strategy:
@@ -192,7 +192,7 @@ jobs:
         uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
         with:
           go-version: ${{ env.SUPI_BASELINE_GO_VERSION }}
-      # Only main and manual full runs write this cache; PRs never run the language baseline.
+      # PR runs restore the cache written on main; a PR that changes the key writes one scoped to its branch.
       - name: Restore pinned LLVM subset
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
@@ -219,7 +219,7 @@ jobs:
 
   installer:
     needs: ci-plan
-    if: needs.ci-plan.outputs.mode == 'full'
+    if: needs.ci-plan.outputs.mode != 'none'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10
     strategy:
@@ -251,7 +251,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Require exactly the checks selected for this verification mode
+      - name: Require every check in a known verification mode
         env:
           PLAN_RESULT: ${{ needs.ci-plan.result }}
           MODE: ${{ needs.ci-plan.outputs.mode }}
@@ -262,18 +262,13 @@ jobs:
           INSTALLER_RESULT: ${{ needs.installer.result }}
           LANGUAGE_BASELINE_RESULT: ${{ needs.language-baseline.result }}
         run: |
-          if [[ "$PLAN_RESULT" != success || "$ACTIONLINT_RESULT" != success || "$COMMITS_RESULT" != success || "$WORKSPACE_RESULT" != success || "$TEST_RESULT" != success ]]; then
-            echo '::error::Required verification checks did not succeed'
+          if [[ "$MODE" != full && "$MODE" != pr ]]; then
+            echo '::error::Unknown verification mode'
             exit 1
           fi
-          case "$MODE" in
-            full) expected=success ;;
-            pr) expected=skipped ;;
-            *) echo '::error::Unknown verification mode'; exit 1 ;;
-          esac
-          for result in "$INSTALLER_RESULT" "$LANGUAGE_BASELINE_RESULT"; do
-            if [[ "$result" != "$expected" ]]; then
-              echo "::error::Unexpected exhaustive-check result: expected=$expected actual=$result"
+          for result in "$PLAN_RESULT" "$ACTIONLINT_RESULT" "$COMMITS_RESULT" "$WORKSPACE_RESULT" "$TEST_RESULT" "$INSTALLER_RESULT" "$LANGUAGE_BASELINE_RESULT"; do
+            if [[ "$result" != success ]]; then
+              echo '::error::Required verification checks did not succeed'
               exit 1
             fi
           done

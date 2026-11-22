@@ -69,7 +69,7 @@ function pushPlan(event, repository, plan) {
   return releaseCandidate(repository, plan, plan.sha);
 }
 
-/** Select fast PR checks or exhaustive verification pinned to an immutable release candidate. */
+/** Select PR checks or release verification pinned to an immutable release candidate. */
 export function createPlan() {
   const {
     GITHUB_EVENT_NAME: eventName,

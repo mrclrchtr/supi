@@ -53,19 +53,8 @@ describe("verification workflow contracts", () => {
     );
   });
 
-  it("accepts a complete successful release verification", () => {
-    expect(runGate().status).toBe(0);
-  });
-
-  it.each(["pr"])("accepts intentionally skipped exhaustive jobs only in %s mode", (mode) => {
-    expect(
-      runGate({
-        MODE: mode,
-        INSTALLER_RESULT: "skipped",
-        LANGUAGE_BASELINE_RESULT: "skipped",
-      }).status,
-    ).toBe(0);
-    expect(runGate({ MODE: mode }).status).toBe(1);
+  it.each(["full", "pr"])("accepts a complete successful %s verification", (mode) => {
+    expect(runGate({ MODE: mode }).status).toBe(0);
   });
 
   it.each([
@@ -74,42 +63,17 @@ describe("verification workflow contracts", () => {
     "COMMITS_RESULT",
     "WORKSPACE_RESULT",
     "TEST_RESULT",
+    "INSTALLER_RESULT",
+    "LANGUAGE_BASELINE_RESULT",
   ])("requires %s in every verification mode", (field) => {
     for (const mode of ["full", "pr"]) {
-      const expected = mode === "full" ? "success" : "skipped";
-      const baseline = {
-        MODE: mode,
-        INSTALLER_RESULT: expected,
-        LANGUAGE_BASELINE_RESULT: expected,
-      };
-      expect(runGate(baseline).status).toBe(0);
       for (const result of ["failure", "cancelled", "skipped", ""]) {
-        expect(
-          runGate({ ...baseline, [field]: result }).status,
-          `${mode}: ${field}=${result}`,
-        ).toBe(1);
+        expect(runGate({ MODE: mode, [field]: result }).status, `${mode}: ${field}=${result}`).toBe(
+          1,
+        );
       }
     }
   });
-
-  it.each(["INSTALLER_RESULT", "LANGUAGE_BASELINE_RESULT"])(
-    "rejects failed or missing %s instead of treating it as a planned skip",
-    (field) => {
-      for (const result of ["failure", "cancelled", "skipped", ""]) {
-        expect(runGate({ [field]: result }).status, `${field}=${result}`).toBe(1);
-      }
-      for (const result of ["success", "failure", "cancelled", ""]) {
-        expect(
-          runGate({
-            MODE: "pr",
-            INSTALLER_RESULT: "skipped",
-            LANGUAGE_BASELINE_RESULT: "skipped",
-            [field]: result,
-          }).status,
-        ).toBe(1);
-      }
-    },
-  );
 
   it.each(["", "unknown", "none"])(
     "rejects unknown/non-verifying mode %j at the required gate",
