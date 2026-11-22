@@ -18,7 +18,7 @@ export function emptyOutputText(subcommand: string | undefined): string {
   return `(no output: ${reason})`;
 }
 
-/** Assemble the model-visible Git result under PI's standard output limits. */
+/** Assemble the model-visible Git result under Pi's standard output limits. */
 export function buildGitResult(
   args: readonly string[],
   output: GitQueryOutput,

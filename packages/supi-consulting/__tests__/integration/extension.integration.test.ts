@@ -240,7 +240,7 @@ describe("supi-consulting extension", () => {
     expect(tool.description.length).toBeLessThanOrEqual(320);
 
     const schemaText = JSON.stringify(tool.parameters);
-    expect(schemaText).toMatch(/true exposes the current PI workspace/i);
+    expect(schemaText).toMatch(/true exposes the current Pi workspace/i);
     expect(schemaText).toMatch(/false uses the empty Consultation Workspace/i);
     expect(schemaText).toMatch(/original selection/i);
     expect(schemaText).toMatch(/Consulting Agent that will perform this Consultation/i);

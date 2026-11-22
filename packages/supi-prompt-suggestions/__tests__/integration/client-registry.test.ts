@@ -16,7 +16,7 @@ it.each([
   { contextWindow: 0, maxTokens: 8192, expected: 8192 },
   { contextWindow: 128_000, maxTokens: 256, expected: 256 },
 ])(
-  "uses PI output limits for context $contextWindow and model cap $maxTokens",
+  "uses Pi output limits for context $contextWindow and model cap $maxTokens",
   async ({ contextWindow, maxTokens, expected }) => {
     const model: Model<"openai-completions"> = {
       id: "suggestion-model",

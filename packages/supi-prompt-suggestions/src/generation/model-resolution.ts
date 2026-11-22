@@ -1,4 +1,4 @@
-/** Select the configured suggestion model from PI's scoped model set. */
+/** Select the configured suggestion model from Pi's scoped model set. */
 
 import type { Api, Model } from "@earendil-works/pi-ai";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
@@ -6,7 +6,7 @@ import { getSelectableModels } from "@mrclrchtr/supi-core/model-selection";
 
 /**
  * Find a configured suggestion model without resolving authentication.
- * Request authentication remains owned by PI's model registry.
+ * Request authentication remains owned by Pi's model registry.
  */
 export function resolveSuggestionModel(
   ctx: Pick<ExtensionContext, "cwd" | "modelRegistry" | "model">,

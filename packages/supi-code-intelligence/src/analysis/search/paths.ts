@@ -68,7 +68,7 @@ function resolveSingleScope(scope: string, cwd: string): ScopeResolution {
   return { kind: "ok", path: resolved };
 }
 
-/** Normalize a PI tool path by stripping a leading @ and resolving from cwd. */
+/** Normalize a Pi tool path by stripping a leading @ and resolving from cwd. */
 export function normalizePath(input: string, cwd: string): string {
   return resolveToolPath(cwd, input);
 }

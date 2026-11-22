@@ -73,7 +73,7 @@ describe("callSuggestionModel", () => {
     vi.restoreAllMocks();
   });
 
-  it("uses the PI registry simple path with the fixed prompt and model defaults", async () => {
+  it("uses the Pi registry simple path with the fixed prompt and model defaults", async () => {
     const signal = new AbortController().signal;
     const { ctx, streamSimple } = makeClientContext(Promise.resolve(makeResponse()));
 

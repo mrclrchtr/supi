@@ -22,7 +22,7 @@ const FacetSchema = Type.Object({
 
 // ── Prompts ───────────────────────────────────────────────────────────────
 
-const FACET_EXTRACTION_PROMPT = `Analyze this PI coding agent session and extract structured facets.
+const FACET_EXTRACTION_PROMPT = `Analyze this Pi coding agent session and extract structured facets.
 
 CRITICAL GUIDELINES:
 
@@ -64,7 +64,7 @@ RESPOND WITH ONLY A VALID JSON OBJECT matching this schema:
 SESSION:
 `;
 
-const SUMMARIZE_CHUNK_PROMPT = `Summarize this portion of a PI session transcript. Focus on:
+const SUMMARIZE_CHUNK_PROMPT = `Summarize this portion of a Pi session transcript. Focus on:
 1. What the user asked for
 2. What the agent did (tools used, files modified)
 3. Any friction or issues

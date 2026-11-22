@@ -382,7 +382,7 @@ describe("target-workflow (deep session seam)", () => {
 
       expect(outcome).toMatchObject({
         kind: "invalid-input",
-        message: expect.stringContaining("PI read or grep"),
+        message: expect.stringContaining("Pi read or grep"),
       });
     });
 

@@ -48,7 +48,7 @@ Pi searches Context7 first when the library ID is unknown, then fetches docs wit
 
 ### Structured results in codemode
 
-All four tools declare PI-native `outputSchema` contracts. Direct calls still return readable, bounded text; `await tools.<name>(args)` in codemode resolves to structured data, not that text or UI `details`.
+All four tools declare Pi-native `outputSchema` contracts. Direct calls still return readable, bounded text; `await tools.<name>(args)` in codemode resolves to structured data, not that text or UI `details`.
 
 | Tool | Structured value |
 |---|---|

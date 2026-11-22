@@ -31,7 +31,7 @@ describe("installer inventory", () => {
     const { context, agentDir } = setup();
     expect(readInventory(context).entries).toEqual({ project: [], global: [] });
     writeJson(join(agentDir, "trust.json"), {});
-    expect(() => readInventory(context)).toThrow(/saved PI trust approval/);
+    expect(() => readInventory(context)).toThrow(/saved Pi trust approval/);
   });
 
   it("honors a nearer denial and ignores a default trust setting", () => {

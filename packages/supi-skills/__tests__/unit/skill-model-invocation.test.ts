@@ -105,7 +105,7 @@ describe("skill model invocation", () => {
     ).toEqual({ disabled: true, source: "global" });
   });
 
-  it("removes a globally disabled skill from PI's generated prompt", () => {
+  it("removes a globally disabled skill from Pi's generated prompt", () => {
     const homeDir = tempHome();
     const cwd = join(homeDir, "project");
     const loadedSkill = skill();
@@ -175,7 +175,7 @@ describe("skill model invocation", () => {
     expect(options.skills?.map((item) => item.name)).toEqual(["visible"]);
   });
 
-  it("updates a forced prompt that contains PI's structured skills section", () => {
+  it("updates a forced prompt that contains Pi's structured skills section", () => {
     const homeDir = tempHome();
     const cwd = join(homeDir, "project");
     const loadedSkill = skill();

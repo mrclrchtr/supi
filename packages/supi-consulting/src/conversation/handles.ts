@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type { ConversationHandleRecord } from "../types.ts";
 
-/** Private custom-entry type used to rebuild handles on the active PI branch. */
+/** Private custom-entry type used to rebuild handles on the active Pi branch. */
 export const CONSULTING_HANDLE_ENTRY_TYPE = "supi-consulting-handle";
 
 interface PersistedHandleEntry {
@@ -35,7 +35,7 @@ export class ConversationHandleStore {
   #records = new Map<string, ConversationHandleRecord>();
   #busy = new Set<string>();
 
-  /** Rebuild valid handles from one current PI branch. */
+  /** Rebuild valid handles from one current Pi branch. */
   rebuild(branch: readonly unknown[]): void {
     this.#records.clear();
     this.#busy.clear();

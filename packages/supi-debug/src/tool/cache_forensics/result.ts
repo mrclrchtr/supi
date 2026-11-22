@@ -1,7 +1,7 @@
 // Bounded model output for the cache_forensics tool.
 //
 // The complete redacted result is always serialized and measured first. When
-// it fits PI's standard model-output limit it is returned unchanged. When it
+// it fits Pi's standard model-output limit it is returned unchanged. When it
 // exceeds either limit, the complete JSON is written to a private OS
 // temporary directory and only a summary envelope is returned — never a
 // partial findings array.
@@ -47,7 +47,7 @@ function measure(text: string): { lines: number; bytes: number } {
 }
 
 /**
- * Bound a forensics result to PI's standard model-output limit (2,000 lines
+ * Bound a forensics result to Pi's standard model-output limit (2,000 lines
  * or 51,200 UTF-8 bytes, whichever is reached first).
  *
  * The complete redacted result is serialized with the same pretty JSON

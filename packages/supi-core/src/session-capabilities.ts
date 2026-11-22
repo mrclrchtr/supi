@@ -216,7 +216,7 @@ function forkKey(sourceSessionFile: string | undefined): string {
   return sourceSessionFile ?? "<memory-session>";
 }
 
-/** Hold a state copy until PI starts the forked session. */
+/** Hold a state copy until Pi starts the forked session. */
 export function setPendingSessionCapabilityFork(
   sourceSessionFile: string | undefined,
   state: SessionCapabilityState,

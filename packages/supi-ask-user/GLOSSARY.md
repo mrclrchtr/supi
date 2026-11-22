@@ -1,6 +1,6 @@
 # supi-ask-user
 
-Rich questionnaire UI for structured agent-user decisions in PI. Renders multi-question forms with choice and text inputs, driven by typed question schemas.
+Rich questionnaire UI for structured agent-user decisions in Pi. Renders multi-question forms with choice and text inputs, driven by typed question schemas.
 
 See also: root `GLOSSARY.md` for project-wide terms.
 

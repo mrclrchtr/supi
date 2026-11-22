@@ -33,7 +33,7 @@ afterEach(() => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
 
-it("cancels the command tree through an npm-style PI shim", { timeout: 10_000 }, async () => {
+it("cancels the command tree through an npm-style Pi shim", { timeout: 10_000 }, async () => {
   const files = fixture();
   roots.push(files.root);
   const command = writePiShim(
@@ -58,7 +58,7 @@ it("cancels the command tree through an npm-style PI shim", { timeout: 10_000 },
 });
 
 it.skipIf(process.platform === "win32")(
-  "propagates process cancellation through the PI version preflight",
+  "propagates process cancellation through the Pi version preflight",
   { timeout: 10_000 },
   async () => {
     const files = fixture();

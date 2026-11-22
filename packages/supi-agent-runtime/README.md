@@ -36,7 +36,7 @@ Agent Runs share the containing process's permissions and external sandbox; cont
 
 ## Auxiliary model authority
 
-Only callers that explicitly enable PI codemode for an invocation should grant its classifier and image-model access. Capture the containing session's available catalogue once per top-level invocation, then pass the same frozen snapshot to each child run in that invocation:
+Only callers that explicitly enable Pi codemode for an invocation should grant its classifier and image-model access. Capture the containing session's available catalogue once per top-level invocation, then pass the same frozen snapshot to each child run in that invocation:
 
 ```ts
 import {
@@ -63,7 +63,7 @@ const run = startAgentRun({
 });
 ```
 
-Omit `authorizedAuxiliaryModels` for children that did not opt in; their auxiliary catalogue stays empty. The snapshot contains the model catalogue available when captured, not resolved credentials, and does not expand if the parent catalogue changes mid-run. PI codemode omits model headers when exposing that catalogue to scripts. Capture a new snapshot for a later invocation. Auxiliary requests resolve through the containing PI registry at request time, so model-specific headers and endpoints remain scoped to the requested model. An empty or unavailable catalogue does not disable codemode's tool scripting.
+Omit `authorizedAuxiliaryModels` for children that did not opt in; their auxiliary catalogue stays empty. The snapshot contains the model catalogue available when captured, not resolved credentials, and does not expand if the parent catalogue changes mid-run. Pi codemode omits model headers when exposing that catalogue to scripts. Capture a new snapshot for a later invocation. Auxiliary requests resolve through the containing Pi registry at request time, so model-specific headers and endpoints remain scoped to the requested model. An empty or unavailable catalogue does not disable codemode's tool scripting.
 
 ## Restored conversation context
 

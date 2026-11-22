@@ -21,13 +21,13 @@ import {
 import { type ModelRegistry, ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { type AgentRunAuxiliaryModelSnapshot, freezeAuxiliaryModels } from "./auxiliary-models.ts";
 
-/** Provider and authentication authority borrowed from the containing PI session. */
+/** Provider and authentication authority borrowed from the containing Pi session. */
 export interface AgentRunProviderAuthority {
   /** Return the current implementation for one provider. */
   getProvider(providerId: string): Provider | undefined;
   /** Resolve current provider authentication, including runtime credentials and OAuth refresh. */
   getProviderAuth(providerId: string): Promise<AuthResult | undefined>;
-  /** Resolve model-specific request auth when PI exposes it. */
+  /** Resolve model-specific request auth when Pi exposes it. */
   getApiKeyAndHeaders?: (model: Model<Api>) => Promise<AgentRunRequestAuth>;
   /** Return the currently available auxiliary models for a caller-owned invocation snapshot. */
   getAvailableAuxiliaryModels?: () => Promise<AgentRunAuxiliaryModelSnapshot>;
@@ -45,7 +45,7 @@ export interface AgentRunProviderAuthority {
   ) => Promise<AssistantImages>;
 }
 
-/** Model-specific request auth returned by PI's compatibility registry facade. */
+/** Model-specific request auth returned by Pi's compatibility registry facade. */
 export type AgentRunRequestAuth =
   | {
       ok: true;
@@ -62,7 +62,7 @@ type AgentRunModelRegistry = Pick<
 > &
   Partial<Pick<ModelRegistry, "getAvailableOfType" | "classify" | "generateImages">>;
 
-/** Adapt PI's public model registry to the narrow Agent Run authority interface. */
+/** Adapt Pi's public model registry to the narrow Agent Run authority interface. */
 export function createAgentRunProviderAuthority(
   registry: AgentRunModelRegistry,
 ): AgentRunProviderAuthority {

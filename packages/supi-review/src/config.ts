@@ -20,7 +20,7 @@ export type PostReviewPolicy = (typeof POST_REVIEW_POLICIES)[number];
 export interface ReviewConfig extends Record<string, unknown> {
   /** Enable tools that start reviews and retrieve audits. */
   agentToolEnabled: boolean;
-  /** Enable PI codemode scripting and scoped auxiliary models for Reviewer investigation. */
+  /** Enable Pi codemode scripting and scoped auxiliary models for Reviewer investigation. */
   reviewerCodemodeEnabled: boolean;
   /** Enable Reviewer Web Access: session-provided Web tools during Reviewer investigation. */
   reviewerWebEnabled: boolean;
@@ -98,7 +98,7 @@ export function loadReviewConfig(cwd: string, homeDir?: string): ReviewConfig {
   };
 }
 
-/** Apply configured Review tool availability to the current PI session. */
+/** Apply configured Review tool availability to the current Pi session. */
 export function syncReviewAgentTools(pi: ExtensionAPI, cwd: string, homeDir?: string): void {
   const currentTools = pi.getActiveTools();
   const nextTools = currentTools.filter(
@@ -161,7 +161,7 @@ export function registerReviewSettings(pi: ExtensionAPI, homeDir?: string): void
           kind: "enum",
           key: "reviewerThinkingLevel",
           label: "Reviewer thinking level",
-          description: "PI reasoning level for Reviewer Sessions.",
+          description: "Pi reasoning level for Reviewer Sessions.",
           values: [...REVIEW_THINKING_LEVELS],
         },
         {
@@ -176,7 +176,7 @@ export function registerReviewSettings(pi: ExtensionAPI, homeDir?: string): void
           kind: "enum",
           key: "plannerThinkingLevel",
           label: "Planner thinking level",
-          description: "PI reasoning level for Planner Drafts.",
+          description: "Pi reasoning level for Planner Drafts.",
           values: [...REVIEW_THINKING_LEVELS],
         },
         {

@@ -71,7 +71,7 @@ export interface AgentSessionInputs {
   resourceLoader: ResourceLoader;
   /** Explicit settings policy for this run. */
   settingsManager: SettingsManager;
-  /** Optional PI agent directory; defaults to PI's configured directory. */
+  /** Optional Pi agent directory; defaults to Pi's configured directory. */
   agentDir?: string;
   /** Optional native Pi conversation history to restore for this run. */
   readonly context?: AgentRunContext;
@@ -105,9 +105,9 @@ export interface AgentRunSessionView {
   getActiveToolNames(): readonly string[];
   /** Return tool renderers without exposing tool execution functions. */
   getToolRenderers(): readonly AgentRunToolRenderer[];
-  /** Return PI's current aggregate session statistics. */
+  /** Return Pi's current aggregate session statistics. */
   getSessionStats(): SessionStats;
-  /** Return the last visible assistant text, when PI has one. */
+  /** Return the last visible assistant text, when Pi has one. */
   getLastAssistantText(): string | undefined;
   /** Observe session events; the runtime still owns the session lifecycle. */
   subscribe(listener: (event: AgentSessionEvent) => void): () => void;

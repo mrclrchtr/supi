@@ -49,13 +49,13 @@ Accepted suggestions are inserted into the editor so you can edit them before se
 
 Open `/supi-settings` → **Prompt suggestions**.
 
-- **Suggestion model** — choose `disabled` or one of PI's scoped enabled models
+- **Suggestion model** — choose `disabled` or one of Pi's scoped enabled models
 
 The default is `disabled`. Pick a cheap, fast model if you want lightweight suggestions after assistant turns.
 
 Settings follow SuPi's normal scoped config behavior: set a global default, then override it per project when needed.
 
-Suggestion requests use PI's registry simple-completion path. PI owns authentication, provider
+Suggestion requests use Pi's registry simple-completion path. Pi owns authentication, provider
 routing, and context-aware output limits; the extension does not resolve or copy credentials.
 
 ## Privacy
@@ -71,15 +71,15 @@ The extension does **not** send:
 - session metadata in the prompt
 
 The request can include a separate opaque provider-routing identity. It is not part of the prompt and
-is derived from the PI session, provider, model, and prompt-suggestion stream.
+is derived from the Pi session, provider, model, and prompt-suggestion stream.
 
 ## Troubleshooting
 
 If no suggestion appears:
 
 - confirm **Suggestion model** is not `disabled`
-- confirm the selected model is still enabled in PI for the current scope
-- if a warning reports authentication failed, check the selected model's authentication in PI
+- confirm the selected model is still enabled in Pi for the current scope
+- if a warning reports authentication failed, check the selected model's authentication in Pi
 - make sure the editor is empty after the assistant finishes
 - wait for the suggestion spinner to finish; generation times out after about 20 seconds
 
@@ -88,4 +88,4 @@ provider/model identifier, a safe failure category, and an optional HTTP status.
 authentication failed, billing failed, quota exceeded, rate limit exceeded, timeout, and provider
 request failed. Repeated failures stay quiet until a request succeeds, settings change, or a new
 session starts. Warning state is held in memory, so `/reload` also starts a new warning cycle. The
-separate routing identity remains stable for the same PI session.
+separate routing identity remains stable for the same Pi session.

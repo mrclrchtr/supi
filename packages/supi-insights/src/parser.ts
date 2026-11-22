@@ -1,4 +1,4 @@
-// Session parser — extract metadata and transcripts from PI session entries.
+// Session parser — extract metadata and transcripts from Pi session entries.
 
 import { readFile } from "node:fs/promises";
 import { diff } from "node:util";
@@ -340,7 +340,7 @@ function categorizeToolError(content: string): string {
   return "Other";
 }
 
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: transcript formatting mirrors PI message block shapes.
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: transcript formatting mirrors Pi message block shapes.
 export function formatTranscriptForFacets(entries: FileEntry[], sessionMeta: SessionMeta): string {
   const lines: string[] = [];
 

@@ -48,7 +48,7 @@ export function applyToolDenylist(
   }
 }
 
-/** Add a late tool to the restore boundary only when PI has activated it. */
+/** Add a late tool to the restore boundary only when Pi has activated it. */
 export function observeNewTools(
   pi: ExtensionAPI,
   state: SessionCapabilityState,

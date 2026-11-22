@@ -13,7 +13,7 @@ export const ENABLED = "Enabled";
 export const MODEL_DISABLED = "Model invocation disabled";
 export const DISABLED = "Disabled";
 
-/** Replace PI's rendered skills section while preserving the rest of a forced prompt. */
+/** Replace Pi's rendered skills section while preserving the rest of a forced prompt. */
 function replaceStructuredSkillsSection(
   systemPrompt: string,
   original: string,
@@ -31,7 +31,7 @@ function replaceStructuredSkillsSection(
   return `${systemPrompt.slice(0, start)}${section}${systemPrompt.slice(start + currentSection.length)}`;
 }
 
-/** Apply the effective scoped invocation state to PI's mutable prompt options. */
+/** Apply the effective scoped invocation state to Pi's mutable prompt options. */
 export function applyPromptOverrides({
   options,
   systemPrompt,
@@ -72,8 +72,8 @@ export function applyPromptOverrides({
   const replacement = formatSkillsForPrompt(effective, skillFileReadTool);
   if (original === replacement) return undefined;
 
-  // PI renders skills inside its structured <skills> section. Mutate the
-  // normalized options so PI can render the replacement without byte matching
+  // Pi renders skills inside its structured <skills> section. Mutate the
+  // normalized options so Pi can render the replacement without byte matching
   // the already-rendered prompt.
   if (options.forceSystemPrompt === undefined) {
     options.skills = effective;

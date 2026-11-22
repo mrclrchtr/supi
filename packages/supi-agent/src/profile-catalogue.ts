@@ -40,9 +40,9 @@ type ProfileSourceDirectory = {
 export interface DiscoverProfileCatalogueOptions {
   /** Session cwd used for trusted-project profile lookup. */
   readonly cwd: string;
-  /** PI agent directory, normally returned by getAgentDir(). */
+  /** Pi agent directory, normally returned by getAgentDir(). */
   readonly agentDir: string;
-  /** Whether PI has already trusted the current project. */
+  /** Whether Pi has already trusted the current project. */
   readonly projectTrusted: boolean;
   /** Package profile root; defaults to this package's bundled profiles. */
   readonly packageDirectory?: string;

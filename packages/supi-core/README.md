@@ -21,7 +21,7 @@ pnpm add @mrclrchtr/supi-core
 ## Package surfaces
 
 - `@mrclrchtr/supi-core/api` — reusable helpers for other packages and extensions
-- `@mrclrchtr/supi-core/llm` — PI-owned direct model requests and JSON helpers
+- `@mrclrchtr/supi-core/llm` — Pi-owned direct model requests and JSON helpers
 - `@mrclrchtr/supi-core/report` — shared text/report rendering helpers for TUI and plain-text summaries
 - `@mrclrchtr/supi-core/tui` — shared terminal UI helpers for list titles, rows, menus, and descriptions
 
@@ -52,11 +52,11 @@ Config file locations:
 
 ### Model requests
 
-- `completeModelRequest(ctx, model, context, options)` — send API-specific options through PI's model registry.
-- `completeSimpleModelRequest(ctx, model, context, options)` — send provider-neutral options through `streamSimple().result()` on PI 0.86.0 or later. PI supplies model-derived output limits and context guards.
+- `completeModelRequest(ctx, model, context, options)` — send API-specific options through Pi's model registry.
+- `completeSimpleModelRequest(ctx, model, context, options)` — send provider-neutral options through `streamSimple().result()` on Pi 0.86.0 or later. Pi supplies model-derived output limits and context guards.
 - `callWithJsonResponse()` — retry a registry request, extract JSON, and validate it with TypeBox.
 
-Both completion helpers require a stable `affinityScope`. PI owns auth and endpoint resolution. The helpers keep cache retention defaults, exclude prompt content from the affinity ID, and add OpenCode headers only when the provider or exact model endpoint matches OpenCode. Use the simple helper when PI should manage output limits; the API-specific helper forwards the caller's limit unchanged.
+Both completion helpers require a stable `affinityScope`. Pi owns auth and endpoint resolution. The helpers keep cache retention defaults, exclude prompt content from the affinity ID, and add OpenCode headers only when the provider or exact model endpoint matches OpenCode. Use the simple helper when Pi should manage output limits; the API-specific helper forwards the caller's limit unchanged.
 
 ### Shared registries
 

@@ -53,7 +53,7 @@ The tool registers only when Web Search is enabled and `bx` is available on `PAT
 
 ## Test layout
 
-Pure logic and settings tests live in `__tests__/unit/`. Tests that start the `bx` subprocess or PI codemode runtime live in `__tests__/integration/`.
+Pure logic and settings tests live in `__tests__/unit/`. Tests that start the `bx` subprocess or Pi codemode runtime live in `__tests__/integration/`.
 
 Context7 adapter tests use the real SDK with provider-shaped HTTP fixtures, including both snippet lists and explicit JSON negotiation. Run the opt-in live contract check from the workspace root with `CONTEXT7_API_KEY` set:
 

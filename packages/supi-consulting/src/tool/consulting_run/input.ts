@@ -46,7 +46,7 @@ export function buildConsultingRunSchema(agent: string, catalogue: readonly stri
             model: buildModelCatalogueEnum(catalogue),
             workspace: Type.Boolean({
               description:
-                "true exposes the current PI workspace; false uses the empty Consultation Workspace.",
+                "true exposes the current Pi workspace; false uses the empty Consultation Workspace.",
             }),
           },
           { additionalProperties: false },

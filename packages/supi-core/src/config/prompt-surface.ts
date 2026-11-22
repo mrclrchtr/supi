@@ -1,7 +1,7 @@
 // Configurable tool prompt-surface overrides.
 //
 // Resolution order: package defaults ← global SuPi config ← trusted project SuPi config.
-// Project overrides are trust-gated; they require PI project trust and a PI-recognized
+// Project overrides are trust-gated; they require Pi project trust and a Pi-recognized
 // trust-requiring resource (e.g. .pi/settings.json).
 
 import {
@@ -12,7 +12,7 @@ import { loadSupiConfigSectionForScope, type SupiConfigOptions } from "./config.
 
 // ── Public types ───────────────────────────────────────────────────────────
 
-/** Model-facing text that PI adds to one registered tool's prompt surface. */
+/** Model-facing text that Pi adds to one registered tool's prompt surface. */
 export interface SuiPiToolPromptSurface {
   description: string;
   promptSnippet: string;
@@ -99,8 +99,8 @@ export function resolveToolPromptSurface(
         section: options.section,
         toolName: options.toolName,
         message: hasTrustMarker
-          ? `Project prompt-surface overrides for ${options.toolName} were ignored because the project is not trusted in PI.`
-          : `Project prompt-surface overrides for ${options.toolName} were ignored because ${options.ctx.cwd}/.pi/supi/config.json is not PI trust-gated. Add .pi/settings.json and trust the project to enable them.`,
+          ? `Project prompt-surface overrides for ${options.toolName} were ignored because the project is not trusted in Pi.`
+          : `Project prompt-surface overrides for ${options.toolName} were ignored because ${options.ctx.cwd}/.pi/supi/config.json is not Pi trust-gated. Add .pi/settings.json and trust the project to enable them.`,
       });
     }
   }

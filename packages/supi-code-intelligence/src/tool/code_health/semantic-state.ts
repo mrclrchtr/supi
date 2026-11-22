@@ -6,7 +6,7 @@ export function formatSemanticHealthState(state: SemanticHealthState | null): st
   return state.kind === "ready" ? "ready" : `${state.kind} — ${state.reason}`;
 }
 
-/** Read semantic-health state from untyped PI result details. */
+/** Read semantic-health state from untyped Pi result details. */
 export function readSemanticHealthState(value: unknown): SemanticHealthState | null {
   if (typeof value !== "object" || value === null) return null;
   const record = value as Record<string, unknown>;

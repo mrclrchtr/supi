@@ -1,6 +1,6 @@
 # supi-tree-sitter
 
-Tree-sitter integration for PI. Provides AST-based structural code analysis consumed by `supi-code-intelligence`.
+Tree-sitter integration for Pi. Provides AST-based structural code analysis consumed by `supi-code-intelligence`.
 
 See also: `packages/supi-code-intelligence/GLOSSARY.md` (Structural request control, Structural analysis, Structural callee) and `packages/supi-code-runtime/GLOSSARY.md`.
 

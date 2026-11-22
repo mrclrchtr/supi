@@ -1,6 +1,6 @@
-// supi-insights — PI usage insights extension.
+// supi-insights — Pi usage insights extension.
 //
-// Scans historical PI sessions, extracts structured metadata and LLM facets,
+// Scans historical Pi sessions, extracts structured metadata and LLM facets,
 // generates narrative insights, and produces a shareable HTML report.
 
 // biome-ignore lint: factory + pipeline in one file keeps phase ordering explicit.
@@ -115,7 +115,7 @@ export default function insightsExtension(pi: ExtensionAPI) {
   // ── /supi-insights command ──────────────────────────────────
 
   pi.registerCommand("supi-insights", {
-    description: "Generate a report analyzing your PI sessions",
+    description: "Generate a report analyzing your Pi sessions",
     // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: command handler coordinates UI and report generation flow.
     handler: async (_args, ctx) => {
       const config = getConfig(ctx.cwd);
@@ -158,7 +158,7 @@ export default function insightsExtension(pi: ExtensionAPI) {
           ...(failureNote ? [`⚠ ${failureNote}`] : []),
         ].join(" · ");
 
-        const header = `# PI Insights\n\n${stats}\n${report.data.dateRange.start} to ${report.data.dateRange.end}\n`;
+        const header = `# Pi Insights\n\n${stats}\n${report.data.dateRange.start} to ${report.data.dateRange.end}\n`;
 
         const atAGlance = report.insights.atAGlance;
 

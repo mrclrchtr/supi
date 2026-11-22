@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-Agent and Review create managed Agent Runs in the same containing PI session. Both packages need a way to show run status, transcript output, steering, and Stop controls. Agent Profile policy and Review audit policy belong to their owner packages. Review audit can be disabled or retained for seven days, but the user needs the shared run transcript until the containing session ends.
+Agent and Review create managed Agent Runs in the same containing Pi session. Both packages need a way to show run status, transcript output, steering, and Stop controls. Agent Profile policy and Review audit policy belong to their owner packages. Review audit can be disabled or retained for seven days, but the user needs the shared run transcript until the containing session ends.
 
 ## Decision
 
@@ -15,7 +15,7 @@ Agent and Review create managed Agent Runs in the same containing PI session. Bo
 - The registry shows neutral run metadata. It accepts steering only when the handle reports that the initial prompt is active. Stop affects only the selected run.
 - The runtime owns one temporary transcript store for every registered run. It removes transcript files at containing-session shutdown. Review audit settings do not change transcript retention.
 - Agent supplies optional Profile and Profile Diagnostics pages. The runtime viewer has no Agent Profile policy. Review keeps its audit store and Review policy.
-- The runtime remains library-only. It does not expose its own PI extension entry.
+- The runtime remains library-only. It does not expose its own Pi extension entry.
 
 ## Consequences
 

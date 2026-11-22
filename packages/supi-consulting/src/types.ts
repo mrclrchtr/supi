@@ -4,7 +4,7 @@ export type ConsultingAgentId = string;
 /** Agent-specific model identifier retained as a neutral string. */
 export type ConsultingModel = string;
 
-/** Caller choice to expose the current PI workspace to a Consultation. */
+/** Caller choice to expose the current Pi workspace to a Consultation. */
 export type WorkspaceAccess = boolean;
 
 /** An answer source returned by a Consulting Agent. */

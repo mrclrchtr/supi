@@ -1,5 +1,5 @@
 const FAILURE_MESSAGES = {
-  unavailable: "The Consulting Agent is unavailable. Reload PI to check availability.",
+  unavailable: "The Consulting Agent is unavailable. Reload Pi to check availability.",
   timeout: "The Consultation timed out.",
   cancelled: "The Consultation was canceled.",
   "invalid-response": "The Consulting Agent returned an invalid response.",

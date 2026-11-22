@@ -32,7 +32,7 @@ afterEach(() => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
 
-describe("PI execution boundary", () => {
+describe("Pi execution boundary", () => {
   it("adds before removing, preserves other settings, and never grants trust", async () => {
     const { inventory, runner, plan, agentDir, project } = setup();
     const report = await executePlan(inventory, plan, { runner });

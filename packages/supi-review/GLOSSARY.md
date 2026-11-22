@@ -47,7 +47,7 @@ A behavioral protocol that permits repository inspection, read-only retrieval of
 _Avoid_: read-only, sandboxed, write-protected, runtime verification, web-only findings
 
 **Reviewer Extension Set**:
-The package-owned extensions requested for Reviewer Sessions: headless Code Intelligence, plus PI codemode only when `review.reviewerCodemodeEnabled` is on and Web tools only under Reviewer Web Access. Codemode does not add tools or inherit parent extensions; unrelated extensions and non-extension resources remain excluded.
+The package-owned extensions requested for Reviewer Sessions: headless Code Intelligence, plus Pi codemode only when `review.reviewerCodemodeEnabled` is on and Web tools only under Reviewer Web Access. Codemode does not add tools or inherit parent extensions; unrelated extensions and non-extension resources remain excluded.
 _Avoid_: ambient extensions, inherited tools, caller-selected extensions
 
 **Reviewer Web Access**:
@@ -83,7 +83,7 @@ The required per-task policy that selects the evidence view. `change` requires o
 _Avoid_: Finding Scope, target kind
 
 **Review Thinking Level**:
-A user-selected PI model reasoning level for one Review child role. Reviewer Sessions and Planner Drafts have separate Review Thinking Levels. When no value is selected, the role keeps its package default. It changes the model's reasoning budget only; it does not change Review Tasks, the Reviewer Protocol, finding eligibility, or inspection permissions.
+A user-selected Pi model reasoning level for one Review child role. Reviewer Sessions and Planner Drafts have separate Review Thinking Levels. When no value is selected, the role keeps its package default. It changes the model's reasoning budget only; it does not change Review Tasks, the Reviewer Protocol, finding eligibility, or inspection permissions.
 _Avoid_: review strategy, inspection depth, review effort
 
 **Requested Review Thinking Level**:
@@ -91,7 +91,7 @@ The Review Thinking Level selected for a child role before the selected model's 
 _Avoid_: effective level, review strategy, reasoning transcript
 
 **Effective Review Thinking Level**:
-The Review Thinking Level that a selected model can use after capability limits are applied. It may be lower than the Requested Review Thinking Level and is the level used by PI. New Local Reviewer Replays record both levels; older v1 records may not have the requested level.
+The Review Thinking Level that a selected model can use after capability limits are applied. It may be lower than the Requested Review Thinking Level and is the level used by Pi. New Local Reviewer Replays record both levels; older v1 records may not have the requested level.
 _Avoid_: configured level, review effort, reasoning transcript
 
 **Finding Verification**:

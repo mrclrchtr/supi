@@ -1,5 +1,5 @@
 /**
- * supi-prompt-suggestions PI extension entrypoint.
+ * supi-prompt-suggestions Pi extension entrypoint.
  *
  * Registers settings and wires session event handlers to a
  * {@link SessionLifecycle} instance that owns the ghost editor,

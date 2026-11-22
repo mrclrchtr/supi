@@ -55,7 +55,7 @@ import type { ToolOutputTruncationDetails } from "../result/types.ts";
 
 /**
  * Apply the canonical output bound to one assembled code-tool result:
- * bound the inline preview before applying PI safety limits, and spill the
+ * bound the inline preview before applying Pi safety limits, and spill the
  * original content when either bound or the human display omits evidence. A display-only
  * continuation does not add text to model content. File failure is fatal only
  * when model content would otherwise be lost.

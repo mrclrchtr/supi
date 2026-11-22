@@ -41,7 +41,7 @@ interface CacheMissData {
   modelChanged: boolean;
 }
 
-/** Read and migrate a PI session file. */
+/** Read and migrate a Pi session file. */
 export async function parseSessionFile(path: string): Promise<FileEntry[]> {
   const content = await readFile(path, { encoding: "utf-8" });
   const entries = parseSessionEntries(content);
@@ -64,7 +64,7 @@ export function extractCacheTurnEntries(branch: SessionEntry[]): CacheTurn[] {
   return mergeLegacyDetails(nativeTurns, legacyTurns);
 }
 
-/** Extract cache observations from native PI assistant messages. */
+/** Extract cache observations from native Pi assistant messages. */
 export function extractNativeCacheTurns(branch: SessionEntry[]): CacheTurn[] {
   const turns: CacheTurn[] = [];
   const state: NativeExtractionState = {

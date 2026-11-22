@@ -1,7 +1,7 @@
 import spawn from "cross-spawn";
 import { terminateTree } from "./process-tree.mjs";
 
-/** Portable PI command boundary. cross-spawn handles Windows npm shims and escaping. @param {{command?: string, prefix?: string[], env?: NodeJS.ProcessEnv}} [options] @returns {import('./types.ts').Runner} */
+/** Portable Pi command boundary. cross-spawn handles Windows npm shims and escaping. @param {{command?: string, prefix?: string[], env?: NodeJS.ProcessEnv}} [options] @returns {import('./types.ts').Runner} */
 export function createPiRunner(options = {}) {
   return (args, { cwd, signal }) =>
     new Promise((resolve) => {
@@ -60,13 +60,13 @@ export function createPiRunner(options = {}) {
 
 /** Check the executable without starting an agent session. The caller can cancel; a stalled version check also has a time limit. @param {import('./types.ts').Runner} runner @param {string} cwd @param {AbortSignal} [signal] */
 export async function requirePi(runner, cwd, signal = new AbortController().signal) {
-  if (signal.aborted) throw new Error("Cancelled while checking PI.");
+  if (signal.aborted) throw new Error("Cancelled while checking Pi.");
   const timeout = AbortSignal.timeout(10_000);
   const result = await runner(["--version"], { cwd, signal: AbortSignal.any([signal, timeout]) });
-  if (signal.aborted) throw new Error("Cancelled while checking PI.");
-  if (timeout.aborted) throw new Error("PI did not respond to --version within 10 seconds.");
+  if (signal.aborted) throw new Error("Cancelled while checking Pi.");
+  if (timeout.aborted) throw new Error("Pi did not respond to --version within 10 seconds.");
   if (result.code !== 0)
     throw new Error(
-      "PI is not available on PATH. Install PI from https://pi.dev, then rerun the installer.",
+      "Pi is not available on PATH. Install Pi from https://pi.dev, then rerun the installer.",
     );
 }

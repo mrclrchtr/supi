@@ -8,7 +8,7 @@ tools: Read, Glob, Grep, Bash, Edit
 
 # CLAUDE.md Improver
 
-Audit, evaluate, and improve CLAUDE.md files across a codebase to ensure PI has optimal project context.
+Audit, evaluate, and improve CLAUDE.md files across a codebase to ensure Pi has optimal project context.
 
 ## Workflow
 
@@ -102,7 +102,7 @@ find . \( -name "CLAUDE.md" -o -name ".claude.md" -o -name ".claude.local.md" \)
 | Package-specific | `./packages/*/CLAUDE.md` | Module-level context in monorepos |
 | Subdirectory | Any nested location | Feature/domain-specific context |
 
-**Note:** PI natively loads context files from the cwd and its ancestors. Nested package files are surfaced when `code_orientation` focuses their directories.
+**Note:** Pi natively loads context files from the cwd and its ancestors. Nested package files are surfaced when `code_orientation` focuses their directories.
 
 After discovery, run workspace `code_orientation` once, then directory Orientation for every target file's containing directory. Use a sufficiently high `maxResults` or narrower repeated focuses so a display cap is not mistaken for absence. This is required baseline evidence, not an optional removal check.
 
@@ -115,7 +115,7 @@ For each CLAUDE.md file found in Phase 2, evaluate against quality criteria, inc
 | Criterion | Weight | Check |
 |-----------|--------|-------|
 | Commands/workflows documented | High | Are non-obvious commands/workflows captured (not routine build/test)? |
-| Architecture clarity | High | Can PI understand the codebase structure? |
+| Architecture clarity | High | Can Pi understand the codebase structure? |
 | Non-obvious patterns | Medium | Are gotchas and quirks documented? |
 | Conciseness | Medium | No verbose explanations or obvious info? |
 | Currency | High | Does it reflect current codebase state? |

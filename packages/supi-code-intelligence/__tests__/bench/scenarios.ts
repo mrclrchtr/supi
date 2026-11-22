@@ -1,5 +1,5 @@
 /**
- * Benchmark scenarios: one navigation question answered once with native PI
+ * Benchmark scenarios: one navigation question answered once with native Pi
  * tools and once with code_* tools. Call sequences model a competent agent;
  * a function step receives earlier outputs (e.g. to pick a candidate handle).
  *

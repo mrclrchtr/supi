@@ -211,7 +211,7 @@ describe("Agent Run finite continuation", () => {
     expect(resolveNext).not.toHaveBeenCalled();
   });
 
-  it("continues an accepted provider error that resolves through PI", async () => {
+  it("continues an accepted provider error that resolves through Pi", async () => {
     const harness = createHarness(mocks);
     harness.session.messages = [
       {

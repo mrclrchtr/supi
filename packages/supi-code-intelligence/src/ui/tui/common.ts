@@ -42,12 +42,12 @@ export interface ToolResult {
   };
 }
 
-/** PI render context used by Code Intelligence result renderers. */
+/** Pi render context used by Code Intelligence result renderers. */
 export interface ToolRendererContext {
   isError: boolean;
 }
 
-/** PI render options used by Code Intelligence result renderers. */
+/** Pi render options used by Code Intelligence result renderers. */
 export type ResultOptios = ToolRenderResultOptions;
 
 // ── Evidence key labels ──────────────────────────────────────────

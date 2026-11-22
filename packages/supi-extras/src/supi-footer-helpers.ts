@@ -154,7 +154,7 @@ function tokenGroup(usage: UsageTotals, style: FooterStyle): string[] {
 
 /**
  * Cache totals and CH (cumulative session cache hit rate).
- * Denominator includes cacheRead + cacheWrite + input (matches PI's built-in footer).
+ * Denominator includes cacheRead + cacheWrite + input (matches Pi's built-in footer).
  * Contrast with TCH which is per-turn and excludes cacheWrite.
  */
 function cacheGroup(usage: UsageTotals, style: FooterStyle): string[] {

@@ -72,7 +72,7 @@ describe("source path display", () => {
 });
 
 describe("search scope paths", () => {
-  it("normalizes PI @ paths and file URIs", () => {
+  it("normalizes Pi @ paths and file URIs", () => {
     expect(normalizePath("@packages/core", "/project")).toBe("/project/packages/core");
   });
 

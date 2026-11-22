@@ -59,7 +59,7 @@ describe("throw policy: whole-tool-unavailable throws, invalid usage returns tex
   it("code_resolve returns corrective invalid-input text for an unsupported file", async () => {
     const result = await executeResolveTool({ target: { file: "image.png" } }, makeTestCtx(tmpDir));
 
-    expect(result.content).toContain("PI read or grep");
+    expect(result.content).toContain("Pi read or grep");
     expect(result.details).toMatchObject({
       type: "resolve",
       data: { resultKind: "invalid-input" },

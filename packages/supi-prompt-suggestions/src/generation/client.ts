@@ -21,7 +21,7 @@ export const GENERATION_TIMEOUT_MS = 20_000;
  * Kept short on purpose: small suggestion models followed a long rule list
  * less reliably and echoed yes/no questions back ("Darf ich …?").
  *
- * The model receives no PI, SuPi, project, or conversation context —
+ * The model receives no Pi, SuPi, project, or conversation context —
  * only the last assistant message text is sent.
  */
 const SYSTEM_PROMPT = `You write the next message the user sends to their coding assistant, given the assistant's last message.
@@ -81,9 +81,9 @@ export interface SuggestionClientOptions {
 // ── API call ────────────────────────────────────────────────────────────────
 
 /**
- * Call the suggestion model through PI's model registry.
+ * Call the suggestion model through Pi's model registry.
  *
- * The request keeps the fixed prompt and bounded assistant tail. PI resolves
+ * The request keeps the fixed prompt and bounded assistant tail. Pi resolves
  * authentication, endpoint, headers, provider environment, and simple output limits.
  */
 export async function callSuggestionModel(

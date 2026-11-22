@@ -9,7 +9,7 @@ import type {
 } from "../../types.ts";
 import { classifyAnswerEvidence } from "./evidence.ts";
 
-/** PI's hard result bounds for model-visible Consultation output. */
+/** Pi's hard result bounds for model-visible Consultation output. */
 export const MAX_RESULT_BYTES = 50 * 1024;
 export const MAX_RESULT_LINES = 2_000;
 
@@ -143,7 +143,7 @@ function boundResult(value: string): string {
     lines.length > MAX_RESULT_LINES || Buffer.byteLength(result, "utf8") > MAX_RESULT_BYTES;
   if (!truncated) return result;
 
-  const marker = "[Consultation result truncated to PI limits]";
+  const marker = "[Consultation result truncated to Pi limits]";
   const markerBytes = Buffer.byteLength(marker, "utf8") + 1;
   const contentLimit = Math.max(0, MAX_RESULT_BYTES - markerBytes);
   const contentLines = result.split(/\r?\n/).slice(0, MAX_RESULT_LINES - 1);

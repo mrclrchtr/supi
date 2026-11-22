@@ -9,7 +9,7 @@
 - Settings modules own data and persistence; `supi-settings` owns the UI. Keep the shared API deliberate and small.
 - Reuse core path/URI normalization, themed report helpers, and normalized-cwd registry storage across packages rather than copying them. Package-specific state unions and wait semantics stay with their owners.
 - Debug producers own event meaning; `supi-debug` owns retention and display policy. `startDebugTimer()` is a no-op when Debug is disabled; pass a factory to `finish()` to avoid building event data on disabled hot paths.
-- Both model-completion paths share stable affinity and OpenCode header policy. The provider-neutral simple path delegates output limits to PI.
+- Both model-completion paths share stable affinity and OpenCode header policy. The provider-neutral simple path delegates output limits to Pi.
 
 ## Config gotchas
 

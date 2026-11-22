@@ -12,7 +12,7 @@ npx skills add mrclrchtr/supi -a pi --skill code-review commit
 
 This checkout links selected catalog skills into `.pi/skills/`, so local agents use the generated files directly. `pnpm skills:sync` also generates `.claude-plugin/marketplace.json`, which groups the public catalog into Matt Pocock and SuPi skills in the skills.sh installer. It does not need a skills.sh install.
 
-This package is not a PI extension and is not published to npm. Skills installed through skills.sh are static PI resources, so `@mrclrchtr/supi-skills` can enable them, hide them from model invocation, or disable them fully.
+This package is not a Pi extension and is not published to npm. Skills installed through skills.sh are static Pi resources, so `@mrclrchtr/supi-skills` can enable them, hide them from model invocation, or disable them fully.
 
 ## Maintenance
 

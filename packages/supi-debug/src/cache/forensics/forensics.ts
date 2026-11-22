@@ -225,7 +225,7 @@ export function buildFindings(
 /**
  * Param keys on `write`/`edit` tools that are expected to hold file paths.
  *
- * Tracks PI's tool API surface. If PI changes these param names, update this
+ * Tracks Pi's tool API surface. If Pi changes these param names, update this
  * constant to keep `_pathsInvolved` extraction working.
  */
 const PATH_PARAM_KEYS = ["file_path", "path"];

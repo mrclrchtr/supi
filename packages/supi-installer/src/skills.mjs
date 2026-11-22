@@ -5,7 +5,7 @@
  */
 export const supiSkills = ["claude-md-improver", "claude-md-revision", "commit"];
 
-/** Build a skills.sh install command for PI. @param {string[]} skills @param {{global?: boolean}} [options] */
+/** Build a skills.sh install command for Pi. @param {string[]} skills @param {{global?: boolean}} [options] */
 export function skillsCommand(skills, options = {}) {
   return `npx skills add mrclrchtr/supi -a pi${options.global ? " -g" : ""} --skill ${skills.join(" ")}`;
 }

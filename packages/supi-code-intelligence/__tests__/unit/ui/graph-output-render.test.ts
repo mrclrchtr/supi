@@ -267,7 +267,7 @@ describe("code_graph human output", () => {
     },
   );
 
-  it("uses PI state for progress and execution failures", () => {
+  it("uses Pi state for progress and execution failures", () => {
     expect(
       renderGraphResult({ content: [] }, { expanded: false, isPartial: true }, theme, undefined)
         .render(80)

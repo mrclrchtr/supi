@@ -25,7 +25,7 @@ import { Value } from "typebox/value";
 import { expect, it } from "vitest";
 import extension from "../../src/extension.ts";
 
-it("delivers real debug query fields through PI's default codemode, preserving direct calls and thrown failures", async () => {
+it("delivers real debug query fields through Pi's default codemode, preserving direct calls and thrown failures", async () => {
   const directory = await mkdtemp(join(tmpdir(), "supi-debug-codemode-"));
   const events: ToolResultEvent[] = [];
   let session: Awaited<ReturnType<typeof createAgentSession>>["session"] | undefined;
@@ -140,7 +140,7 @@ it("delivers real debug query fields through PI's default codemode, preserving d
         stream.push({ type: "done", reason: first ? "toolUse" : "stop", message });
         return stream;
       };
-      // Replace only the provider stream/auth preflight. PI executes the actual tools and hooks.
+      // Replace only the provider stream/auth preflight. Pi executes the actual tools and hooks.
       await session.agent.prompt("Run the offline debug fixture");
       const result = [...session.messages]
         .reverse()

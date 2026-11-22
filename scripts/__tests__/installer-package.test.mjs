@@ -13,7 +13,7 @@ import { dirname, join, resolve } from "node:path";
 import { expect, it } from "vitest";
 import { packStaged } from "../pack-staged.mjs";
 
-it("packs a standalone executable with no PI extension surface or build output", {
+it("packs a standalone executable with no Pi extension surface or build output", {
   timeout: 120_000,
 }, async () => {
   const directory = mkdtempSync(join(tmpdir(), "supi-installer-pack-"));

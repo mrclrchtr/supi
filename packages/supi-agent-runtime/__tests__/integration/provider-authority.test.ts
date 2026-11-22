@@ -53,7 +53,7 @@ afterEach(async () => {
 });
 
 describe("Agent Run Provider Authority contract", () => {
-  it("uses the parent provider and live request auth in a real PI session", async () => {
+  it("uses the parent provider and live request auth in a real Pi session", async () => {
     const root = await mkdtemp(join(tmpdir(), "supi-agent-authority-"));
     temporaryDirectories.push(root);
     const streamSimple = vi.fn((parentModel, _context, options) => {
@@ -334,7 +334,7 @@ describe("Agent Run Provider Authority contract", () => {
     });
   });
 
-  it("keeps PI child session IDs stable within a run and separate across sibling runs", async () => {
+  it("keeps Pi child session IDs stable within a run and separate across sibling runs", async () => {
     const root = await mkdtemp(join(tmpdir(), "supi-agent-session-id-"));
     temporaryDirectories.push(root);
     const sessionIds: string[] = [];

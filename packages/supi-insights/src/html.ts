@@ -74,7 +74,7 @@ function renderInteractionHtml(insights: InsightResults): string {
   if (!interactionStyle?.narrative) return "";
 
   return `
-    <h2>How You Use PI</h2>
+    <h2>How You Use Pi</h2>
     <div class="narrative">
       ${markdownToHtml(interactionStyle.narrative)}
       ${interactionStyle.keyPattern ? `<div class="key-insight"><strong>Key pattern:</strong> ${escapeXmlAttr(interactionStyle.keyPattern)}</div>` : ""}
@@ -178,7 +178,7 @@ function renderSuggestionsHtml(insights: InsightResults): string {
     ${
       suggestions.usagePatterns?.length
         ? `
-    <h2>New Ways to Use PI</h2>
+    <h2>New Ways to Use Pi</h2>
     <div class="patterns-section">
       ${suggestions.usagePatterns
         .map(
@@ -279,10 +279,10 @@ function renderResponseTimeCard(data: AggregatedData): string {
 function renderMultiClaudingCard(data: AggregatedData): string {
   return `
     <div class="chart-card" style="margin: 24px 0;">
-      <div class="chart-title">Multi-PI (Parallel Sessions)</div>
+      <div class="chart-title">Multi-Pi (Parallel Sessions)</div>
       ${
         data.multiClauding.overlapEvents === 0
-          ? `<p style="font-size: 14px; color: #64748b; padding: 8px 0;">No parallel session usage detected. You typically work with one PI session at a time.</p>`
+          ? `<p style="font-size: 14px; color: #64748b; padding: 8px 0;">No parallel session usage detected. You typically work with one Pi session at a time.</p>`
           : `
         <div style="display: flex; gap: 24px; margin: 12px 0;">
           <div style="text-align: center;"><div style="font-size: 24px; font-weight: 700; color: #7c3aed;">${data.multiClauding.overlapEvents}</div><div style="font-size: 11px; color: #64748b; text-transform: uppercase;">Overlap Events</div></div>
@@ -373,13 +373,13 @@ export function generateHtmlReport(data: AggregatedData, insights: InsightResult
 <html>
 <head>
   <meta charset="utf-8">
-  <title>PI Insights</title>
+  <title>Pi Insights</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>${REPORT_CSS}</style>
 </head>
 <body>
   <div class="container">
-    <h1>PI Insights</h1>
+    <h1>Pi Insights</h1>
     <p class="subtitle">${data.totalMessages.toLocaleString()} messages across ${sessionLabel} | ${data.dateRange.start} to ${data.dateRange.end}</p>
 
     ${failureBanner}

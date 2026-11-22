@@ -1,6 +1,6 @@
 # Tool-output benchmark
 
-Deterministic comparison of native PI tools (`grep`, `read`) and `code_*` tools on the same navigation questions. No model calls: it measures what each tool sequence puts into context, not how an agent behaves.
+Deterministic comparison of native Pi tools (`grep`, `read`) and `code_*` tools on the same navigation questions. No model calls: it measures what each tool sequence puts into context, not how an agent behaves.
 
 ```bash
 pnpm bench:code-intelligence            # run and diff against baseline.json
@@ -32,7 +32,7 @@ SuPi's `packages/` tree at `CORPUS_COMMIT`, extracted with `git archive` (binari
 
 | Metric | Compared with baseline | Notes |
 | --- | --- | --- |
-| `tokens` | yes | chars/4 of call arguments plus model-visible output, the estimate PI uses. Not a provider tokenizer. |
+| `tokens` | yes | chars/4 of call arguments plus model-visible output, the estimate Pi uses. Not a provider tokenizer. |
 | `calls` | yes | Executed steps; conditional steps that return `null` are not counted. |
 | `precision` / `recall` | yes | Answer locations against `truth` spans (`path:line` or `path:start-end`). "Read Next" hints and `locate` steps are excluded. Lines shown by `read` count only when they hit a span: unrelated window lines are already paid for in tokens. Recall counts covered spans. Only for scenarios with `truth`. |
 | `recall` (paths) | yes | For `truthPaths` scenarios (orientation, multi-line imports): share of expected files the answer names, workspace- or focus-relative, or reads. No precision: a map may list more than the question needs. |

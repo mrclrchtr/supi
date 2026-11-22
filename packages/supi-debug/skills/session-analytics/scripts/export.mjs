@@ -28,7 +28,7 @@ Kinds:
 Options:
   --workspace <path>     Include sessions in this directory tree (default: cwd)
   --all-workspaces       Explicitly include other projects; replaces --workspace
-  --sessions-dir <path>  Override PI storage discovery
+  --sessions-dir <path>  Override Pi storage discovery
   --since <date|Nd>      Inclusive ISO date/time or number of days ago
   --max-sessions <n>     Bound session scans (default: 5000)
   --output <path>        New JSONL file; existing files are preserved

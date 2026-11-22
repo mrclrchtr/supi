@@ -74,7 +74,7 @@ Assume `code_orientation` is used heavily. Distinguish first-turn context from r
 | `supi-code-intelligence` overview | Every discovered module's name, description, selected manifest entrypoints, manifest-declared dependency arrows, and detected languages | Hidden message on the first `before_agent_start` |
 | Workspace `code_orientation` | Root manifest, package names and paths, manifest-declared relationships, direct root files/directories | Routine on demand |
 | Directory/file `code_orientation` | Applicable instruction files, direct entries, package manifest/dependency facts, and file outline/import/export observations | Routine on demand for trusted focused paths |
-| Native PI context | Context files from the cwd and ancestor chain | Session startup/system prompt |
+| Native Pi context | Context files from the cwd and ancestor chain | Session startup/system prompt |
 
 **Implication:** Instruction files should preserve only information that these surfaces cannot generate:
 - Non-obvious commands and workflows (gotcha flags, hook behaviors—not routine npm install/test/build)

@@ -121,7 +121,7 @@ describe("resolveToolPromptSurface", () => {
     expect(result.surface.promptSnippet).toBe("project snippet");
   });
 
-  it("ignores project prompt-surface overrides without a PI trust marker", () => {
+  it("ignores project prompt-surface overrides without a Pi trust marker", () => {
     writeProjectConfig(tmpDir, {
       "ask-user": {
         tools: {

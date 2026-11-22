@@ -11,7 +11,7 @@ metadata:
 disable-model-invocation: true
 ---
 
-# PI Upgrade Advisor
+# Pi Upgrade Advisor
 
 Upgrade pi framework dependencies, migrate legacy package names, and surface the
 new patterns available in the latest release.

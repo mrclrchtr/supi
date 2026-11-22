@@ -1,6 +1,6 @@
 # supi-insights
 
-Analysis of past PI sessions: what the user worked on, how it went, and where tooling got in the way. It turns session history into a report for people and evidence for agents.
+Analysis of past Pi sessions: what the user worked on, how it went, and where tooling got in the way. It turns session history into a report for people and evidence for agents.
 
 See also: root `GLOSSARY.md` (DevTool), `packages/supi-agent-runtime/GLOSSARY.md` (Agent Run Retrospective), `packages/supi-debug/GLOSSARY.md` (Tooling Retrospective).
 

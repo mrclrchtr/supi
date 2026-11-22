@@ -1,6 +1,6 @@
 # supi-lsp
 
-Language Server Protocol integration for PI. Provides semantic code-intelligence capabilities consumed by `supi-code-intelligence`.
+Language Server Protocol integration for Pi. Provides semantic code-intelligence capabilities consumed by `supi-code-intelligence`.
 
 See also: `packages/supi-code-intelligence/GLOSSARY.md` and `packages/supi-code-runtime/GLOSSARY.md`.
 

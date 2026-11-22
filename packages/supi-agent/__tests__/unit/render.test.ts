@@ -229,7 +229,7 @@ describe("renderResult", () => {
     );
   });
 
-  it("renders error state from PI's renderer context", () => {
+  it("renders error state from Pi's renderer context", () => {
     const result = renderResult(
       { content: [{ type: "text", text: "Provider rejected the request\nDetails omitted" }] },
       { expanded: false, isPartial: false },

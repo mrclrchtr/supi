@@ -60,7 +60,7 @@ describe("profile resource policy", () => {
     ).toBe(true);
   });
 
-  it("loads only selected instruction scopes and excludes PI system files", async () => {
+  it("loads only selected instruction scopes and excludes Pi system files", async () => {
     const setupState = await setup();
     const files = selectInstructionFiles(
       setupState.profile,

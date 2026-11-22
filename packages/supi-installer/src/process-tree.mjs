@@ -16,7 +16,7 @@ export async function terminateTree(pid, force) {
       child.once("close", (code) => {
         // A second stop can find that the root process has already exited.
         if (code === 0 || code === 128) resolve(undefined);
-        else reject(new Error(`Could not stop the PI process tree (taskkill status ${code}).`));
+        else reject(new Error(`Could not stop the Pi process tree (taskkill status ${code}).`));
       });
     });
     return;

@@ -10,12 +10,12 @@ export interface ToolBaseline {
   initiallyInactiveToolNames: string[];
 }
 
-/** Return true when PI reports a non-built-in tool source. */
+/** Return true when Pi reports a non-built-in tool source. */
 export function isExtensionTool(tool: ToolInfo): boolean {
   return tool.sourceInfo.source !== "builtin" && tool.sourceInfo.source !== "sdk";
 }
 
-/** Capture the PI tool set before session overrides run. */
+/** Capture the Pi tool set before session overrides run. */
 export function captureToolBaseline(pi: ExtensionAPI): ToolBaseline {
   const tools = pi.getAllTools().filter(isExtensionTool);
   const activeNames = new Set(pi.getActiveTools());

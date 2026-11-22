@@ -1,10 +1,10 @@
 # Make model calls from an extension
 
-## PI request authority
+## Pi request authority
 
-Use `ctx.modelRegistry.complete(model, context, options)` for API-specific options outside the agent loop. On PI 0.86.0 or later, use `ctx.modelRegistry.streamSimple(model, context, options).result()` for provider-neutral options and PI's simple output-limit handling. Both paths resolve the current provider, authentication, OAuth refresh, headers, environment, and credential-specific endpoint.
+Use `ctx.modelRegistry.complete(model, context, options)` for API-specific options outside the agent loop. On Pi 0.86.0 or later, use `ctx.modelRegistry.streamSimple(model, context, options).result()` for provider-neutral options and Pi's simple output-limit handling. Both paths resolve the current provider, authentication, OAuth refresh, headers, environment, and credential-specific endpoint.
 
-The installed PI example `examples/extensions/summarize.ts` uses this public registry method. `ExtensionAPI` (`pi`) does not expose `callModel()`.
+The installed Pi example `examples/extensions/summarize.ts` uses this public registry method. `ExtensionAPI` (`pi`) does not expose `callModel()`.
 
 ```typescript
 const model = ctx.modelRegistry.find("openai", "gpt-5.2");
@@ -43,7 +43,7 @@ const response = await completeSimpleModelRequest(ctx, model, context, {
 });
 ```
 
-The simple helper requires PI 0.86.0 or later. It delegates output limits to PI without importing Pi AI subpaths. API-specific callers retain their current interface:
+The simple helper requires Pi 0.86.0 or later. It delegates output limits to Pi without importing Pi AI subpaths. API-specific callers retain their current interface:
 
 ```typescript
 import { completeModelRequest } from "@mrclrchtr/supi-core/llm";
@@ -57,18 +57,18 @@ const response = await completeModelRequest(ctx, model, context, {
 
 | Owner | Responsibility |
 | --- | --- |
-| PI model registry | Provider dispatch, request auth, OAuth refresh, effective endpoint, auth headers, environment |
+| Pi model registry | Provider dispatch, request auth, OAuth refresh, effective endpoint, auth headers, environment |
 | Both SuPi completion helpers | Stable separate request identity and OpenCode header defaults |
-| PI simple path | Model-derived output limits and context guards for provider-neutral requests |
+| Pi simple path | Model-derived output limits and context guards for provider-neutral requests |
 | Calling feature | Model selection, prompt, explicit limit overrides, cancellation, retries, validation, error presentation |
 
-Choose a stable scope for each distinct feature prompt stream. Do not put prompt text, turn numbers, retry counts, credentials, or project paths into that scope. The helper derives an opaque identity from the scope, PI session, provider, and model. Repeated calls in the same stream retain that identity without using the primary agent's identity.
+Choose a stable scope for each distinct feature prompt stream. Do not put prompt text, turn numbers, retry counts, credentials, or project paths into that scope. The helper derives an opaque identity from the scope, Pi session, provider, and model. Repeated calls in the same stream retain that identity without using the primary agent's identity.
 
 The helper does not change provider cache retention defaults or guarantee a cache hit rate. Explicit configured session headers retain precedence and can remove the default separation.
 
-## OpenCode compatibility on PI 0.85.1
+## OpenCode compatibility on Pi 0.85.1
 
-PI's SDK supplies OpenCode session headers for AgentSession requests. Direct registry completions need their own transform on this version.
+Pi's SDK supplies OpenCode session headers for AgentSession requests. Direct registry completions need their own transform on this version.
 
 The shared helper adds defaults for `opencode`, `opencode-go`, or the exact model URL hostname `opencode.ai`:
 
@@ -81,18 +81,18 @@ The public `transformHeaders` option runs after auth/model/explicit headers are 
 
 ## Child sessions
 
-Agent Runs in `supi-agent-runtime` retain their private PI runtime and borrowed Provider Authority. They do not use the direct-completion helper. PI already forwards each child's SessionManager ID; preserve it across child turns and continuation.
+Agent Runs in `supi-agent-runtime` retain their private Pi runtime and borrowed Provider Authority. They do not use the direct-completion helper. Pi already forwards each child's SessionManager ID; preserve it across child turns and continuation.
 
 When a borrowed provider delegates to the current parent provider, it must preserve the prepared model's effective endpoint. Replacing the prepared model with an unmodified catalog entry can lose a Copilot credential-specific endpoint.
 
 ## Evidence and decisions
 
-Request handling was verified against PI and pi-ai 0.85.1. Registry simple completion was added in PI 0.86.0 and verified with 0.86.1:
+Request handling was verified against Pi and pi-ai 0.85.1. Registry simple completion was added in Pi 0.86.0 and verified with 0.86.1:
 
-- PI `docs/extensions.md`: model registry and provider auth.
-- PI `examples/extensions/summarize.ts`: public registry completion.
-- PI `dist/core/model-runtime.js`: auth and endpoint preparation.
-- PI `dist/core/sdk.js` and `provider-attribution.js`: session ID and OpenCode headers.
+- Pi `docs/extensions.md`: model registry and provider auth.
+- Pi `examples/extensions/summarize.ts`: public registry completion.
+- Pi `dist/core/model-runtime.js`: auth and endpoint preparation.
+- Pi `dist/core/sdk.js` and `provider-attribution.js`: session ID and OpenCode headers.
 - pi-ai `README.md`: auth ownership, request header ordering, and compat migration.
 
 Related: [request decision](../adr/0023-pi-owned-model-requests.md), [issue #402](https://github.com/mrclrchtr/supi/issues/402), and [context architecture](context-architecture.md).

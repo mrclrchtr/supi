@@ -42,7 +42,7 @@ function formatScope(inventory, scope) {
   for (const source of inventory.blocked[scope]) {
     lines.push(
       `  BLOCKED: ${source}`,
-      `  Remove this source with PI before changing this scope: pi remove <source>${scope === "project" ? " --local" : ""}`,
+      `  Remove this source with Pi before changing this scope: pi remove <source>${scope === "project" ? " --local" : ""}`,
     );
   }
   for (const source of inventory.unmanaged[scope]) lines.push(`  Unmanaged; retained: ${source}`);
@@ -110,9 +110,9 @@ export function formatReport(report) {
   if (report.cancelled) lines.push("Cancelled. No more commands will start.");
   if (report.error) lines.push(`Error: ${report.error}`);
   if (report.inventory) lines.push("", ...formatInventory(report.inventory));
-  else lines.push("Final declarations could not be read. Inspect them with PI before retrying.");
+  else lines.push("Final declarations could not be read. Inspect them with Pi before retrying.");
   if (report.results.some((result) => result.status !== "unattempted"))
-    lines.push("", "Run /reload or restart PI after package changes.");
+    lines.push("", "Run /reload or restart Pi after package changes.");
   const removed = report.results
     .filter((result) => result.status === "success")
     .map((result) => result.operation);

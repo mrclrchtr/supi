@@ -7,7 +7,7 @@ if (args[0] === "--version") {
     writeFileSync(join(process.env.PI_CODING_AGENT_DIR, "version-ready"), "ready");
     await new Promise((resolve) => setTimeout(resolve, 1_000));
   }
-  process.stdout.write("PI fixture\n");
+  process.stdout.write("Pi fixture\n");
 } else {
   appendFileSync(
     join(process.env.PI_CODING_AGENT_DIR, "calls.jsonl"),

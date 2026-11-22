@@ -56,7 +56,7 @@ export class AgentRunLifecycleTraceCollector {
 
   constructor(private readonly registeredToolNames: ReadonlySet<string> = new Set()) {}
 
-  /** Observe one PI event without retaining arbitrary event payloads. */
+  /** Observe one Pi event without retaining arbitrary event payloads. */
   observe(event: AgentSessionEvent): void {
     try {
       const entry = mapLifecycleEvent(event);

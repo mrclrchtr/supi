@@ -1,13 +1,13 @@
 # SuPi
 
-SuPi is a curated toolkit of extensions for the PI coding agent. It exists to make PI more capable in day-to-day coding sessions while keeping agent-facing context intentional and small.
+SuPi is a curated toolkit of extensions for the Pi coding agent. It exists to make Pi more capable in day-to-day coding sessions while keeping agent-facing context intentional and small.
 
 This repo is a multi-context monorepo. See `GLOSSARY-MAP.md` for per-package contexts. This file defines project-wide, cross-cutting domain terms. Package-specific terms live in each package's `GLOSSARY.md`.
 
 ## Language
 
 **SuPi**:
-A curated PI extension toolkit for day-to-day coding sessions, spanning code understanding, external knowledge lookup, context and cache observability, structured human handoff, review and reporting workflows, diagnostics, configuration, and workflow quality. It can be installed as a full stack or as individual packages.
+A curated Pi extension toolkit for day-to-day coding sessions, spanning code understanding, external knowledge lookup, context and cache observability, structured human handoff, review and reporting workflows, diagnostics, configuration, and workflow quality. It can be installed as a full stack or as individual packages.
 _Avoid_: token-saving layer, generic plugin collection
 
 **Context Efficiency**:
@@ -43,7 +43,7 @@ The complete set of Extension Packages loaded from the repository root for devel
 _Avoid_: root stack, standard stack, release stack
 
 **Extension Package**:
-A SuPi package that can be installed into PI and registers extension behavior such as tools, commands, event handlers, settings, or UI.
+A SuPi package that can be installed into Pi and registers extension behavior such as tools, commands, event handlers, settings, or UI.
 _Avoid_: plugin package, module
 
 **SuPi Release Notes**:
@@ -63,7 +63,7 @@ A named set of Extension Packages that defines a complete desired selection for 
 _Avoid_: additive shortcut, install profile
 
 **Infrastructure Package**:
-A SuPi package that supports other packages but is not promoted as a directly installed PI extension. Infrastructure packages should still be linked from the root README, but separately from user-facing extension packages.
+A SuPi package that supports other packages but is not promoted as a directly installed Pi extension. Infrastructure packages should still be linked from the root README, but separately from user-facing extension packages.
 _Avoid_: internal package, hidden package
 
 **Configuration Surface**:
@@ -79,7 +79,7 @@ A root README catalog entry that promotes one SuPi package with its README link,
 _Avoid_: package table row
 
 **Agent-Facing**:
-A package-catalog badge for SuPi behavior the PI agent can use directly, such as model-callable tools, injected agent context, or tool-call hooks. The public README badge should be written as `Agent`.
+A package-catalog badge for SuPi behavior the Pi agent can use directly, such as model-callable tools, injected agent context, or tool-call hooks. The public README badge should be written as `Agent`.
 _Avoid_: agent-usable, passive
 
 **Human-Facing**:
@@ -87,19 +87,19 @@ A package-catalog badge for SuPi behavior the user drives directly, such as slas
 _Avoid_: human-only
 
 **DevTool**:
-A package-catalog badge for SuPi features aimed primarily at debugging, inspecting, or developing SuPi/PI extension behavior rather than ordinary coding workflow.
+A package-catalog badge for SuPi features aimed primarily at debugging, inspecting, or developing SuPi/Pi extension behavior rather than ordinary coding workflow.
 _Avoid_: DevTools, developer tools
 
 **DevTool Package**:
-A released Extension Package that is not part of the recommended stack. It is aimed at debugging, inspecting, or developing SuPi/PI extension behavior rather than ordinary coding workflow, and users opt in to it instead of receiving it by default.
+A released Extension Package that is not part of the recommended stack. It is aimed at debugging, inspecting, or developing SuPi/Pi extension behavior rather than ordinary coding workflow, and users opt in to it instead of receiving it by default.
 _Avoid_: beta package, Infrastructure Package, release stack package
 
 **Quality-of-Life**:
-Small PI session improvements that reduce friction without becoming the central reason to install SuPi, such as aliases, prompt stashing, activity indicators, and default bash timeouts.
+Small Pi session improvements that reduce friction without becoming the central reason to install SuPi, such as aliases, prompt stashing, activity indicators, and default bash timeouts.
 _Avoid_: workflow guardrails, workflow quality-of-life
 
 **Context Usage Monitor**:
-A display or report that shows how the current PI session is spending its context window.
+A display or report that shows how the current Pi session is spending its context window.
 _Avoid_: context usage
 
 **Prompt Surface Override**:
@@ -107,7 +107,7 @@ A user or project configuration of a tool's model-facing prompt surface — desc
 _Avoid_: tool behavior override, UI customization
 
 **Trust-Gated Prompt Surface Override**:
-A project-scoped Prompt Surface Override that SuPi honors only when PI project trust is active and the project has a PI-recognized trust-gated resource such as `.pi/settings.json`. Global prompt-surface overrides are user-scoped and do not require project trust.
+A project-scoped Prompt Surface Override that SuPi honors only when Pi project trust is active and the project has a Pi-recognized trust-gated resource such as `.pi/settings.json`. Global prompt-surface overrides are user-scoped and do not require project trust.
 _Avoid_: treating project prompt text as trusted by location alone, runtime behavior override
 
 **Load Status Marker**:

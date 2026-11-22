@@ -116,7 +116,7 @@ describe("session capability controls", () => {
     expect(pi.getHandlers("tool_call")).toEqual([]);
   });
 
-  it("toggles tools by PI source and resets the session override", async () => {
+  it("toggles tools by Pi source and resets the session override", async () => {
     const packageTools: Tool[] = [
       tool("tool-active", "@example/tools", "/one/tool.ts"),
       tool("tool-second", "@example/tools", "/two/tool.ts"),

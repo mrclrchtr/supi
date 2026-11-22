@@ -1,5 +1,5 @@
 /**
- * Deterministic tool-output benchmark: native PI tools vs. code_* tools on a
+ * Deterministic tool-output benchmark: native Pi tools vs. code_* tools on a
  * frozen corpus. No model calls. See ../../docs/bench.md.
  *
  *   pnpm bench:code-intelligence            # compare with baseline.json
@@ -65,7 +65,7 @@ const MAX_EXPANSIONS = 3;
 /** Lines of context an agent reads around each location it has not seen yet. */
 const VIEW_CONTEXT = 2;
 
-/** Same heuristic PI uses for context estimation. */
+/** Same heuristic Pi uses for context estimation. */
 const estimateTokens = (text: string) => Math.ceil(text.length / 4);
 
 const corpus = extractCorpus(CORPUS_COMMIT);
@@ -504,7 +504,7 @@ function spanProblem(scenario: BenchScenario, entry: string, root: string): stri
 }
 
 /**
- * Corpus lines a read call displayed. PI's read output has no line numbers;
+ * Corpus lines a read call displayed. Pi's read output has no line numbers;
  * a trailing continuation notice (`[N more lines …]`) is not file content.
  */
 function readWindow(call: BenchCall, output: string, cwd: string): string[] {

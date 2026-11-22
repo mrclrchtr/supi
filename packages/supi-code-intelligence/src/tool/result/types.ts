@@ -31,7 +31,7 @@ export type ToolResultStatus = "completed" | "invalid-input" | "disambiguation" 
 
 /** Separate model-content and human-display bounds, with one optional continuation file. */
 export interface ToolOutputTruncationDetails {
-  /** Model content exceeded its economic budget or the PI safety limit. */
+  /** Model content exceeded its economic budget or the Pi safety limit. */
   truncated: boolean;
   /** The TUI omits evidence that remains in the model content. */
   displayTruncated?: boolean;

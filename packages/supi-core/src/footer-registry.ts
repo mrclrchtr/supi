@@ -2,7 +2,7 @@
 //
 // Extensions register text chunks with a placement hint. The custom footer in
 // supi-extras reads these contributions and renders them alongside the
-// built-in metrics. Extensions can use PI's status API with the same key as a
+// built-in metrics. Extensions can use Pi's status API with the same key as a
 // fallback when the custom footer is not installed.
 
 import { createRegistry } from "./registry-utils.ts";

@@ -64,7 +64,7 @@ describe("standalone CLI", () => {
     expect(readFileSync(path, "utf8")).toBe(before);
   });
 
-  it("rejects missing trust, missing PI, non-terminal use, and mutation flags", () => {
+  it("rejects missing trust, missing Pi, non-terminal use, and mutation flags", () => {
     const { run, agentDir } = setup();
     expect(run([]).stderr).toMatch(/terminal/);
     expect(run(["--yes"]).status).toBe(1);

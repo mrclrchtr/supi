@@ -288,7 +288,7 @@ export class SessionLifecycle {
   private installEditor(ctx: ExtensionContext): void {
     let mainEditorPending = true;
     ctx.ui.setEditorComponent((tui, theme, keybindings) => {
-      // PI creates the installed editor when setEditorComponent is called. Later
+      // Pi creates the installed editor when setEditorComponent is called. Later
       // factory calls can create embedded editors for forms, so they do not own suggestions.
       const isMainEditor = mainEditorPending;
       mainEditorPending = false;

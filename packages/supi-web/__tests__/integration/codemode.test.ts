@@ -126,7 +126,7 @@ function reply(
   return stream;
 }
 
-it("delivers actual web tool data through PI's default codemode and rejects thrown failures", async () => {
+it("delivers actual web tool data through Pi's default codemode and rejects thrown failures", async () => {
   const environment = Object.fromEntries(
     ["PATH", "BX_ARGS_FILE", "BX_OUTPUT", "BX_STDERR", "BX_EXIT_CODE"].map((key) => [
       key,

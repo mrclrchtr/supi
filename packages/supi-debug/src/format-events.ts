@@ -101,7 +101,7 @@ function reserveTruncationSpace(content: string): TruncationResult {
   });
 }
 
-/** Limit model-visible debug output to PI's standard tool-output bounds. */
+/** Limit model-visible debug output to Pi's standard tool-output bounds. */
 export function truncateDebugOutput(content: string): {
   text: string;
   truncation?: TruncationResult;

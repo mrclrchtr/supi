@@ -18,17 +18,17 @@ Keep `src/analysis/` independent of Pi. It owns evidence collection and refactor
 
 `src/tool/result/assembly.ts` is the sole shared result-policy module. Graph evidence is bounded there once so Markdown and structured details consume the same list metadata. Markdown and TUI consume assembled facts independently. Do not collect evidence in renderers or parse markdown in TUI code. After a renderer change, `/reload` and verify collapsed and expanded output with `tui_render` (`format: "marked"` for tone; enable `debug.tuiRenderTool`).
 
-Whole-workflow capability unavailable → throw from `execute()` so PI marks a real tool failure. Invalid usage → return error text so the model can self-correct. Zero matches are successful results.
+Whole-workflow capability unavailable → throw from `execute()` so Pi marks a real tool failure. Invalid usage → return error text so the model can self-correct. Zero matches are successful results.
 
 ## Tool adapter contract
 
-- `src/tool/infra/truncate.ts` (`boundCodeToolResult`) truncates content at PI defaults (2000 lines / 50 KB); details remain structured and untruncated. Full content spills to a temporary file. Each tool's `result.ts` owns the final model-visible content and details via its `finish*Result` builder; `execute.ts` only calls the session workflow and delegates.
+- `src/tool/infra/truncate.ts` (`boundCodeToolResult`) truncates content at Pi defaults (2000 lines / 50 KB); details remain structured and untruncated. Full content spills to a temporary file. Each tool's `result.ts` owns the final model-visible content and details via its `finish*Result` builder; `execute.ts` only calls the session workflow and delegates.
 - `src/headless.ts` is the managed-child profile. It registers exactly `code_resolve`, `code_inspect`, `code_orientation`, `code_graph`, `code_find`, and `code_health`; never add refactors, settings, UI, commands, or overview injection there. Both entry points call `registerInstructionDedup` (`src/app/app.ts`); add instruction-state handlers there, not in one entry point.
 - Forward `signal` and `onUpdate` through `toWorkflowControl()`. The tool adapter derives one absolute deadline per public call (`DEFAULT_WORKFLOW_DEADLINE_MS`). Every workflow must pass the exact signal/deadline control to its provider. AST Scan creates one shared absolute deadline for enumeration and substrate work.
-- PI schema validation is not enough: workflow validation must protect direct callers.
+- Pi schema validation is not enough: workflow validation must protect direct callers.
 - Exact-one schemas use closed one-key objects rather than TypeBox unions/literals for model-provider compatibility.
 - Prompt-surface ownership (see `docs/pi/tool-guidance.md`): `description` owns selection rules, preconditions, and no-fallback contracts; `promptSnippet` owns one capability phrase; `promptGuidelines` owns cross-tool routing; schema field descriptions own parameter mechanics. Every model-facing fact lives in exactly one home; duplicates are deleted.
-- `/supi-capabilities` can turn eligible `code_*` tools off for one session. The PI startup allowlist still sets the boundary. Keep cross-tool guidance conditional on the named tool being available. Do not assume all `code_*` tools are active together.
+- `/supi-capabilities` can turn eligible `code_*` tools off for one session. The Pi startup allowlist still sets the boundary. Keep cross-tool guidance conditional on the named tool being available. Do not assume all `code_*` tools are active together.
 
 ## Target resolution
 

@@ -18,7 +18,7 @@ type PersistedDebugEventQuery = Pick<
   "operationId" | "source" | "level" | "category" | "limit"
 >;
 
-/** Sanitized selection and scan totals from one PI session file. */
+/** Sanitized selection and scan totals from one Pi session file. */
 export interface SessionDebugEvents {
   events: DebugEventView[];
   persistedEventCount: number;
@@ -98,7 +98,7 @@ function reportProgress(
   onProgress?.(progress);
 }
 
-/** Read sanitized debug events persisted by SuPi Debug from a PI session file. */
+/** Read sanitized debug events persisted by SuPi Debug from a Pi session file. */
 export async function readSessionDebugEvents(
   sessionFile: string,
   query: PersistedDebugEventQuery = {},

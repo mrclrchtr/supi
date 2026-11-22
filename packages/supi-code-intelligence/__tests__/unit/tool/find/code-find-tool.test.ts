@@ -193,7 +193,7 @@ describe("code_find tool", () => {
     it.each(["namespace", "test"] as const)(
       "returns invalid-input for an unsupported kind when TypeBox is bypassed",
       async (kind) => {
-        // PI's TypeBox schema normally rejects this before execution. The
+        // Pi's TypeBox schema normally rejects this before execution. The
         // session parser must return the same agent-correctable failure when a
         // direct call bypasses that adapter validation.
         writeFileSync(path.join(tmpDir, "a.ts"), "function foo() {}\n");

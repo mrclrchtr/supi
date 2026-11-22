@@ -1,7 +1,7 @@
 /**
  * Ghost-text editor component.
  *
- * Extends PI's CustomEditor and renders prompt suggestions as dim ghost text
+ * Extends Pi's CustomEditor and renders prompt suggestions as dim ghost text
  * after the cursor in an empty editor.
  *
  * @module
@@ -74,7 +74,7 @@ export class GhostTextEditor extends CustomEditor {
 
   override handleInput(data: string): void {
     if (this.suggestion && !this.isSuppressed) {
-      // Use PI's matchesKey (not raw escape sequences) — it handles
+      // Use Pi's matchesKey (not raw escape sequences) — it handles
       // CSI (\x1b[C), SS3 (\x1bOC), and Kitty keyboard protocol correctly.
       if (matchesKey(data, "right") || matchesKey(data, "tab")) {
         this.insertTextAtCursor(this.suggestion);

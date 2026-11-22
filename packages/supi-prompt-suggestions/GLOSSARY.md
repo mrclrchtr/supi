@@ -1,6 +1,6 @@
 # supi-prompt-suggestions
 
-Generates candidate user prompts after assistant responses for the user to accept, edit, ignore, or replace. Presents suggestions as ghost text in the PI editor.
+Generates candidate user prompts after assistant responses for the user to accept, edit, ignore, or replace. Presents suggestions as ghost text in the Pi editor.
 
 See also: root `GLOSSARY.md` for project-wide terms.
 
@@ -19,7 +19,7 @@ A ready prompt suggestion retained while its ghost text is hidden because the us
 _Avoid_: dismissed suggestion, cached suggestion
 
 **Suggestion source**:
-The component responsible for producing prompt suggestions. A suggestion source may be model-backed, heuristic, disabled, or test-only, and is distinct from PI model providers and autocomplete providers.
+The component responsible for producing prompt suggestions. A suggestion source may be model-backed, heuristic, disabled, or test-only, and is distinct from Pi model providers and autocomplete providers.
 _Avoid_: suggestion provider, ghost text provider, model provider
 
 **Suggestion affinity stream**:
@@ -27,5 +27,5 @@ A group of prompt-suggestion requests with a common provider-routing identity, s
 _Avoid_: suggestion cache, model session, shared conversation cache
 
 **Scoped model set**:
-The PI-configured set of models a SuPi feature may offer when it requires explicit model selection. A feature using this set should not silently widen to every available model or fall back to the current session model when it is outside the set.
+The Pi-configured set of models a SuPi feature may offer when it requires explicit model selection. A feature using this set should not silently widen to every available model or fall back to the current session model when it is outside the set.
 _Avoid_: all models, unscoped picker, current-model fallback

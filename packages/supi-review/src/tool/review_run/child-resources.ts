@@ -15,7 +15,7 @@ export interface IsolatedChildResources {
 /** Optional Reviewer Extension Set settings for one isolated child. */
 export interface IsolatedChildResourceOptions {
   headlessInspection?: boolean;
-  /** Load PI codemode only for an explicitly opted-in Reviewer. */
+  /** Load Pi codemode only for an explicitly opted-in Reviewer. */
   codemode?: boolean;
   /** Session-provided Web tools for Reviewer Web Access; omitted means none. */
   webTools?: ChildWebToolProvision;

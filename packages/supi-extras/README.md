@@ -37,7 +37,7 @@ pi install npm:@mrclrchtr/supi-extras
 
 `/supi-capabilities` opens a searchable selector. Use it to change extension tool and skill visibility for the current session.
 
-- The selector lists only extension tools that were active at startup. It does not list PI built-in tools or tools supplied by integrations.
+- The selector lists only extension tools that were active at startup. It does not list Pi built-in tools or tools supplied by integrations.
 - Tool and skill overrides are stored in the session. Resume restores them. Fork and `/clone-session` copy them. New sessions use the optional default profile; without a default, they start without overrides.
 - Tree navigation keeps explicit capability tool choices and does not change other tool choices.
 - The selector waits until the agent is idle before it opens. It does not interrupt a running tool call.
@@ -153,6 +153,6 @@ That prevents git subprocesses from hanging while waiting for an interactive edi
 
 ### Default bash timeout
 
-PI's `bash` tool has no default timeout. When the model calls `bash` without `timeout`, the package fills in a default (600 seconds) so a hung command cannot stall an unattended session. The limit is long enough for typical test and check runs; set an explicit `timeout` or lower the default for faster failure. Explicit `timeout` values are kept; other tools are untouched.
+Pi's `bash` tool has no default timeout. When the model calls `bash` without `timeout`, the package fills in a default (600 seconds) so a hung command cannot stall an unattended session. The limit is long enough for typical test and check runs; set an explicit `timeout` or lower the default for faster failure. Explicit `timeout` values are kept; other tools are untouched.
 
 Configure it in `/supi-settings` → **Bash Timeout** → **Default Timeout** (seconds), stored in the `bash-timeout` section of `~/.pi/agent/supi/config.json` or `.pi/supi/config.json`. This replaces the former `@mrclrchtr/supi-bash-timeout` package; existing settings keep working.

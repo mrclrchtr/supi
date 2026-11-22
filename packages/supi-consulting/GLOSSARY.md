@@ -10,14 +10,14 @@ _Avoid_: Antigravity Run, Agent Run, child session
 
 **Consulting Agent**:
 An agent selected to perform a Consultation. Antigravity is the only supported Consulting Agent.
-_Avoid_: Agent Profile, PI model provider, model
+_Avoid_: Agent Profile, Pi model provider, model
 
 **Workspace Access**:
-The caller's decision to expose the current PI workspace to a Consultation. A Consultation without Workspace Access uses the selected agent's Consultation Workspace.
+The caller's decision to expose the current Pi workspace to a Consultation. A Consultation without Workspace Access uses the selected agent's Consultation Workspace.
 _Avoid_: consult mode, explore mode, repository mode
 
 **Consultation Workspace**:
-A package-managed empty project for Consultations without access to the current PI workspace. Its stable identity keeps agent-specific permissions and conversations separate from the current workspace.
+A package-managed empty project for Consultations without access to the current Pi workspace. Its stable identity keeps agent-specific permissions and conversations separate from the current workspace.
 _Avoid_: temporary workspace, sandbox, current workspace
 
 **Web Capability**:
@@ -34,7 +34,7 @@ _Avoid_: read-only mode, safe mode, SuPi permissions
 
 **Model Catalogue**:
 The immutable model choices available through one Consulting Agent for the current session. A new Consultation selects one entry explicitly.
-_Avoid_: PI model list, default model, all provider models
+_Avoid_: Pi model list, default model, all provider models
 
 **Observed Evidence**:
 Bounded execution facts derived from Consulting Agent tool activity and validated result references. Model claims alone are not Observed Evidence.

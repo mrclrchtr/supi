@@ -130,7 +130,7 @@ export function effectiveCapabilities(
   return tools.filter((tool) => byId.get(tool)?.conditional !== true || provided.has(tool));
 }
 
-/** Convert validated capability IDs to PI's tool allowlist. */
+/** Convert validated capability IDs to Pi's tool allowlist. */
 export function toAgentToolNames(tools: readonly AgentCapabilityId[]): string[] {
   return tools.map((tool) => byId.get(tool)?.toolName ?? tool);
 }

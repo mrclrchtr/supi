@@ -1,6 +1,6 @@
 # supi-context
 
-Observability for how a PI session occupies and approaches the limit of its context window.
+Observability for how a Pi session occupies and approaches the limit of its context window.
 
 ## Language
 

@@ -16,7 +16,7 @@ export function renderReportMessage(
   const stats = typeof message.content === "string" ? message.content : "";
   const summary = (message.details as { summary?: unknown } | undefined)?.summary;
   const box = new Box(options.outputPad, 0, undefined);
-  box.addChild(new Text(`${theme.fg("toolTitle", "PI Insights")} ${theme.fg("dim", stats)}`, 0, 0));
+  box.addChild(new Text(`${theme.fg("toolTitle", "Pi Insights")} ${theme.fg("dim", stats)}`, 0, 0));
   if (options.expanded && typeof summary === "string") {
     box.addChild(new Markdown(summary, 0, 0, getMarkdownTheme()));
   }

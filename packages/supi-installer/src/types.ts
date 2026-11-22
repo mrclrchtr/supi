@@ -2,7 +2,7 @@
 export type Scope = "project" | "global";
 /** Preserve object entries, including fields not owned by the installer. */
 export type PackageEntry = string | { source: string; [key: string]: unknown };
-/** Paths used by inventory reads and PI child commands. */
+/** Paths used by inventory reads and Pi child commands. */
 export interface Context {
   project: string;
   agentDir: string;
@@ -46,7 +46,7 @@ export interface CommandResult {
   code: number;
   output: string;
 }
-/** The process boundary can use a fake PI executable in tests. */
+/** The process boundary can use a fake Pi executable in tests. */
 export type Runner = (
   args: string[],
   options: { cwd: string; signal: AbortSignal },

@@ -7,7 +7,7 @@ import { expectStructuredContent } from "../helpers/structured-result.ts";
 
 /** Opt-in provider contract check; ordinary verification must stay offline. */
 it.skipIf(process.env.SUPI_WEB_LIVE_TESTS !== "1")(
-  "delivers live Context7 results through registered PI tools",
+  "delivers live Context7 results through registered Pi tools",
   async () => {
     if (!process.env.CONTEXT7_API_KEY)
       throw new Error("Set CONTEXT7_API_KEY for the live Context7 smoke test.");

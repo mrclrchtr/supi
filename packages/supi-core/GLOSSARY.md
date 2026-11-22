@@ -1,6 +1,6 @@
 # supi-core
 
-Shared infrastructure for SuPi extensions: XML context tags, config system, settings registry, debug registry, and instruction-file surfacing. Library-only — no PI extension surface, no `./extension` export.
+Shared infrastructure for SuPi extensions: XML context tags, config system, settings registry, debug registry, and instruction-file surfacing. Library-only — no Pi extension surface, no `./extension` export.
 
 See also: root `GLOSSARY.md` for project-wide terms (Extension Package, Infrastructure Package, Capability Family, etc.).
 

@@ -81,7 +81,7 @@ it("does not start a prompt accepted after cancellation", async () => {
           try {
             options?.preflightResult?.("started");
           } catch {
-            // The runtime rejects a late preflight acceptance to stop PI prompting.
+            // The runtime rejects a late preflight acceptance to stop Pi prompting.
           }
         };
       }),

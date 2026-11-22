@@ -14,7 +14,7 @@ describe("renderReportMessage", () => {
     const text = renderReportMessage(message, { expanded: false, outputPad: 0 }, theme)
       .render(120)
       .join("\n");
-    expect(text).toContain("PI Insights");
+    expect(text).toContain("Pi Insights");
     expect(text).toContain("12 sessions");
     expect(text).not.toContain("Quick wins");
   });

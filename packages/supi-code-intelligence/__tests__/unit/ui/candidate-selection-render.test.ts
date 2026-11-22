@@ -180,7 +180,7 @@ describe("candidate selection rendering", () => {
     expect(text).toContain("Choose one candidate handle");
   });
 
-  it("keeps progress and PI execution failure precedence over selection", () => {
+  it("keeps progress and Pi execution failure precedence over selection", () => {
     const result = candidateResult("resolve.candidates");
     expect(
       renderResolveResult(result, { expanded: true, isPartial: true }, theme, { isError: true })
@@ -459,7 +459,7 @@ describe("candidate selection rendering", () => {
     expect(text).toContain("Legacy graph candidate details");
   });
 
-  it("keeps Graph progress and PI execution failure precedence over selection", () => {
+  it("keeps Graph progress and Pi execution failure precedence over selection", () => {
     const result: ToolResult = {
       content: [{ type: "text", text: "Graph selection Markdown" }],
       details: {

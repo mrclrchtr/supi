@@ -2,11 +2,11 @@
 status: accepted
 ---
 
-# Keep model requests under PI provider authority
+# Keep model requests under Pi provider authority
 
-SuPi direct completions will use one shared request module in `supi-core/llm`, backed by the public PI model registry. PI will own authentication, OAuth refresh, provider headers, environment, and effective endpoints. Features will own model selection, prompts, output limits, cancellation, retries, output validation, and error presentation.
+SuPi direct completions will use one shared request module in `supi-core/llm`, backed by the public Pi model registry. Pi will own authentication, OAuth refresh, provider headers, environment, and effective endpoints. Features will own model selection, prompts, output limits, cancellation, retries, output validation, and error presentation.
 
-Agent Runs will retain their private PI runtime and borrowed Provider Authority. They will not use the direct-completion module. Their provider adapter must preserve the auth-resolved endpoint when it delegates to the parent provider. PI already supplies a stable, separate child session identity; SuPi will keep that mechanism.
+Agent Runs will retain their private Pi runtime and borrowed Provider Authority. They will not use the direct-completion module. Their provider adapter must preserve the auth-resolved endpoint when it delegates to the parent provider. Pi already supplies a stable, separate child session identity; SuPi will keep that mechanism.
 
 ## Considered options
 
@@ -16,8 +16,8 @@ Agent Runs will retain their private PI runtime and borrowed Provider Authority.
 
 ## Consequences
 
-- Direct completions will use stable, opaque identities separated by feature prompt stream, PI session, provider, and model. Prompt suggestions will reuse their identity across assistant turns and session resume. These identities reduce routing interference risk; they do not guarantee provider cache reuse.
-- PI 0.85.1 OpenCode compatibility will be implemented once for direct completions. It will match PI's provider-ID or exact-host rule and preserve explicit header overrides. An explicit shared session header can remove the default separation.
+- Direct completions will use stable, opaque identities separated by feature prompt stream, Pi session, provider, and model. Prompt suggestions will reuse their identity across assistant turns and session resume. These identities reduce routing interference risk; they do not guarantee provider cache reuse.
+- Pi 0.85.1 OpenCode compatibility will be implemented once for direct completions. It will match Pi's provider-ID or exact-host rule and preserve explicit header overrides. An explicit shared session header can remove the default separation.
 - Features will not copy resolved credentials into request options. No dependency from `supi-core` to `supi-agent-runtime` will be added.
 
 See [Make model calls from an extension](../pi/model-call.md) for the current request, identity, and OpenCode header rules. The original plan and verification record are archived on [#402](https://github.com/mrclrchtr/supi/issues/402).

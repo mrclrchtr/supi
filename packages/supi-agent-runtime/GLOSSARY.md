@@ -1,15 +1,15 @@
 # supi-agent-runtime
 
-Runs in-process PI sessions and owns the shared session-local run registry, transcript store, and `/agents` viewer for its adapters.
+Runs in-process Pi sessions and owns the shared session-local run registry, transcript store, and `/agents` viewer for its adapters.
 
 ## Language
 
 **Agent Run**:
-One managed AgentSession execution from creation and binding through completion and disposal. It has isolated conversation context but shares the containing PI process's operating-system permissions and external sandbox.
+One managed AgentSession execution from creation and binding through completion and disposal. It has isolated conversation context but shares the containing Pi process's operating-system permissions and external sandbox.
 _Avoid_: Subagent process, sandbox, Reviewer Session, delegation task
 
 **Context Isolation**:
-The separation of one Agent Run's conversation and loaded PI resources from its containing session and sibling runs. It is not filesystem, process, credential, or permission isolation.
+The separation of one Agent Run's conversation and loaded Pi resources from its containing session and sibling runs. It is not filesystem, process, credential, or permission isolation.
 _Avoid_: Sandbox, read-only environment, process isolation
 
 **Agent Session Inputs**:
@@ -17,7 +17,7 @@ The caller-owned cwd, model, provider authority, thinking level, tools, custom t
 _Avoid_: Runtime policy, child configuration, session adapter
 
 **Provider Authority**:
-The caller-owned provider, credential, and model-resolution authority used to execute an Agent Run. The runtime creates a private PI ModelRuntime that delegates the selected provider, request authentication, headers, environment, and OAuth refresh to this authority. The Agent Run does not inherit conversation or resource policy, and the caller owns any permitted mutation.
+The caller-owned provider, credential, and model-resolution authority used to execute an Agent Run. The runtime creates a private Pi ModelRuntime that delegates the selected provider, request authentication, headers, environment, and OAuth refresh to this authority. The Agent Run does not inherit conversation or resource policy, and the caller owns any permitted mutation.
 _Avoid_: API key, model configuration, runtime policy
 
 **Agent Run Outcome**:
@@ -65,7 +65,7 @@ A caller-owned post-bind, pre-prompt decision over the read-only session view. I
 _Avoid_: Tool validation flag, observer exception, session preflight
 
 **Agent Run Settlement**:
-The point after the tracked initial prompt, extension sends started during its handling, and any PI continuation are idle. The runtime requires prompt completion plus PI idle and queue checks; it excludes work that an extension detaches and starts later.
+The point after the tracked initial prompt, extension sends started during its handling, and any Pi continuation are idle. The runtime requires prompt completion plus Pi idle and queue checks; it excludes work that an extension detaches and starts later.
 _Avoid_: Prompt return, settled event, delayed extension work
 
 **Completion Resolver**:
@@ -77,7 +77,7 @@ A bounded caller-owned policy that selects declarative same-session steps after 
 _Avoid_: Session controls, retry loop, mutable callback view
 
 **Cancellation Fence**:
-The synchronous point at which stop or timeout claims an Agent Run. The runtime closes extension-send admission, clears PI queues, and starts abort before awaiting. A steering call already inside PI is rechecked and any late queue write is cleared. PI context invalidation occurs during normal or forced disposal after `session_shutdown` gets its bounded attempt. After the fence, no queued turn or tool work may start and unpublished completion cannot win; active work proceeds only toward bounded disposal.
+The synchronous point at which stop or timeout claims an Agent Run. The runtime closes extension-send admission, clears Pi queues, and starts abort before awaiting. A steering call already inside Pi is rechecked and any late queue write is cleared. Pi context invalidation occurs during normal or forced disposal after `session_shutdown` gets its bounded attempt. After the fence, no queued turn or tool work may start and unpublished completion cannot win; active work proceeds only toward bounded disposal.
 _Avoid_: Best-effort abort, graceful drain
 
 **Bounded Agent Run Disposal**:

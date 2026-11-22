@@ -23,7 +23,7 @@ Profile sources overlay fields by ID with project → global → package precede
 
 The built-in profiles use package-owned system prompts written for a delegated run: the reader is the calling agent, only the final message reaches it, and nobody can answer questions during the run.
 
-Profiles with a package-owned or custom prompt also get a generated `<tool_rules>` section with the usage rules (`promptGuidelines`) of their active tools. Profiles with `systemPrompt: "native"` keep PI's own rules section.
+Profiles with a package-owned or custom prompt also get a generated `<tool_rules>` section with the usage rules (`promptGuidelines`) of their active tools. Profiles with `systemPrompt: "native"` keep Pi's own rules section.
 
 `instructionScopes` selects which AGENTS.md or CLAUDE.md files a profile's runs load: `[]`, `["project"]`, `["global"]`, or `["global", "project"]`. Change it with the profile's **Instructions** row in `/supi-settings`, or in its `profile.json`. For example, keep your global instruction file out of `general` runs with `~/.pi/agent/supi/agents/general/profile.json`:
 
@@ -180,9 +180,9 @@ Use `/agents` in TUI mode to inspect Agent and Reviewer runs in the current sess
 - Use the configured Pi thinking and tool-detail shortcuts (Ctrl+T and Ctrl+O by default). In Details, click a raw tool block to show or hide its input and output. These keys do not apply while you enter a steering message.
 - The bounded Conversation View can omit old entries. The runtime-owned human-only transcript keeps captured messages for Agent and Reviewer runs until the containing session ends. Its retention does not depend on Review audit settings.
 - Use `s` to steer the selected run when steering is available. A text field opens inside the viewer. Press Enter to send or Esc to cancel.
-- Use `x` to request a stop for a starting or running Agent or Reviewer Run. Press Enter or `y` to confirm. A startup stop can wait for PI setup to finish. Stopping one Reviewer Run does not stop its sibling tasks.
+- Use `x` to request a stop for a starting or running Agent or Reviewer Run. Press Enter or `y` to confirm. A startup stop can wait for Pi setup to finish. Stopping one Reviewer Run does not stop its sibling tasks.
 - Mouse-wheel input scrolls the transcript or selects a run. Closing the viewer does not stop Agent Runs. Parent abort stops active background Delegation Batches; foreground tool cancellation stops that foreground batch.
 
 Transcript files are temporary JSONL files in a private directory for the parent session. They have no application cap or restart recovery. A storage failure marks capture incomplete but does not stop a run. The viewer shows the available transcript and the incomplete status. Session shutdown removes the directory.
 
-Other PI modes show only an unavailable notice. The overlay does not change global `tuiMode` or add a text control protocol, durable viewer transcripts, or replay files. Closing the viewer does not stop runs.
+Other Pi modes show only an unavailable notice. The overlay does not change global `tuiMode` or add a text control protocol, durable viewer transcripts, or replay files. Closing the viewer does not stop runs.

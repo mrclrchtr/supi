@@ -65,7 +65,7 @@ function addSource(catalog: SkillCatalog, source: SkillSource): void {
   });
 }
 
-/** Load every resolved resource, including resources that PI currently filters out. */
+/** Load every resolved resource, including resources that Pi currently filters out. */
 export function buildSkillCatalog(
   resources: ResolvedResource[],
   cwd: string,
@@ -101,7 +101,7 @@ function contextSkills(ctx?: ExtensionContext): Skill[] {
 }
 
 /**
- * Reconcile PI's active winner with resolved static sources.
+ * Reconcile Pi's active winner with resolved static sources.
  *
  * A pending identity suppresses only the stale pre-reload static winner. A
  * different public provenance remains a runtime source and prevents full disable.
@@ -131,12 +131,12 @@ function mergeRuntimeSkill(
     }
     return;
   }
-  // ponytail: PI exposes only winning runtime skills; use an aggregate resource API if PI adds one.
+  // ponytail: Pi exposes only winning runtime skills; use an aggregate resource API if Pi adds one.
   record.activeSkill = skill;
   record.sources.push({ skill, runtime: true });
 }
 
-/** Merge skills that runtime resource events added outside PI's configurable catalog. */
+/** Merge skills that runtime resource events added outside Pi's configurable catalog. */
 export function mergeRuntimeSkills(
   base: SkillCatalog,
   ctx: ExtensionContext | undefined,

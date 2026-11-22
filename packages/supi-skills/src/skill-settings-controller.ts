@@ -233,7 +233,7 @@ export class SkillSettingsController {
     const sourceCount = record.sources.length;
     const limitation = canDisable(record)
       ? ""
-      : " Full disable is unavailable because PI does not expose a load setting for one or more sources.";
+      : " Full disable is unavailable because Pi does not expose a load setting for one or more sources.";
     return {
       field: {
         kind: "enum",
@@ -274,7 +274,7 @@ export class SkillSettingsController {
       .map((record) => this.row(record, scope));
   }
 
-  /** Return PI's loaded skill winners that persistent settings allow in the prompt. */
+  /** Return Pi's loaded skill winners that persistent settings allow in the prompt. */
   eligibleModelSkills(ctx: ExtensionCommandContext): SessionCapabilitySkill[] {
     const records = this.records("project", ctx);
     return (ctx.getSystemPromptOptions().skills ?? [])

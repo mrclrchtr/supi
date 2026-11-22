@@ -17,8 +17,8 @@ Select direct SuPi package declarations in Project and Global scopes.
   --help, -h        Show help
   --version, -v     Show the installer version
 
-Requires PI on PATH and saved PI trust for the project, even for global work.
-Open PI in that directory and use /trust before starting the installer.
+Requires Pi on PATH and saved Pi trust for the project, even for global work.
+Open Pi in that directory and use /trust before starting the installer.
 
 Arrows: select row/scope. Space: toggle. r/a/c: Recommended/All/Clear column.
 Enter: review. y: confirm in review. Escape: cancel.

@@ -61,7 +61,7 @@ export class ConsultingRuntime {
     return this.#footerState === "ready" ? CONSULTING_READY_ICON : undefined;
   }
 
-  /** Rebuild handles from the current PI branch. */
+  /** Rebuild handles from the current Pi branch. */
   rebuildHandles(branch: readonly unknown[]): void {
     this.handles.rebuild(branch);
   }
@@ -72,9 +72,9 @@ export class ConsultingRuntime {
       try {
         // biome-ignore lint/suspicious/noConsole: unexpected failures must stay visible.
         console.warn(`[supi-consulting] Availability check failed: ${formatRefreshError(error)}`);
-        context?.ui.notify("Consulting availability check failed. Reload PI to retry.", "warning");
+        context?.ui.notify("Consulting availability check failed. Reload Pi to retry.", "warning");
       } catch {
-        // PI may be shutting down while the refresh completes.
+        // Pi may be shutting down while the refresh completes.
       }
     });
   }
@@ -103,7 +103,7 @@ export class ConsultingRuntime {
         status: "unavailable",
         reason: "discovery",
         warning:
-          "Consulting Agent availability discovery failed. Check the installation, then reload PI.",
+          "Consulting Agent availability discovery failed. Check the installation, then reload Pi.",
       })));
     if (generation !== this.#refreshGeneration || abortController.signal.aborted) return;
     if (availability.status === "available") {
@@ -215,7 +215,7 @@ export class ConsultingRuntime {
     try {
       this.#statusUi?.setStatus(CONSULTING_FOOTER_KEY, this.footerIcon);
     } catch {
-      // PI may be shutting down while the footer status changes.
+      // Pi may be shutting down while the footer status changes.
     }
   }
 
@@ -266,6 +266,6 @@ function notifyRefreshWarning(
   try {
     context?.ui.notify(message, "warning");
   } catch {
-    // PI may be shutting down while the refresh reports its result.
+    // Pi may be shutting down while the refresh reports its result.
   }
 }

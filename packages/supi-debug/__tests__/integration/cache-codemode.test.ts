@@ -81,7 +81,7 @@ function historicalSession() {
   return [header, ...entries].map((entry) => JSON.stringify(entry)).join("\n");
 }
 
-it("selects real cache facts and spill references through PI's default codemode without parsing tool text", async () => {
+it("selects real cache facts and spill references through Pi's default codemode without parsing tool text", async () => {
   const directory = await mkdtemp(join(tmpdir(), "supi-cache-codemode-"));
   const events: ToolResultEvent[] = [];
   const spillDirectories = new Set<string>();
@@ -177,7 +177,7 @@ it("selects real cache facts and spill references through PI's default codemode 
         stream.push({ type: "done", reason: first ? "toolUse" : "stop", message });
         return stream;
       };
-      // Replace only provider streaming/auth preflight; PI executes real tools and nested hooks.
+      // Replace only provider streaming/auth preflight; Pi executes real tools and nested hooks.
       await session.agent.prompt("Run the offline cache fixture");
       const result = [...session.messages]
         .reverse()

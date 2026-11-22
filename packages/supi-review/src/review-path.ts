@@ -6,7 +6,7 @@ export interface SafeReviewPath {
   path: string;
 }
 
-/** Strip PI's model-facing path sigil before repository-relative validation. */
+/** Strip Pi's model-facing path sigil before repository-relative validation. */
 export function normalizeReviewPathArgument(path: string): string {
   return path.startsWith("@") ? path.slice(1) : path;
 }
@@ -26,7 +26,7 @@ export function normalizeRepositoryRelativePath(path: string): string {
 /**
  * Resolve a normalized repository-relative path without lexical escape.
  *
- * Model-facing callers must remove PI's `@` path sigil first.
+ * Model-facing callers must remove Pi's `@` path sigil first.
  */
 export function resolveReviewPath(cwd: string, path: string): SafeReviewPath {
   const normalizedInput = normalizeRepositoryRelativePath(path);

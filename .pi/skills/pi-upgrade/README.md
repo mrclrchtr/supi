@@ -1,4 +1,4 @@
-# PI Upgrade (Skill)
+# Pi Upgrade (Skill)
 
 Check for available upgrades to the pi coding agent framework and generate actionable migration reports. Intended for **extension developers** who build on top of `@earendil-works/pi-coding-agent` or `@earendil-works/pi-tui` (and legacy `@mariozechner/*` installs) and want to keep their projects current with new releases.
 

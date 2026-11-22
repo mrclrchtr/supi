@@ -7,7 +7,7 @@ import type { ProfileCatalogue } from "./types.ts";
 export class AgentProfileCatalogueStore {
   #catalogue: ProfileCatalogue | undefined;
 
-  /** Resolve and replace the snapshot for a PI session start or reload. */
+  /** Resolve and replace the snapshot for a Pi session start or reload. */
   async reload(options: {
     readonly cwd: string;
     readonly projectTrusted: boolean;
@@ -42,7 +42,7 @@ export class AgentProfileCatalogueStore {
     return this.#catalogue;
   }
 
-  /** Clear session state on PI shutdown or extension replacement. */
+  /** Clear session state on Pi shutdown or extension replacement. */
   clear(): void {
     this.#catalogue = undefined;
   }

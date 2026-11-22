@@ -52,7 +52,7 @@ export type AgentCapabilityId =
   | "web_docs_search"
   | "web_docs_fetch";
 
-/** Values accepted by PI's model thinking policy. */
+/** Values accepted by Pi's model thinking policy. */
 export type AgentThinkingLevel = ModelThinkingLevel;
 
 /** Closed profile.json manifest after field-level source resolution. */
@@ -69,7 +69,7 @@ export interface AgentProfileManifest {
   readonly instructionScopes: readonly AgentInstructionScope[];
   /** Optional canonical provider/model-id; omitted values inherit the containing model. */
   readonly model?: string;
-  /** Optional PI thinking level; omitted values inherit the containing session level. */
+  /** Optional Pi thinking level; omitted values inherit the containing session level. */
   readonly thinking?: AgentThinkingLevel;
   /** Optional host timeout in minutes, from 1 through 240. */
   readonly timeoutMinutes?: number;
@@ -175,18 +175,18 @@ export interface ProfileCatalogue {
 /** Parent model context needed to resolve a profile's effective execution policy. */
 export interface AgentModelContext {
   readonly providerAuthority: AgentRunProviderAuthority;
-  // biome-ignore lint/suspicious/noExplicitAny: Model<any> is PI's canonical type
+  // biome-ignore lint/suspicious/noExplicitAny: Model<any> is Pi's canonical type
   readonly currentModel: Model<any> | undefined;
   readonly currentThinkingLevel: AgentThinkingLevel | undefined;
   readonly scopedModels: readonly {
-    // biome-ignore lint/suspicious/noExplicitAny: Model<any> is PI's canonical type
+    // biome-ignore lint/suspicious/noExplicitAny: Model<any> is Pi's canonical type
     readonly model: Model<any>;
     readonly thinkingLevel?: AgentThinkingLevel;
   }[];
   readonly modelRegistry: {
-    // biome-ignore lint/suspicious/noExplicitAny: Model<any> is PI's canonical type
+    // biome-ignore lint/suspicious/noExplicitAny: Model<any> is Pi's canonical type
     find(provider: string, modelId: string): Model<any> | undefined;
-    // biome-ignore lint/suspicious/noExplicitAny: Model<any> is PI's canonical type
+    // biome-ignore lint/suspicious/noExplicitAny: Model<any> is Pi's canonical type
     hasConfiguredAuth(model: Model<any>): boolean;
   };
 }
@@ -194,7 +194,7 @@ export interface AgentModelContext {
 /** Effective model and runtime inputs for one selected Agent Profile. */
 export interface ResolvedAgentProfile {
   readonly profile: AgentProfile;
-  // biome-ignore lint/suspicious/noExplicitAny: Model<any> is PI's canonical type
+  // biome-ignore lint/suspicious/noExplicitAny: Model<any> is Pi's canonical type
   readonly model: Model<any>;
   readonly thinkingLevel: AgentThinkingLevel;
   readonly timeoutMs?: number;
@@ -207,7 +207,7 @@ export interface AgentSessionInputOptions {
   readonly agentDir: string;
   readonly projectTrusted: boolean;
   readonly providerAuthority: AgentRunProviderAuthority;
-  // biome-ignore lint/suspicious/noExplicitAny: Model<any> is PI's canonical type
+  // biome-ignore lint/suspicious/noExplicitAny: Model<any> is Pi's canonical type
   readonly model: Model<any>;
   readonly thinkingLevel: AgentThinkingLevel;
   readonly profile: AgentProfile;

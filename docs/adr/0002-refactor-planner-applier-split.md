@@ -8,7 +8,7 @@
 - `code_refactor_apply` is the **sole mutator**: it applies a previously stored plan by `planId`. It does not require a live semantic provider. The Workspace code-intelligence session checks stored SHA-256 file fingerprints (`isPlanFresh` in `src/session/refactor-plans.ts`) and revalidates edit ranges and overlap before writing. Stale plans are rejected with an explicit request to regenerate. No heuristic text fallback.
 - Plans live in the Workspace code-intelligence session's in-memory map. `planId` is `plan-<12hex>` derived from operation, file, operation scope, and a time discriminator. Plans are removed after successful apply and are never persisted across sessions.
 
-**The planner/applier invariant.** Planning and mutation are separate tools; the only path from a plan to the filesystem is `code_refactor_apply` with a fresh `planId`. `code_refactor_plan` has no write capability; `code_refactor_apply` has no planning capability. Application acquires PI's per-file mutation queues in sorted path order and rolls back already-written files if a later write fails (ADR 0006).
+**The planner/applier invariant.** Planning and mutation are separate tools; the only path from a plan to the filesystem is `code_refactor_apply` with a fresh `planId`. `code_refactor_plan` has no write capability; `code_refactor_apply` has no planning capability. Application acquires Pi's per-file mutation queues in sorted path order and rolls back already-written files if a later write fails (ADR 0006).
 
 **Considered Options (rejected).**
 

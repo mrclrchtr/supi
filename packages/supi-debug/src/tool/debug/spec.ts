@@ -34,7 +34,7 @@ export const debugSpec = {
         Type.Integer({ minimum: 1, description: "Maximum number of events to return" }),
       ),
       sessionFile: Type.Optional(
-        Type.String({ description: "PI session JSONL file containing persisted debug events" }),
+        Type.String({ description: "Pi session JSONL file containing persisted debug events" }),
       ),
       includeRaw: Type.Optional(
         Type.Boolean({ description: "Request raw event data when settings permit it" }),

@@ -67,7 +67,7 @@ export function createAgentSessionInputs(options: AgentSessionInputOptions): Age
     noThemes: true,
     noContextFiles: true,
     agentsFilesOverride: () => ({ agentsFiles: contextFiles }),
-    // Supply a literal sentinel source so PI does not discover ambient SYSTEM.md files.
+    // Supply a literal sentinel source so Pi does not discover ambient SYSTEM.md files.
     systemPrompt: systemPrompt ?? "",
     appendSystemPrompt: [],
     systemPromptOverride: () => systemPrompt,
@@ -86,7 +86,7 @@ export function createAgentSessionInputs(options: AgentSessionInputOptions): Age
   };
 }
 
-/** Return the agent directory used by the current PI installation. */
+/** Return the agent directory used by the current Pi installation. */
 export function resolveAgentDirectory(): string {
   return process.env.PI_CODING_AGENT_DIR || getAgentDir();
 }

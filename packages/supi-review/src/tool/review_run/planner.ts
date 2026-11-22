@@ -36,7 +36,7 @@ export function buildPlannerSystemPrompt(
     reviewerWebEnabled
       ? "During Reviewer investigation only, Reviewers may also receive the Web tools this session provides to consult external documentation; web content supports but never replaces repository evidence for findings."
       : "Reviewers have no web tools.",
-    "Reviewers may use Git and read-only Code Intelligence, but must not launch PI, invoke nested reviews, mutate source/Git history, or inspect live runtime/accounting state.",
+    "Reviewers may use Git and read-only Code Intelligence, but must not launch Pi, invoke nested reviews, mutate source/Git history, or inspect live runtime/accounting state.",
     "Do not request tests, builds, linters, runtime experiments, or verification outside repository inspection.",
     "Require findings to be concrete and supported by inspected code.",
     "Do not claim to have inspected or verified code.",

@@ -3,7 +3,7 @@ import { GIT_READ_SUBCOMMANDS } from "./spec.ts";
 
 const GIT_TIMEOUT_MS = 30_000;
 /**
- * Collection cap, well above PI's model-facing output limit so truncation still reports
+ * Collection cap, well above Pi's model-facing output limit so truncation still reports
  * line counts for typical output, while bounding memory for full-history queries.
  */
 const GIT_MAX_BUFFER_BYTES = 1024 * 1024;

@@ -8,7 +8,7 @@ Code-intelligence executors repeated target resolution, readiness checks, provid
 
 ## Decision
 
-Use `WorkspaceCodeIntelligenceSession` as the internal workflow interface for one workspace and PI session.
+Use `WorkspaceCodeIntelligenceSession` as the internal workflow interface for one workspace and Pi session.
 
 The session owns:
 
@@ -25,7 +25,7 @@ Session workflows return typed, immutable outcomes. Providers, clients, mutable 
 
 Orientation context collection produces typed `OrientationBlock` facts directly. It no longer renders a brief and reparses markdown at the session seam.
 
-Tool executors stay thin: translate PI execution controls, invoke one session workflow, assemble its outcome, and hand the assembly to presentation adapters.
+Tool executors stay thin: translate Pi execution controls, invoke one session workflow, assemble its outcome, and hand the assembly to presentation adapters.
 
 ## Consequences
 

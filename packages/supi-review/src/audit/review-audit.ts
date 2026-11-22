@@ -50,7 +50,7 @@ export interface ReviewAuditTrace {
 export interface ReviewAuditRecordInput {
   task: ReviewTask;
   modelId: string;
-  /** Effective level passed to PI. */
+  /** Effective level passed to Pi. */
   thinkingLevel: string;
   /** Requested level, absent only in older v1 records. */
   requestedThinkingLevel: string;

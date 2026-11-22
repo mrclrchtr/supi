@@ -292,7 +292,7 @@ function validateOptionalFields(
     (typeof value.thinking !== "string" ||
       !THINKING_LEVELS.has(value.thinking as AgentThinkingLevel))
   ) {
-    return invalidManifest("thinking is not a supported PI thinking level.");
+    return invalidManifest("thinking is not a supported Pi thinking level.");
   }
   if (
     hasOwn(value, "timeoutMinutes") &&

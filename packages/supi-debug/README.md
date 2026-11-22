@@ -106,13 +106,13 @@ keeps the conversation focused; expand only when you need the details.
 ### Seeing full details without expanding
 
 The agent-facing `debug` tool returns the expanded plain-text
-representation, subject to PI's standard tool-output truncation limits. This is
+representation, subject to Pi's standard tool-output truncation limits. This is
 useful for automated troubleshooting flows while protecting the model context
 from very large event payloads.
 
 ## Structured results
 
-`debug` declares PI's native `outputSchema`. Direct calls retain readable, bounded
+`debug` declares Pi's native `outputSchema`. Direct calls retain readable, bounded
 text; default codemode calls resolve to structured data without parsing that text:
 
 ```js
@@ -193,7 +193,7 @@ On the side branch, the retrospective runs on a branch of the session tree. When
 When Debug capture is enabled, its session persistence sink is active, and `persistLevel` admits `info` events, a normally completed report is stored as a Debug event with category `tooling-retrospective` and source `supi-debug`, so `gather-retrospectives` can collect it (`--source supi-debug`). The event data holds `text`, `status`, `promptRevision`, and a `runKey` for deduplication across forks. Aborted, failed, or truncated answers are not stored, and the command says so. Without active persistence, the command still runs and states that the report is not stored. No separate setting exists.
 
 Historical inspection works for events captured after this extension is loaded. For example, an
-agent can call `debug` with `sessionFile` set to a PI session JSONL path.
+agent can call `debug` with `sessionFile` set to a Pi session JSONL path.
 
 Defaults come from the shared debug registry:
 
@@ -234,10 +234,10 @@ The model text omits the row's blank edge lines; `structuredContent.lines` keeps
 
 ## Prompt-cache history and forensics
 
-Formerly the standalone `@mrclrchtr/supi-cache` package. PI owns live cache statistics and cache-miss notices (enable transcript notices with `showCacheMissNotices`); this package adds two views:
+Formerly the standalone `@mrclrchtr/supi-cache` package. Pi owns live cache statistics and cache-miss notices (enable transcript notices with `showCacheMissNotices`); this package adds two views:
 
 1. **Current-branch history**
-   - reads usage from native PI assistant messages
+   - reads usage from native Pi assistant messages
    - shows input, cache reads, cache writes, and hit rate for each request
    - keeps old prompt-change notes and fingerprints when they exist
 
@@ -311,7 +311,7 @@ Forensics reads these optional values from the `cache` section. They are also av
 }
 ```
 
-The loader also reads these two values from the old `cache-monitor` section. Old `enabled` and `notifications` values are ignored. Configure live PI cache notices with PI's `showCacheMissNotices` setting.
+The loader also reads these two values from the old `cache-monitor` section. Old `enabled` and `notifications` values are ignored. Configure live Pi cache notices with Pi's `showCacheMissNotices` setting.
 
 ### Cache Native session data
 

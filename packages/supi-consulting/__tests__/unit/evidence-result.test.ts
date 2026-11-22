@@ -90,7 +90,7 @@ describe("Consultation evidence and results", () => {
     }
   });
 
-  it("keeps model-visible output within PI limits and excludes continuation details", () => {
+  it("keeps model-visible output within Pi limits and excludes continuation details", () => {
     const longAnswer = `${"line\n".repeat(MAX_RESULT_LINES + 100)}${"x".repeat(MAX_RESULT_BYTES)}`;
     const answer = { answer: longAnswer, sources: [], workspaceEvidence: [] };
     const result = buildConsultationResult({ facts: makeFacts(answer), handle, durationMs: 12 });

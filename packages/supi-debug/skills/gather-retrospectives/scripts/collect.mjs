@@ -27,7 +27,7 @@ Usage: node collect.mjs --output <new-file.json> [collection options]
   --workspace <path>     Include sessions in this directory tree (default: cwd);
                          repeat to combine trees, such as sibling Git worktrees
   --all-workspaces       Explicitly include other projects; replaces --workspace
-  --sessions-dir <path>  Override PI storage discovery
+  --sessions-dir <path>  Override Pi storage discovery
   --source <name>        supi-agent (delegated runs), supi-review (Reviewer Runs), or
                          supi-debug (/supi-tooling-retro reports); default: all
                          producers. Not a topic filter

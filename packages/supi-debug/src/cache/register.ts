@@ -53,7 +53,7 @@ export function registerCacheSurfaces(pi: ExtensionAPI): void {
   });
 
   pi.registerCommand("supi-cache-forensics", {
-    description: "Investigate cache regressions across past PI sessions",
+    description: "Investigate cache regressions across past Pi sessions",
     handler: async (args, ctx) => {
       const config = loadCacheForensicsConfig(ctx.cwd);
       const query = {

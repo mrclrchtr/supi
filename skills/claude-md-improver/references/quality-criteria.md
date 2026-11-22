@@ -89,7 +89,7 @@ Score human architectural meaning, not inventories available from the complete f
 
 ### 7. SuPi Context Overlap (10 points)
 
-Score after comparing the file with the complete first-turn code-intelligence overview, native PI context, and workspace/directory/file Orientation. Assume `code_orientation` is used repeatedly with adequate `maxResults` or narrower focuses.
+Score after comparing the file with the complete first-turn code-intelligence overview, native Pi context, and workspace/directory/file Orientation. Assume `code_orientation` is used repeatedly with adequate `maxResults` or narrower focuses.
 
 **10 points**: Almost no overlap; mentions of discoverable files/packages carry human-only reasoning.
 
@@ -109,7 +109,7 @@ Score after comparing the file with the complete first-turn code-intelligence ov
 
 1. For a repo-wide check, run workspace Orientation first. For a targeted change, start with focused directory/file Orientation. Use workspace Orientation only when the edit checks repo-wide facts. Repeat or raise `maxResults` as needed.
 2. Read the CLAUDE.md file completely.
-3. Classify sections against the first-turn overview, native PI context, and Orientation as **fully redundant**, **partially redundant**, or **unique**.
+3. Classify sections against the first-turn overview, native Pi context, and Orientation as **fully redundant**, **partially redundant**, or **unique**.
 4. Cross-reference with the codebase: test non-obvious commands, check paths, and verify human architectural claims.
 5. Score each criterion, calculate the total, assign the grade, list issues, and propose concrete improvements.
 

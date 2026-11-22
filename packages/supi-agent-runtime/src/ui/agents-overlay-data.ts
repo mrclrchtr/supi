@@ -7,7 +7,7 @@ import type {
 import type { AgentRunTranscriptSource } from "../session/transcript-store.ts";
 import type { AgentRunSteerResult } from "../types.ts";
 
-/** Shared height limit for the PI overlay and its rendered viewport. */
+/** Shared height limit for the Pi overlay and its rendered viewport. */
 export const AGENTS_OVERLAY_MAX_HEIGHT_PERCENT = 100;
 
 /** One Profile shown by the optional Agent Profiles pages. */

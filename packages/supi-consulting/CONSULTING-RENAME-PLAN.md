@@ -12,7 +12,7 @@ The user approved this design in a planning session, then explicitly authorized 
 | Preparation for other agents | One private adapter interface; one Antigravity adapter |
 | Agent selection | Require `new.agent: "antigravity"` |
 | Compatibility | Clean break; no aliases, legacy reads, or automatic migration |
-| State | `<PI agent dir>/supi/consulting/antigravity/` |
+| State | `<Pi agent dir>/supi/consulting/antigravity/` |
 | Future runtime option | `supi-agent-runtime` integration is outside this change |
 
 ## Scope
@@ -33,19 +33,19 @@ _Avoid_: Antigravity Run, Agent Run, child session
 
 **Consulting Agent**:
 An agent selected to perform a Consultation. Antigravity is the only supported Consulting Agent in this change.
-_Avoid_: Agent Profile, PI model provider, model
+_Avoid_: Agent Profile, Pi model provider, model
 
 **Workspace Access**:
-The caller's decision to expose the current PI workspace to a Consultation. A Consultation without Workspace Access uses the selected agent's Consultation Workspace.
+The caller's decision to expose the current Pi workspace to a Consultation. A Consultation without Workspace Access uses the selected agent's Consultation Workspace.
 _Avoid_: consult mode, explore mode, repository mode
 
 **Consultation Workspace**:
-A package-managed empty project for Consultations without access to the current PI workspace. Its stable identity keeps agent-specific permissions and conversations separate from the current workspace.
+A package-managed empty project for Consultations without access to the current Pi workspace. Its stable identity keeps agent-specific permissions and conversations separate from the current workspace.
 _Avoid_: temporary workspace, sandbox, current workspace
 
 **Model Catalogue**:
 The immutable model choices available through one Consulting Agent for the current session. A new Consultation selects one entry explicitly.
-_Avoid_: PI model list, default model, all provider models
+_Avoid_: Pi model list, default model, all provider models
 
 **Conversation Handle**:
 An opaque SuPi identifier for an observed conversation with one Consulting Agent. It retains the original agent, model, working directory, and Workspace Access.
@@ -103,7 +103,7 @@ Keep agent-specific names inside the Antigravity adapter: CLI version parsing, p
 
 Own:
 
-- PI lifecycle, settings, footer, tool metadata, input validation, and activation.
+- Pi lifecycle, settings, footer, tool metadata, input validation, and activation.
 - Explicit Workspace Access and canonical working-directory choice.
 - Conversation Handle acquisition, release, retirement, and branch reconstruction.
 - Validated reference classification, bounded result assembly, and rendering.
@@ -160,11 +160,11 @@ Keep exports limited to `./extension` and `./package.json`. Keep `supi-core` bun
 Create new state only under:
 
 ```text
-<PI agent dir>/supi/consulting/antigravity/home/
-<PI agent dir>/supi/consulting/antigravity/consultation-workspace/
+<Pi agent dir>/supi/consulting/antigravity/home/
+<Pi agent dir>/supi/consulting/antigravity/consultation-workspace/
 ```
 
-- Leave `<PI agent dir>/supi/antigravity/` untouched and unused.
+- Leave `<Pi agent dir>/supi/antigravity/` untouched and unused.
 - Require a new isolated sign-in. Do not copy credentials or link the old home.
 - Read only the `consulting` settings section. Retain `agentToolEnabled: true` as the default; explain that an old disabled setting does not carry over.
 - Read only the new custom-entry type and `consulting_run` result details. Ignore old tool results and handle records.

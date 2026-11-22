@@ -1,6 +1,6 @@
 # supi-code-intelligence
 
-Agent-facing capabilities for code understanding, navigation, search, and refactor in PI. Depends on `supi-code-runtime` for shared workspace context and types.
+Agent-facing capabilities for code understanding, navigation, search, and refactor in Pi. Depends on `supi-code-runtime` for shared workspace context and types.
 
 See also: root `GLOSSARY.md` for project-wide terms (Context Efficiency, Prompt Surface Compression, etc.) and `packages/supi-code-runtime/GLOSSARY.md`.
 
@@ -79,7 +79,7 @@ A bounded, focus-relevant fact included in Orientation to help choose what sourc
 _Avoid_: health section, diagnostic report, priority warning
 
 **Workspace code-intelligence session**:
-The workspace-scoped Code intelligence context that owns workflow policy, capability readiness, and ephemeral target and refactor handles for one PI session. It yields typed workflow outcomes without owning Tool result assembly, presentation, or provider lifecycle.
+The workspace-scoped Code intelligence context that owns workflow policy, capability readiness, and ephemeral target and refactor handles for one Pi session. It yields typed workflow outcomes without owning Tool result assembly, presentation, or provider lifecycle.
 _Avoid_: provider bag, renderer, global code-intelligence state
 
 **Structural Worker lifecycle**:

@@ -1,8 +1,8 @@
 ---
-description: Live-check PI changes after /reload and identify regressions, unexpected behavior, improvements, and follow-up work
+description: Live-check Pi changes after /reload and identify regressions, unexpected behavior, improvements, and follow-up work
 ---
 
-PI got reloaded with `/reload`, verify the changes live by invoking the relevant tool(s).
+Pi got reloaded with `/reload`, verify the changes live by invoking the relevant tool(s).
 
 Confirm the intended behavior works end-to-end. Test key paths and edge cases where useful.
 

@@ -14,7 +14,7 @@ import { Value } from "typebox/value";
 
 // Shared LLM utilities for SuPi extensions.
 //
-// Provides PI-owned model requests, retry logic, structured LLM call helpers,
+// Provides Pi-owned model requests, retry logic, structured LLM call helpers,
 // and other common patterns for extensions that interact with AI models.
 
 const MODEL_REQUEST_NAMESPACE = "supi-direct-model-request-v1";
@@ -22,18 +22,18 @@ const MODEL_REQUEST_NAMESPACE = "supi-direct-model-request-v1";
 type ModelRequestOptions<T> = Omit<T, "apiKey" | "env" | "sessionId"> & {
   /** Stable feature scope. Do not include prompt, turn, or retry data. */
   affinityScope: string;
-  /** PI owns these fields, including for APIs with open-ended option types. */
+  /** Pi owns these fields, including for APIs with open-ended option types. */
   apiKey?: never;
   env?: never;
   sessionId?: never;
 };
 
-/** API-specific completion options. PI owns auth, environment, and identity. */
+/** API-specific completion options. Pi owns auth, environment, and identity. */
 export type CompleteModelRequestOptions<TApi extends Api = Api> = ModelRequestOptions<
   ModelsApiStreamOptions<TApi>
 >;
 
-/** Provider-neutral completion options. PI owns auth, environment, and identity. */
+/** Provider-neutral completion options. Pi owns auth, environment, and identity. */
 export type CompleteSimpleModelRequestOptions = ModelRequestOptions<ModelsSimpleStreamOptions>;
 
 function createModelRequestAffinityId(
@@ -104,7 +104,7 @@ function prepareModelRequestOptions<
     return addOpenCodeDefaultHeaders(model, affinityId, transformed);
   };
 
-  // Restore PI's option type after removing owned fields.
+  // Restore Pi's option type after removing owned fields.
   return {
     ...safeRequestOptions,
     signal: safeRequestOptions.signal ?? ctx.signal,
@@ -114,12 +114,12 @@ function prepareModelRequestOptions<
 }
 
 /**
- * Complete an API-specific request through PI's model registry.
+ * Complete an API-specific request through Pi's model registry.
  *
- * PI resolves auth, headers, environment, and the effective endpoint. SuPi adds
+ * Pi resolves auth, headers, environment, and the effective endpoint. SuPi adds
  * a stable opaque feature identity and OpenCode header defaults. This helper
  * does not retry, validate output, or present errors. It supplies no output cap
- * when `maxTokens` is omitted; use {@link completeSimpleModelRequest} for PI's
+ * when `maxTokens` is omitted; use {@link completeSimpleModelRequest} for Pi's
  * model-derived defaults and context-aware limits.
  */
 export async function completeModelRequest<TApi extends Api>(
@@ -136,9 +136,9 @@ export async function completeModelRequest<TApi extends Api>(
 }
 
 /**
- * Complete a provider-neutral request through PI's registry simple path.
+ * Complete a provider-neutral request through Pi's registry simple path.
  *
- * Requires PI 0.86.0 or later. PI's provider handles simple options, including
+ * Requires Pi 0.86.0 or later. Pi's provider handles simple options, including
  * model-derived output limits and context estimates. Request identity, header
  * policy, and error behavior match {@link completeModelRequest}.
  */
@@ -287,7 +287,7 @@ export interface CallWithJsonResponseOptions {
  * Call the LLM with a prompt and validate the JSON response against a TypeBox schema.
  *
  * Handles model resolution, retry via `withRetry`, text extraction, JSON
- * matching, and TypeBox validation. The request itself stays under PI
+ * matching, and TypeBox validation. The request itself stays under Pi
  * registry authority through {@link completeModelRequest}.
  *
  * Returns `null` when:
@@ -297,7 +297,7 @@ export interface CallWithJsonResponseOptions {
  * - JSON doesn't match the schema
  * - The request is aborted
  *
- * @param ctx - The extension context for model selection and PI registry access.
+ * @param ctx - The extension context for model selection and Pi registry access.
  * @param options - Call options including prompt, schema, and retry config.
  * @param schema - TypeBox schema to validate the JSON response against.
  * @returns The parsed and validated result, or `null`.

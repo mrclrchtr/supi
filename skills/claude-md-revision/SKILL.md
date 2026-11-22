@@ -128,7 +128,7 @@ If the user rejects or modifies a proposal, adjust and re-present.
 
 ## Guidelines
 
-- **Every token must earn its place** — if content doesn't save future sessions more time than it costs to read, remove it. Root context files are loaded by PI; nested files consume context when relevant Orientation surfaces them.
+- **Every token must earn its place** — if content doesn't save future sessions more time than it costs to read, remove it. Root context files are loaded by Pi; nested files consume context when relevant Orientation surfaces them.
 - **200-line hard cap** — no instruction file should exceed 200 lines. Above that, every line must fight for its place against removal. If a file is over 200 lines, prioritize removals over additions.
 - **Actionability** — each line should save future sessions time or prevent a mistake.
 - **No duplication** — read the existing file before adding; merge with existing entries when possible.

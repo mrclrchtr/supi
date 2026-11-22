@@ -1,8 +1,8 @@
-# Borrow provider authority through a public PI adapter
+# Borrow provider authority through a public Pi adapter
 
-The Agent Run must use the containing session's effective provider authority. A fresh PI `ModelRuntime` loses runtime API keys, OAuth state, model-specific headers, environment values, and extension-registered provider implementations.
+The Agent Run must use the containing session's effective provider authority. A fresh Pi `ModelRuntime` loses runtime API keys, OAuth state, model-specific headers, environment values, and extension-registered provider implementations.
 
-PI 0.83 does not expose the containing `ModelRuntime` through `ExtensionContext`. We therefore do not wait for an upstream API, use a private cast, or share the mutable parent runtime.
+Pi 0.83 does not expose the containing `ModelRuntime` through `ExtensionContext`. We therefore do not wait for an upstream API, use a private cast, or share the mutable parent runtime.
 
 `AgentSessionInputs` requires a narrow caller-owned `AgentRunProviderAuthority` with the public provider and authentication operations. `createAgentRunProviderAuthority()` adapts the containing `ModelRegistry`. The runtime creates a private child `ModelRuntime` with network refresh disabled and registers one native provider adapter. The adapter:
 

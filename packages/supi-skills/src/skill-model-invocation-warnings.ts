@@ -15,7 +15,7 @@ function warningSessionId(ctx: ExtensionContext): string {
     : `cwd:${ctx.cwd}`;
 }
 
-/** Show invalid config warnings once for each scope file in one PI session. */
+/** Show invalid config warnings once for each scope file in one Pi session. */
 export function notifyInvocationConfigWarnings(ctx: ExtensionContext, homeDir?: string): void {
   const invalidConfigs = readInvalidInvocationConfigNames(ctx.cwd, ctx.isProjectTrusted(), homeDir);
   const globalRecord = globalThis as Record<symbol, Set<string> | undefined>;

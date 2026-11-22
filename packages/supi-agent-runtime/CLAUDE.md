@@ -12,6 +12,6 @@
 - Keep the lifecycle state machine in one audited closure; prefer targeted state-machine edits over a generic coordinator abstraction that would obscure teardown ordering.
 - Keep normal diagnostics bounded and free of conversation, tool arguments/results, and raw errors.
 - Usage aggregation must include nested tool and summary calls.
-- Keep the package library-only. It may provide `registerAgentsCommand()` for extension callers, but it must not add a PI extension entry.
+- Keep the package library-only. It may provide `registerAgentsCommand()` for extension callers, but it must not add a Pi extension entry.
 - Keep Agent Profile pages optional and caller-owned. Do not move profile policy or Review audit into the runtime.
-- Test through `startAgentRun()` and its returned Handle; use controlled PI session factories and fake timers.
+- Test through `startAgentRun()` and its returned Handle; use controlled Pi session factories and fake timers.

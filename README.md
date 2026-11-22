@@ -36,7 +36,7 @@ Tree-sitter support is bundled. Full LSP features require the matching language-
 - **Structured decisions** — ask you focused choice or text questions through a keyboard-driven form with [`supi-ask-user`](packages/supi-ask-user/README.md).
 - **Review workflows** — run independent, inspection-only reviews of exact Git targets with [`supi-review`](packages/supi-review/README.md).
 - **Agent Profile policy** — discover explicit `explore` and `general` profiles with bounded resource envelopes through [`supi-agent`](packages/supi-agent/README.md).
-- **Operational awareness** — inspect context pressure, cache history and forensics, and SuPi debug events with `supi-context` and `supi-debug`. PI owns live cache statistics and cache-miss notices.
+- **Operational awareness** — inspect context pressure, cache history and forensics, and SuPi debug events with `supi-context` and `supi-debug`. Pi owns live cache statistics and cache-miss notices.
 - **Repository guidance** — maintain `CLAUDE.md` and `AGENTS.md` files with the `claude-md-improver` and `claude-md-revision` skills: `npx skills add mrclrchtr/supi -a pi --skill claude-md-improver claude-md-revision`.
 - **Skills on your terms** — use [`supi-skills`](packages/supi-skills/README.md) to choose, globally or per project, whether Pi can select each skill automatically, whether only you can start it, or whether it is disabled. Type `$` to search and start installed skills without remembering their full command names.
 - **Session polish** — use [`supi-extras`](packages/supi-extras/README.md) to choose session-only tool visibility and, with `supi-skills`, skill visibility. It also adds compact `codemode` rows that summarize nested tool calls, prompt stashing, activity indicators, shortcuts, and a default `bash` timeout.
@@ -47,7 +47,7 @@ After any installation, run `/reload` or restart Pi.
 
 ### Select packages and scopes
 
-Install PI and make sure `pi` is on `PATH`. Open PI in the target project and use `/trust` to save project approval. Then run the [SuPi installer](packages/supi-installer/README.md):
+Install Pi and make sure `pi` is on `PATH`. Open Pi in the target project and use `/trust` to save project approval. Then run the [SuPi installer](packages/supi-installer/README.md):
 
 ```sh
 npx @mrclrchtr/supi-installer@latest
@@ -65,9 +65,9 @@ To target another project directory:
 npx @mrclrchtr/supi-installer@latest --project /path/to/project
 ```
 
-The installer requires saved project trust even for global-only work. It never grants trust or installs PI. Clearing Project does not disable a global declaration. Removal keeps user data. If a scope move fails, source removal can still run; review the failure warning before confirmation.
+The installer requires saved project trust even for global-only work. It never grants trust or installs Pi. Clearing Project does not disable a global declaration. Removal keeps user data. If a scope move fails, source removal can still run; review the failure warning before confirmation.
 
-> PI extensions run with your user permissions. Review packages before installing them.
+> Pi extensions run with your user permissions. Review packages before installing them.
 
 ### One package
 
@@ -188,7 +188,7 @@ To remove selected SuPi packages, open the installer and clear their scope check
 npx @mrclrchtr/supi-installer@latest
 ```
 
-Unknown sources remain unchanged. Recognized Git/local or legacy root installs need manual removal through PI. The old shell installer commands have been retired.
+Unknown sources remain unchanged. Recognized Git/local or legacy root installs need manual removal through Pi. The old shell installer commands have been retired.
 
 Remove one package:
 

@@ -157,7 +157,7 @@ function validateDiscoveryFile(resolvedFile: string, requestedFile: string): str
     return `Cannot access file: \`${requestedFile}\``;
   }
   if (!BINARY_EXTENSIONS.has(path.extname(resolvedFile).toLowerCase())) return null;
-  return `File type not supported for code analysis: \`${requestedFile}\`. Use PI read or grep for explicit filesystem inspection when appropriate.`;
+  return `File type not supported for code analysis: \`${requestedFile}\`. Use Pi read or grep for explicit filesystem inspection when appropriate.`;
 }
 
 async function discoverSemantic(

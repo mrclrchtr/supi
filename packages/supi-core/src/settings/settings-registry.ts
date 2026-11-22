@@ -7,7 +7,7 @@ export const SUPI_SETTINGS_COLLECT_EVENT = "supi:settings:collect";
 
 export type SettingsScope = "project" | "global";
 
-/** Scope and PI runtime state supplied for each settings read. */
+/** Scope and Pi runtime state supplied for each settings read. */
 export interface SettingsContext {
   scope: SettingsScope;
   cwd: string;

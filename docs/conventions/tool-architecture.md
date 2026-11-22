@@ -1,6 +1,6 @@
 # Tool package architecture convention
 
-This document defines the preferred internal architecture for SuPi packages that register model-callable tools with PI. `package-layout.md` defines folder layout; this document defines metadata, workflow, result, runtime, and presentation seams.
+This document defines the preferred internal architecture for SuPi packages that register model-callable tools with Pi. `package-layout.md` defines folder layout; this document defines metadata, workflow, result, runtime, and presentation seams.
 
 ## Core rule: one public-surface source
 
@@ -24,9 +24,9 @@ A tool-bearing package normally separates five concerns:
 2. **Workflow** — intent policy, readiness, target resolution, and typed outcomes.
 3. **Result assembly** — sections, evidence lists, totals, omission metadata, provenance, and actions.
 4. **Presentation adapters** — markdown and TUI projections over assembled results.
-5. **PI adapter** — `pi.registerTool`, lifecycle hooks, commands, and execution-control translation.
+5. **Pi adapter** — `pi.registerTool`, lifecycle hooks, commands, and execution-control translation.
 
-The PI adapter should register metadata, invoke one workflow interface, and map the result. Filesystem, parser, language-server, and evidence policy do not belong there.
+The Pi adapter should register metadata, invoke one workflow interface, and map the result. Filesystem, parser, language-server, and evidence policy do not belong there.
 
 A deep workflow module hides multiple decisions behind a small interface. A forwarding module that merely renames another method adds no depth and should usually be removed.
 
@@ -49,19 +49,19 @@ Rules:
 
 - Files inside a tool directory are role-named; the directory carries the tool name.
 - A tool directory holds only that tool's files. Shared modules live at `src/tool/` level; infrastructure that is not tool-specific lives in package-level domain folders (`target/`, `audit/`, git helpers, …).
-- Registration (the PI adapter) imports each tool's spec and guidance and holds no tool-specific logic.
+- Registration (the Pi adapter) imports each tool's spec and guidance and holds no tool-specific logic.
 - Presentation for one tool lives in its directory (`render.ts` or `render/`); package-wide UI lives in `ui/`.
 - Keep spec and schema dependencies cycle-free: put shared parameter schemas and constants in leaf modules such as `input.ts`, and keep runtime modules from importing `spec.ts`; Biome's `noImportCycles` rule enforces this, and `scripts/__tests__/tool-schema-integrity.test.mjs` checks the serialized provider shape.
 - Optional files are allowed: tiny tools may not need separate execute or render modules. `spec.ts`, `guidance.ts` (when the tool ships prompt metadata), and `result.ts` exist for every tool that returns model-visible results.
 
 ## Context channel ownership
 
-Each PI context channel (`../pi/context-architecture.md`) maps to exactly one seam. Content placement rules live in `../pi/tool-guidance.md` § Content Budget and Placement; this section assigns code ownership.
+Each Pi context channel (`../pi/context-architecture.md`) maps to exactly one seam. Content placement rules live in `../pi/tool-guidance.md` § Content Budget and Placement; this section assigns code ownership.
 
 | Channel | Billing | Owning seam |
 | --- | --- | --- |
 | `description`, `promptSnippet`, `promptGuidelines`, schema field descriptions | Tier 1 prefix | Metadata (spec + guidance) |
-| System-prompt injection, skill catalog entries | Tier 1 prefix | PI adapter; skill files |
+| System-prompt injection, skill catalog entries | Tier 1 prefix | Pi adapter; skill files |
 | Result `content`, injected message `content` | Tier 2 addition | Result assembly |
 | Result `structuredContent` | Programmatic; selected script output becomes model content | Result assembly, projected against the registered output schema |
 | Result `details`, `pi.appendEntry`, spill files | Free | Result assembly; session code |
@@ -102,7 +102,7 @@ Workflow seams return immutable facts, not presentation strings. Keep these outc
 - timeout
 - partial evidence
 
-Internal defects may throw. A whole-tool capability failure should throw from the PI executor; valid searches with zero matches are successful completed outcomes.
+Internal defects may throw. A whole-tool capability failure should throw from the Pi executor; valid searches with zero matches are successful completed outcomes.
 
 Mutable providers, clients, managers, caches, and target records should not cross a public workflow seam.
 
@@ -122,7 +122,7 @@ Markdown, native script, and TUI adapters consume canonical assembly independent
 
 Keep caller selection and collection limits separate from text/TUI preview reductions. Each representation's counts describe its own list. A complete native list must not carry a shortened text preview's omitted count; an unknown collection remainder remains unknown. Health returns every collected diagnostic-file/server entry (with its per-file message limit); Refactor Plan returns every proposed edit; Orientation retains the focus, ordering, caller cap, and collection limits independently of text budgets. Snapshot references describe captured observations, not refresh operations.
 
-The PI adapter forwards `outputSchema` and `structuredContent` unchanged, including through child profiles. Preserve UI/state fields consumed by hooks (for example Apply recovery's `details.data.changedFiles`). Hooks replacing `content` must also replace `structuredContent` or Pi removes it. See [Execution and Results](../pi/tool-guidance.md#execution-and-results) for failure routing and schema-validation responsibility. Test actual registrations for schema validity and JSON round-tripping; test the real default codemode route separately. Pi does not validate output schemas at runtime.
+The Pi adapter forwards `outputSchema` and `structuredContent` unchanged, including through child profiles. Preserve UI/state fields consumed by hooks (for example Apply recovery's `details.data.changedFiles`). Hooks replacing `content` must also replace `structuredContent` or Pi removes it. See [Execution and Results](../pi/tool-guidance.md#execution-and-results) for failure routing and schema-validation responsibility. Test actual registrations for schema validity and JSON round-tripping; test the real default codemode route separately. Pi does not validate output schemas at runtime.
 
 ## Schemas and exact-one inputs
 
@@ -130,7 +130,7 @@ Use structurally explicit inputs when one of several intents is valid. For model
 
 For example, a target selector may admit one of `handle`, `anchor`, `symbol`, or `file`, with each tool allowing only the branches it can honor. Do not accept contradictory flat fields and resolve them through precedence.
 
-Runtime validation still matters for direct tests and callers that bypass PI schema validation.
+Runtime validation still matters for direct tests and callers that bypass Pi schema validation.
 
 Keep the input vocabulary uniform across tools:
 
@@ -232,7 +232,7 @@ Its main seams are:
 - `src/session/` — Workspace code-intelligence session and typed workflows
 - `src/tool/code_*/result.ts` with the shared core in `src/tool/result/assembly.ts` — canonical Tool result assembly
 - `src/tool/code_*/markdown.ts` and TUI modules — presentation adapters
-- `src/tool/register.ts` — PI registration adapter
+- `src/tool/register.ts` — Pi registration adapter
 
 `code_orientation` replaced the old context/brief surfaces. `code_impact` and the older graph relation families are removed rather than aliased.
 

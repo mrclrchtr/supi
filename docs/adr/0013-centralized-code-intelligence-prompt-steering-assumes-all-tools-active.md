@@ -1,10 +1,10 @@
 # Code-intelligence prompt steering with session tool controls
 
 ADR 0005 assigns tool selection rules to `description`, parameter mechanics to
-schemas, and cross-tool routes to `promptGuidelines`. PI adds a tool's
+schemas, and cross-tool routes to `promptGuidelines`. Pi adds a tool's
 `promptGuidelines` only while that tool is active.
 
-`/supi-capabilities` can turn eligible extension tools off for one session. PI's
+`/supi-capabilities` can turn eligible extension tools off for one session. Pi's
 startup tool allowlist remains the limit. A `code_*` tool can be active while a
 sibling tool is inactive. A guideline must not direct the model to call an
 inactive tool.
@@ -35,5 +35,5 @@ description and schema define their selection contract.
 - Cross-tool guidance must use availability conditions.
 - Tests must check those conditions and must not assume that every registered
 tool is active.
-- Selection-critical rules stay in descriptions and schemas. Standard PI
+- Selection-critical rules stay in descriptions and schemas. Standard Pi
   result limits stay in result builders, not in tool descriptions.

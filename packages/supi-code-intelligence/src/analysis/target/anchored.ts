@@ -246,7 +246,7 @@ export async function resolveAnchoredSymbolTarget(
   if (isBinaryFile(file)) {
     return {
       kind: "error",
-      message: `File type not supported for semantic analysis: \`${file}\`. Use PI read or grep for explicit filesystem inspection when appropriate.`,
+      message: `File type not supported for semantic analysis: \`${file}\`. Use Pi read or grep for explicit filesystem inspection when appropriate.`,
     };
   }
 

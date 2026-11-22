@@ -45,10 +45,10 @@ export function createSessionNameTracker(pi: SessionNameTrackerHost): () => stri
 }
 
 /**
- * Resolve the active branch path using PI's append-only tree semantics.
+ * Resolve the active branch path using Pi's append-only tree semantics.
  *
  * The active branch is the path from the **last entry** (current leaf)
- * back to the root via `parentId`. This follows PI's tree structure where
+ * back to the root via `parentId`. This follows Pi's tree structure where
  * entries are append-only and the last entry in the file is always the
  * current leaf of the active branch.
  */

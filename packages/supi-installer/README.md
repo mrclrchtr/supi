@@ -1,11 +1,11 @@
 # @mrclrchtr/supi-installer
 
-Select direct SuPi package declarations in Project and Global scopes. This is a standalone Node CLI, not a PI extension.
+Select direct SuPi package declarations in Project and Global scopes. This is a standalone Node CLI, not a Pi extension.
 
 ## Start
 
-1. Install [PI](https://pi.dev) and its required Node runtime. Make sure `pi` is on `PATH`.
-2. Open PI in the target project directory. Use `/trust` to save approval for that directory or an ancestor.
+1. Install [Pi](https://pi.dev) and its required Node runtime. Make sure `pi` is on `PATH`.
+2. Open Pi in the target project directory. Use `/trust` to save approval for that directory or an ancestor.
 3. Run the installer in a terminal:
 
 ```sh
@@ -18,7 +18,7 @@ To select another exact project directory:
 npx @mrclrchtr/supi-installer@latest --project /path/to/project
 ```
 
-The installer does not find a Git root, install PI, or grant project trust. Without saved project approval, it exits even for global-only changes. `PI_CODING_AGENT_DIR` selects a different PI agent directory when set.
+The installer does not find a Git root, install Pi, or grant project trust. Without saved project approval, it exits even for global-only changes. `PI_CODING_AGENT_DIR` selects a different Pi agent directory when set.
 
 ## Installation Matrix
 
@@ -35,11 +35,11 @@ The installer does not find a Git root, install PI, or grant project trust. With
 - `[!]` marks a kept obsolete declaration. Removal is recommended; press Space to mark it `[-]`. The status line counts obsolete declarations still kept.
 - `★` marks Recommended packages. Beta and opt-in packages are tagged next to their name.
 - Colors follow the terminal's color support and honor `NO_COLOR`.
-- Project uses `<project>/.pi/settings.json`. Global uses PI's agent settings.
+- Project uses `<project>/.pi/settings.json`. Global uses Pi's agent settings.
 - The matrix starts from current declarations, not a preset.
 - Clearing Project does not disable a global declaration. Filters and bundled extensions can also affect which capabilities load.
 - Existing pins and resource filters remain unchanged unless their declaration is removed.
-- New declarations use unpinned official npm sources. Use PI for later updates.
+- New declarations use unpinned official npm sources. Use Pi for later updates.
 
 | Key | Action |
 | --- | --- |
@@ -62,14 +62,14 @@ Recommended contains the eight release-stack packages. All also includes beta pa
 
 - Normal removal uses `pi remove` in the selected scope. It does not purge SuPi configuration, credentials, sessions, reports, or local checkouts.
 - Known obsolete standalone declarations have removal-only cells. They cannot be added to a new scope.
-- Recognized Git/local SuPi installations and legacy root installations block their scope. Remove the conflicting source with PI before using the matrix. The installer does not migrate it.
+- Recognized Git/local SuPi installations and legacy root installations block their scope. Remove the conflicting source with Pi before using the matrix. The installer does not migrate it.
 - Unknown and unrelated declarations remain unmanaged and unchanged.
 - Settings and trust are checked again before and between commands. An observed external edit stops new commands and requires a new review.
 - Additions run before removals. A failed command does not stop independent changes, including a removal in the other scope of the same row.
 - **A failed destination install can still be followed by source removal, leaving neither declaration.** There is no automatic rollback.
 - Cancellation stops new commands and stops the active child where possible. The final report lists successes, failures, unattempted operations, and observed declarations.
 
-Run `/reload` or restart PI after package changes.
+Run `/reload` or restart Pi after package changes.
 
 ## Agent skills
 
@@ -88,7 +88,7 @@ Use `supi-skills` to control installed skills. When the review removes an obsole
 npx @mrclrchtr/supi-installer@latest --dry-run
 ```
 
-This prints current declarations and scope restrictions without a terminal or package changes. It still requires PI and saved project trust. It is not a scripted target selection or an update/repair command.
+This prints current declarations and scope restrictions without a terminal or package changes. It still requires Pi and saved project trust. It is not a scripted target selection or an update/repair command.
 
 Use `--help` or `--version` without a trust requirement. Unattended package changes are not supported.
 
@@ -100,4 +100,4 @@ pnpm vitest run packages/supi-installer/ --reporter=agent
 node node_modules/@typescript/native/bin/tsc -b packages/supi-installer/tsconfig.json packages/supi-installer/__tests__/tsconfig.json
 ```
 
-The CLI uses checked JavaScript and has no build step. Tests use temporary settings, trust stores, and a fake PI executable. See the [installer contract](../../docs/conventions/installer.md) for the full design and verification requirements.
+The CLI uses checked JavaScript and has no build step. Tests use temporary settings, trust stores, and a fake Pi executable. See the [installer contract](../../docs/conventions/installer.md) for the full design and verification requirements.

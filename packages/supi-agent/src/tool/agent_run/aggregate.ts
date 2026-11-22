@@ -1,7 +1,7 @@
 // Aggregate output bound for the joined Agent Run parent result.
 //
 // The complete joined result is assembled and measured first. When it fits
-// PI's standard model-output limit it is returned unchanged. When it exceeds
+// Pi's standard model-output limit it is returned unchanged. When it exceeds
 // either limit, visible space is allocated fairly: every task header/status
 // line always remains, the remaining byte budget is split across tasks and
 // unused shares are redistributed to longer outputs, and every shortened
@@ -101,7 +101,7 @@ interface KeptBody {
 }
 
 /**
- * Bound the joined Agent Run parent result to PI's standard model-output
+ * Bound the joined Agent Run parent result to Pi's standard model-output
  * limit (2,000 lines or 51,200 UTF-8 bytes, whichever is reached first).
  *
  * Every task section head always remains. When the joined result exceeds the

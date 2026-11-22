@@ -150,7 +150,7 @@ describe("cacheForensicsExtension", () => {
     cacheForensicsExtension(pi as never);
 
     const tool = getTool(pi, "cache_forensics");
-    expect(tool.description).toMatch(/historical PI sessions/i);
+    expect(tool.description).toMatch(/historical Pi sessions/i);
     expect(tool.description).toMatch(/redacted shape fingerprints/i);
     expect(tool.description).not.toMatch(/breakdown.*hotspots.*correlate.*idle/i);
 

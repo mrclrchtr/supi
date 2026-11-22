@@ -114,7 +114,7 @@ export async function discoverAntigravityAvailability(
       status: "unavailable",
       reason: "discovery",
       warning:
-        "Antigravity CLI version could not be read. Install or update Antigravity, then reload PI.",
+        "Antigravity CLI version could not be read. Install or update Antigravity, then reload Pi.",
     };
   }
   const cliVersion = formatAntigravityVersion(version);
@@ -148,7 +148,7 @@ export async function discoverAntigravityAvailability(
       reason: "discovery",
       cliVersion,
       warning:
-        "Antigravity model discovery failed. Check the isolated Antigravity sign-in, then reload PI.",
+        "Antigravity model discovery failed. Check the isolated Antigravity sign-in, then reload Pi.",
     };
   }
 
@@ -183,7 +183,7 @@ function unavailableFromError(
     return {
       status: "unavailable",
       reason: "missing",
-      warning: "Antigravity CLI `agy` was not found on PATH. Install it, then reload PI.",
+      warning: "Antigravity CLI `agy` was not found on PATH. Install it, then reload Pi.",
     };
   }
   if (
@@ -201,7 +201,7 @@ function unavailableFromError(
     status: "unavailable",
     reason: "discovery",
     ...(cliVersion ? { cliVersion } : {}),
-    warning: "Antigravity availability discovery failed. Check the installation, then reload PI.",
+    warning: "Antigravity availability discovery failed. Check the installation, then reload Pi.",
   };
 }
 
@@ -213,7 +213,7 @@ function authenticationUnavailable(
     status: "unavailable",
     reason: "authentication",
     ...(cliVersion ? { cliVersion } : {}),
-    warning: `Antigravity needs sign-in in its Isolated Antigravity Home. Run:\n${formatAntigravityLoginCommand(paths)}\nThen exit Antigravity and reload PI.`,
+    warning: `Antigravity needs sign-in in its Isolated Antigravity Home. Run:\n${formatAntigravityLoginCommand(paths)}\nThen exit Antigravity and reload Pi.`,
   };
 }
 

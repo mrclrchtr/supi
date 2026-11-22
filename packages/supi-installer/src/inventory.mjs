@@ -46,7 +46,7 @@ function requireTrust(context, files) {
     current = dirname(current);
   }
   throw new Error(
-    `A saved PI trust approval is required for ${context.project}. Open PI in that directory, use /trust, then rerun the installer.`,
+    `A saved Pi trust approval is required for ${context.project}. Open Pi in that directory, use /trust, then rerun the installer.`,
   );
 }
 
@@ -67,7 +67,7 @@ function validateEntry(entry, path) {
   return /** @type {PackageEntry} */ (entry);
 }
 
-/** Observe both scopes without starting PI or changing settings or trust. @param {Context} context @returns {import('./types.ts').Inventory} */
+/** Observe both scopes without starting Pi or changing settings or trust. @param {Context} context @returns {import('./types.ts').Inventory} */
 export function readInventory(context) {
   /** @type {Record<string, string | null>} */
   const files = {};

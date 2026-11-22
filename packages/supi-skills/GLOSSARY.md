@@ -7,7 +7,7 @@ See also: root `GLOSSARY.md` (Quality-of-Life).
 ## Language
 
 **Skill Load**:
-Whether PI loads a skill and makes its user command available.
+Whether Pi loads a skill and makes its user command available.
 
 **Model Invocation**:
 Whether a loaded skill appears in the model's skill catalog. This preference remains when Skill Load is disabled.

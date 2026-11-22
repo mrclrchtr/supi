@@ -1,6 +1,6 @@
 import { clampThinkingLevel, type Model, type ModelThinkingLevel } from "@earendil-works/pi-ai";
 
-/** PI thinking levels available in Review settings. */
+/** Pi thinking levels available in Review settings. */
 export const REVIEW_THINKING_LEVELS = [
   "off",
   "minimal",
@@ -11,7 +11,7 @@ export const REVIEW_THINKING_LEVELS = [
   "max",
 ] as const satisfies readonly ModelThinkingLevel[];
 
-/** A validated PI thinking level used by a Review child role. */
+/** A validated Pi thinking level used by a Review child role. */
 export type ReviewThinkingLevel = (typeof REVIEW_THINKING_LEVELS)[number];
 
 /** Default reasoning budget for Reviewer Sessions. */
@@ -44,7 +44,7 @@ export function resolveReviewThinkingLevel(
 
 /** Clamp a requested Review level to the selected model's capabilities. */
 export function clampReviewThinkingLevel(
-  // biome-ignore lint/suspicious/noExplicitAny: Model<any> is PI's canonical type
+  // biome-ignore lint/suspicious/noExplicitAny: Model<any> is Pi's canonical type
   model: Model<any>,
   requested: ReviewThinkingLevel,
 ): ModelThinkingLevel {

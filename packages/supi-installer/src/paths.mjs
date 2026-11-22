@@ -13,7 +13,7 @@ export function canonicalPath(path) {
   }
 }
 
-/** Match PI's tilde and file URL path forms. @param {string} path @param {string} [home] */
+/** Match Pi's tilde and file URL path forms. @param {string} path @param {string} [home] */
 export function expandPath(path, home = homedir()) {
   if (path === "~") return home;
   if (path.startsWith("~/") || (process.platform === "win32" && path.startsWith("~\\")))

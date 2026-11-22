@@ -93,7 +93,7 @@ function toolRows(tools: CapabilityToolItem[], state: SessionCapabilityState): C
       id: groupId,
       label: source,
       currentValue: groupValue,
-      description: "Toggle current eligible tools from this PI source.",
+      description: "Toggle current eligible tools from this Pi source.",
       indent: 2,
       searchText: source,
       actions: [

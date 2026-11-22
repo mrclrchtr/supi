@@ -11,5 +11,5 @@ The report produced by the `/supi-tooling-retro` command, which evaluates which 
 _Avoid_: retro, post-task review
 
 **Cache Forensics**:
-Cross-session analysis of prompt-cache hit-rate drops (`/supi-cache-forensics`, `cache_forensics`), grouped by cause. Per-turn current-branch usage is **Cache History** (`/supi-cache-history`). PI owns live cache statistics and cache-miss notices.
+Cross-session analysis of prompt-cache hit-rate drops (`/supi-cache-forensics`, `cache_forensics`), grouped by cause. Per-turn current-branch usage is **Cache History** (`/supi-cache-history`). Pi owns live cache statistics and cache-miss notices.
 _Avoid_: cache monitor

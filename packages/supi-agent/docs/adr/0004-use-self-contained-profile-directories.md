@@ -1,6 +1,6 @@
 # Use field-level overlays for Profile Directories
 
-Agent Profiles are discovered as Profile Directories with a `profile.json` manifest rather than stored in shared SuPi configuration. User profiles live under `~/.pi/agent/supi/agents/`; the nearest `.pi/supi/agents/` from cwd through the Git root supplies project profiles only when PI project trust is active. Outside Git, only the exact cwd project directory is considered.
+Agent Profiles are discovered as Profile Directories with a `profile.json` manifest rather than stored in shared SuPi configuration. User profiles live under `~/.pi/agent/supi/agents/`; the nearest `.pi/supi/agents/` from cwd through the Git root supplies project profiles only when Pi project trust is active. Outside Git, only the exact cwd project directory is considered.
 
 Sources keep package, global, and trusted-project entries separately. Precedence is project → global → package for each manifest field. A user `profile.json` may contain only the fields it overrides, such as `{ "model": "provider/id" }`; omitted fields use the next available source. Lists are replaced as fields and are never merged element by element. Prompt assets follow the source that provides the selected `systemPrompt` field.
 

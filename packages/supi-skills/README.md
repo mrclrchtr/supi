@@ -29,13 +29,13 @@ pi install ./packages/supi-skills
 
 `/supi-settings` includes a searchable **Skills** section. Each skill has one of these effective states:
 
-- **Enabled** — PI loads the skill, and the model can invoke it.
-- **Model invocation disabled** — PI loads the skill for explicit user commands but omits it from the model's skill catalog.
-- **Disabled** — PI does not load the skill or its command.
+- **Enabled** — Pi loads the skill, and the model can invoke it.
+- **Model invocation disabled** — Pi loads the skill for explicit user commands but omits it from the model's skill catalog.
+- **Disabled** — Pi does not load the skill or its command.
 
-Use `Tab` to switch between project and global scope. Project settings inherit global settings, and trusted project overrides take precedence. SuPi stores model-invocation preferences without changing `SKILL.md`; full load changes use PI resource settings and require `/reload`.
+Use `Tab` to switch between project and global scope. Project settings inherit global settings, and trusted project overrides take precedence. SuPi stores model-invocation preferences without changing `SKILL.md`; full load changes use Pi resource settings and require `/reload`.
 
-Skills that an extension adds only at runtime support Enabled and Model invocation disabled. PI does not provide a persistent load setting for these resources. PI exposes only the active source after a name collision, so disabling a static winner can reveal a runtime source after reload. The refreshed row then shows the runtime limitation.
+Skills that an extension adds only at runtime support Enabled and Model invocation disabled. Pi does not provide a persistent load setting for these resources. Pi exposes only the active source after a name collision, so disabling a static winner can reveal a runtime source after reload. The refreshed row then shows the runtime limitation.
 
 ## Config shape
 
@@ -52,15 +52,15 @@ SuPi stores Model Invocation overrides as per-skill records in the SuPi config:
 }
 ```
 
-Use `enabled` or `disabled` as the stored value. An absent record or field inherits the source default, global value, or project value. Skill Load remains in PI's native settings. SuPi adds the schema marker so a skill named `modelInvocation` can use an ordinary record.
+Use `enabled` or `disabled` as the stored value. An absent record or field inherits the source default, global value, or project value. Skill Load remains in Pi's native settings. SuPi adds the schema marker so a skill named `modelInvocation` can use an ordinary record.
 
 Older versions stored boolean values in `skills.modelInvocation`. SuPi reads that format and migrates valid entries on the next settings write. Invalid values remain preserved, marked as invalid, and produce a warning until they are repaired. A conflicting legacy fallback is kept under `$legacyModelInvocation` until the invalid record is repaired.
 
 ## Session visibility
 
-Install `@mrclrchtr/supi-extras` to use `/supi-capabilities`. Its Skills tab lists skills that PI has loaded and that persistent settings allow in the model catalog. It does not list unloaded skills or skills that persistent settings block.
+Install `@mrclrchtr/supi-extras` to use `/supi-capabilities`. Its Skills tab lists skills that Pi has loaded and that persistent settings allow in the model catalog. It does not list unloaded skills or skills that persistent settings block.
 
-A session visibility override hides a skill from the model prompt for the current session. It does not change PI settings or SuPi skill settings. The user can still run `/skill:name` or use `$name`. Resume restores the override. A fork copies it. Use **Reset Skills** to show all eligible skills again.
+A session visibility override hides a skill from the model prompt for the current session. It does not change Pi settings or SuPi skill settings. The user can still run `/skill:name` or use `$name`. Resume restores the override. A fork copies it. Use **Reset Skills** to show all eligible skills again.
 
 ## Input shortcut
 
@@ -70,4 +70,4 @@ Installed skill names are captured at `session_start`. Use `/reload` after you a
 
 ## Credit
 
-The skill controls are inspired by [Whamp/pi-skill-toggle](https://github.com/Whamp/pi-skill-toggle). SuPi uses PI's resource interfaces and shared settings UI instead of the upstream custom overlay and theme configuration.
+The skill controls are inspired by [Whamp/pi-skill-toggle](https://github.com/Whamp/pi-skill-toggle). SuPi uses Pi's resource interfaces and shared settings UI instead of the upstream custom overlay and theme configuration.

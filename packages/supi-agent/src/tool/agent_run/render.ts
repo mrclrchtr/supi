@@ -53,7 +53,7 @@ export function renderCall(args: unknown, theme: Theme): Text {
 
 // ── renderResult ─────────────────────────────────────────────────
 
-/** Render bounded Agent Run progress and results for the PI tool row. */
+/** Render bounded Agent Run progress and results for the Pi tool row. */
 export function renderResult(
   result: {
     content?: Array<{ type: string; text?: string }>;

@@ -29,7 +29,7 @@ A bounded configuration error for one unavailable Profile Directory source or in
 _Avoid_: Profile warning, fallback notice, Agent Run failure
 
 **Agent Capability Set**:
-The fixed package-owned set of tools that Agent Profiles may select for Agent Runs. It includes PI built-ins, explicitly supported child-capable extensions, and package-owned tools, never ambient extensions.
+The fixed package-owned set of tools that Agent Profiles may select for Agent Runs. It includes Pi built-ins, explicitly supported child-capable extensions, and package-owned tools, never ambient extensions.
 _Avoid_: Inherited tools, parent tool set, extension allowlist
 
 **Conditional Capability**:
@@ -37,7 +37,7 @@ A member of the Agent Capability Set that an Agent Profile may allow but an Agen
 _Avoid_: Optional tool, inherited tool, parent tool
 
 **Agent Prompt Policy**:
-An Agent Profile's choice of one complete base prompt: PI-native, package-owned by Prompt ID, or a Custom System Prompt from the Profile Directory's `SYSTEM.md`.
+An Agent Profile's choice of one complete base prompt: Pi-native, package-owned by Prompt ID, or a Custom System Prompt from the Profile Directory's `SYSTEM.md`.
 _Avoid_: Prompt mode, system prompt type, layered prompt
 
 **Custom System Prompt**:
@@ -45,7 +45,7 @@ The complete system prompt stored in a Profile Directory's `SYSTEM.md` and selec
 _Avoid_: Profile Prompt, Markdown body, appended instructions
 
 **Agent Instruction Scope**:
-One of the explicit `global` or `project` AGENTS.md/CLAUDE.md sources selected by an Agent Profile's required `instructionScopes` set. `project` uses PI's normal cwd-ancestry context discovery; PI SYSTEM.md and APPEND_SYSTEM.md files are not instruction-scope inputs.
+One of the explicit `global` or `project` AGENTS.md/CLAUDE.md sources selected by an Agent Profile's required `instructionScopes` set. `project` uses Pi's normal cwd-ancestry context discovery; Pi SYSTEM.md and APPEND_SYSTEM.md files are not instruction-scope inputs.
 _Avoid_: Applied context, prompt inheritance, resource mode
 
 **Delegation Task**:

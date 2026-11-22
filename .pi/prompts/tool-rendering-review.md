@@ -1,5 +1,5 @@
 ---
-description: Check a named SuPi package for correct PI tool rendering
+description: Check a named SuPi package for correct Pi tool rendering
 argument-hint: "[package path]"
 ---
 

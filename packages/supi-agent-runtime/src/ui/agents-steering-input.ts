@@ -27,7 +27,7 @@ export class AgentsSteeringInput implements Focusable {
     this.#input.onEscape = callbacks.onCancel;
   }
 
-  /** Whether PI should show the hardware cursor in this input. */
+  /** Whether Pi should show the hardware cursor in this input. */
   get focused(): boolean {
     return this.#input.focused;
   }

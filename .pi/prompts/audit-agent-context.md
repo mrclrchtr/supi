@@ -8,7 +8,7 @@ Write the audit to `${1:-docs/agent-context-audit.md}`. Limit repository changes
 
 ## Goal
 
-Define a SuPi package catalog that gives agents powerful, optional capabilities while PI stays as close as possible to its standard behavior.
+Define a SuPi package catalog that gives agents powerful, optional capabilities while Pi stays as close as possible to its standard behavior.
 
 Inspect every immediate package directory under `packages/`. Find agent-facing context that is:
 
@@ -23,14 +23,14 @@ Do not assume that context is useful because it already has tests or an ADR. Tre
 ## Establish the baseline
 
 1. Read the repository instructions, root `GLOSSARY.md`, `GLOSSARY-MAP.md`, and the glossary for each package.
-2. Read the relevant installed PI documentation before you make PI-specific claims. Start with PI's `docs/index.md`. Read the relevant sections of `docs/extensions.md`, especially the system-prompt build, event lifecycle, tool registration, tool results, `sendMessage()`, and `appendEntry()`.
+2. Read the relevant installed Pi documentation before you make Pi-specific claims. Start with Pi's `docs/index.md`. Read the relevant sections of `docs/extensions.md`, especially the system-prompt build, event lifecycle, tool registration, tool results, `sendMessage()`, and `appendEntry()`.
 3. Read the repository guidance that defines prompt-surface intent, including:
    - `docs/pi/tool-guidance.md`
    - `docs/conventions/tool-architecture.md`
    - `docs/adr/0005-code-tool-prompt-surface-division-of-labor.md`
    - `docs/adr/0012-runtime-scoped-prompt-surfaces-and-settings.md`
    - `docs/adr/0013-centralized-code-intelligence-prompt-steering-assumes-all-tools-active.md`
-4. State the standard PI baseline. Separate PI-owned context from text that SuPi adds, replaces, or causes PI to expose.
+4. State the standard Pi baseline. Separate Pi-owned context from text that SuPi adds, replaces, or causes Pi to expose.
 5. Derive the package list from the filesystem. Include empty, private, resource-only, infrastructure, and extension packages. Do not use `GLOSSARY-MAP.md` as the package inventory.
 
 ## Build a complete context-surface inventory
@@ -72,7 +72,7 @@ Assess each surface with these tests.
 
 - What agent decision does this text improve?
 - Is the text necessary to discover the capability, select it over a sibling, call it correctly, interpret its result, or preserve safety?
-- Does standard PI behavior, the schema, the current tool result, or another package already supply the same information?
+- Does standard Pi behavior, the schema, the current tool result, or another package already supply the same information?
 - Is the text available at the time when the agent needs it?
 
 ### Duplication
@@ -102,7 +102,7 @@ Keep only the information needed at that decision point. Look for:
 
 Flag text that can make the agent:
 
-- select a SuPi tool when a standard PI tool is more direct
+- select a SuPi tool when a standard Pi tool is more direct
 - inspect broadly before a narrow task
 - call extra tools without an evidence need
 - treat observations as proof
@@ -156,7 +156,7 @@ Use this structure in `${1:-docs/agent-context-audit.md}`:
    - the proposed standard SuPi principle in one short paragraph
 
 2. **Baseline and method**
-   - standard PI baseline
+   - standard Pi baseline
    - inspected surfaces
    - package count
    - measurement method and limits

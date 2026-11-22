@@ -30,7 +30,7 @@ Notes:
   When present, it must re-export actual API symbols (types, utilities), never the extension factory function.
 - `src/index.ts` exists when a package exports a package-root (`.`) surface or uses the file as its package centerpiece. Omit pass-through indexes that only duplicate `api.ts` or `extension.ts`.
 - `src/extension.ts` exists when the package installs into pi.
-- CLI-only packages use an executable under `bin/` and checked JavaScript under `src/` when they must run without a build or a TypeScript loader. They have no PI manifest or extension export; their typecheck config enables `allowJs` and `checkJs`.
+- CLI-only packages use an executable under `bin/` and checked JavaScript under `src/` when they must run without a build or a TypeScript loader. They have no Pi manifest or extension export; their typecheck config enables `allowJs` and `checkJs`.
 - `<main>.ts` is the package centerpiece, usually named after the package or primary tool.
 - `__tests__/unit` and `__tests__/integration` are the default test buckets once a package has more than a trivial number of tests.
 
@@ -123,7 +123,7 @@ When multiple SuPi packages need the same path, URI, config, or session helper s
 | `supi-debug` | root domains stay; per-tool `tool/debug/` layout |
 | `supi-extras` | mostly flat; split only if coherent domains emerge |
 | `supi-insights` | flat source is fine; move tests to package-level `__tests__/unit/` |
-| `supi-installer` | CLI-only: `bin/supi-installer.mjs`, checked `src/*.mjs`, `ui/`, and package-level tests; no PI extension or library API |
+| `supi-installer` | CLI-only: `bin/supi-installer.mjs`, checked `src/*.mjs`, `ui/`, and package-level tests; no Pi extension or library API |
 | `supi-lsp` | hybrid large-package layout with `client/`, `config/`, `diagnostics/`, `manager/`, `provider/`, `session/` |
 | `supi-review` | per-tool `tool/review_run/`, `tool/review_output/`, `tool/review_audit/` + shared tool modules; keep package domains (`audit/`, `target/`, `history/`) |
 | `supi-skill-patches` | private maintenance package: flat patch, upstream sync, and root skill catalog validation |

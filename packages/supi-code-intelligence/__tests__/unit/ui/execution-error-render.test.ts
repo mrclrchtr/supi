@@ -12,7 +12,7 @@ const reason =
   "LSP request textDocument/references failed: Semantic input changed while the request was running.";
 
 describe.each(CODE_INTELLIGENCE_TOOL_SPECS)("$name execution failure", (spec) => {
-  it.each([false, true])("shows PI's failure reason when expanded=%s", (expanded) => {
+  it.each([false, true])("shows Pi's failure reason when expanded=%s", (expanded) => {
     const result = { content: [{ type: "text", text: reason }] };
     const component = spec.renderResult(result, { expanded, isPartial: false }, theme, {
       isError: true,

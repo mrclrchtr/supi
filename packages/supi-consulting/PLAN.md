@@ -84,8 +84,8 @@ Keep the package outside the "Recommended" Release and "All" Stack. It should no
 Use these package-owned paths:
 
 ```text
-<PI agent dir>/supi/antigravity/home/
-<PI agent dir>/supi/antigravity/consultation-workspace/
+<Pi agent dir>/supi/antigravity/home/
+<Pi agent dir>/supi/antigravity/consultation-workspace/
 ```
 
 `isolated-home.ts` must:
@@ -122,11 +122,11 @@ cd "<consultation-workspace>" &&
 HOME="<isolated-home>" AGY_CLI_DISABLE_AUTO_UPDATE=true agy
 ```
 
-Tell the user to exit Antigravity and reload PI after sign-in.
+Tell the user to exit Antigravity and reload Pi after sign-in.
 
 ## 3. Add availability discovery
 
-At `session_start`, when the Agent tools setting is enabled, start availability discovery without making PI startup wait. Do not await it from the `session_start` handler:
+At `session_start`, when the Agent tools setting is enabled, start availability discovery without making Pi startup wait. Do not await it from the `session_start` handler:
 
 1. Run `agy --version`.
 2. Require version `>=1.1.24`.
@@ -206,7 +206,7 @@ Process behavior:
 - Do not retain raw NDJSON, tool parameters, or tool output.
 - Set `HOME=<isolated-home>` and `AGY_CLI_DISABLE_AUTO_UPDATE=true` for every `agy` process, including discovery and hook probes.
 - Pass only the approved environment allowlist.
-- Do not pass unrelated PI provider credentials.
+- Do not pass unrelated Pi provider credentials.
 - Enforce package-owned limits for bytes per stdout line, total events, and retained stderr. Detect an oversized line before unbounded newline buffering. Kill the process group and throw when a limit is exceeded.
 - Use a detached POSIX process group.
 - On cancellation, timeout, or parser failure, send `SIGTERM` to the process group, wait for a short grace period, then send `SIGKILL` to the process group.
@@ -233,7 +233,7 @@ interface AntigravityAnswer {
 }
 ```
 
-Set field and item limits so the complete PI result stays below:
+Set field and item limits so the complete Pi result stays below:
 
 - 50 KB
 - 2,000 lines
@@ -265,7 +265,7 @@ For each successful new run:
 
 For each successful follow-up, require the terminal Antigravity ID to match the stored ID and persist the current handle metadata and status in tool-result `details`.
 
-Rebuild active handles from the current PI branch during `session_start` and `session_tree`.
+Rebuild active handles from the current Pi branch during `session_start` and `session_tree`.
 
 For failed or canceled follow-ups that acquired the handle and started process work:
 
@@ -408,22 +408,22 @@ Run three real calls with Gemini 3.8 Flash Low:
 
 The Walking Skeleton is complete when:
 
-- PI startup does not wait for Antigravity availability discovery.
+- Pi startup does not wait for Antigravity availability discovery.
 - `antigravity_run` is absent with clear guidance before isolated authentication.
 - The tool appears after authentication and reload.
 - Only available curated models enter its schema and pass runtime validation.
 - New and follow-up inputs cannot conflict.
-- Web consultation works without access to the current PI workspace.
+- Web consultation works without access to the current Pi workspace.
 - Workspace analysis uses both code and web evidence.
 - The live fixture stays byte-identical.
 - Follow-up context works through a Conversation Handle.
 - Concurrent fresh runs work.
 - Concurrent same-handle turns fail before process startup without retiring the in-flight handle.
-- Failed follow-ups retire their handles across PI resume.
+- Failed follow-ups retire their handles across Pi resume.
 - Every `agy` process uses the Isolated Antigravity Home.
 - Active or unknown project hook state produces a warning before a workspace run.
 - No result exceeds 50 KB or 2,000 lines.
-- SuPi does not copy raw stream or transcript data into PI session state or SuPi logs. Antigravity keeps its own transcript in the Isolated Antigravity Home for follow-ups.
+- SuPi does not copy raw stream or transcript data into Pi session state or SuPi logs. Antigravity keeps its own transcript in the Isolated Antigravity Home for follow-ups.
 - `pnpm verify:ai` passes.
 - Package staging and tarball verification pass.
 

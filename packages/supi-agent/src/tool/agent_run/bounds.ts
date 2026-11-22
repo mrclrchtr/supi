@@ -17,9 +17,9 @@ import { DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES } from "@earendil-works/pi-coding-
 export const MODEL_LANE_MAX_CHARS = 16_000;
 /** Per-task characters visible to humans (expanded details). */
 export const HUMAN_LANE_MAX_CHARS = 51_200; // 50 KB
-/** Joined parent-visible result bytes — PI's standard output default (50 KB). */
+/** Joined parent-visible result bytes — Pi's standard output default (50 KB). */
 export const AGGREGATE_MAX_BYTES = DEFAULT_MAX_BYTES;
-/** Joined parent-visible result lines — PI's standard output default. */
+/** Joined parent-visible result lines — Pi's standard output default. */
 export const AGGREGATE_MAX_LINES = DEFAULT_MAX_LINES;
 
 // ── Conversation View bounds ─────────────────────────────────────

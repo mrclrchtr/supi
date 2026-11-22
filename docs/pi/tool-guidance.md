@@ -1,6 +1,6 @@
-# PI Extension Tool Guidelines
+# Pi Extension Tool Guidelines
 
-Checklist for designing, registering, and improving model-callable tools in PI extensions. Two goals: the model can select and use the tool correctly, and the tool consumes as little model context as possible.
+Checklist for designing, registering, and improving model-callable tools in Pi extensions. Two goals: the model can select and use the tool correctly, and the tool consumes as little model context as possible.
 
 - Context mechanics and costs (billing tiers, free channels, cache breaks): `context-architecture.md`.
 - Baseline tool API: installed Pi `docs/extensions.md` of `@earendil-works/pi-coding-agent` — the primary source for mechanics, not restated here (§3 of `context-architecture.md` is the index).
@@ -84,14 +84,14 @@ Placement rules:
 
 ## Naming
 
-PI built-in tools occupy the shared tool namespace: `read`, `write`, `edit`, `bash`, `grep`, `find`, `ls`. Registering the same `name` replaces the built-in.
+Pi built-in tools occupy the shared tool namespace: `read`, `write`, `edit`, `bash`, `grep`, `find`, `ls`. Registering the same `name` replaces the built-in.
 
 SuPi naming rules:
 
 - Lowercase snake_case.
-- No `supi_` prefix in tool names. Slash commands keep the `supi-` prefix because they share one namespace with PI core commands; tool names do not need it.
+- No `supi_` prefix in tool names. Slash commands keep the `supi-` prefix because they share one namespace with Pi core commands; tool names do not need it.
 - Use a domain prefix only for a family of related tools (`code_*`, `web_*`, `review_*`). Single tools use flat names (`debug`, `agent_run`, `cache_forensics`, `context_report`, `ask_user`).
-- Never reuse a PI built-in name unless you intend to replace that built-in.
+- Never reuse a Pi built-in name unless you intend to replace that built-in.
 
 ## Registration Shape
 
@@ -186,11 +186,11 @@ SuPi rules:
 
 ## Output Size
 
-PI does not automatically truncate custom tool output. Truncation helpers and defaults (`truncateHead`/`truncateTail`, `DEFAULT_MAX_LINES = 2000`, `DEFAULT_MAX_BYTES = 50KB`, truncation notice + full-output path): installed Pi `docs/extensions.md` § Output Truncation.
+Pi does not automatically truncate custom tool output. Truncation helpers and defaults (`truncateHead`/`truncateTail`, `DEFAULT_MAX_LINES = 2000`, `DEFAULT_MAX_BYTES = 50KB`, truncation notice + full-output path): installed Pi `docs/extensions.md` § Output Truncation.
 
 SuPi rules:
 
-- Mention a truncation limit in `description` only when it changes tool or input selection. Omit PI's standard 2,000-line and 50 KB limits from descriptions.
+- Mention a truncation limit in `description` only when it changes tool or input selection. Omit Pi's standard 2,000-line and 50 KB limits from descriptions.
 - Prefer spill files over large inline output: `content` carries preview + path only (Tier 2 economy), full data stays on disk.
 - `tool_result` handlers that shrink history should move noise to `details` rather than delete information.
 
@@ -220,7 +220,7 @@ Slots (`renderCall`/`renderResult`), required option handling (`isPartial`, `exp
 SuPi additions:
 
 - Built-in overrides inherit omitted `renderCall`/`renderResult` per slot from the built-in renderer (official: § Overriding Built-in Tools).
-- `renderShell: "self"` strips PI's Box (background, padding) entirely — the tool must provide its own framing. Avoid unless the tool needs full-screen control.
+- `renderShell: "self"` strips Pi's Box (background, padding) entirely — the tool must provide its own framing. Avoid unless the tool needs full-screen control.
 - Custom components follow installed Pi `docs/tui.md`: each rendered line fits `width`; implement `invalidate()`; rebuild cached themed strings on invalidation.
 
 ## Built-ins, Dynamic Tools, and Events

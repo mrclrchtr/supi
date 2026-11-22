@@ -7,7 +7,7 @@ const MAX_FAILURE_TEXT_CHARACTERS = 4096;
 const MAX_COLLAPSED_FAILURE_ROWS = 2;
 const MAX_EXPANDED_FAILURE_ROWS = 20;
 
-/** PI execution state and presentation for a failed tool call. */
+/** Pi execution state and presentation for a failed tool call. */
 interface ExecutionErrorOptions {
   isError?: boolean;
   expanded: boolean;
@@ -20,8 +20,8 @@ interface FailureReason {
 }
 
 /**
- * Show a failure reason only when PI marks the execution as failed.
- * PI throws can have plain content without details. This text is a failure
+ * Show a failure reason only when Pi marks the execution as failed.
+ * Pi throws can have plain content without details. This text is a failure
  * body, not Markdown from which the renderer infers tool evidence.
  */
 export function renderExecutionError(

@@ -69,7 +69,7 @@ export interface RunReviewInput {
   reviewerModel: ReviewModelSelection;
   /** Requested thinking level for Reviewer Sessions in this workflow. */
   reviewerThinkingLevel?: ReviewThinkingLevel;
-  /** Opt Reviewer investigation into PI codemode and scoped auxiliary models. */
+  /** Opt Reviewer investigation into Pi codemode and scoped auxiliary models. */
   reviewerCodemodeEnabled?: boolean;
   /** Reviewer Web Access snapshot captured in the containing session; omitted means none. */
   reviewerWebTools?: ChildWebToolProvision;

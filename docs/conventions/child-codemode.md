@@ -8,14 +8,14 @@ Status: implemented. The sections below record the approved contract and impleme
 | --- | --- |
 | Consumers | Agent Runs and Reviewer Sessions |
 | Availability | Selected through Agent Profile tools; built-in `explore` and `general` include codemode. Review remains explicitly opt-in. |
-| Functionality | PI codemode scripting, tool discovery, storage, classifier APIs, and image-model APIs |
+| Functionality | Pi codemode scripting, tool discovery, storage, classifier APIs, and image-model APIs |
 | Tool access | Existing permitted child tools only; no ambient extensions or inherited MCP servers |
-| Presentation | PI codemode mode `on`: direct tools remain available |
+| Presentation | Pi codemode mode `on`: direct tools remain available |
 | Settings inheritance | Do not inherit parent codemode settings |
 | Auxiliary models | All parent classifier/image models available at invocation startup |
 | Model catalogue lifetime | One snapshot per top-level invocation, shared by its children |
 | Review phases | Reviewer investigation only; exclude Planner Drafts and submission recovery |
-| Cost controls | Existing PI/runtime controls and reported Usage; no new spending cap |
+| Cost controls | Existing Pi/runtime controls and reported Usage; no new spending cap |
 
 Opt-in authorizes auxiliary provider requests, transmission of supplied model inputs (which may include repository evidence), and their costs. It does not grant additional tool permissions. Parent model availability does not guarantee provider entitlement or successful execution.
 
@@ -56,7 +56,7 @@ Caller packages retain capability/resource policy. The shared runtime must not i
 
 ## Child tool boundary
 
-- Explicitly register PI's `createCodemodeExtension()` only for opted-in children, with model APIs enabled.
+- Explicitly register Pi's `createCodemodeExtension()` only for opted-in children, with model APIs enabled.
 - Explicitly activate the tool; the SDK does not load or activate codemode automatically.
 - Retain the isolated resource loader and the existing headless Code Intelligence profile.
 - Bound script calls and discovery helpers to the child's permitted tools.
@@ -86,7 +86,7 @@ An empty available catalogue does not prevent tool scripting. Do not substitute 
 
 ## Lifecycle, continuation, and Usage
 
-- Reuse PI's codemode worker pool and model-call concurrency controls; do not introduce a second scheduler.
+- Reuse Pi's codemode worker pool and model-call concurrency controls; do not introduce a second scheduler.
 - Preserve Agent Run cancellation, settlement, and bounded disposal semantics, including calls waiting for a codemode worker.
 - Forward cancellation through nested tool and model requests. Completed side effects are not rolled back.
 - Preserve successful branch-specific `store()` entries in saved Delegation Checkpoints and restore them on follow-up.
@@ -133,9 +133,9 @@ Verification during implementation: package-focused Vitest and TypeScript checks
 
 ## Evidence and implementation risks
 
-Executable regression coverage uses controlled providers and real PI codemode for auxiliary discovery/dispatch, tool reachability, reported Usage, worker-queue cancellation, and storage restoration across Agent Runs. Adapter tests cover profile opt-in and Review's default-off configuration, shared snapshots, background collection, and Review phase restrictions. Live provider entitlement and billing are not tested.
+Executable regression coverage uses controlled providers and real Pi codemode for auxiliary discovery/dispatch, tool reachability, reported Usage, worker-queue cancellation, and storage restoration across Agent Runs. Adapter tests cover profile opt-in and Review's default-off configuration, shared snapshots, background collection, and Review phase restrictions. Live provider entitlement and billing are not tested.
 
-Catalogue discovery is not cancelable in PI. Invocation cancellation races that lookup, releases Agent admission reservations, and discards late results. The Agent controller retains settlement ownership and awaits pending discovery during shutdown while stopping existing children immediately. Review performs discovery before target/workspace creation, so canceled discovery cannot create later resources. A permanently stalled provider lookup can delay Agent session shutdown; it cannot start a canceled child.
+Catalogue discovery is not cancelable in Pi. Invocation cancellation races that lookup, releases Agent admission reservations, and discards late results. The Agent controller retains settlement ownership and awaits pending discovery during shutdown while stopping existing children immediately. Review performs discovery before target/workspace creation, so canceled discovery cannot create later resources. A permanently stalled provider lookup can delay Agent session shutdown; it cannot start a canceled child.
 
 The review identified and corrected request-auth-only chat authentication and pending-startup cancellation regressions. Request credentials remain resolved for the exact chat model; auxiliary calls do not receive prepared chat auth.
 
@@ -161,7 +161,7 @@ Repository references:
 - [Fixed child capability set](../../packages/supi-agent/docs/adr/0002-use-a-fixed-child-capability-set.md)
 - [Runtime ownership](../../packages/supi-agent-runtime/docs/adr/0001-own-session-mechanics-not-resource-policy.md)
 
-PI references, resolved under the installed dependency:
+Pi references, resolved under the installed dependency:
 
 - `@earendil-works/pi-coding-agent/docs/sdk.md`, “Codemode and MCP”.
 - `@earendil-works/pi-coding-agent/examples/sdk/14-codemode-mcp.ts`.

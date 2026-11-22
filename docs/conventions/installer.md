@@ -4,8 +4,8 @@ Status: implemented. See the [CLI README](../../packages/supi-installer/README.m
 
 ## Boundary
 
-- Provide a separate Node CLI, not a PI extension or a runtime meta-package.
-- Manage direct package declarations through PI package commands.
+- Provide a separate Node CLI, not a Pi extension or a runtime meta-package.
+- Manage direct package declarations through Pi package commands.
 - Do not manage effective resource activation, standalone skills, or user-data cleanup.
 - Point to SuPi-owned skills.sh skills with copyable `npx skills add mrclrchtr/supi -a pi [-g] --skill …` commands in `--help`, `--dry-run`, no-change exits, and successful reports. Do not run the skills CLI or detect installed skills. A unit test keeps the shipped skill names aligned with the `supi-skills` group in `.claude-plugin/marketplace.json`.
 - Use the terms [Installation Matrix and Installation Preset](../../GLOSSARY.md).
@@ -19,11 +19,11 @@ Status: implemented. See the [CLI README](../../packages/supi-installer/README.m
 | Recommended invocation | `npx @mrclrchtr/supi-installer@latest` |
 | Binary | `supi-installer` |
 | Systems | macOS, Linux, Windows |
-| Runtime | Node compatible with PI's documented requirement; no Bash dependency |
+| Runtime | Node compatible with Pi's documented requirement; no Bash dependency |
 | Host | Require `pi` on `PATH`; show setup instructions and exit if absent |
 | Package role | CLI-only; no `pi.extensions` entry |
 
-- Do not install or upgrade PI.
+- Do not install or upgrade Pi.
 - The CLI replaces the retired `scripts/install.sh`, `scripts/install-all.sh`, and `scripts/uninstall.sh` commands.
 - Update installation documentation to use the CLI. Do not retain compatibility wrappers or a second installer implementation.
 - Add the CLI to the normal publish and unified-release process when implemented.
@@ -43,21 +43,21 @@ Status: implemented. See the [CLI README](../../packages/supi-installer/README.m
 - The first version has no unattended install, remove, or preset-apply arguments.
 - Use the exact project directory, not an inferred Git root. Show its absolute path and the settings paths.
 - Warn if the selected project directory is the user's home directory.
-- Global settings use PI's agent directory, including `PI_CODING_AGENT_DIR` when set.
+- Global settings use Pi's agent directory, including `PI_CODING_AGENT_DIR` when set.
 - Project settings use `<project>/.pi/settings.json`.
 
 ## Preflight and project trust
 
-- Require a saved PI trust approval for the canonical project directory or an ancestor.
+- Require a saved Pi trust approval for the canonical project directory or an ancestor.
 - Use the nearest saved decision. A nearer denial overrides an ancestor approval.
 - No saved approval means exit before opening the matrix, even for global-only work.
 - Apply the same trust requirement to `--dry-run`.
-- Show instructions to open PI in the chosen directory, use `/trust`, and rerun the installer.
-- Do not pass `--approve`, prompt for new trust, or change PI's trust store.
+- Show instructions to open Pi in the chosen directory, use `/trust`, and rerun the installer.
+- Do not pass `--approve`, prompt for new trust, or change Pi's trust store.
 - Do not treat `defaultProjectTrust: "always"` as a saved approval.
 - Read settings and trust data without executing project code. Do not start an agent session to inspect them.
 - Invalid or unreadable state must produce an error before package changes. Do not treat a read failure as an empty installation.
-- Let PI enforce its own trust checks when package commands run. Report a later rejection as an operation failure.
+- Let Pi enforce its own trust checks when package commands run. Report a later rejection as an operation failure.
 
 ## Installation Matrix
 
@@ -72,7 +72,7 @@ Ask User                  [x]      [x]
 - Each cell represents a direct declaration in its own scope.
 - A checked cell does not prove that its resources load or its package files are present.
 - Initialize cells from existing declarations. Do not apply a startup preset, including on a fresh installation.
-- Both cells can be checked. PI normally gives the project declaration precedence in that project.
+- Both cells can be checked. Pi normally gives the project declaration precedence in that project.
 - A clear Project cell does not disable a global declaration. Show global availability separately from the checkbox.
 - A clear cell does not prove that related behavior is absent. For example, Prompt Improver also exposes Ask User.
 - Preserve resource filters, including project filtering deltas. The matrix does not interpret a filtered entry as absent.
@@ -96,7 +96,7 @@ Ask User                  [x]      [x]
 
 - Ship package names, descriptions, labels, and preset membership with the CLI release.
 - Do not fetch a live catalog, repository script, or remote command definition at startup.
-- `npx` can download the CLI before it starts. Package downloads after confirmation remain PI's responsibility.
+- `npx` can download the CLI before it starts. Package downloads after confirmation remain Pi's responsibility.
 - Use one installer-owned catalog. Check its current-package coverage against workspace extension manifests.
 - New package choices require a CLI release; document `@latest` as the normal invocation.
 
@@ -150,7 +150,7 @@ Infrastructure Packages are not new-install choices.
 - Match official npm entries by package name, including versioned sources and object-form declarations.
 - Preserve exact sources and filters for entries that remain unchanged.
 - Do not execute a local package to identify it. Do not assume every arbitrary checkout can be recognized.
-- For blocked scopes, show the configured source and manual PI removal instructions. Keep an otherwise eligible scope available.
+- For blocked scopes, show the configured source and manual Pi removal instructions. Keep an otherwise eligible scope available.
 - Do not migrate sources automatically or delete local checkouts.
 - Treat `@mrclrchtr/supi` as a legacy root conflict, not a new-install or removal-only preset member.
 - Known obsolete standalone declarations include `@mrclrchtr/supi-agents`, `@mrclrchtr/supi-rtk`, `@mrclrchtr/supi-lsp`, `@mrclrchtr/supi-tree-sitter`, `@mrclrchtr/supi-bash-timeout` (merged into `supi-extras`), `@mrclrchtr/supi-cache` (merged into `supi-debug`), and `@mrclrchtr/supi-claude-md` (skills moved to the skills.sh catalog).
@@ -174,8 +174,8 @@ Infrastructure Packages are not new-install choices.
 - Use unpinned sources for new declarations. Do not align them to the CLI version.
 - Remove an existing declaration through `pi remove <existing-source>` in its scope.
 - Do not reinstall or rewrite unchanged entries. Do not reset pins or filters, or run updates as a side effect.
-- Do not rewrite settings directly to apply the plan. PI owns package changes and persistence.
-- Normal removal includes PI's managed-package removal. Do not add a purge of SuPi configuration, credentials, sessions, reports, or local source directories.
+- Do not rewrite settings directly to apply the plan. Pi owns package changes and persistence.
+- Normal removal includes Pi's managed-package removal. Do not add a purge of SuPi configuration, credentials, sessions, reports, or local source directories.
 - Do not remove the other scope's declaration or another selected package because it supplies related behavior.
 - Do not construct shell command strings from package names or paths.
 
@@ -191,7 +191,7 @@ Infrastructure Packages are not new-install choices.
 - Cancellation stops new commands, stops the active child where possible, restores the terminal, and reports partial results.
 - If observed state becomes stale during execution, stop new commands and require a new review. Do not override external edits to finish the old plan.
 - A rerun starts from actual declarations, not the previous draft. Do not claim that a failed command left no downloaded files or other package-manager effects.
-- Remind the user to `/reload` or restart PI after changes.
+- Remind the user to `/reload` or restart Pi after changes.
 
 ## Verification requirements
 
@@ -206,10 +206,10 @@ Infrastructure Packages are not new-install choices.
 | Execution | Correct cwd and scope, unpinned additions, preserved existing sources, no shell interpolation, no updates or purge |
 | Failures | Failed addition followed by independent removal, failed scope move with source removal, multiple failures, final inventory, unsuccessful exit status |
 | Cancellation | Before confirmation, during a child command, partial report, restored terminal |
-| Invocation | Non-terminal rejection, read-only dry run, help/version, missing PI, no unattended mutation flags |
-| Packaging | Published executable, clean `npx` invocation, no PI extension manifest, no Bash dependency, macOS/Linux/Windows process handling |
+| Invocation | Non-terminal rejection, read-only dry run, help/version, missing Pi, no unattended mutation flags |
+| Packaging | Published executable, clean `npx` invocation, no Pi extension manifest, no Bash dependency, macOS/Linux/Windows process handling |
 
-- Use fixtures and a fake PI executable for automated package-command tests. Do not modify developer settings or trust state.
+- Use fixtures and a fake Pi executable for automated package-command tests. Do not modify developer settings or trust state.
 - Add terminal interaction tests and manual terminal checks for the two-column matrix.
 - Run `pnpm verify:ai` and the applicable package/publish checks when implementation changes code or packaging.
 
@@ -223,19 +223,19 @@ Infrastructure Packages are not new-install choices.
 | Default `pnpm verify:ai` test execution | Two runs hit existing 2-second timeouts in `scripts/__tests__/pi-upgrade.test.mjs`; the affected test file passed alone |
 | `pnpm pack:verify` | All 23 publishable packages passed |
 | Clean-cache local-tarball `npm exec` | Executable help passed without a workspace loader |
-| Real pseudo-terminal check | Selection, review, confirmation, fake PI execution, and terminal restoration passed |
+| Real pseudo-terminal check | Selection, review, confirmation, fake Pi execution, and terminal restoration passed |
 | Follow-up Standards review | No remaining findings |
 | Follow-up Spec review | No remaining findings |
 
 - Keep the unrelated upgrade tests unchanged. The complete suite passed with two workers.
-- Cross-platform CI covers macOS, Linux, and Windows; Linux also checks PI's minimum Node runtime. Those remote jobs were not run in the local session.
+- Cross-platform CI covers macOS, Linux, and Windows; Linux also checks Pi's minimum Node runtime. Those remote jobs were not run in the local session.
 - Review regressions cover command-tree cancellation through npm-style shims, preflight cancellation, and Git fragment refs.
 - The process-level SIGTERM test runs only on Unix. Windows command-boundary cancellation tests still run; Windows `child.kill("SIGTERM")` does not deliver a console Ctrl-C event.
 
 ## Sources
 
-- [PI packages](https://github.com/earendil-works/pi/blob/main/docs/packages.md): scope, package identity, filters, and declarations.
-- [PI CLI](https://github.com/earendil-works/pi/blob/main/docs/cli.md): install, remove, and trust options.
-- [PI security](https://github.com/earendil-works/pi/blob/main/docs/security.md): saved trust and command-level approval.
-- [PI environment variables](https://github.com/earendil-works/pi/blob/main/docs/environment-variables.md): agent-directory override.
-- Installed PI source checks: `dist/package-manager-cli.js` (`handlePackageCommand`); `dist/core/package-manager.js` (`installAndPersist`, `removeAndPersist`); `dist/core/trust-manager.js` (`ProjectTrustStore`). Local package changes require trust; `--no-approve` is not a way to bypass that requirement.
+- [Pi packages](https://github.com/earendil-works/pi/blob/main/docs/packages.md): scope, package identity, filters, and declarations.
+- [Pi CLI](https://github.com/earendil-works/pi/blob/main/docs/cli.md): install, remove, and trust options.
+- [Pi security](https://github.com/earendil-works/pi/blob/main/docs/security.md): saved trust and command-level approval.
+- [Pi environment variables](https://github.com/earendil-works/pi/blob/main/docs/environment-variables.md): agent-directory override.
+- Installed Pi source checks: `dist/package-manager-cli.js` (`handlePackageCommand`); `dist/core/package-manager.js` (`installAndPersist`, `removeAndPersist`); `dist/core/trust-manager.js` (`ProjectTrustStore`). Local package changes require trust; `--no-approve` is not a way to bypass that requirement.

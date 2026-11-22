@@ -13,7 +13,7 @@ export function isProviderReportedUsageDelta(after: Usage, before: Usage | undef
   );
 }
 
-/** Add PI Usage records; the total is provider-reported only when both parts are. */
+/** Add Pi Usage records; the total is provider-reported only when both parts are. */
 export function addAgentRunUsage(first: Usage, second: Usage): Usage {
   const cacheWrite1h = addOptional(first.cacheWrite1h, second.cacheWrite1h);
   const reasoning = addOptional(first.reasoning, second.reasoning);
@@ -125,7 +125,7 @@ function collectEntryUsage(
       collectEntryUsageItem(entry, collector);
     }
   } catch {
-    // Test doubles and older PI versions may not expose session entries.
+    // Test doubles and older Pi versions may not expose session entries.
   }
   return collector.usages;
 }
@@ -256,7 +256,7 @@ function collectStatsUsage(session: AgentSession): Usage | undefined {
       },
     };
   } catch {
-    // Usage is optional when PI cannot expose a stable snapshot.
+    // Usage is optional when Pi cannot expose a stable snapshot.
     return undefined;
   }
 }

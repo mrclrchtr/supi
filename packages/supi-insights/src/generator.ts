@@ -27,12 +27,12 @@ type ParallelInsightSection = {
 const INSIGHT_SECTIONS = [
   {
     name: "projectAreas",
-    prompt: `Analyze this PI usage data and identify project areas.
+    prompt: `Analyze this Pi usage data and identify project areas.
 
 RESPOND WITH ONLY A VALID JSON OBJECT:
 {
   "areas": [
-    {"name": "Area name", "sessionCount": N, "description": "2-3 sentences about what was worked on and how PI was used."}
+    {"name": "Area name", "sessionCount": N, "description": "2-3 sentences about what was worked on and how Pi was used."}
   ]
 }
 
@@ -42,11 +42,11 @@ Include 4-5 areas.`,
   },
   {
     name: "interactionStyle",
-    prompt: `Analyze this PI usage data and describe the user's interaction style.
+    prompt: `Analyze this Pi usage data and describe the user's interaction style.
 
 RESPOND WITH ONLY A VALID JSON OBJECT:
 {
-  "narrative": "2-3 paragraphs analyzing HOW the user interacts with PI. Use second person 'you'. Describe patterns: iterate quickly vs detailed upfront specs? Interrupt often or let the agent run? Include specific examples. Use **bold** for key insights.",
+  "narrative": "2-3 paragraphs analyzing HOW the user interacts with Pi. Use second person 'you'. Describe patterns: iterate quickly vs detailed upfront specs? Interrupt often or let the agent run? Include specific examples. Use **bold** for key insights.",
   "keyPattern": "One sentence summary of most distinctive interaction style"
 }`,
     schema: INSIGHT_SCHEMAS.interactionStyle,
@@ -54,7 +54,7 @@ RESPOND WITH ONLY A VALID JSON OBJECT:
   },
   {
     name: "whatWorks",
-    prompt: `Analyze this PI usage data and identify what's working well for this user. Use second person ("you").
+    prompt: `Analyze this Pi usage data and identify what's working well for this user. Use second person ("you").
 
 RESPOND WITH ONLY A VALID JSON OBJECT:
 {
@@ -70,7 +70,7 @@ Include 3 impressive workflows.`,
   },
   {
     name: "frictionAnalysis",
-    prompt: `Analyze this PI usage data and identify friction points for this user. Use second person ("you").
+    prompt: `Analyze this Pi usage data and identify friction points for this user. Use second person ("you").
 
 RESPOND WITH ONLY A VALID JSON OBJECT:
 {
@@ -86,7 +86,7 @@ Include 3 friction categories with 2 examples each.`,
   },
   {
     name: "suggestions",
-    prompt: `Analyze this PI usage data and suggest improvements.
+    prompt: `Analyze this Pi usage data and suggest improvements.
 
 RESPOND WITH ONLY A VALID JSON OBJECT:
 {
@@ -107,7 +107,7 @@ IMPORTANT: PRIORITIZE instructions that appear MULTIPLE TIMES in the user data.`
   },
   {
     name: "onTheHorizon",
-    prompt: `Analyze this PI usage data and identify future opportunities.
+    prompt: `Analyze this Pi usage data and identify future opportunities.
 
 RESPOND WITH ONLY A VALID JSON OBJECT:
 {
@@ -123,7 +123,7 @@ Include 3 opportunities. Think BIG - autonomous workflows, parallel agents, iter
   },
   {
     name: "funEnding",
-    prompt: `Analyze this PI usage data and find a memorable moment.
+    prompt: `Analyze this Pi usage data and find a memorable moment.
 
 RESPOND WITH ONLY A VALID JSON OBJECT:
 {
@@ -216,11 +216,11 @@ async function generateAtAGlance(
       .map((opportunity) => `- ${opportunity.title}: ${opportunity.whatsPossible}`)
       .join("\n") ?? "";
 
-  const prompt = `You're writing an "At a Glance" summary for a PI usage insights report.
+  const prompt = `You're writing an "At a Glance" summary for a Pi usage insights report.
 
 Use this 4-part structure:
 
-1. **What's working** - What is the user's unique style of interacting with PI and what are some impactful things they've done?
+1. **What's working** - What is the user's unique style of interacting with Pi and what are some impactful things they've done?
 
 2. **What's hindering you** - Split into (a) the agent's fault and (b) user-side friction.
 

@@ -88,7 +88,7 @@ function topLevelTargets(
 /**
  * Replace only SuPi-managed exact overrides for one top-level resource.
  * Broad patterns stay unchanged; inherited resources also receive a plain
- * support path because PI applies project filters only to project resources.
+ * support path because Pi applies project filters only to project resources.
  */
 function updateTopLevelEntries(
   entries: string[],
@@ -132,7 +132,7 @@ function resolvePackageSource(source: string, baseDir: string): string {
   return isAbsolute(value) ? resolve(value) : resolve(baseDir, value);
 }
 
-/** Match package identity with the scope-relative local-path rules used by PI. */
+/** Match package identity with the scope-relative local-path rules used by Pi. */
 function packageSourcesMatch(options: {
   left: string;
   leftScope: SettingsScope;
@@ -233,7 +233,7 @@ function updatePackageEntries(
   cleanPackageEntry(packages, index, context.scope);
 }
 
-/** Update only exact PI skill filters and preserve broad user patterns. */
+/** Update only exact Pi skill filters and preserve broad user patterns. */
 export function updateSkillLoadOverrides(
   input: SkillLoadContext & { resources: ResolvedResource[]; state: SkillLoadOverride },
 ): void {

@@ -163,7 +163,7 @@ export class WorkspaceCodeIntelligenceSession {
   /** Session-scoped refactor plan storage (planId → plan). */
   readonly #refactorPlans = new Map<string, RefactorPlan>();
 
-  /** Absolute instruction files already loaded by PI's native context-file mechanism. */
+  /** Absolute instruction files already loaded by Pi's native context-file mechanism. */
   readonly #nativeInstructionPaths = new Set<string>();
 
   /** Absolute directories whose instruction files were already surfaced by code_orientation. */
@@ -415,7 +415,7 @@ export class WorkspaceCodeIntelligenceSession {
 
   // ── Instruction-file state ───────────────────────────────────────
 
-  /** Remember instruction/context file paths already loaded by PI natively. */
+  /** Remember instruction/context file paths already loaded by Pi natively. */
   captureNativeInstructionPaths(files: Array<{ path: string }>): void {
     for (const file of files) this.#nativeInstructionPaths.add(this.#realPath(file.path));
   }

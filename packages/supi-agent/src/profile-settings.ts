@@ -23,7 +23,7 @@ import type {
   ProfileSource,
 } from "./types.ts";
 
-/** PI thinking levels exposed by the profile settings rows. */
+/** Pi thinking levels exposed by the profile settings rows. */
 export const PROFILE_THINKING_LEVELS: readonly AgentThinkingLevel[] = [
   "off",
   "minimal",
@@ -342,7 +342,7 @@ function validateSettingValue(field: ProfileSettingField, value: string): void {
     return;
   }
   if (field === "thinking") {
-    if (!isThinkingLevel(value)) throw new Error("Thinking is not a supported PI thinking level.");
+    if (!isThinkingLevel(value)) throw new Error("Thinking is not a supported Pi thinking level.");
     return;
   }
   if (!isCanonicalModel(value)) {

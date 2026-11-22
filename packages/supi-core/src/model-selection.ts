@@ -1,7 +1,7 @@
 /**
  * Shared model-selection helpers for SuPi extensions.
  *
- * Provides scoped-model listing using PI's `enabledModels` configuration,
+ * Provides scoped-model listing using Pi's `enabledModels` configuration,
  * matching the same semantics as the `@mrclrchtr/supi-review` model picker.
  *
  * @module
@@ -40,7 +40,7 @@ export function toCanonicalModelId(
 }
 
 /**
- * List selectable models from PI's scoped model configuration.
+ * List selectable models from Pi's scoped model configuration.
  *
  * Only models that match the configured `enabledModels` patterns are offered.
  * The current session model is included only when it is inside that scoped set.

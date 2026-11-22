@@ -197,7 +197,7 @@ describe("Consulting runtime activation", () => {
     try {
       await runtime.startRefresh(cwd, { ui: context.ui });
       expect(context.ui.notify).toHaveBeenCalledWith(
-        "Consulting availability check failed. Reload PI to retry.",
+        "Consulting availability check failed. Reload Pi to retry.",
         "warning",
       );
       expect(warning).toHaveBeenCalledWith(

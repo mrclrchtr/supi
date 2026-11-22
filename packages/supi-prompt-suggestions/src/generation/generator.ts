@@ -55,7 +55,7 @@ type ModelCallOutcome =
  * Encapsulates the async suggestion generation lifecycle.
  *
  * Each instance owns cancellation, stale-result checks, and failure warning
- * suppression. Model authentication and provider routing stay under PI.
+ * suppression. Model authentication and provider routing stay under Pi.
  */
 export class SuggestionGenerator {
   private currentAbort: AbortController | null = null;

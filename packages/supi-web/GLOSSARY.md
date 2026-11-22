@@ -1,6 +1,6 @@
 # supi-web
 
-Public web content and library documentation for PI.
+Public web content and library documentation for Pi.
 
 See also: root `GLOSSARY.md` (Extension Package, Agent-Facing).
 

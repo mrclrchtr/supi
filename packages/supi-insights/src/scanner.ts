@@ -1,4 +1,4 @@
-// Session scanner — discover and list PI sessions
+// Session scanner — discover and list Pi sessions
 
 import type { SessionInfo } from "@earendil-works/pi-coding-agent";
 import { SessionManager } from "@earendil-works/pi-coding-agent";

@@ -5,7 +5,7 @@ export const TOOL_RULES_SECTION = "tool_rules";
 
 /**
  * Child-session extension factory that restores per-tool usage rules for profiles with their
- * own system prompt. PI builds its rules section only for its native prompt, so a package or
+ * own system prompt. Pi builds its rules section only for its native prompt, so a package or
  * custom prompt would otherwise drop every tool's `promptGuidelines`.
  */
 export function registerToolRules(pi: ExtensionAPI): void {
