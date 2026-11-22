@@ -1,7 +1,7 @@
 {
   "name": "@mrclrchtr/supi-extras",
   "version": "14.1.0",
-  "description": "Compact codemode rows, session capability controls, prompt stash, shortcuts, and activity indicators",
+  "description": "Quality-of-life extras for the Pi coding agent: compact codemode rows, session capability controls, prompt stash, shortcuts, and activity indicators",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -24,7 +24,8 @@
     "prompt-stash",
     "tab-spinner",
     "shortcuts",
-    "tui"
+    "tui",
+    "pi-agent"
   ],
   "type": "module",
   "files": [

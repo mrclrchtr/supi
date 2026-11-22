@@ -1,7 +1,7 @@
 {
   "name": "@mrclrchtr/supi-consulting",
   "version": "14.1.0",
-  "description": "Bounded consultations with explicit agent and workspace selection and observed evidence",
+  "description": "Bounded consultations with external agents for the Pi coding agent, with explicit workspace selection and observed evidence",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -25,7 +25,8 @@
     "antigravity",
     "agent",
     "web",
-    "workspace"
+    "workspace",
+    "pi-agent"
   ],
   "type": "module",
   "files": [

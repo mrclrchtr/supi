@@ -1,7 +1,7 @@
 {
   "name": "@mrclrchtr/supi-debug",
   "version": "14.1.0",
-  "description": "Capture and inspect SuPi debug events",
+  "description": "Capture and inspect SuPi debug events in the Pi coding agent",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -23,7 +23,8 @@
     "debug",
     "diagnostics",
     "events",
-    "observability"
+    "observability",
+    "pi-agent"
   ],
   "type": "module",
   "files": [

@@ -22,7 +22,9 @@
     "supi",
     "agent-profile",
     "delegation",
-    "agent-run"
+    "agent-run",
+    "pi-agent",
+    "pi-extension"
   ],
   "type": "module",
   "files": [

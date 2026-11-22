@@ -2,7 +2,7 @@
 
 [![GitHub stars](https://img.shields.io/github/stars/mrclrchtr/supi)](https://github.com/mrclrchtr/supi/stargazers)
 
-Neutral lifecycle management for one context-isolated, permission-shared in-process pi Agent Run.
+Neutral lifecycle management for one context-isolated, permission-shared in-process Pi Agent Run.
 
 The package is library-only. Use `@mrclrchtr/supi-agent-runtime/api` to start a run with caller-owned resources, provider authority, completion, readiness, and evidence policy:
 

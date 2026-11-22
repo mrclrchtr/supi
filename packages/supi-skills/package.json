@@ -1,7 +1,7 @@
 {
   "name": "@mrclrchtr/supi-skills",
   "version": "14.1.0",
-  "description": "Scoped skill controls and skill input shortcuts for PI",
+  "description": "Scoped skill controls and skill input shortcuts for the Pi coding agent",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -22,7 +22,8 @@
     "pi-extension",
     "skills",
     "skill-settings",
-    "shortcuts"
+    "shortcuts",
+    "pi-agent"
   ],
   "type": "module",
   "files": [

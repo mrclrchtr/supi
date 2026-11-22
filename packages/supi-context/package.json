@@ -1,7 +1,7 @@
 {
   "name": "@mrclrchtr/supi-context",
   "version": "14.1.0",
-  "description": "Live context pressure and token-use reports",
+  "description": "Live context-window pressure and token-use reports for the Pi coding agent",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -23,7 +23,8 @@
     "context-window",
     "token-usage",
     "usage-report",
-    "diagnostics"
+    "diagnostics",
+    "pi-agent"
   ],
   "type": "module",
   "files": [

@@ -1,7 +1,7 @@
 {
   "name": "@mrclrchtr/supi-settings",
   "version": "14.1.0",
-  "description": "One project/global settings UI for SuPi packages",
+  "description": "One project/global settings UI for SuPi packages in the Pi coding agent",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -22,7 +22,8 @@
     "pi-extension",
     "settings",
     "configuration",
-    "tui"
+    "tui",
+    "pi-agent"
   ],
   "type": "module",
   "files": [

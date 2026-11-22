@@ -1,7 +1,7 @@
 {
   "name": "@mrclrchtr/supi-ask-user",
   "version": "14.1.0",
-  "description": "Structured choice and text forms for agent-user decisions",
+  "description": "Structured choice and text forms for agent-user decisions in the Pi coding agent",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -24,7 +24,8 @@
     "questionnaire",
     "decision-form",
     "interactive",
-    "tui"
+    "tui",
+    "pi-agent"
   ],
   "type": "module",
   "files": [

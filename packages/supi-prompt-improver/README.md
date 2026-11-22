@@ -1,6 +1,6 @@
 # @mrclrchtr/supi-prompt-improver
 
-Command-based prompt improvement for the [pi coding agent](https://github.com/earendil-works/pi).
+Command-based prompt improvement for the [Pi coding agent](https://github.com/earendil-works/pi).
 
 ## Install
 

@@ -1,7 +1,7 @@
 {
   "name": "@mrclrchtr/supi-web",
   "version": "14.1.0",
-  "description": "Public web pages, web search sources, and focused Context7 docs",
+  "description": "Web fetch, web search, and Context7 docs for the Pi coding agent",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -25,7 +25,8 @@
     "context7",
     "web-search",
     "documentation",
-    "readability"
+    "readability",
+    "pi-agent"
   ],
   "type": "module",
   "files": [

@@ -1,7 +1,7 @@
 {
   "name": "@mrclrchtr/supi-insights",
   "version": "14.1.0",
-  "description": "Historical Pi-session reports and shareable HTML",
+  "description": "Historical Pi coding agent session reports and shareable HTML",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -23,7 +23,8 @@
     "analytics",
     "session-analysis",
     "usage-report",
-    "html-report"
+    "html-report",
+    "pi-agent"
   ],
   "type": "module",
   "files": [

@@ -1,7 +1,7 @@
 {
   "name": "@mrclrchtr/supi-installer",
   "version": "14.1.0",
-  "description": "Select SuPi packages in project and global PI scopes",
+  "description": "Install and select SuPi extension packages for the Pi coding agent",
   "type": "module",
   "license": "MIT",
   "repository": {
@@ -26,5 +26,13 @@
   },
   "devDependencies": {
     "@types/cross-spawn": "6.0.6"
-  }
+  },
+  "keywords": [
+    "pi",
+    "pi-coding-agent",
+    "pi-agent",
+    "supi",
+    "installer",
+    "cli"
+  ]
 }

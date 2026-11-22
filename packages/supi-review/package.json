@@ -1,7 +1,7 @@
 {
   "name": "@mrclrchtr/supi-review",
   "version": "14.1.0",
-  "description": "Parallel inspection-only reviews of exact Git targets",
+  "description": "Parallel inspection-only code reviews of exact Git targets for the Pi coding agent",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -23,7 +23,8 @@
     "code-review",
     "review",
     "llm-review",
-    "tui"
+    "tui",
+    "pi-agent"
   ],
   "type": "module",
   "files": [
