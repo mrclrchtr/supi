@@ -19,8 +19,8 @@ export function controlledSession(
   let rejectPrompt: ((error: Error) => void) | undefined;
   let disposal: Promise<void> | undefined;
   const extensionRuntime = {
-    sendMessage: vi.fn(),
-    sendUserMessage: vi.fn(),
+    sendMessage: vi.fn<(...args: unknown[]) => unknown>(),
+    sendUserMessage: vi.fn<(...args: unknown[]) => unknown>(),
     assertActive: () => {
       if (!active) throw new Error("The SDK session is closed.");
     },
@@ -61,9 +61,9 @@ export function controlledSession(
         for (const listener of listeners) listener({ type: "agent_settled" });
       }
     }),
-    setActiveToolsByName: vi.fn(),
-    setModel: vi.fn(),
-    setThinkingLevel: vi.fn(),
+    setActiveToolsByName: vi.fn<(...args: unknown[]) => unknown>(),
+    setModel: vi.fn<(...args: unknown[]) => unknown>(),
+    setThinkingLevel: vi.fn<(...args: unknown[]) => unknown>(),
     steer: vi.fn(async () => "queued"),
     sendUserMessage: vi.fn(async () => undefined),
     sendCustomMessage: vi.fn(async () => undefined),

@@ -728,6 +728,9 @@ importers:
 
   packages/supi-test-utils:
     dependencies:
+      '@earendil-works/pi-ai':
+        specifier: 1.5.1
+        version: 1.5.1(@aws-sdk/credential-provider-node@3.972.97)(@smithy/signature-v4@5.7.5)(undici@8.12.4)(ws@8.23.0)
       '@earendil-works/pi-coding-agent':
         specifier: 1.5.1
         version: 1.5.1(@aws-sdk/credential-provider-node@3.972.97)(@smithy/signature-v4@5.7.5)(ws@8.23.0)

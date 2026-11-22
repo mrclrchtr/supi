@@ -20,6 +20,7 @@ This is a **workspace-internal** package (`"private": true`). It is meant for te
 - `getTools()` / `getTool()` — inspect registered tools with typed helpers
 - `createMarkedTheme()` — test theme that marks colors and styles in rendered text, so TUI render tests can assert tone
 - `ToolDef` — simple tool type used by the tool helpers
+- `@mrclrchtr/supi-test-utils/background` — background harness for extensions that start Agent Runs in child SDK sessions (see below)
 
 ## `createPiMock()`
 
@@ -103,6 +104,35 @@ expect(output).not.toContain("[success]");
 
 Keep the plain theme for tests that only assert text. Adopt the marked theme where tone carries meaning, such as diagnostics, status, or errors. Tokens add width, so render at a generous width.
 
+## Background harness
+
+`@mrclrchtr/supi-test-utils/background` tests an extension that starts child SDK sessions at the seam the parent observes: registered tool handlers, controlled child sessions, parent turn boundaries, and a real parent `SessionManager` that stores tool results. It is a separate subpath so tests that do not need the Pi SDK do not load it.
+
+The harness has no owner policy. The test passes the extension under test and calls its tools by name:
+
+```ts
+import { backgroundHarness } from "@mrclrchtr/supi-test-utils/background";
+
+const sdk = vi.hoisted(() => ({ createAgentSession: vi.fn(), createAgentSessionRuntime: vi.fn() }));
+vi.mock("@earendil-works/pi-coding-agent", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@earendil-works/pi-coding-agent")>()),
+  ...sdk,
+}));
+
+const harness = await backgroundHarness({ sdk, extension: ownerExtension });
+const started = await harness.invoke("owner_run", { prompt: "Inspect one" });
+harness.child("Inspect one").finish("Done");
+await harness.close();
+```
+
+- `invoke(name, params, options?)` stores the assistant tool call and the tool result, and ends the parent turn once no invocation is in flight. Pass `{ persist: false }`, `{ endTurn: false }`, or a `resultHook` to model other Pi paths.
+- `beginParent()` / `endParent(aborted?)` / `deliverQueued()` model a running parent turn, its settlement, and delivery of queued custom messages through the extension's `context` handler.
+- `replaceSession()`, `reopenParent()`, and `openParent(manager)` shut down and restart the parent session.
+- `children` and `child(key)` expose controlled sessions; `finish()`, `fail()`, `failProvider()`, and `holdDisposal()` drive a child. `holdNextStartup()` pauses the next child creation.
+- Options: `childPrompt` maps a `child(key)` lookup to prompt text, `prepare` writes files into the temporary agent directory before the extension loads, `baseContext` replaces the default test model context, `childUsage` replaces `controlledUsage`, and `persistentParent` stores the parent session on disk.
+
+The harness does not depend on any SuPi package. Read shared state such as the Agent Run Registry in the owner's test helper from `harness.pi`.
+
 ## Mocking guidance
 
 When mocking `@mrclrchtr/supi-core`, prefer `importOriginal` so new runtime exports do not break older tests:
@@ -131,6 +161,8 @@ src/
   marked-theme.ts  # createMarkedTheme()
   handler-utils.ts # getHandler(), getHandlerOrThrow()
   tool-utils.ts    # getTools(), getTool(), ToolDef
+  background-harness.ts # backgroundHarness() (subpath ./background)
+  background-session.ts # controlledSession()
 __tests__/
   helpers/         # Shared test utilities
   fixtures/        # Test data
@@ -146,3 +178,5 @@ __tests__/
 - `src/marked-theme.ts` — `createMarkedTheme()`
 - `src/handler-utils.ts` — handler lookup helpers
 - `src/tool-utils.ts` — tool lookup helpers
+- `src/background-harness.ts` — background harness, exported as `./background`
+- `src/background-session.ts` — controlled Pi SDK child session
