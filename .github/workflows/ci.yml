@@ -94,7 +94,7 @@ jobs:
       - name: Set up Node.js without workspace dependencies
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: "24.22.3"
+          node-version: "26.13.1"
           package-manager-cache: false
       # Installs only commitlint, at the versions pinned in package.json, instead of the workspace.
       # The workspace lockfile does not pin its transitive dependencies.
