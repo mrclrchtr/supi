@@ -848,8 +848,8 @@ importers:
         specifier: '*'
         version: 1.4.6
       unpdf:
-        specifier: 2.2.0
-        version: 2.2.0
+        specifier: 2.2.1
+        version: 2.2.1
     devDependencies:
       '@mrclrchtr/supi-test-utils':
         specifier: workspace:*
@@ -2734,8 +2734,8 @@ packages:
     resolution: {integrity: sha512-VGXBUVwxKMBUznyffQweQABPRRW1vHZAbadFZud4pLFAqRGvv/96vafgjWFqzourzr8YonlQiPgH0YCJfawoGQ==}
     engines: {node: '>=12'}
 
-  unpdf@2.2.0:
-    resolution: {integrity: sha512-E33ir6FPxrLuRlhLJ3KbPwcOnHozd6ITe/uhr22+Oiis6e7YQ9N/9K7hfMe1aZ9yoO6eypgI1Cc7UuYP6BkyWw==}
+  unpdf@2.2.1:
+    resolution: {integrity: sha512-tstQpe/fhxkDGY1ZtpejwnU14QZ9w0SYLo9lIZooB1zQ7QXVE4t+SBQUN/2a9+EBg9UrrO2bWlqdzV+UtoebHw==}
     engines: {node: '>=24'}
     peerDependencies:
       '@napi-rs/canvas': ^0.1.69 || ^1.0.0
@@ -4766,7 +4766,7 @@ snapshots:
     dependencies:
       crypto-random-string: 4.0.0
 
-  unpdf@2.2.0: {}
+  unpdf@2.2.1: {}
 
   verkit@0.5.0: {}
 
