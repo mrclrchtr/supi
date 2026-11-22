@@ -15,7 +15,7 @@ The fixed, package-owned behavioral and delivery rules every Reviewer Session fo
 _Avoid_: system prompt, caller instructions
 
 **Reviewer Session**:
-A managed child agent that executes exactly one Review Task in the batch's shared Review Workspace. It shares the containing Pi process's trust boundary and follows the Reviewer Protocol without per-session write isolation.
+A managed child agent that executes exactly one Review Task in its Review's shared Review Workspace. It shares the containing Pi process's trust boundary and follows the Reviewer Protocol without per-session write isolation.
 _Avoid_: reviewer sub-agent, review sandbox
 
 **Reviewer Run Entry**:
@@ -23,11 +23,11 @@ The neutral runtime record for one Reviewer Session in `/agents`. It uses the ru
 _Avoid_: review task result, Local Reviewer Replay
 
 **Review Workspace**:
-A disposable registered Git worktree that freezes one verified Review Target's reviewed state for a concurrent review batch. It is visible in Git while active and removed best-effort afterward; later caller edits and reviewer-generated dependency state are not Target Evidence.
+A disposable registered Git worktree that freezes one verified Review Target's reviewed state for the concurrent Review Tasks of one Review. It is visible in Git while active and removed best-effort once every task is terminal; later caller edits and reviewer-generated dependency state are not Target Evidence.
 _Avoid_: live worktree, per-reviewer checkout, child sandbox
 
 **Review Workspace Receipt**:
-The compact post-materialization proof attached to every review batch. It records the resolved states, uncommitted-change inclusion, expected and observed checkout, canonical patch hashes, and changed-path count after the linked worktree is reconstructed; it is evidence that children began from the selected target, not a post-review mutation audit.
+The compact post-materialization proof attached to every Review. It records the resolved states, uncommitted-change inclusion, expected and observed checkout, canonical patch hashes, and changed-path count after the linked worktree is reconstructed; it is evidence that children began from the selected target, not a post-review mutation audit.
 _Avoid_: workspace path, cleanup receipt, reviewer activity log
 
 **Review Workspace Cleanup**:
@@ -75,7 +75,7 @@ A required completed Review Task statement that the supplied Review Criteria wer
 _Avoid_: proof that every source was fetched, task failure, Reviewer Capability Warning, finding count
 
 **Review Scope**:
-Caller-supplied workspace-relative file or directory paths that focus every task in a review batch on part of the frozen after state. It does not restrict inspection or finding eligibility.
+Caller-supplied workspace-relative file or directory paths that focus every task in a Review on part of the frozen after state. It does not restrict inspection or finding eligibility.
 _Avoid_: access boundary, finding boundary, Review Criteria, Review Mode
 
 **Review Mode**:
@@ -100,7 +100,15 @@ _Avoid_: Reviewer Session, review rerun, fixing
 
 **Review**:
 One execution request that supplies a Review Target and a complete set of Review Tasks.
-_Avoid_: separate execution mode, Planner Draft
+_Avoid_: separate execution mode, Planner Draft, review batch
+
+**Background Review**:
+A Review whose caller continues once the Review Workspace is frozen and prepared, while its Review Tasks run as one Background Run Batch. Its single Completion Notice arrives when every task is terminal, and the Post-Review Policy applies only to the complete collected result.
+_Avoid_: async review, detached review, partial review
+
+**Foreground Review**:
+A Review whose caller waits until every Review Task is terminal and receives the result directly.
+_Avoid_: synchronous review, blocking review
 
 **Reviewer Packet**:
 The canonical, protocol-versioned input compiled for one Review Task from its resolved target, review input, and reviewer model. Each result carries the SHA-256 of the exact packet bytes.

@@ -65,11 +65,11 @@ The child conversation state associated with a stored Delegation Task Result. It
 _Avoid_: Conversation View, human transcript, memory summary
 
 **Delegation Batch**:
-An ordered set of independent Delegation Tasks accepted only when every selected profile and policy resolves successfully. Every task in a valid read-only multi-task batch starts concurrently without a queue; canceling the batch cancels every active Agent Run in it.
+A Run Batch of independent Delegation Tasks, accepted only when every selected profile and policy resolves successfully. Every task in a valid read-only multi-task batch starts concurrently without a queue; canceling the batch cancels every active Agent Run in it.
 _Avoid_: Workflow, chain, DAG
 
 **Background Delegation Batch**:
-A Delegation Batch whose caller can continue before its Agent Run Outcomes are available. It belongs to the containing session.
+A Delegation Batch that runs as a Background Run Batch: its caller can continue before its Agent Run Outcomes are available.
 _Avoid_: Async run, detached job, persistent worker
 
 **Foreground Delegation Batch**:
@@ -81,11 +81,11 @@ The caller-facing terminal status, bounded output, and Usage for one Delegation 
 _Avoid_: Batch result, completion notice, Agent Run Outcome
 
 **Delegation Completion Notice**:
-A parent-facing notice that one or more Delegation Task Results are available for collection. It identifies the tasks and their terminal status but does not contain their output.
+A Completion Notice for a Background Delegation Batch, sent per task as soon as that Delegation Task Result is available for collection.
 _Avoid_: Task result, result payload, progress update
 
 **Delegation Result Collection**:
-The caller's retrieval of available Delegation Task Results. It is separate from task completion and does not remove the results.
+A Result Collection that returns available Delegation Task Results. It is separate from task completion and can store Delegation Checkpoints.
 _Avoid_: Completion notification, result consumption, polling
 
 **Delegation Batch Result**:

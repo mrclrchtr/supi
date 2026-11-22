@@ -36,6 +36,22 @@ _Avoid_: Retro facts, self-improvement, Delegation Follow-Up
 The containing-session list of managed Agent and Reviewer runs. The runtime owns neutral display data, transcript access, and selected-run controls. Agent and Review packages keep their own policy.
 _Avoid_: profile catalogue, review audit, process-wide history
 
+**Run Batch**:
+An ordered set of Agent Runs started by one request of one owner package and tracked together in the containing session. The owner keeps admission policy and the result format.
+_Avoid_: Job, workflow, queue, Delegation Batch, Review
+
+**Background Run Batch**:
+A Run Batch whose caller continues before its Agent Run Outcomes are available. It belongs to the containing session and to the conversation branch that launched it, and it does not survive either.
+_Avoid_: Async run, detached job, persistent worker
+
+**Completion Notice**:
+A parent-facing notice that results of a Background Run Batch are available for Result Collection. It identifies the batch, its tasks, and their terminal status, but carries no output or Usage. The owner chooses whether it is sent per task or once for the whole batch.
+_Avoid_: Result payload, progress update, task result
+
+**Result Collection**:
+The caller's retrieval of available results from a Background Run Batch, in the owner's result format. It is repeatable, does not remove results, and is the only point at which the batch's Usage is reported to the parent.
+_Avoid_: Completion notification, result consumption, polling
+
 **Agent Run Transcript**:
 The human-only record of finalized child-session messages, effective system prompts, and allowlisted lifecycle fields. It stays outside tool results and normal diagnostics.
 _Avoid_: conversation summary, audit replay, model output
