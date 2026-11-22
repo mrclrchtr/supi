@@ -8,10 +8,11 @@ import type {
   ReviewSnapshot,
   ReviewTask,
 } from "../types.ts";
+import type { ReviewTargetDiffFile } from "./diff.ts";
 import { buildChangeSummary, buildFileManifest } from "./file-manifest.ts";
 
 /** Protocol version included in every canonical reviewer packet for future evolution. */
-export const REVIEW_PACKET_PROTOCOL_VERSION = "8";
+export const REVIEW_PACKET_PROTOCOL_VERSION = "9";
 
 function sha256(value: string): string {
   return createHash("sha256").update(value, "utf8").digest("hex");
@@ -68,7 +69,19 @@ function divergenceGuidance(snapshot: ReviewSnapshot): string[] {
   ];
 }
 
-function changeInspectionGuidance(target: ResolvedReviewTarget): string[] {
+/** Point at the saved target diff, or at the Git command when no file was written. */
+function completeChangeGuidance(command: string, targetDiff?: ReviewTargetDiffFile): string[] {
+  if (!targetDiff) return [`Run \`${command}\` to inspect the complete target change.`];
+  return [
+    `The complete target change is saved as \`${targetDiff.path}\` (${targetDiff.lineCount} lines), outside the workspace. Page it with \`read\` (offset and limit) or search it with \`grep\`; each Changed files row names the line where that path starts. A binary change takes one line there, so the file's hash can differ from the Target diff SHA-256.`,
+    `\`${command} -- <path>\` shows the same change for selected paths.`,
+  ];
+}
+
+function changeInspectionGuidance(
+  target: ResolvedReviewTarget,
+  targetDiff?: ReviewTargetDiffFile,
+): string[] {
   const from = target.fromCommit;
   if (!from) throw new Error("Change Review Mode requires an exact before commit.");
   if (target.includeUncommittedChanges) {
@@ -76,7 +89,7 @@ function changeInspectionGuidance(target: ResolvedReviewTarget): string[] {
       `Before state: exact commit ${from}.`,
       `After state: the frozen current filesystem captured with HEAD ${target.toCommit}.`,
       "The workspace checks out the exact before commit and stages one canonical freeze patch.",
-      "Run `git diff HEAD` to inspect the complete target change.",
+      ...completeChangeGuidance("git diff HEAD", targetDiff),
       `Use \`git show ${from}:path/to/file\` for before-side content.`,
     ];
   }
@@ -84,7 +97,7 @@ function changeInspectionGuidance(target: ResolvedReviewTarget): string[] {
     `Before state: exact commit ${from}.`,
     `After state: exact commit ${target.toCommit}.`,
     `The workspace checks out exact after commit ${target.toCommit}.`,
-    `Run \`git diff ${from} ${target.toCommit}\` to inspect the complete target change.`,
+    ...completeChangeGuidance(`git diff ${from} ${target.toCommit}`, targetDiff),
     `Use \`git show ${from}:path/to/file\` for before-side content.`,
   ];
 }
@@ -113,7 +126,24 @@ function stateInspectionGuidance(target: ResolvedReviewTarget): string[] {
   ];
 }
 
-/** Build the canonical caller-policy and engine-mechanics reviewer packet. */
+/** Facts about the materialized Review Workspace that a Reviewer Packet states. */
+export interface ReviewPacketWorkspace {
+  /** Saved change file; without it the packet names the Git command only. */
+  targetDiff?: ReviewTargetDiffFile;
+  /** Whether the configured Dependency Bootstrap ran before fan-out. */
+  dependencyBootstrapRan: boolean;
+}
+
+function dependencyGuidance(bootstrapRan: boolean): string {
+  return bootstrapRan
+    ? "The configured Dependency Bootstrap already ran in this workspace; what it installs or generates is present."
+    : "No Dependency Bootstrap ran in this workspace: installed dependencies (such as node_modules) and generated files are absent unless you run one.";
+}
+
+/**
+ * Build the canonical caller-policy and engine-mechanics reviewer packet. Pass `workspace` once
+ * the Review Workspace is materialized; without it the packet omits workspace facts.
+ */
 // biome-ignore lint/complexity/useMaxParams: the batch Review Scope stays separate from the Review Target and input.
 export function buildReviewPacket(
   snapshot: ReviewSnapshot,
@@ -121,7 +151,9 @@ export function buildReviewPacket(
   scope: ReviewScope,
   task: ReviewTask,
   model: ReviewModelSelection,
+  workspace?: ReviewPacketWorkspace,
 ): ReviewPacket {
+  const targetDiff = workspace?.targetDiff;
   const change = task.mode === "change";
   const parts = [
     "# Review Task",
@@ -162,6 +194,7 @@ export function buildReviewPacket(
       ...buildFileManifest(snapshot.changes, {
         maxCharacters: PACKET_MANIFEST_CHARACTERS,
         inventoryCommand: inventoryCommand(snapshot.target),
+        ...(targetDiff ? { diffStartLines: targetDiff.startLines } : {}),
       }),
     );
   }
@@ -170,8 +203,9 @@ export function buildReviewPacket(
     "## Inspection",
     "Your cwd is the shared frozen Review Workspace for this batch.",
     "Use the available inspection tools to inspect the repository.",
+    ...(workspace ? [dependencyGuidance(workspace.dependencyBootstrapRan)] : []),
     ...(change
-      ? [...changeInspectionGuidance(snapshot.target), ...divergenceGuidance(snapshot)]
+      ? [...changeInspectionGuidance(snapshot.target, targetDiff), ...divergenceGuidance(snapshot)]
       : stateInspectionGuidance(snapshot.target)),
   );
   const prompt = parts.join("\n");

@@ -98,6 +98,8 @@ For a filesystem target, it checks out exact `from` and stages one canonical pat
 
 The engine verifies the linked worktree before it starts Reviewer Sessions. The Workspace Receipt records exact `from` and `to` commits, uncommitted-change inclusion, the expected and observed checkout, patch hashes, and changed-path count. Later caller changes do not change Target Evidence.
 
+For a change target, the engine also saves the complete change as `target.diff` beside the workspace and names it in the Reviewer Packet, with the line where each changed path starts. Reviewers page that file with `read`, which keeps the start of a long file; a large `git diff` through `bash` keeps only its end. The file is outside the worktree, so it is not Target Evidence, and binary changes appear as one line each.
+
 Workspaces are marked and locked in the Git worktree list. Normal cleanup removes them. Use `/supi-review-cleanup` if cleanup stops early.
 
 ## Settings
@@ -112,7 +114,7 @@ Workspaces are marked and locked in the Git worktree list. Normal cleanup remove
 
 `review.recoveryModel` selects one optional explicit model for Submission Recovery. It defaults to `disabled`. `current` is not a valid implicit Recovery Model. If the configured model is unavailable, the original review still runs. Recovery records the failed model switch only if the chain reaches that model.
 
-`review.bootstrapCommand` defaults to empty. When set, the Review Engine runs the command once in the frozen Review Workspace before Reviewer Sessions start. When empty, a reviewer can run a Dependency Bootstrap command when needed.
+`review.bootstrapCommand` defaults to empty. When set, the Review Engine runs the command once in the frozen Review Workspace before Reviewer Sessions start. When empty, a reviewer can run a Dependency Bootstrap command when needed. The Reviewer Packet states which of the two applies, so a Reviewer does not search for installed dependencies that are absent.
 
 ## Reviewer Protocol
 

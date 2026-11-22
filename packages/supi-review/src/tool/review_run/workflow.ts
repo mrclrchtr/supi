@@ -434,6 +434,7 @@ export async function runReview(input: RunReviewInput) {
       input.reviewerCodemodeEnabled ?? false,
       authorizedAuxiliaryModels,
       input.reviewerWebTools,
+      workspace.targetDiff,
     );
   } finally {
     cleanupWarning = await workspace.cleanup();

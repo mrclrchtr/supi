@@ -24,7 +24,7 @@ const scopeAdvisory =
 
 describe("buildReviewPacket", () => {
   it("builds a change packet with exact before and after guidance", () => {
-    expect(REVIEW_PACKET_PROTOCOL_VERSION).toBe("8");
+    expect(REVIEW_PACKET_PROTOCOL_VERSION).toBe("9");
     const task = { id: "spec", instructions: "Check requirement R1.", mode: "change" as const };
     const packet = buildReviewPacket(
       snapshot,
@@ -105,6 +105,36 @@ describe("buildReviewPacket", () => {
     expect(packet.prompt).toContain(`After state: exact commit ${"e".repeat(40)}.`);
   });
 
+  it("points at the saved target diff and each path's start line when the workspace has one", () => {
+    const task = { id: "change", instructions: "Check.", mode: "change" as const };
+    const packet = buildReviewPacket(snapshot, { tasks: [task] }, {}, task, model, {
+      targetDiff: {
+        path: "../target.diff",
+        lineCount: 1_856,
+        startLines: new Map([["src/a.ts", 412]]),
+      },
+      dependencyBootstrapRan: false,
+    }).prompt;
+
+    expect(packet).toContain("`../target.diff` (1856 lines)");
+    expect(packet).toContain('- M +1 -0 "src/a.ts" (diff line 412)');
+    expect(packet).toContain("`git diff HEAD -- <path>`");
+    expect(packet).not.toContain("Run `git diff HEAD` to inspect the complete target change.");
+  });
+
+  it("states whether the Dependency Bootstrap ran, in both modes", () => {
+    for (const mode of ["change", "state"] as const) {
+      const task = { id: mode, instructions: "Check.", mode };
+      const build = (dependencyBootstrapRan: boolean) =>
+        buildReviewPacket(snapshot, { tasks: [task] }, {}, task, model, {
+          dependencyBootstrapRan,
+        }).prompt;
+
+      expect(build(true)).toContain("Dependency Bootstrap already ran");
+      expect(build(false)).toContain("No Dependency Bootstrap ran");
+    }
+  });
+
   it("keeps the same advisory scope in mixed-mode packets", () => {
     const change = { id: "change", instructions: "Check the change.", mode: "change" as const };
     const state = { id: "state", instructions: "Check the state.", mode: "state" as const };
@@ -144,14 +174,14 @@ describe("buildReviewPacket", () => {
     expect(packet).toEqual(buildReviewPacket(snapshot, review, {}, task, model));
     expect(packet.packetHash).toBe(
       [
-        "b7488ff3",
-        "4af03391",
-        "eb478abd",
-        "66ed3126",
-        "ff8cb0e7",
-        "5677b0d9",
-        "97bdac2e",
-        "e5f3f420",
+        "33a46c8f",
+        "9a1cfeeb",
+        "fca40cbf",
+        "c64c1f94",
+        "4914af2b",
+        "bde41724",
+        "b6870103",
+        "6a18355b",
       ].join(""),
     );
   });

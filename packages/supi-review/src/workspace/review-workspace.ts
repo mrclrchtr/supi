@@ -3,10 +3,12 @@ import { mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { readReviewDiff } from "../git.ts";
-import { runGit, runGitAllowExit } from "../git-command.ts";
+import { runGit, runGitAllowExit, runGitBuffer } from "../git-command.ts";
+import { indexPatchLines, type ReviewTargetDiffFile } from "../target/diff.ts";
 import type { ReviewSnapshot, ReviewWorkspaceReceipt } from "../types.ts";
 
 const WORKSPACE_MARKER = "supi-review:";
+const TARGET_DIFF_FILE = "target.diff";
 
 /** Parent-facing warning retained when a disposable Review Workspace cannot be removed. */
 export interface ReviewWorkspaceCleanupWarning {
@@ -19,6 +21,8 @@ export interface ReviewWorkspaceCleanupWarning {
 export interface ReviewWorkspace {
   cwd: string;
   receipt: ReviewWorkspaceReceipt;
+  /** Present when the target has a before commit and at least one changed path. */
+  targetDiff?: ReviewTargetDiffFile;
   cleanup(): Promise<ReviewWorkspaceCleanupWarning | undefined>;
 }
 
@@ -94,6 +98,38 @@ async function verifyWorkspace(
 }
 
 /**
+ * Save the target change as text beside the verified workspace and index where each path starts.
+ * Binary changes appear as one `Binary files … differ` line instead of the canonical patch's
+ * encoded blocks. Start lines are omitted when Git's path list does not match the headers.
+ */
+async function writeTargetDiff(
+  snapshot: ReviewSnapshot,
+  parent: string,
+  cwd: string,
+  signal?: AbortSignal,
+): Promise<ReviewTargetDiffFile | undefined> {
+  const { fromCommit, toCommit, includeUncommittedChanges } = snapshot.target;
+  if (!fromCommit || snapshot.changes.length === 0) return undefined;
+  const diff = ["diff", "--no-color", "--no-ext-diff", "--no-textconv"];
+  const range = includeUncommittedChanges ? ["HEAD"] : [fromCommit, toCommit];
+  const [patch, names] = await Promise.all([
+    runGitBuffer(cwd, [...diff, ...range], undefined, signal),
+    runGit(cwd, [...diff, "--name-only", "-z", ...range], undefined, signal),
+  ]);
+  await writeFile(join(parent, TARGET_DIFF_FILE), patch, { signal });
+  const { lineCount, headerLines } = indexPatchLines(patch);
+  const paths = names.split("\0").filter(Boolean);
+  const startLines = new Map<string, number>();
+  if (paths.length === headerLines.length) {
+    for (const [position, path] of paths.entries()) {
+      const line = headerLines[position];
+      if (line !== undefined) startLines.set(path, line);
+    }
+  }
+  return { path: `../${TARGET_DIFF_FILE}`, lineCount, startLines };
+}
+
+/**
  * Materialize one exact Review Snapshot as a disposable linked worktree.
  * Filesystem targets replay one already-hashed canonical patch over the exact
  * freeze base and stage it so each Reviewer Session sees the frozen after state.
@@ -108,6 +144,7 @@ export async function materializeReviewWorkspace(
   let cwd = workspacePath;
   let created = false;
   let receipt: ReviewWorkspaceReceipt | undefined;
+  let targetDiff: ReviewTargetDiffFile | undefined;
 
   try {
     await runGit(
@@ -142,6 +179,7 @@ export async function materializeReviewWorkspace(
       }
     }
     receipt = await verifyWorkspace(snapshot, cwd, signal);
+    targetDiff = await writeTargetDiff(snapshot, dirname(cwd), cwd, signal);
   } catch (error) {
     if (created) {
       await runGitAllowExit(snapshot.repositoryRoot, ["worktree", "unlock", cwd], [128]).catch(
@@ -162,6 +200,7 @@ export async function materializeReviewWorkspace(
   return {
     cwd,
     receipt,
+    ...(targetDiff ? { targetDiff } : {}),
     async cleanup() {
       if (cleaned) return undefined;
       cleaned = true;

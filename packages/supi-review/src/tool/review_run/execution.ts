@@ -7,7 +7,8 @@ import {
 } from "@mrclrchtr/supi-agent-runtime/api";
 import type { ChildWebToolProvision } from "@mrclrchtr/supi-core/session";
 import { normalizeReviewInput } from "../../review-input.ts";
-import { buildReviewPacket } from "../../target/packet.ts";
+import type { ReviewTargetDiffFile } from "../../target/diff.ts";
+import { buildReviewPacket, type ReviewPacketWorkspace } from "../../target/packet.ts";
 import {
   clampReviewThinkingLevel,
   REVIEWER_DEFAULT_THINKING_LEVEL,
@@ -134,6 +135,7 @@ export async function executeReviewTasks(
   reviewerCodemodeEnabled = false,
   authorizedAuxiliaryModels?: AgentRunAuxiliaryModelSnapshot,
   reviewerWebTools?: ChildWebToolProvision,
+  targetDiff?: ReviewTargetDiffFile,
 ): Promise<ReviewTaskResult[]> {
   const review = normalizeReviewInput(reviewInput);
   let completedCount = 0;
@@ -169,9 +171,14 @@ export async function executeReviewTasks(
     ...(reviewerWebTools ? { reviewerWebTools } : {}),
   };
 
+  const packetWorkspace: ReviewPacketWorkspace = {
+    ...(targetDiff ? { targetDiff } : {}),
+    dependencyBootstrapRan: dependencyBootstrapConfigured,
+  };
+
   return Promise.all(
     review.tasks.map(async (task) => {
-      const packet = buildReviewPacket(snapshot, review, scope, task, model);
+      const packet = buildReviewPacket(snapshot, review, scope, task, model, packetWorkspace);
       const packetBytes = Buffer.byteLength(packet.prompt, "utf8");
       const startedAt = Date.now();
       const debugSummary = (

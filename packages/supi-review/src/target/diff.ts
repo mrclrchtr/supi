@@ -41,6 +41,39 @@ function splitPatchFiles(patch: Buffer): Buffer[] {
 }
 
 /**
+ * Readable copy of the complete target change, stored beside the Review Workspace so that it is
+ * not Target Evidence. Reviewers page it with `read`, which keeps the start of a long file; a
+ * `git diff` through `bash` keeps only the end.
+ */
+export interface ReviewTargetDiffFile {
+  /** Path relative to the Review Workspace, identical for every Review. */
+  path: string;
+  lineCount: number;
+  /** 1-based line of each changed path's `diff --git` header, keyed by after-side path. */
+  startLines: ReadonlyMap<string, number>;
+}
+
+/**
+ * Count the lines of a patch and locate each `diff --git` header as a 1-based line number, in
+ * patch order.
+ */
+export function indexPatchLines(patch: Buffer): { lineCount: number; headerLines: number[] } {
+  const header = Buffer.from("diff --git ");
+  const headerLines: number[] = [];
+  let line = 1;
+  let start = 0;
+  while (start < patch.length) {
+    if (patch.subarray(start, start + header.length).equals(header)) headerLines.push(line);
+    const newline = patch.indexOf(0x0a, start);
+    if (newline < 0) break;
+    start = newline + 1;
+    line += 1;
+  }
+  if (patch.length === 0) return { lineCount: 0, headerLines };
+  return { lineCount: patch.at(-1) === 0x0a ? line - 1 : line, headerLines };
+}
+
+/**
  * Render untracked paths as exact `/dev/null`-to-file patches with one `git diff`.
  *
  * The paths are recorded with `--intent-to-add` in an empty scratch index, so the diff shows each

@@ -2,6 +2,8 @@
 
 ## [14.2.0]
 
+- Change reviews get the complete target change as a file. The Review Engine saves it as `target.diff` beside the Review Workspace, and the Reviewer Packet names it and adds the line where each changed path starts, for example `(diff line 412)`. Reviewers page it with `read`, which keeps the start of a long file. Before, a large `git diff` through `bash` returned only its last 50 KB and Reviewers fetched the start again. Binary changes take one line each.
+- The Reviewer Packet states whether the configured Dependency Bootstrap ran. Without one, Reviewers looked for `node_modules` over several calls before noticing it was absent.
 - Reviewer Run retrospective Debug events now carry `metrics` for the assessed task: wall-clock duration, turns, tool executions and errors, executions per tool name, and task-only Usage. Self-reported friction can now be compared with measured cost.
 - Sessions with `bash` learn which `sed` it runs. SuPi runs `sed --version` once through the same shell as the bash tool, including `shellPath` and `shellCommandPrefix`, and adds the result as a `<shell>` section of the system prompt: GNU sed takes `sed -i 's/a/b/' file`, BSD sed (macOS default) needs `sed -i '' ...`. This replaces the hint that appeared after the first BSD sed error, which never fired with GNU sed installed. Reviewers get the rule too.
 

@@ -489,6 +489,8 @@ describe("runReview exact Review Target workflow", () => {
     expect(packet).toContain("5 additional change(s) omitted");
     // The omission row names the command that lists the rest in the Review Workspace.
     expect(packet).toContain("`git diff --name-status HEAD`");
+    // Omitted rows carry no start line, so the row says how to find them in the saved diff.
+    expect(packet).toContain("Search the saved target diff for `^diff --git `");
   });
 
   it("lists every path of a change with long paths below the row bound", async () => {

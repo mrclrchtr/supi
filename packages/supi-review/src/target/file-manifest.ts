@@ -6,6 +6,8 @@ export interface FileManifestOptions {
   maxCharacters?: number;
   /** Exact command that lists the complete inventory; named in the omission row when given. */
   inventoryCommand?: string;
+  /** Line in the saved target diff where each path starts; adds `(diff line N)` to its row. */
+  diffStartLines?: ReadonlyMap<string, number>;
 }
 
 function formatLineStats(change: ReviewChange): string {
@@ -55,7 +57,8 @@ export function buildFileManifest(
   const lines: string[] = [];
   let size = 0;
   for (const change of changes) {
-    const line = `- ${formatReviewChange(change)}`;
+    const startLine = options.diffStartLines?.get(change.path);
+    const line = `- ${formatReviewChange(change)}${startLine ? ` (diff line ${startLine})` : ""}`;
     if (lines.length >= maxFiles || size + line.length + 1 > maxCharacters - 100) break;
     lines.push(line);
     size += line.length + 1;
@@ -65,7 +68,10 @@ export function buildFileManifest(
     const recovery = options.inventoryCommand
       ? `run \`${options.inventoryCommand}\` for the complete inventory`
       : "use Git to inspect the complete inventory";
-    lines.push(`- … ${omitted} additional change(s) omitted; ${recovery}.`);
+    const startLines = options.diffStartLines
+      ? " Search the saved target diff for `^diff --git ` to find where each omitted path starts."
+      : "";
+    lines.push(`- … ${omitted} additional change(s) omitted; ${recovery}.${startLines}`);
   }
   return lines;
 }

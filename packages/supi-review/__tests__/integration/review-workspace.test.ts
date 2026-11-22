@@ -108,4 +108,51 @@ describe("Review Workspace materialization", () => {
     expect(readFileSync(join(workspace.cwd, "tracked.txt"), "utf8")).toBe("committed\n");
     await workspace.cleanup();
   });
+
+  it.each([
+    ["filesystem", false],
+    ["committed", true],
+  ])(
+    "saves a readable %s target diff beside the workspace with each path's start line",
+    async (_kind, commit) => {
+      const from = git(cwd, "rev-parse", "HEAD");
+      writeFileSync(join(cwd, "tracked.txt"), "reviewed\n");
+      writeFileSync(join(cwd, "added.txt"), "one\ntwo\n");
+      writeFileSync(join(cwd, "image.bin"), Buffer.from([0x00, 0xff, 0x00, 0x01]));
+      if (commit) {
+        git(cwd, "add", ".");
+        git(cwd, "commit", "-m", "target");
+      }
+      const snapshot = await resolveReviewSnapshot(
+        cwd,
+        commit ? { committed: { from, to: "HEAD" } } : {},
+      );
+
+      const workspace = await materializeReviewWorkspace(snapshot);
+      try {
+        const targetDiff = workspace.targetDiff;
+        if (!targetDiff) throw new Error("Expected a saved target diff.");
+        const lines = readFileSync(join(workspace.cwd, targetDiff.path), "utf8").split("\n");
+
+        expect(lines.length - 1).toBe(targetDiff.lineCount);
+        expect([...targetDiff.startLines.keys()].sort((a, b) => a.localeCompare(b))).toEqual([
+          "added.txt",
+          "image.bin",
+          "tracked.txt",
+        ]);
+        for (const [path, line] of targetDiff.startLines) {
+          expect(lines[line - 1]).toBe(`diff --git a/${path} b/${path}`);
+        }
+        expect(lines).toContain("+reviewed");
+        expect(lines.some((line) => line.startsWith("Binary files "))).toBe(true);
+        expect(lines).not.toContain("GIT binary patch");
+        // The file is outside the worktree, so it never becomes Target Evidence.
+        expect(git(workspace.cwd, "status", "--porcelain", "--untracked-files=all")).not.toContain(
+          "target.diff",
+        );
+      } finally {
+        await workspace.cleanup();
+      }
+    },
+  );
 });
