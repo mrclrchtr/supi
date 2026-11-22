@@ -53,6 +53,30 @@ local commitmsg = new Mapping<String, Step> {
   }
 }
 
+// Keeps node_modules in sync after pulls, merges, rebases, and branch switches.
+// A no-op install is fast; --frozen-lockfile never rewrites pnpm-lock.yaml.
+local installDependencies: Step = new {
+  check = "pnpm install --frozen-lockfile --reporter=silent"
+  stomp = true
+}
+
+local postcheckout = new Mapping<String, Step> {
+  ["install-dependencies"] = (installDependencies) {
+    step_condition = "is_branch_checkout"
+  }
+}
+
+// `git pull` merges (post-merge) or, with pull.rebase/branch.*.rebase, rebases (post-rewrite).
+local postmerge = new Mapping<String, Step> {
+  ["install-dependencies"] = installDependencies
+}
+
+local postrewrite = new Mapping<String, Step> {
+  ["install-dependencies"] = (installDependencies) {
+    step_condition = "hook_args == 'rebase'"
+  }
+}
+
 // stash = "none" because "git" and "patch-file" have data-loss bugs:
 // - "git": discards fixer changes (#368), resurrects deleted files (#209), corrupts binaries (#743)
 // - "patch-file": corrupts binaries (#743), removes untracked files (#209)
@@ -67,6 +91,18 @@ hooks {
     fix = true
     stash = "none"
     steps = precommit
+  }
+
+  ["post-checkout"] {
+    steps = postcheckout
+  }
+
+  ["post-merge"] {
+    steps = postmerge
+  }
+
+  ["post-rewrite"] {
+    steps = postrewrite
   }
 
   ["fix"] {

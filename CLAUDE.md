@@ -90,7 +90,7 @@ Register a `SettingsModule` with `registerSettings()` from `@mrclrchtr/supi-core
 - For dependency changes, run `pnpm install` before editing `.ts` files.
 
 ### Dev workflow
-- `hk` pre-commit autofixes with `stash = "none"`; unstaged changes in fixed files may be staged too. No pre-push hook.
+- `hk` pre-commit autofixes with `stash = "none"`; unstaged changes in fixed files may be staged too. No pre-push hook. Branch checkouts, merges (including `git pull`), and rebases run `pnpm install --frozen-lockfile`.
 - `.pi/supi/config.json` is tracked. For live settings probes, merge one key into it and restore it with `git checkout -- .pi/supi/config.json`; never overwrite the whole file.
 - Use `pnpm exec jiti /tmp/script.mjs` for TS runtime probes; Node `--experimental-strip-types` breaks on TS parameter properties here.
 - Dependency install scripts use `allowBuilds` in `pnpm-workspace.yaml` (`true` allows, `false` skips); keep `tree-sitter-cli` enabled so its native binary is installed.
