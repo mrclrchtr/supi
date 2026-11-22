@@ -106,8 +106,6 @@ npx skills add mrclrchtr/supi -a pi --skill code-review commit
 
 The `claude-md-improver` and `claude-md-revision` skills (formerly `@mrclrchtr/supi-claude-md`) audit and revise `CLAUDE.md` and `AGENTS.md` files. For Pi extension development, the `pi-tui-design` skill helps build Pi TUI components.
 
-[`supi-skill-patches`](packages/supi-skill-patches/README.md) is the private maintenance workspace that synchronizes and validates this catalog.
-
 ### DevTools
 
 Not part of the Recommended release stack. Select these packages individually, use All in the installer, or install them separately:
@@ -140,7 +138,6 @@ These packages power the stack and are not standalone Pi extensions:
 - [`supi-code-runtime`](packages/supi-code-runtime/README.md) — shared code-intelligence contracts and workspace capability state.
 - [`supi-agent-runtime`](packages/supi-agent-runtime/README.md) — neutral in-memory Agent Run lifecycle, usage accounting, and bounded diagnostics for extension-owned adapters.
 - [`supi-core`](packages/supi-core/README.md) — common configuration, settings, reporting, and session infrastructure.
-- [`supi-test-utils`](packages/supi-test-utils/README.md) — shared test helpers for SuPi packages.
 
 ## Configure
 
@@ -210,6 +207,8 @@ pi install npm:@mrclrchtr/supi-debug
 ```
 
 Share the result, or any friction you find in SuPi tools, prompts, skills, or injected context, as a [GitHub issue](https://github.com/mrclrchtr/supi/issues).
+
+To work on SuPi itself, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 If SuPi is useful to you, consider giving it a [star](https://github.com/mrclrchtr/supi/stargazers) as well.
 
