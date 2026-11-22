@@ -4,14 +4,14 @@
 
 | Event | Checks | Release effects |
 | --- | --- | --- |
-| PR | Actionlint, Conventional Commits, Biome, TypeScript, skills, WASM consistency, focused CI/release/preparation regression tests | None |
+| PR | Actionlint, Conventional Commits, Biome, TypeScript, skills, WASM consistency, test suite without real language servers | None |
 | Ordinary main push | Release Commit detection from Git only | None |
-| Release Commit pushed to main | Complete workspace checks, unsharded test suite, staged tarball verification, both full cross-platform matrices | Tag/release creation, then npm publishing, only after verification succeeds |
+| Release Commit pushed to main | Complete workspace checks, test suite, staged tarball verification, both full cross-platform matrices | Tag/release creation, then npm publishing, only after verification succeeds |
 | Manual CI run without inputs | Same exhaustive verification at the selected event commit | None |
 | Manual `release_sha` retry | Same exhaustive verification at that Release Commit | Recover tag/release creation and publishing |
 | Manual `publish_tag` retry | Same exhaustive verification at the existing release tag's commit | Retry npm publishing only |
 
-The complete test suite, tarball verification, and cross-platform matrices are release gates, not main-branch admission checks. `main` may contain failures that only exhaustive verification detects. Run manual full verification when early cross-platform feedback is needed.
+Real language-server tests, tarball verification, and cross-platform matrices are release gates, not main-branch admission checks. The `servers` Vitest project runs only in the language-baseline job, where every server is provisioned. `main` may contain failures that only exhaustive verification detects. Run manual full verification when early cross-platform feedback is needed.
 
 ## Workflow ownership
 
@@ -45,7 +45,7 @@ The planner also emits `release=true` when tag/release creation is authorized.
 ## Release safety and concurrency
 
 - Keep required PR check names `actionlint`, `conventional-commits`, and `verify` stable.
-- `verify` requires successful planning, actionlint, Conventional Commits, and workspace checks. Full verification additionally requires successful tests and both matrices. PR modes require those heavy jobs to be intentionally skipped. Missing/unknown modes, missing results, cancellations, and unexpected skips fail verification.
+- `verify` requires successful planning, actionlint, Conventional Commits, workspace checks, and tests. Full verification additionally requires both successful matrices. PR mode requires those matrices to be intentionally skipped. Missing/unknown modes, missing results, cancellations, and unexpected skips fail verification.
 - Tagging requires a successful full gate and a Release Commit candidate. Publishing requires that gate plus successful release creation, or an explicitly selected existing tag on a manual retry. Manual verification without inputs never releases.
 - Immediately before tagging, revalidate the candidate's checkout, package versions, Release Commit rules, ancestry on main, and first changelog entry.
 - Existing tags are never moved. Annotated tags are peeled to their commit. An existing tag at another SHA, a draft/mismatched release, or an API failure blocks release creation. Tag-only/fully-created releases can be recovered without deleting or recreating a tag/release.
@@ -80,8 +80,9 @@ gh workflow run ci.yml --repo mrclrchtr/supi --ref main -f publish_tag=v1.2.3
 
 ## Runner policy
 
-- All jobs use free GitHub-hosted runners (`ubuntu-latest`, `macos-latest`, `windows-latest`); the repository is public, so standard runner minutes cost nothing.
+- All jobs use free GitHub-hosted runners (`ubuntu-latest`, `macos-latest`, `windows-latest`); the repository is public, so standard runner minutes cost nothing. Larger runners are billed even for public repositories; do not use them.
 - `ci.yml` ignores `pull_request` `edited` events so body-only edits do not rerun every check. `pr-title.yml` revalidates title-only edits without dependencies.
+- `conventional-commits` runs commitlint through `pnpm dlx` at the versions pinned in the root `package.json` instead of installing the workspace. The lockfile does not pin commitlint's transitive dependencies in that job.
 - Language-baseline provisioning extracts only the LLVM members it needs (clangd, clang drivers, builtin and libc++ headers) and caches them by OS, architecture, and the hashes of `pins.json` and `clang-artifacts.mjs`. A completion marker prevents reusing an interrupted extraction; other servers are still provisioned fresh.
 - Language acceptance retains Linux and macOS. Installer verification retains Linux, macOS, Windows, and the minimum Node runtime, including the skill-patch line-ending regression.
 - npm publishing uses the official GitHub-hosted `ubuntu-latest` runner for trusted publishing, for automatic releases and manual retries.

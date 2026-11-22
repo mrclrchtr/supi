@@ -61,7 +61,6 @@ describe("verification workflow contracts", () => {
     expect(
       runGate({
         MODE: mode,
-        TEST_RESULT: "skipped",
         INSTALLER_RESULT: "skipped",
         LANGUAGE_BASELINE_RESULT: "skipped",
       }).status,
@@ -69,29 +68,31 @@ describe("verification workflow contracts", () => {
     expect(runGate({ MODE: mode }).status).toBe(1);
   });
 
-  it.each(["PLAN_RESULT", "ACTIONLINT_RESULT", "COMMITS_RESULT", "WORKSPACE_RESULT"])(
-    "requires %s in every verification mode",
-    (field) => {
-      for (const mode of ["full", "pr"]) {
-        const expected = mode === "full" ? "success" : "skipped";
-        const baseline = {
-          MODE: mode,
-          TEST_RESULT: expected,
-          INSTALLER_RESULT: expected,
-          LANGUAGE_BASELINE_RESULT: expected,
-        };
-        expect(runGate(baseline).status).toBe(0);
-        for (const result of ["failure", "cancelled", "skipped", ""]) {
-          expect(
-            runGate({ ...baseline, [field]: result }).status,
-            `${mode}: ${field}=${result}`,
-          ).toBe(1);
-        }
+  it.each([
+    "PLAN_RESULT",
+    "ACTIONLINT_RESULT",
+    "COMMITS_RESULT",
+    "WORKSPACE_RESULT",
+    "TEST_RESULT",
+  ])("requires %s in every verification mode", (field) => {
+    for (const mode of ["full", "pr"]) {
+      const expected = mode === "full" ? "success" : "skipped";
+      const baseline = {
+        MODE: mode,
+        INSTALLER_RESULT: expected,
+        LANGUAGE_BASELINE_RESULT: expected,
+      };
+      expect(runGate(baseline).status).toBe(0);
+      for (const result of ["failure", "cancelled", "skipped", ""]) {
+        expect(
+          runGate({ ...baseline, [field]: result }).status,
+          `${mode}: ${field}=${result}`,
+        ).toBe(1);
       }
-    },
-  );
+    }
+  });
 
-  it.each(["TEST_RESULT", "INSTALLER_RESULT", "LANGUAGE_BASELINE_RESULT"])(
+  it.each(["INSTALLER_RESULT", "LANGUAGE_BASELINE_RESULT"])(
     "rejects failed or missing %s instead of treating it as a planned skip",
     (field) => {
       for (const result of ["failure", "cancelled", "skipped", ""]) {
@@ -101,7 +102,6 @@ describe("verification workflow contracts", () => {
         expect(
           runGate({
             MODE: "pr",
-            TEST_RESULT: "skipped",
             INSTALLER_RESULT: "skipped",
             LANGUAGE_BASELINE_RESULT: "skipped",
             [field]: result,

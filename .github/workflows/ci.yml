@@ -79,8 +79,6 @@ jobs:
           ref: ${{ needs.ci-plan.outputs.sha }}
           fetch-depth: 0
           persist-credentials: false
-      - name: Set up workspace dependencies
-        uses: ./.github/actions/setup-pnpm
       - name: Validate PR title
         if: github.event_name == 'pull_request'
         env:
@@ -91,15 +89,30 @@ jobs:
             echo "PR title must follow Conventional Commits. Got: $PR_TITLE"
             exit 1
           fi
-      - name: Validate current commit
-        if: github.event_name != 'pull_request'
-        run: pnpm exec commitlint --last --verbose
-      - name: Validate PR commits
-        if: github.event_name == 'pull_request'
+      - name: Set up pnpm without workspace dependencies
+        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - name: Set up Node.js without workspace dependencies
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          package-manager-cache: false
+      # Installs only commitlint, at the versions pinned in package.json, instead of the workspace.
+      # The workspace lockfile does not pin its transitive dependencies.
+      - name: Validate commits
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: pnpm exec commitlint --from "$BASE_SHA" --to "$HEAD_SHA" --verbose
+        run: |
+          cli="@commitlint/cli@$(jq -r '.devDependencies["@commitlint/cli"]' package.json)"
+          config="@commitlint/config-conventional@$(jq -r '.devDependencies["@commitlint/config-conventional"]' package.json)"
+          if [[ "$GITHUB_EVENT_NAME" == pull_request ]]; then
+            range="--from $BASE_SHA --to $HEAD_SHA"
+          else
+            range="--last"
+          fi
+          # NODE_PATH lets commitlint.config.mjs resolve the shared config from the dlx install.
+          pnpm --package "$cli" --package "$config" dlx -c \
+            "NODE_PATH=\"\$(dirname \"\$(dirname \"\$(command -v commitlint)\")\")\" commitlint $range --verbose"
 
   workspace-checks:
     needs: ci-plan
@@ -126,16 +139,14 @@ jobs:
           pnpm biome:ai
           pnpm typecheck:ai
           pnpm skills:check
-      - name: Check CI planning and release safety contracts
-        if: needs.ci-plan.outputs.mode == 'pr'
-        run: pnpm vitest run scripts/__tests__/ci-plan.test.mjs scripts/__tests__/release-workflow.test.mjs scripts/__tests__/verify-workflow.test.mjs scripts/__tests__/release-prepare.test.mjs --reporter=agent
       - name: Verify staged package tarballs
         if: needs.ci-plan.outputs.mode == 'full'
         run: pnpm pack:verify
 
+  # Runs for PRs too. The language-baseline job runs the `servers` project with every server provisioned.
   tests:
     needs: ci-plan
-    if: needs.ci-plan.outputs.mode == 'full'
+    if: needs.ci-plan.outputs.mode != 'none'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -148,8 +159,8 @@ jobs:
         uses: ./.github/actions/setup-pnpm
       - name: Install ripgrep
         run: sudo apt-get install -y ripgrep
-      - name: Run complete test suite
-        run: pnpm test:all:ai
+      - name: Run test suite without real language servers
+        run: pnpm test:ai
 
   language-baseline:
     needs: ci-plan
@@ -251,7 +262,7 @@ jobs:
           INSTALLER_RESULT: ${{ needs.installer.result }}
           LANGUAGE_BASELINE_RESULT: ${{ needs.language-baseline.result }}
         run: |
-          if [[ "$PLAN_RESULT" != success || "$ACTIONLINT_RESULT" != success || "$COMMITS_RESULT" != success || "$WORKSPACE_RESULT" != success ]]; then
+          if [[ "$PLAN_RESULT" != success || "$ACTIONLINT_RESULT" != success || "$COMMITS_RESULT" != success || "$WORKSPACE_RESULT" != success || "$TEST_RESULT" != success ]]; then
             echo '::error::Required verification checks did not succeed'
             exit 1
           fi
@@ -260,7 +271,7 @@ jobs:
             pr) expected=skipped ;;
             *) echo '::error::Unknown verification mode'; exit 1 ;;
           esac
-          for result in "$TEST_RESULT" "$INSTALLER_RESULT" "$LANGUAGE_BASELINE_RESULT"; do
+          for result in "$INSTALLER_RESULT" "$LANGUAGE_BASELINE_RESULT"; do
             if [[ "$result" != "$expected" ]]; then
               echo "::error::Unexpected exhaustive-check result: expected=$expected actual=$result"
               exit 1
