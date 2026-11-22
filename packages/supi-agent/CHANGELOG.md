@@ -1,5 +1,9 @@
 # Changelog
 
+## [14.2.0]
+
+- Sessions with `bash` learn which `sed` it runs. SuPi runs `sed --version` once through the same shell as the bash tool, including `shellPath` and `shellCommandPrefix`, and adds the result as a `<shell>` section of the system prompt: GNU sed takes `sed -i 's/a/b/' file`, BSD sed (macOS default) needs `sed -i '' ...`. This replaces the hint that appeared after the first BSD sed error, which never fired with GNU sed installed. Delegated runs get the rule too.
+
 ## [14.1.0]
 
 - The `explore` system prompt says how a length limit applies to a sourced answer: the limit covers the prose, and required sources go once into a numbered list after it. Before, runs asked for "about 900 words" with a URL on every claim could not meet both.

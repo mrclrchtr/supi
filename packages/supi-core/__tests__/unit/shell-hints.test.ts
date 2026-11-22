@@ -1,40 +1,85 @@
-import { createPiMock, getHandlerOrThrow, makeCtx } from "@mrclrchtr/supi-test-utils";
-import { describe, expect, it } from "vitest";
-import { BSD_SED_HINT, BSD_SED_HINT_MARKER, registerShellHints } from "../../src/shell-hints.ts";
+import { createPiMock, getHandlerOrThrow } from "@mrclrchtr/supi-test-utils";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const sedError = 'sed: 1: "src/a.ts": command a expects \\ followed by text';
+const shell = vi.hoisted(() => ({
+  calls: [] as Array<{ shellPath?: string; command: string }>,
+  result: { exitCode: 0 as number | null, output: "" },
+}));
 
-function setup(branch: unknown[] = []) {
+vi.mock("@earendil-works/pi-coding-agent", () => ({
+  createLocalBashOperations: ({ shellPath }: { shellPath?: string } = {}) => ({
+    exec: async (command: string, _cwd: string, { onData }: { onData: (d: Buffer) => void }) => {
+      shell.calls.push({ shellPath, command });
+      onData(Buffer.from(shell.result.output));
+      return { exitCode: shell.result.exitCode };
+    },
+  }),
+}));
+
+import {
+  classifySed,
+  registerShellHints,
+  resetSedProbeForTests,
+  SED_RULES,
+  SHELL_SECTION,
+} from "../../src/shell-hints.ts";
+
+const gnu = { exitCode: 0, output: "sed (GNU sed) 4.10\nCopyright ..." };
+const bsd = {
+  exitCode: 1,
+  output: "sed: illegal option -- -\nusage: sed script [-EHalnru] [-i extension] [file ...]",
+};
+
+function setup(settings: Record<string, string> = {}, tools = ["read", "bash"]) {
   const pi = createPiMock();
+  Object.assign(pi, { getSettings: () => settings });
   registerShellHints(pi as never);
-  const ctx = makeCtx({ sessionManager: { getBranch: () => branch } });
-  const handler = getHandlerOrThrow(pi, "tool_result");
-  const run = (toolName: string, text: string) =>
-    handler({ toolName, content: [{ type: "text", text }] } as never, ctx as never) as
-      | { content: Array<{ type: string; text: string }> }
-      | undefined;
-  return { run };
+  const handler = getHandlerOrThrow(pi, "before_agent_start");
+  return async (sections: Record<string, string> = {}) => {
+    const systemPromptOptions = { selectedTools: tools, sections };
+    await handler({ systemPromptOptions } as never, { cwd: "/repo" } as never);
+    return sections;
+  };
 }
 
+describe("classifySed", () => {
+  it("recognizes GNU and BSD sed and leaves other output unknown", () => {
+    expect(classifySed(gnu.exitCode, gnu.output)).toBe("gnu");
+    expect(classifySed(bsd.exitCode, bsd.output)).toBe("bsd");
+    expect(classifySed(0, "BusyBox v1.36")).toBeUndefined();
+    expect(classifySed(127, "bash: sed: command not found")).toBeUndefined();
+  });
+});
+
 describe("registerShellHints", () => {
-  it("appends the BSD sed hint to a bash result with a sed script error", () => {
-    const result = setup().run("bash", `${sedError}\n\nCommand exited with code 1`);
-    expect(result?.content.at(-1)).toEqual({ type: "text", text: BSD_SED_HINT });
-    expect(result?.content[0]?.text).toContain(sedError);
+  beforeEach(() => {
+    resetSedProbeForTests();
+    shell.calls.length = 0;
+    shell.result = gnu;
   });
 
-  it("ignores other tools, other errors, and results that already carry the hint", () => {
-    const { run } = setup();
-    expect(run("read", sedError)).toBeUndefined();
-    expect(run("bash", "grep: invalid option")).toBeUndefined();
-    expect(run("bash", `${sedError}\n${BSD_SED_HINT}`)).toBeUndefined();
+  it("probes sed with the bash tool's shell path and command prefix", async () => {
+    shell.result = bsd;
+    const sections = await setup({ shellPath: "/bin/zsh", shellCommandPrefix: "source ~/.env" })();
+    expect(shell.calls).toEqual([
+      { shellPath: "/bin/zsh", command: "source ~/.env\nsed --version" },
+    ]);
+    expect(sections[SHELL_SECTION]).toBe(`- ${SED_RULES.bsd}`);
   });
 
-  it("shows the hint once per session branch", () => {
-    const shown = {
-      type: "message",
-      message: { role: "toolResult", content: [{ type: "text", text: BSD_SED_HINT_MARKER }] },
-    };
-    expect(setup([shown]).run("bash", sedError)).toBeUndefined();
+  it("probes once per shell setup and separately for a different setup", async () => {
+    await setup()();
+    await setup()();
+    await setup({ shellCommandPrefix: "export PATH=/x:$PATH" })();
+    expect(shell.calls).toHaveLength(2);
+  });
+
+  it("removes the section without bash or when the probe is inconclusive", async () => {
+    const stale = { [SHELL_SECTION]: `- ${SED_RULES.gnu}` };
+    expect(await setup({}, ["read"])({ ...stale })).toEqual({});
+    expect(shell.calls).toHaveLength(0);
+
+    shell.result = { exitCode: 127, output: "" };
+    expect(await setup()({ ...stale })).toEqual({});
   });
 });

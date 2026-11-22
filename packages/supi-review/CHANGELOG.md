@@ -1,5 +1,9 @@
 # Changelog
 
+## [14.2.0]
+
+- Sessions with `bash` learn which `sed` it runs. SuPi runs `sed --version` once through the same shell as the bash tool, including `shellPath` and `shellCommandPrefix`, and adds the result as a `<shell>` section of the system prompt: GNU sed takes `sed -i 's/a/b/' file`, BSD sed (macOS default) needs `sed -i '' ...`. This replaces the hint that appeared after the first BSD sed error, which never fired with GNU sed installed. Reviewers get the rule too.
+
 ## [14.1.0]
 
 - The changed-path manifest in a Reviewer Packet now lists up to 200 paths for ordinary path lengths. Before, a character budget cut a 154-file change at 102 paths and hid directories the review focused on. When paths are still omitted, the manifest names the exact Git command that lists them all.
