@@ -1,3 +1,4 @@
+import type { Usage } from "@earendil-works/pi-ai";
 import { canRecordAgentRunRetrospective, recordDebugEvent } from "@mrclrchtr/supi-core/debug";
 import type { AgentRunRetrospective } from "./types.ts";
 
@@ -37,7 +38,8 @@ export function createDebugAgentRunRetrospective(input: {
     prompt: RETROSPECTIVE_PROMPT,
     isEnabled: canRecordAgentRunRetrospective,
     onResult: (result) => {
-      const { usage, ...assessment } = result;
+      const { usage, metrics, ...assessment } = result;
+      const { usage: taskUsage, ...taskMetrics } = metrics;
       recordDebugEvent({
         source: input.source,
         cwd: input.cwd,
@@ -53,21 +55,23 @@ export function createDebugAgentRunRetrospective(input: {
           promptRevision: RETROSPECTIVE_PROMPT_REVISION,
           ...(input.conversationId === undefined ? {} : { conversationId: input.conversationId }),
           ...assessment,
-          // Avoid secret-like "token" keys in the shared Debug sanitizer.
-          ...(usage
-            ? {
-                usage: {
-                  input: usage.input,
-                  output: usage.output,
-                  cacheRead: usage.cacheRead,
-                  cacheWrite: usage.cacheWrite,
-                  total: usage.totalTokens,
-                  cost: usage.cost,
-                },
-              }
-            : {}),
+          // Task measurements; the sibling `usage` covers the assessment turn only.
+          metrics: { ...taskMetrics, ...(taskUsage ? { usage: debugUsage(taskUsage) } : {}) },
+          ...(usage ? { usage: debugUsage(usage) } : {}),
         },
       });
     },
+  };
+}
+
+/** Avoid secret-like "token" keys in the shared Debug sanitizer. */
+function debugUsage(usage: Usage) {
+  return {
+    input: usage.input,
+    output: usage.output,
+    cacheRead: usage.cacheRead,
+    cacheWrite: usage.cacheWrite,
+    total: usage.totalTokens,
+    cost: usage.cost,
   };
 }

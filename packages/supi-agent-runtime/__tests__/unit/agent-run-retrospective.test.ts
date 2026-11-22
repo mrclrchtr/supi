@@ -122,7 +122,51 @@ it("freezes task context and Usage before the assessment and bills each phase se
   expect(onResult).toHaveBeenCalledWith({
     status: "completed",
     text: "observed friction",
+    metrics: expect.objectContaining({ usage: usage(10) }),
     usage: usage(3),
+  });
+});
+
+it("reports task metrics frozen before the assessment turn", async () => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(1_000);
+  const harness = createHarness(mocks);
+  let promptNumber = 0;
+  harness.session.prompt.mockImplementation(async (_prompt, options) => {
+    options?.preflightResult?.("started");
+    promptNumber++;
+    if (promptNumber === 1) {
+      for (const toolName of ["grep", "read", "grep"]) {
+        harness.session.emit({ type: "tool_execution_start", toolCallId: toolName, toolName });
+      }
+      harness.session.emit({ type: "tool_execution_end", toolCallId: "read", isError: true });
+      harness.session.emit({ type: "turn_end" });
+      vi.setSystemTime(8_000);
+    } else {
+      // Assessment activity must not count toward the task.
+      harness.session.emit({ type: "turn_end" });
+      vi.setSystemTime(20_000);
+    }
+    harness.session.messages.push({ role: "assistant", content: [{ type: "text", text: "x" }] });
+  });
+  const onResult = vi.fn();
+  const run = startAgentRun({
+    inputs: inputs(),
+    prompt: "Task",
+    completionResolver: () => "answer",
+    retrospective: { prompt: "Assess", onResult },
+  });
+  await run.result;
+
+  expect(onResult.mock.calls[0]?.[0].metrics).toEqual({
+    durationMs: 7_000,
+    turns: 1,
+    toolUses: 3,
+    toolErrors: 1,
+    tools: [
+      { name: "grep", uses: 2 },
+      { name: "read", uses: 1 },
+    ],
   });
 });
 
@@ -282,6 +326,6 @@ it("never logs the old task answer as the assessment after a provider failure", 
     retrospective: { prompt: "Assess", onResult },
   });
   await expect(run.result).resolves.toMatchObject({ kind: "success", value: "answer" });
-  expect(onResult).toHaveBeenCalledWith({ status: "failed" });
+  expect(onResult).toHaveBeenCalledWith({ status: "failed", metrics: expect.any(Object) });
   expect(harness.session.prompt).toHaveBeenCalledTimes(2);
 });

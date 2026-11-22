@@ -452,6 +452,33 @@ describe("retrospective collector CLI", () => {
     expect(preview.records[1]).not.toHaveProperty("promptRevision");
   });
 
+  it("carries task metrics into the evidence and the export, dropping malformed fields", async () => {
+    await session("a/session.jsonl", workspace, [
+      withData(retrospective("measured", "Measured.", "supi-review", 2000), {
+        metrics: {
+          durationMs: 90_000,
+          turns: 12,
+          toolUses: 30,
+          toolErrors: "2",
+          tools: [{ name: "bash", uses: 25 }, { name: 7 }],
+          usage: { total: 4000, cost: { total: 0.5 } },
+        },
+      }),
+      retrospective("unmeasured", "Older event.", "supi-agent", 1000),
+    ]);
+
+    const { evidence } = await collect();
+    expect(evidence.records[0].metrics).toEqual({
+      durationMs: 90_000,
+      turns: 12,
+      toolUses: 30,
+      tools: [{ name: "bash", uses: 25 }],
+      totalTokens: 4000,
+      cost: 0.5,
+    });
+    expect(evidence.records[1]).not.toHaveProperty("metrics");
+  });
+
   // Several real Git processes; the default timeout is too tight under full parallel load.
   it("filters by recorded runtime provenance with --since-commit and counts unknown sessions", {
     timeout: 10_000,

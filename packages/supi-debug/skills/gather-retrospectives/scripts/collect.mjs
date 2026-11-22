@@ -196,11 +196,32 @@ function report(entry, context) {
     if (typeof data[key] === "string") report[key] = data[key];
   }
   if (Number.isSafeInteger(data.promptRevision)) report.promptRevision = data.promptRevision;
+  const metrics = taskMetrics(data.metrics);
+  if (metrics) report.metrics = metrics;
   const identity = report.runKey
     ? [report.source, report.runKey]
     : [report.source, report.timestamp, report.status, report.text, report.entryId];
   report.ref = `R-${createHash("sha256").update(JSON.stringify(identity)).digest("hex").slice(0, 16)}`;
   return report;
+}
+
+const count = (value) => (Number.isSafeInteger(value) && value >= 0 ? value : undefined);
+
+// Task measurements recorded with delegated and Reviewer Run reports; absent on older events.
+function taskMetrics(value) {
+  if (!value || typeof value !== "object") return null;
+  const metrics = {};
+  for (const key of ["durationMs", "turns", "toolUses", "toolErrors"]) {
+    if (count(value[key]) !== undefined) metrics[key] = value[key];
+  }
+  if (Array.isArray(value.tools)) {
+    metrics.tools = value.tools.filter(
+      (tool) => typeof tool?.name === "string" && count(tool.uses) !== undefined,
+    );
+  }
+  if (count(value.usage?.total) !== undefined) metrics.totalTokens = value.usage.total;
+  if (typeof value.usage?.cost?.total === "number") metrics.cost = value.usage.cost.total;
+  return Object.keys(metrics).length > 0 ? metrics : null;
 }
 
 function trackProvenance(entry, state) {

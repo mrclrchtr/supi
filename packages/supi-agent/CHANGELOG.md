@@ -2,6 +2,7 @@
 
 ## [14.2.0]
 
+- Agent Run retrospective Debug events now carry `metrics` for the assessed task: wall-clock duration, turns, tool executions and errors, executions per tool name, and task-only Usage. Self-reported friction can now be compared with measured cost.
 - Sessions with `bash` learn which `sed` it runs. SuPi runs `sed --version` once through the same shell as the bash tool, including `shellPath` and `shellCommandPrefix`, and adds the result as a `<shell>` section of the system prompt: GNU sed takes `sed -i 's/a/b/' file`, BSD sed (macOS default) needs `sed -i '' ...`. This replaces the hint that appeared after the first BSD sed error, which never fired with GNU sed installed. Delegated runs get the rule too.
 
 ## [14.1.0]

@@ -191,10 +191,26 @@ export interface AgentRunContinuation {
   onTurn?: (turn: AgentRunContinuationTurn) => void;
 }
 
+/** Measured facts about the completed task, frozen before the assessment turn. */
+export interface AgentRunTaskMetrics {
+  /** Wall-clock time from Agent Run start to task completion, including session startup. */
+  readonly durationMs: number;
+  readonly turns: number;
+  readonly toolUses: number;
+  /** Tool executions that returned an error. */
+  readonly toolErrors: number;
+  /** Tool executions per tool name, most used first. */
+  readonly tools: readonly { readonly name: string; readonly uses: number }[];
+  /** Task-only Usage, excluding the assessment. */
+  readonly usage?: Usage;
+}
+
 /** Result of the optional, tool-free assessment phase; never changes task completion. */
 export interface AgentRunRetrospectiveResult {
   readonly status: "completed" | "failed";
   readonly text?: string;
+  /** Task measurements, so self-reported friction can be compared with measured cost. */
+  readonly metrics: AgentRunTaskMetrics;
   /** Newly billed retrospective Usage, excluding the completed task. */
   readonly usage?: Usage;
 }

@@ -110,7 +110,12 @@ function displayRecord(record, filters) {
 export async function exportReports(evidence, evidenceFile, exportFile, refs) {
   const records = selectRecords(evidence.records, { refs, offset: 0, textOffset: 0 });
   const lines = records.map((record) =>
-    JSON.stringify({ ...displayRecord(record, evidence.filters), text: record.text ?? null }),
+    JSON.stringify({
+      ...displayRecord(record, evidence.filters),
+      ...(record.label === undefined ? {} : { label: record.label }),
+      ...(record.metrics === undefined ? {} : { metrics: record.metrics }),
+      text: record.text ?? null,
+    }),
   );
   await writeFile(exportFile, lines.length ? `${lines.join("\n")}\n` : "", {
     flag: "wx",

@@ -61,6 +61,7 @@ export type {
   AgentRunSessionView,
   AgentRunStatus,
   AgentRunSteerResult,
+  AgentRunTaskMetrics,
   AgentRunToolRenderer,
   AgentSessionInputs,
   CompletionResolver,

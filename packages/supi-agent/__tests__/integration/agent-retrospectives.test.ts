@@ -59,6 +59,13 @@ it("returns foreground results before the retrospective and logs its separate Us
     conversationId: (result.details.tasks as Array<{ conversationId: string }>)[0]?.conversationId,
     text: "Parent could have supplied the implementation path.",
     promptRevision: expect.any(Number),
+    metrics: {
+      durationMs: expect.any(Number),
+      turns: expect.any(Number),
+      toolUses: 0,
+      tools: [],
+      usage: { total: 15 },
+    },
     usage: { total: 15 },
   });
 });

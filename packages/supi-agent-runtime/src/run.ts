@@ -37,6 +37,7 @@ import type {
   AgentRunSessionView,
   AgentRunStatus,
   AgentRunSteerResult,
+  AgentRunTaskMetrics,
   RegisteredAgentRunHandle,
   StartAgentRunOptions,
   StartRegisteredAgentRunOptions,
@@ -97,6 +98,8 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
     toolUses: 0,
     toolErrors: 0,
   };
+  const startedAt = Date.now();
+  const toolUsesByName = new Map<string, number>();
   let lifecycle = new AgentRunLifecycleTraceCollector();
   let runtime: AgentSessionRuntime | undefined;
   let session: AgentSession | undefined;
@@ -467,7 +470,10 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
   const dispatchEvent = (event: AgentSessionEvent): void => {
     lifecycle.observe(event);
     if (event.type === "turn_end") progressState.turns++;
-    if (event.type === "tool_execution_start") progressState.toolUses++;
+    if (event.type === "tool_execution_start") {
+      progressState.toolUses++;
+      toolUsesByName.set(event.toolName, (toolUsesByName.get(event.toolName) ?? 0) + 1);
+    }
     if (event.type === "tool_execution_end" && event.isError) progressState.toolErrors++;
     if (
       event.type === "turn_end" ||
@@ -679,6 +685,17 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
       captureFinalizedContext(),
     );
     if (taskOutcome.usage) taskOutcome = { ...taskOutcome, usage: cloneUsage(taskOutcome.usage) };
+    // Frozen here: the assessment turn must not count toward the task it assesses.
+    const metrics: AgentRunTaskMetrics = {
+      durationMs: Date.now() - startedAt,
+      turns: progressState.turns,
+      toolUses: progressState.toolUses,
+      toolErrors: progressState.toolErrors,
+      tools: [...toolUsesByName]
+        .map(([name, uses]) => ({ name, uses }))
+        .sort((a, b) => b.uses - a.uses || a.name.localeCompare(b.name)),
+      ...(taskOutcome.usage ? { usage: taskOutcome.usage } : {}),
+    };
     if (timeoutId) clearTimeout(timeoutId);
     timeoutId = undefined;
     try {
@@ -764,6 +781,7 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
       policy.onResult({
         status: completed ? "completed" : "failed",
         ...(completed ? { text: activeSession.getLastAssistantText() } : {}),
+        metrics,
         ...usageDeltaFields(before, refreshUsage()),
       });
     } catch {
