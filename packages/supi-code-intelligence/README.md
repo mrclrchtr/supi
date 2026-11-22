@@ -8,7 +8,7 @@
 
 [![GitHub stars](https://img.shields.io/github/stars/mrclrchtr/supi)](https://github.com/mrclrchtr/supi/stargazers) [![npm downloads](https://img.shields.io/npm/dm/@mrclrchtr/supi-code-intelligence)](https://www.npmjs.com/package/@mrclrchtr/supi-code-intelligence)
 
-A [Pi coding agent](https://github.com/earendil-works/pi) extension to navigate symbols, search code structure, check diagnostics, and preview and apply semantic refactors.
+A [Pi coding agent](https://github.com/earendil-works/pi) extension that adds LSP (Language Server Protocol) and Tree-sitter code intelligence: navigate symbols, search code structure, check diagnostics, and preview and apply semantic refactors.
 
 ## Install
 

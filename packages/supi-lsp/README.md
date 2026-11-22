@@ -8,7 +8,13 @@
 
 [![GitHub stars](https://img.shields.io/github/stars/mrclrchtr/supi)](https://github.com/mrclrchtr/supi/stargazers)
 
-Language Server Protocol runtime library for the [pi coding agent](https://github.com/earendil-works/pi).
+Language Server Protocol runtime library for the [Pi coding agent](https://github.com/earendil-works/pi).
+
+> **Looking for LSP tools in Pi?** Install [`@mrclrchtr/supi-code-intelligence`](https://www.npmjs.com/package/@mrclrchtr/supi-code-intelligence). It bundles this runtime and gives the agent LSP and Tree-sitter tools:
+>
+> ```bash
+> pi install npm:@mrclrchtr/supi-code-intelligence
+> ```
 
 This package is library-only. It registers no model-callable tools; `@mrclrchtr/supi-code-intelligence` owns the public `code_*` family.
 
