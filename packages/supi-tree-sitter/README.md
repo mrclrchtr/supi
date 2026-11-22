@@ -8,10 +8,15 @@
 
 [![GitHub stars](https://img.shields.io/github/stars/mrclrchtr/supi)](https://github.com/mrclrchtr/supi/stargazers)
 
-Tree-sitter structural code analysis library for the [pi coding agent](https://github.com/earendil-works/pi).
+Tree-sitter structural code analysis library for the [Pi coding agent](https://github.com/earendil-works/pi).
 
-This is a **library-only** package — it has no pi extension surface. Use `@mrclrchtr/supi-code-intelligence`
-to access structural code-understanding workflows in pi.
+> **Looking for Tree-sitter tools in Pi?** Install [`@mrclrchtr/supi-code-intelligence`](https://www.npmjs.com/package/@mrclrchtr/supi-code-intelligence). It bundles this library and gives the agent Tree-sitter and LSP tools:
+>
+> ```bash
+> pi install npm:@mrclrchtr/supi-code-intelligence
+> ```
+
+This is a **library-only** package — it has no Pi extension surface.
 
 ## Install
 
