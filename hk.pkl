@@ -41,6 +41,12 @@ local precommit = new Mapping<String, Step> {
 
   ["biome"] = (Builtins.biome) {
     prefix = List("pnpm", "-s", "exec")
+    // The builtin glob skips module and JSONC variants such as scripts/*.mjs and biome.jsonc.
+    glob = List(
+      "**/*.{js,mjs,cjs,jsx}",
+      "**/*.{ts,mts,cts,tsx}",
+      "**/*.{json,jsonc}"
+    )
   }
 
   ["trailing-whitespace"] = Builtins.trailing_whitespace
