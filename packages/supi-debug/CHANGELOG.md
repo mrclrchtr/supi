@@ -3,7 +3,7 @@
 ## [14.3.0]
 
 - `gather-retrospectives` attributes each report to a project: the main working tree of the Git repository its session ran in, so sibling worktrees count as one project. The collector summary lists reports per project (`byProject`), and `--export` lines carry `project` and `session`. Evidence files written by earlier versions show each working directory as its own project.
-- The `gather-retrospectives` summary ranks themes by report count and gives each as a share of its producer's reports, with the number of sessions and, when several projects are mixed, the project it comes from. It names the concrete symptom, reports a proposal only when the cited report states one, moves citations into one source line, and adds the measured effort per producer. Questions the retrospective prompt asks, such as Code Intelligence use, are reported separately by the reasons given, next to the call count from the recorded metrics.
+- The `gather-retrospectives` summary ranks themes by report count and gives each as a share of its producer's reports, with the number of sessions and, when several projects are mixed, the project it comes from. It names the concrete symptom, reports a proposal only when the cited report states one, moves citations into one source line, and adds the measured effort per producer. Questions the retrospective prompt asks, such as Code Intelligence use, are reported separately by the reasons given, next to the call count from the recorded metrics. The summary details at most seven themes and names every further theme with its count and every dropped theme with the reason; its limit is 250 words instead of 200, not counting the source and evidence lines.
 
 ## [14.2.0]
 

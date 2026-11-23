@@ -45,7 +45,7 @@
         "Uses supported collector commands rather than handwritten JSON extraction to retrieve undisplayed assessments.",
         "Distinguishes complete scan coverage from display completion and finishes reading before making exhaustive claims.",
         "Provides original source locations, labels proposals as untested, and preserves all session inputs.",
-        "Keeps the user-facing summary within 200 words and links one complete evidence snapshot.",
+        "Keeps the user-facing summary within 250 words, not counting the sources and evidence lines, and links one complete evidence snapshot.",
         "Applies the stated scope without asking scope questions and passes --no-record so no last-gather marker is written outside the output directory."
       ]
     },
