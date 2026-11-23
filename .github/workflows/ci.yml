@@ -190,6 +190,9 @@ jobs:
         run: node scripts/language-baseline/ci-env.mjs >> "$GITHUB_ENV"
       - name: Set up workspace dependencies
         uses: ./.github/actions/setup-pnpm
+      # CPU samples for judging the test worker counts against the runner's cores; printed at the end.
+      - name: Sample runner load in background
+        run: node scripts/language-baseline/runner-load.mjs sample "$RUNNER_TEMP/runner-load.jsonl" &
       - name: Set up Java
         uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:
@@ -228,6 +231,9 @@ jobs:
           retention-days: 14
       - name: Run required real-server acceptance suite
         run: pnpm test:language-baseline:acceptance
+      - name: Show runner load samples
+        if: ${{ always() && !cancelled() }}
+        run: node scripts/language-baseline/runner-load.mjs summarize "$RUNNER_TEMP/runner-load.jsonl"
       - name: Remove isolated server installs
         if: always()
         run: |
