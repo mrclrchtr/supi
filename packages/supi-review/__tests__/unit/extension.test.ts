@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   registerReviewSettings: vi.fn(),
-  syncReviewAgentTools: vi.fn(),
+  syncReviewAgentTools: vi.fn(() => ({ agentToolEnabled: true })),
 }));
 
 vi.mock("../../src/config.ts", () => ({

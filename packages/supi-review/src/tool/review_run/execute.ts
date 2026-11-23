@@ -8,6 +8,7 @@ import type { LocalReviewAuditStore } from "../../audit/local-review-audit-store
 import { type ReviewBatchHandle, startReviewBatch } from "../../background/handle.ts";
 import type { ReviewBatchOwner } from "../../background/owner.ts";
 import { buildBackgroundStartResult } from "../../background/result.ts";
+import type { BackgroundReviewStatus } from "../../background/status.ts";
 import { loadReviewConfig, type PostReviewPolicy } from "../../config.ts";
 import {
   CURRENT_SESSION_REVIEW_MODEL,
@@ -87,6 +88,8 @@ export interface RunReviewExecuteOptions {
   registry?: AgentRunRegistry;
   /** Current Background Review owner; absent outside a session or without background support. */
   batchOwner?: () => ReviewBatchOwner | undefined;
+  /** Status line of the session's active Background Reviews. */
+  backgroundStatus?: BackgroundReviewStatus;
   events?: Pick<ExtensionAPI["events"], "on" | "emit">;
 }
 
@@ -100,6 +103,7 @@ interface BackgroundReviewStart {
   readonly request: RunReviewInput;
   readonly postReviewPolicy: PostReviewPolicy;
   readonly ctx: ToolContext;
+  readonly status?: BackgroundReviewStatus;
 }
 
 /**
@@ -126,7 +130,10 @@ async function startBackgroundReview(start: BackgroundReviewStart) {
       begin: (control) => {
         handle = startReviewBatch(prepared.review, {
           signal: control.signal,
-          onTaskResult: (batchId) => control.taskSettled(batchId),
+          onTaskResult: (batchId) => {
+            control.taskSettled(batchId);
+            start.status?.refresh();
+          },
         });
         return { result: Promise.resolve(handle) };
       },
@@ -137,6 +144,7 @@ async function startBackgroundReview(start: BackgroundReviewStart) {
     throw error;
   }
   if (!handle) throw new Error("The Background Review did not start.");
+  start.status?.track(handle, ctx);
   return buildBackgroundStartResult(handle, prepared.review);
 }
 
@@ -197,6 +205,7 @@ export function makeRunReviewExecute(
         request,
         postReviewPolicy: config.postReviewPolicy,
         ctx,
+        ...(options.backgroundStatus ? { status: options.backgroundStatus } : {}),
       });
     }
     const { statusSpinner, wrappedUpdate } = wireSpinnerToProgress(ctx, onUpdate);

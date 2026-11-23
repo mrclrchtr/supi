@@ -4,7 +4,8 @@ import { registerAgentsCommand } from "@mrclrchtr/supi-agent-runtime/api";
 import { registerShellHints } from "@mrclrchtr/supi-core/session";
 import { LocalReviewAuditStore } from "./audit/local-review-audit-store.ts";
 import { registerReviewBatchOwner } from "./background/owner.ts";
-import { registerReviewSettings, syncReviewAgentTools } from "./config.ts";
+import { registerBackgroundReviewStatus } from "./background/status.ts";
+import { type ReviewConfig, registerReviewSettings, syncReviewAgentTools } from "./config.ts";
 import { ReviewArtifactStore } from "./session/review-artifact-store.ts";
 import { registerReviewAuditTool } from "./tool/review_audit/register.ts";
 import { registerReviewOutputTool } from "./tool/review_output/register.ts";
@@ -20,18 +21,27 @@ export default function reviewExtension(pi: ExtensionAPI): void {
     agentDir: process.env.PI_CODING_AGENT_DIR || getAgentDir(),
   });
   const registry = registerAgentsCommand(pi);
-  registerReviewSettings(pi);
-  registerShellHints(pi);
-  registerReviewOutputTool(pi, artifactStore);
   // Background Reviews are owned by the containing session; collection uses agent_result.
   const batchOwner = registerReviewBatchOwner(pi, artifactStore);
+  // agent_result and agent_cancel follow the Agent tools setting; another owner, such as Agent,
+  // keeps them active when it needs them.
+  const syncCollectionTools = (config: ReviewConfig) => {
+    const owner = batchOwner();
+    // Batches created by an older bundled runtime copy may lack this control.
+    if (typeof owner?.setCollectionToolsActive === "function")
+      owner.setCollectionToolsActive(config.agentToolEnabled);
+  };
+  registerReviewSettings(pi, undefined, syncCollectionTools);
+  registerShellHints(pi);
+  registerReviewOutputTool(pi, artifactStore);
   registerReviewRunTool(pi, artifactStore, {
     localAuditStore: auditStore,
     registry,
     batchOwner,
+    backgroundStatus: registerBackgroundReviewStatus(pi),
   });
   registerReviewAuditTool(pi, auditStore);
-  pi.on("session_start", (_event, ctx) => syncReviewAgentTools(pi, ctx.cwd));
+  pi.on("session_start", (_event, ctx) => syncCollectionTools(syncReviewAgentTools(pi, ctx.cwd)));
   registerReviewWorkspaceCleanupCommand(pi);
 
   pi.registerMessageRenderer("supi-review", (message, options, theme) => {

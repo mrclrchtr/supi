@@ -98,8 +98,12 @@ export function loadReviewConfig(cwd: string, homeDir?: string): ReviewConfig {
   };
 }
 
-/** Apply configured Review tool availability to the current Pi session. */
-export function syncReviewAgentTools(pi: ExtensionAPI, cwd: string, homeDir?: string): void {
+/** Apply configured Review tool availability to the current Pi session; returns the config used. */
+export function syncReviewAgentTools(
+  pi: ExtensionAPI,
+  cwd: string,
+  homeDir?: string,
+): ReviewConfig {
   const currentTools = pi.getActiveTools();
   const nextTools = currentTools.filter(
     (name) => name !== REVIEW_RUN_TOOL_NAME && name !== REVIEW_AUDIT_TOOL_NAME,
@@ -113,10 +117,18 @@ export function syncReviewAgentTools(pi: ExtensionAPI, cwd: string, homeDir?: st
   ) {
     pi.setActiveTools(nextTools);
   }
+  return config;
 }
 
-/** Contribute reviewer and Planner model pickers to `/supi-settings`. */
-export function registerReviewSettings(pi: ExtensionAPI, homeDir?: string): void {
+/**
+ * Contribute reviewer and Planner model pickers to `/supi-settings`. `afterSync` receives the
+ * config each time a persisted change re-applies Review tool availability.
+ */
+export function registerReviewSettings(
+  pi: ExtensionAPI,
+  homeDir?: string,
+  afterSync?: (config: ReviewConfig) => void,
+): void {
   const currentOption = {
     value: CURRENT_SESSION_REVIEW_MODEL,
     label: "current session model",
@@ -208,7 +220,10 @@ export function registerReviewSettings(pi: ExtensionAPI, homeDir?: string): void
           description: "Record every reviewer's raw messages and tool output for seven days.",
         },
       ],
-      afterPersist: ({ cwd }) => syncReviewAgentTools(pi, cwd, homeDir),
+      afterPersist: ({ cwd }) => {
+        const config = syncReviewAgentTools(pi, cwd, homeDir);
+        afterSync?.(config);
+      },
       ...(homeDir ? { homeDir } : {}),
     }),
   );

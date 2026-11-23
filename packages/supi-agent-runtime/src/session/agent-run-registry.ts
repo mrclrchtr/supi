@@ -161,11 +161,18 @@ export class AgentRunRegistry {
     };
   }
 
-  /** Set caller-owned, human-only display details after the run settles. */
+  /**
+   * Set caller-owned, human-only display details after the run settles. Fields merge with earlier
+   * calls, including the `display` fields, so a later Usage marker keeps an earlier verdict.
+   */
   setDisplayResult(runKey: string, result: AgentRunDisplayResult): void {
     const run = this.#runs.get(runKey);
     if (!run || !this.#isCurrent(run)) return;
-    run.result = { ...run.result, ...result };
+    const display =
+      run.result?.display && result.display
+        ? { ...run.result.display, ...result.display }
+        : (result.display ?? run.result?.display);
+    run.result = { ...run.result, ...result, ...(display ? { display } : {}) };
     this.#publish();
   }
 

@@ -9,6 +9,7 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 import type { AgentRunRegistry } from "../session/agent-run-registry.ts";
 import { readResultCollection } from "./collection.ts";
+import { syncCollectionTools } from "./collection-tools.ts";
 import { findLaunchEntry, readNoticeTarget, sendCompletionNotice } from "./notices.ts";
 import type {
   CollectableRunBatch,
@@ -26,6 +27,8 @@ import { waitForRunBatch } from "./wait.ts";
 interface OwnerRecord {
   pi: ExtensionAPI;
   options: RunBatchOwnerOptions<RunBatchHandle, unknown>;
+  /** Explicit collection-tool demand; `undefined` counts as needing the tools. */
+  collectionToolsActive?: boolean;
 }
 
 /** One owned batch with the delivery state the runtime keeps for it. */
@@ -72,6 +75,7 @@ export class BackgroundRunBatches {
     owner.pi = pi;
     owner.options = owned;
     this.#owners.set(options.noticeType, owner);
+    syncCollectionTools(pi, this.#owners.values());
     return this.#ownerView<THandle, TData>(owner);
   }
 
@@ -89,6 +93,10 @@ export class BackgroundRunBatches {
       usageReported: (batch, taskId) => this.#receipts.reported(batch.handle.batchId, taskId),
       retainOutput: (path) => {
         if (path) this.#outputPaths.add(path);
+      },
+      setCollectionToolsActive: (active) => {
+        owner.collectionToolsActive = active;
+        syncCollectionTools(owner.pi, this.#owners.values());
       },
     };
   }

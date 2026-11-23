@@ -216,4 +216,10 @@ export interface RunBatchOwner<THandle extends RunBatchHandle = RunBatchHandle, 
   usageReported(batch: RunBatch<THandle, TData>, taskId: string): boolean;
   /** Delete an internally generated spill file and its directory when the session closes. */
   retainOutput(path: string | undefined): void;
+  /**
+   * State whether this owner needs `agent_result` and `agent_cancel` in the current session. The
+   * runtime keeps both tools active while any collection owner needs them; an owner that never
+   * states a demand counts as needing them. Takes effect immediately, without a reload.
+   */
+  setCollectionToolsActive(active: boolean): void;
 }
