@@ -226,10 +226,6 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        node: ["24"]
-        include:
-          - os: ubuntu-latest
-            node: "22.19.0"
     steps:
       - name: Checkout verification commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -239,7 +235,8 @@ jobs:
       - name: Set up workspace dependencies
         uses: ./.github/actions/setup-pnpm
         with:
-          node-version: ${{ matrix.node }}
+          # Minimum Node.js version from the installer's `engines.node`; keep them in sync.
+          node-version: "22.19.0"
       - name: Check installer types
         run: node node_modules/@typescript/native/bin/tsc -b packages/supi-installer/tsconfig.json packages/supi-installer/__tests__/tsconfig.json
       - name: Check installer behavior
