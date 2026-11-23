@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Pi loads SuPi TypeScript extensions from the working tree; no build step. After edits, `/reload` or restart Pi.
+Pi loads SuPi TypeScript extensions from this session's working tree; no build step. After edits, `/reload` or restart Pi. Before a live probe, check out the commit under test in this worktree, then `/reload`.
 
 ## Development status
 
