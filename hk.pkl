@@ -55,8 +55,10 @@ local commitmsg = new Mapping<String, Step> {
 
 // Keeps node_modules in sync after pulls, merges, rebases, and branch switches.
 // A no-op install is fast; --frozen-lockfile never rewrites pnpm-lock.yaml.
+// append-only keeps pnpm's log readable without a TTY; hk prints it after the hook run.
 local installDependencies: Step = new {
-  check = "pnpm install --frozen-lockfile --reporter=silent"
+  check = "pnpm install --frozen-lockfile --reporter=append-only"
+  output_summary = "combined"
   stomp = true
 }
 
