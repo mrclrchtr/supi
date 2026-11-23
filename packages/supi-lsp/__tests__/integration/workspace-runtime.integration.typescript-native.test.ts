@@ -143,10 +143,17 @@ it.each(["native-only", "mixed"])(
     });
     expect(recovered.processCrashRecovery).toMatchObject({ recoveredRoutes: 1 });
     expect(fs.readFileSync(startupMarker, "utf8")).toBe("started");
-    await expect(runtime.fileDiagnostics(file)).resolves.toMatchObject({
-      kind: "completed",
-      data: [],
-    });
+    // The replacement process can send `workspace/diagnostic/refresh` shortly
+    // after it starts. That refresh invalidates diagnostic evidence, so one
+    // query that overlaps it is `partial` by design (ADR 0022). Wait for the
+    // eventual confirmation; the last value names the reason on failure.
+    await expect(
+      waitFor(
+        () => runtime.fileDiagnostics(file),
+        (result) => result.kind === "completed",
+        { timeoutMs: 10_000, label: "confirmed diagnostics after crash recovery" },
+      ),
+    ).resolves.toMatchObject({ kind: "completed", data: [] });
     expect(runtime.getProjectServers()).toMatchObject([
       {
         status: "running",
