@@ -16,7 +16,9 @@ export function makeAgentCancelExecute(pi: ExtensionAPI, parameters: TSchema): E
     const { batch, collection, ownerKey } = batches.resolveCollection(params.batchId, ctx);
     const requested = batches.hasActiveRuns(batch);
     const result = collection.cancel(batch, { requested }, ctx);
-    if (requested) void batch.handle.stop().catch(() => undefined);
+    // A controller created by an older bundled runtime copy may lack `requestStop`.
+    if (requested && typeof batches.requestStop === "function") batches.requestStop(batch);
+    else if (requested) void batch.handle.stop().catch(() => undefined);
     return stampOwnedResult(result, ownerKey);
   };
 }

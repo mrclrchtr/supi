@@ -1,5 +1,9 @@
-import type { AgentToolResult } from "@earendil-works/pi-coding-agent";
-import type { CompletionNotice, RunBatch } from "@mrclrchtr/supi-agent-runtime/api";
+import type { AgentToolResult, SessionEntry } from "@earendil-works/pi-coding-agent";
+import {
+  type CompletionNotice,
+  type RunBatch,
+  readResultCollection,
+} from "@mrclrchtr/supi-agent-runtime/api";
 import type { PostReviewPolicy } from "../config.ts";
 import type { ReviewArtifactStore } from "../session/review-artifact-store.ts";
 import { formatWorkspaceReceipt } from "../tool/review_run/format.ts";
@@ -112,21 +116,48 @@ export function collectReviewBatch(
   };
 }
 
+/**
+ * Whether a Background Review still has results or Usage to collect: it is incomplete, or a
+ * successful stored collection on the active branch is missing a task or its Usage receipt.
+ */
+export function reviewNeedsCollection(
+  batch: ReviewRunBatch,
+  branch: readonly SessionEntry[],
+  usageReported: (taskId: string) => boolean,
+): boolean {
+  const { handle } = batch;
+  if (!handle.outcome()) return true;
+  const collected = new Set<string>();
+  for (const entry of branch) {
+    const result = readResultCollection(entry);
+    if (result?.batchId === handle.batchId) for (const id of result.taskIds) collected.add(id);
+  }
+  return handle
+    .snapshot()
+    .results.some(
+      (task) => !collected.has(task.taskId) || (task.usage && !usageReported(task.taskId)),
+    );
+}
+
 /** Format a Background Review stop request; the runtime requests the stop afterwards. */
 export function cancelReviewBatch(
   batch: ReviewRunBatch,
   requested: boolean,
+  needsCollection: boolean,
 ): AgentToolResult<unknown> {
   const status = requested
     ? "Stop requested. Cleanup may still be active."
     : "No active work remains.";
+  const collection = needsCollection
+    ? " Collect the report, including canceled tasks and Usage, with agent_result."
+    : "";
   return {
     content: [
       {
         type: "text",
-        text: `Background Review ${batch.handle.batchId}: ${status} Collect the report with agent_result.`,
+        text: `Background Review ${batch.handle.batchId}: ${status}${collection}`,
       },
     ],
-    details: { batchId: batch.handle.batchId, requested },
+    details: { batchId: batch.handle.batchId, requested, needsCollection },
   };
 }

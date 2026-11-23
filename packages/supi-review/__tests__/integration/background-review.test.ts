@@ -1,11 +1,19 @@
-import { execFileSync } from "node:child_process";
-import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import type { Theme, ToolDefinition } from "@earendil-works/pi-coding-agent";
+import type { Theme } from "@earendil-works/pi-coding-agent";
 import { getTool } from "@mrclrchtr/supi-test-utils";
-import { type BackgroundHarness, backgroundHarness } from "@mrclrchtr/supi-test-utils/background";
+import type { BackgroundHarness } from "@mrclrchtr/supi-test-utils/background";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import reviewExtension from "../../src/review.ts";
+import {
+  finding,
+  reviewerInputs,
+  reviewHarness,
+  reviewWorktrees,
+  submitReview,
+  task,
+  text,
+  waitForReviewers,
+} from "../helpers/background-review.ts";
 
 const sdk = vi.hoisted(() => ({ createAgentSession: vi.fn(), createAgentSessionRuntime: vi.fn() }));
 vi.mock("@earendil-works/pi-coding-agent", async (importOriginal) => ({
@@ -14,64 +22,6 @@ vi.mock("@earendil-works/pi-coding-agent", async (importOriginal) => ({
 }));
 
 vi.setConfig({ testTimeout: 30_000 });
-
-function git(cwd: string, ...args: string[]): string {
-  return execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
-}
-
-/** Linked worktrees besides the main checkout: Review Workspaces that still exist in Git. */
-function reviewWorktrees(cwd: string): string[] {
-  return git(cwd, "worktree", "list", "--porcelain")
-    .split("\n")
-    .filter((line) => line.startsWith("worktree "))
-    .slice(1);
-}
-
-/** Initialize the parent directory as a Git repository with an uncommitted change. */
-function prepareRepository(cwd: string, review: Record<string, unknown> = {}): void {
-  git(cwd, "init");
-  git(cwd, "config", "user.email", "test@example.com");
-  git(cwd, "config", "user.name", "Test");
-  git(cwd, "config", "commit.gpgsign", "false");
-  git(cwd, "config", "core.hooksPath", "/dev/null");
-  // The harness keeps its agent directory, home, and Pi project config inside the repository.
-  writeFileSync(join(cwd, ".gitignore"), "agent/\nhome/\n.pi/\n");
-  writeFileSync(join(cwd, "tracked.txt"), "base\n");
-  git(cwd, "add", ".");
-  git(cwd, "commit", "-m", "base");
-  writeFileSync(join(cwd, "tracked.txt"), "frozen\n");
-  mkdirSync(join(cwd, ".pi", "supi"), { recursive: true });
-  writeFileSync(
-    join(cwd, ".pi", "supi", "config.json"),
-    JSON.stringify({
-      review: {
-        agentModel: "current",
-        recoveryModel: "disabled",
-        reviewerCodemodeEnabled: false,
-        reviewerWebEnabled: false,
-        auditEnabled: false,
-        bootstrapCommand: "",
-        postReviewPolicy: "verify",
-        ...review,
-      },
-    }),
-  );
-}
-
-const task = (id: string, mode: "change" | "state" = "change") => ({
-  id,
-  mode,
-  instructions: `Review ${id} carefully.`,
-});
-
-const finding = {
-  title: "Frozen value is wrong",
-  description: "tracked.txt should not say frozen.",
-  blocksAcceptance: true,
-  impact: "medium",
-  effort: "small",
-  confidence: 0.8,
-};
 
 const theme = {
   fg: (_color: string, value: string) => value,
@@ -96,53 +46,14 @@ afterEach(async () => {
   vi.clearAllMocks();
 });
 
-async function reviewHarness(review: Record<string, unknown> = {}): Promise<BackgroundHarness> {
-  harness = await backgroundHarness({
-    sdk,
-    extension: reviewExtension,
-    childPrompt: (id) => `Review ${id} carefully.`,
-    prepare: ({ directory }) => prepareRepository(directory, review),
-  });
+async function startHarness(review: Record<string, unknown> = {}): Promise<BackgroundHarness> {
+  harness = await reviewHarness(sdk, review);
   return harness;
 }
 
-/** The SDK inputs of one controlled Reviewer Session. */
-function reviewerInputs(current: BackgroundHarness, id: string) {
-  const child = current.child(id);
-  const call = sdk.createAgentSession.mock.calls.find(
-    ([inputs]) => inputs.sessionManager === child.session.sessionManager,
-  );
-  if (!call) throw new Error(`Missing SDK inputs for ${id}.`);
-  return { child, inputs: call[0] as { cwd: string; customTools: ToolDefinition[] } };
-}
-
-/** Submit a structured review through the child's real submit tool, then end its prompt. */
-async function submitReview(current: BackgroundHarness, id: string, findings: unknown[] = []) {
-  const { child, inputs } = reviewerInputs(current, id);
-  const submit = inputs.customTools.find((tool) => tool.name === "submit_review");
-  if (!submit) throw new Error("Missing submit_review.");
-  await submit.execute(
-    "submit",
-    { summary: `Reviewed ${id}.`, findings, criteriaCoverage: { status: "complete" } } as never,
-    undefined,
-    undefined,
-    undefined as never,
-  );
-  child.finish(`Submitted ${id}.`);
-}
-
-async function waitForReviewers(current: BackgroundHarness, count: number) {
-  await vi.waitFor(() =>
-    expect(current.children.filter((child) => child.session.isStreaming)).toHaveLength(count),
-  );
-}
-
-const text = (result: { content: { type: string; text?: string }[] }) =>
-  result.content.map((part) => part.text ?? "").join("\n");
-
 describe("Background Review through registered tools", () => {
   it("returns a start handle before Reviewers finish and collects the report once", async () => {
-    const current = await reviewHarness();
+    const current = await startHarness();
     const cwd = current.ctx.cwd;
     const started = await current.invoke("review_run", {
       mode: "background",
@@ -165,11 +76,11 @@ describe("Background Review through registered tools", () => {
     // An edit after the start returns stays out of the frozen Review Workspace.
     writeFileSync(join(cwd, "tracked.txt"), "edited after start\n");
     await waitForReviewers(current, 2);
-    const { inputs } = reviewerInputs(current, "alpha");
+    const { inputs } = reviewerInputs(sdk, current, "alpha");
     expect(readFileSync(join(inputs.cwd, "tracked.txt"), "utf8")).toBe("frozen\n");
     expect(reviewWorktrees(cwd)).toHaveLength(1);
 
-    await submitReview(current, "alpha", [finding]);
+    await submitReview(sdk, current, "alpha", [finding]);
     await vi.waitFor(() =>
       expect(current.children.filter((child) => child.session.isStreaming)).toHaveLength(1),
     );
@@ -177,7 +88,7 @@ describe("Background Review through registered tools", () => {
     await new Promise((resolve) => setTimeout(resolve, 20));
     expect(current.pi.messages).toHaveLength(0);
 
-    await submitReview(current, "beta");
+    await submitReview(sdk, current, "beta");
     await vi.waitFor(() => expect(current.pi.messages).toHaveLength(1));
     const notice = current.pi.messages[0] as { content: string; details: unknown };
     expect(notice.content).toContain(batchId);
@@ -219,7 +130,7 @@ describe("Background Review through registered tools", () => {
   });
 
   it("keeps a Foreground Review awaited when mode is foreground", async () => {
-    const current = await reviewHarness();
+    const current = await startHarness();
     let returned = false;
     const running = current
       .invoke("review_run", { mode: "foreground", tasks: [task("alpha")] })
@@ -230,7 +141,7 @@ describe("Background Review through registered tools", () => {
     await waitForReviewers(current, 1);
     await new Promise((resolve) => setTimeout(resolve, 20));
     expect(returned).toBe(false);
-    await submitReview(current, "alpha", [finding]);
+    await submitReview(sdk, current, "alpha", [finding]);
     const result = await running;
     expect(text(result)).toContain("Verdict: ISSUES");
     expect(text(result)).toContain("The configured Post-Review Policy is `verify`");
@@ -263,7 +174,7 @@ describe("Background Review through registered tools", () => {
       error: "Configured Dependency Bootstrap failed.",
     },
   ])("fails the call for $name and leaves no batch or Review Workspace", async (example) => {
-    const current = await reviewHarness(example.review);
+    const current = await startHarness(example.review);
     await expect(current.invoke("review_run", example.params)).rejects.toThrow(example.error);
     expect(reviewWorktrees(current.ctx.cwd)).toHaveLength(0);
     expect(current.children).toHaveLength(0);
@@ -271,7 +182,7 @@ describe("Background Review through registered tools", () => {
   });
 
   it("rejects a background start whose launch is not on the active branch", async () => {
-    const current = await reviewHarness();
+    const current = await startHarness();
     const tool = getTool(current.pi, "review_run") as unknown as {
       execute: (...args: unknown[]) => Promise<unknown>;
     };
@@ -289,13 +200,13 @@ describe("Background Review through registered tools", () => {
   });
 
   it("records Local Reviewer Replays as a Foreground Review does", async () => {
-    const current = await reviewHarness({ auditEnabled: true });
+    const current = await startHarness({ auditEnabled: true });
     const started = await current.invoke("review_run", {
       mode: "background",
       tasks: [task("alpha")],
     });
     await waitForReviewers(current, 1);
-    await submitReview(current, "alpha");
+    await submitReview(sdk, current, "alpha");
     await vi.waitFor(() => expect(current.pi.messages).toHaveLength(1));
     const audits = readdirSync(join(current.agentDir, "supi-review", "audits")).filter((name) =>
       name.endsWith(".json"),

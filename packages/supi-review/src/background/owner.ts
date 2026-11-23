@@ -10,6 +10,7 @@ import {
   collectReviewBatch,
   REVIEW_COMPLETION_MESSAGE_TYPE,
   type ReviewBatchData,
+  reviewNeedsCollection,
 } from "./result.ts";
 
 /** Review's access to the Background Run Batches of the containing session. */
@@ -26,22 +27,33 @@ export function registerReviewBatchOwner(
 ): () => ReviewBatchOwner | undefined {
   let owner: ReviewBatchOwner | undefined;
   pi.on("session_start", () => {
-    owner = registerRunBatchOwner<ReviewBatchHandle, ReviewBatchData>(pi, {
-      source: "supi-review",
-      noticeType: REVIEW_COMPLETION_MESSAGE_TYPE,
-      noticeGranularity: "batch",
-      buildNotice: buildReviewCompletionNotice,
-      collection: {
-        collect: (_callId, batch) => collectReviewBatch(artifactStore, batch),
-        cancel: (batch, { requested }) => cancelReviewBatch(batch, requested),
-        renderResult: renderReviewCollection,
-        renderCancel: (result, options, theme) => renderReviewText(result, options, theme),
-        canceledMessages: {
-          wait: "Review wait canceled.",
-          collection: "Review collection canceled.",
+    const current: ReviewBatchOwner = registerRunBatchOwner<ReviewBatchHandle, ReviewBatchData>(
+      pi,
+      {
+        source: "supi-review",
+        noticeType: REVIEW_COMPLETION_MESSAGE_TYPE,
+        noticeGranularity: "batch",
+        buildNotice: buildReviewCompletionNotice,
+        collection: {
+          collect: (_callId, batch) => collectReviewBatch(artifactStore, batch),
+          cancel: (batch, { requested }, ctx) =>
+            cancelReviewBatch(
+              batch,
+              requested,
+              reviewNeedsCollection(batch, ctx.sessionManager.getBranch(), (taskId) =>
+                current.usageReported(batch, taskId),
+              ),
+            ),
+          renderResult: renderReviewCollection,
+          renderCancel: (result, options, theme) => renderReviewText(result, options, theme),
+          canceledMessages: {
+            wait: "Review wait canceled.",
+            collection: "Review collection canceled.",
+          },
         },
       },
-    });
+    );
+    owner = current;
   });
   pi.on("session_shutdown", () => {
     owner = undefined;

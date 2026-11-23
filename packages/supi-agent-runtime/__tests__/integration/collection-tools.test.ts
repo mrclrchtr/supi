@@ -189,6 +189,31 @@ describe.each(loadOrders)("Completion Notice granularity (%s)", (order) => {
     ]);
   });
 
+  it("sends no notice for a once-per-batch owner after agent_cancel completes its batch", async () => {
+    const { harness } = await twoOwners(order);
+    const batchId = await start("beta_run", ["b1", "b2"]);
+    harness.child("b1").finish("First");
+    await vi.waitFor(() =>
+      expect(harness.registry.snapshot().runs.find((run) => run.taskId === "b1")?.status).toBe(
+        "completed",
+      ),
+    );
+    await harness.invoke("agent_cancel", { batchId });
+    await vi.waitFor(() =>
+      expect(harness.registry.snapshot().runs.find((run) => run.taskId === "b2")?.status).toBe(
+        "canceled",
+      ),
+    );
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(harness.pi.messages).toHaveLength(0);
+    expect(harness.turnsStarted).toBe(0);
+    const collected = await harness.invoke("agent_result", { batchId, wait: true });
+    expect(collected.details.tasks).toEqual([
+      expect.objectContaining({ taskId: "b1", status: "completed" }),
+      expect.objectContaining({ taskId: "b2", status: "canceled" }),
+    ]);
+  });
+
   it("keeps per-task notices for a per-task owner", async () => {
     const { harness } = await twoOwners(order);
     await start("alpha_run", ["a1", "a2"]);

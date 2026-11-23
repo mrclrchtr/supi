@@ -35,6 +35,8 @@ interface BatchRecord {
   readonly notified: Set<string>;
   acknowledged: boolean;
   abandoned: boolean;
+  /** `agent_cancel` requested a stop; the batch sends no further Completion Notice. */
+  stopRequested: boolean;
   /** Every task is terminal; once-per-batch notices wait for it. */
   complete: boolean;
 }
@@ -149,6 +151,16 @@ export class BackgroundRunBatches {
     );
   }
 
+  /**
+   * Stop a batch at the user's request. A task that finishes while the stop is pending, or a
+   * once-per-batch notice that the stop itself completes, must not start a parent turn.
+   */
+  requestStop(batch: RunBatch<RunBatchHandle, unknown>): void {
+    const record = this.#batches.get(batch.handle.batchId);
+    if (record) record.stopRequested = true;
+    void batch.handle.stop().catch(() => undefined);
+  }
+
   /** Whether any Agent Run of the batch is still active in the Agent Run Registry. */
   hasActiveRuns(batch: RunBatch<RunBatchHandle, unknown>): boolean {
     return this.registry
@@ -201,6 +213,7 @@ export class BackgroundRunBatches {
       notified: new Set(),
       acknowledged: false,
       abandoned: false,
+      stopRequested: false,
       complete: false,
     };
     this.#batches.set(handle.batchId, record);
@@ -378,6 +391,7 @@ export class BackgroundRunBatches {
     if (
       batch.mode !== "background" ||
       record.abandoned ||
+      record.stopRequested ||
       !record.acknowledged ||
       (owner.options.noticeGranularity === "batch" && !record.complete) ||
       !this.#onBranch(batch)
