@@ -54,7 +54,6 @@
     }
   },
   "toolchains": {
-    "node": "24.22.0",
     "java": {
       "version": "27.0.0+35",
       "distribution": "temurin"

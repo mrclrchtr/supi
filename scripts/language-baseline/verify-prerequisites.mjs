@@ -62,8 +62,13 @@ function requireJdtlsVersion(command) {
   );
 }
 
-if (process.versions.node !== pins.toolchains.node) {
-  throw new Error(`Node ${pins.toolchains.node} is required; found ${process.versions.node}.`);
+// .mise.toml is the single source of the Node.js version; Renovate updates it.
+const miseNode = readFileSync(new URL("../../.mise.toml", import.meta.url), "utf8").match(
+  /^node\s*=\s*"([^"]+)"/m,
+)?.[1];
+if (!miseNode) throw new Error("Node version is not pinned in .mise.toml.");
+if (process.versions.node !== miseNode) {
+  throw new Error(`Node ${miseNode} is required; found ${process.versions.node}.`);
 }
 // pnpm, TypeScript, and typescript-language-server come from package.json and the frozen
 // lockfile, which CI installs exactly. Do not duplicate their versions here.

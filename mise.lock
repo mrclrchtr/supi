@@ -47,7 +47,7 @@ repository_ids = { repository = "922514152" }
 [[tools.node]]
 version = "26.13.1"
 backend = "core:node"
-specifiers = ["lts"]
+specifiers = ["26.13.1"]
 
 [tools.node."platforms.linux-arm64"]
 checksum = "sha256:80a330b35415382878df18d41afbd106ea89bfb3be0087d6608e289a14c5cc7d"

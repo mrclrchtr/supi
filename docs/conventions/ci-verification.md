@@ -91,6 +91,7 @@ gh workflow run ci.yml --repo mrclrchtr/supi --ref main -f publish_tag=v1.2.3
 
 - Routine Renovate minor, patch, pin, and digest updates share a group unless a later dedicated-group rule applies. Existing schedules and routine automerge remain enabled.
 - npm major, minor, and patch updates must be at least 7 days old before Renovate proposes them. Strict internal checks and required release timestamps prevent missing metadata from bypassing the cooldown.
+- `.mise.toml` is the single source of the Node.js version for local development and CI: workflows read it through `node-version-file`, and Renovate's `mise` manager updates it. Only the installer job sets an explicit version, the `engines.node` minimum.
 - npm-managed language-baseline packages (TypeScript, TLS, the TS6 wrapper) and pnpm are pinned only in the root `package.json` and lockfile; the frozen install enforces them. `scripts/language-baseline/pins.json` pins only toolchains and servers that npm does not manage, so Renovate npm updates cannot leave it stale.
 - Security-alert PRs bypass Renovate's cooldown but require manual merge. pnpm's install-time cooldown still applies; urgent fixes need a reviewed, version-specific `minimumReleaseAgeExclude` exception rather than disabling the policy globally.
 - GitHub Actions digest and digest-pin changes require manual merge: release timestamps cannot reliably age a moved tag. Upstream skills remain separate and manually reviewed; Pi remains manually upgraded.

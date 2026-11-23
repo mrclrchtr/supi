@@ -45,7 +45,7 @@ jobs:
       - name: Set up Node.js without workspace dependencies
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: "26.13.1"
+          node-version-file: .mise.toml
           package-manager-cache: false
       - name: Select verification and immutable checkout
         id: plan
@@ -94,7 +94,7 @@ jobs:
       - name: Set up Node.js without workspace dependencies
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: "24.22.3"
+          node-version-file: .mise.toml
           package-manager-cache: false
       # Installs only commitlint, at the versions pinned in package.json, instead of the workspace.
       # The workspace lockfile does not pin its transitive dependencies.
@@ -181,8 +181,6 @@ jobs:
         run: node scripts/language-baseline/ci-env.mjs >> "$GITHUB_ENV"
       - name: Set up workspace dependencies
         uses: ./.github/actions/setup-pnpm
-        with:
-          node-version: ${{ env.SUPI_BASELINE_NODE_VERSION }}
       - name: Set up Java
         uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:

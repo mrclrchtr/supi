@@ -3,8 +3,8 @@ name: Setup pnpm workspace
 description: Setup Node.js and pnpm, restore cache, and install dependencies
 inputs:
   node-version:
-    description: Node.js runtime version
-    default: "26"
+    description: Node.js runtime version; overrides the version from .mise.toml
+    default: ""
 runs:
   using: composite
   steps:
@@ -16,6 +16,7 @@ runs:
       uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
       with:
         node-version: ${{ inputs.node-version }}
+        node-version-file: .mise.toml
         registry-url: "https://registry.npmjs.org"
         cache: pnpm
 
