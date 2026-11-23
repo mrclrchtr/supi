@@ -1,4 +1,3 @@
-import { execFileSync } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { ExtensionAPI, ToolDefinition } from "@earendil-works/pi-coding-agent";
@@ -9,18 +8,7 @@ import {
 } from "@mrclrchtr/supi-test-utils/background";
 import { expect, vi } from "vitest";
 import reviewExtension from "../../src/review.ts";
-
-export function git(cwd: string, ...args: string[]): string {
-  return execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
-}
-
-/** Linked worktrees besides the main checkout: Review Workspaces that still exist in Git. */
-export function reviewWorktrees(cwd: string): string[] {
-  return git(cwd, "worktree", "list", "--porcelain")
-    .split("\n")
-    .filter((line) => line.startsWith("worktree "))
-    .slice(1);
-}
+import { git } from "./git.ts";
 
 /** Initialize the parent directory as a Git repository with an uncommitted change. */
 function prepareRepository(

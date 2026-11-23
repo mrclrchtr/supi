@@ -8,12 +8,12 @@ import {
   finding,
   reviewerInputs,
   reviewHarness,
-  reviewWorktrees,
   submitReview,
   task,
   text,
   waitForReviewers,
 } from "../helpers/background-review.ts";
+import { reviewWorktrees } from "../helpers/git.ts";
 
 const sdk = vi.hoisted(() => ({ createAgentSession: vi.fn(), createAgentSessionRuntime: vi.fn() }));
 vi.mock("@earendil-works/pi-coding-agent", async (importOriginal) => ({

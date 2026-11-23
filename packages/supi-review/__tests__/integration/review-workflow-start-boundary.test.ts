@@ -1,8 +1,8 @@
-import { execFileSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { git, reviewWorktrees } from "../helpers/git.ts";
 import { useRepositoryTemplate } from "../helpers/repository-template.ts";
 
 const mocks = vi.hoisted(() => ({ runReviewer: vi.fn() }));
@@ -12,10 +12,6 @@ import { executePreparedReview, prepareReview } from "../../src/tool/review_run/
 import type { ReviewModelSelection, ReviewTask } from "../../src/types.ts";
 
 vi.setConfig({ testTimeout: 20_000 });
-
-function git(cwd: string, ...args: string[]): string {
-  return execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
-}
 
 const initializeRepository = useRepositoryTemplate((cwd) => {
   git(cwd, "init");
@@ -30,13 +26,6 @@ const initializeRepository = useRepositoryTemplate((cwd) => {
 
 const model = { canonicalId: "provider/reviewer", model: {} } as ReviewModelSelection;
 const changeTask: ReviewTask = { id: "change", instructions: "Review the change.", mode: "change" };
-
-function reviewWorktrees(cwd: string): string[] {
-  return git(cwd, "worktree", "list", "--porcelain")
-    .split("\n")
-    .filter((line) => line.startsWith("worktree "))
-    .slice(1);
-}
 
 describe("Review start boundary", () => {
   let cwd: string;
