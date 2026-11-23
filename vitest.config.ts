@@ -111,7 +111,8 @@ export default defineConfig({
           setupFiles: ["packages/supi-lsp/__tests__/helpers/server-test-debug.ts"],
           testTimeout: 10_000,
           hookTimeout: 30_000,
-          maxWorkers: 3,
+          // Six workers timed out on the 3-vCPU macOS CI runner; four passed there and on Linux.
+          maxWorkers: 4,
           sequence: { groupOrder: 1 },
         },
       },
