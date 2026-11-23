@@ -87,7 +87,7 @@ Each tool's result assembly lives in `src/tool/<tool_name>/result.ts`. Shared re
 
 Placement rules:
 
-- Result assembly never lives under `render/` or `ui/`, and not at the package root once `src/tool/` exists.
+- Result assembly never lives under `render/` or `ui/`, and not at the package root once `src/tool/` exists. `scripts/__tests__/tool-result-placement.test.mjs` rejects `result.ts`, `output.ts`, and `*-result.ts` outside `src/tool/` in such packages.
 - Transient `onUpdate` progress text may live in workflow/execution modules; final results must be built by the tool's result module.
 - Legacy names (`output.ts`, `review-result.ts`) are renamed when the package migrates to the per-tool layout.
 
