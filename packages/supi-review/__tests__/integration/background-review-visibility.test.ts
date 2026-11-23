@@ -89,6 +89,30 @@ describe("a running Background Review", () => {
     await vi.waitFor(() => expect(statusLine(current)).toBe(""));
   });
 
+  it("sets a static status line in RPC mode and re-sends it only when the count changes", async () => {
+    harness = await reviewHarness(sdk);
+    const current = harness;
+    Object.assign(current.ctx, { mode: "rpc" });
+    const statusCalls = () =>
+      vi.mocked(current.ctx.ui.setStatus).mock.calls.filter(([key]) => key === STATUS_KEY);
+    await startReview(current, ["alpha", "beta"]);
+    await waitForReviewers(current, 2);
+    expect(statusLine(current)).toBe("Background Review running (0 of 2 tasks finished)");
+    const before = statusCalls().length;
+    // Several spinner frames pass; an RPC client receives no event while nothing changes.
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect(statusCalls()).toHaveLength(before);
+
+    await submitReview(sdk, current, "alpha");
+    await vi.waitFor(() =>
+      expect(statusLine(current)).toBe("Background Review running (1 of 2 tasks finished)"),
+    );
+    expect(statusCalls()).toHaveLength(before + 1);
+
+    await submitReview(sdk, current, "beta");
+    await vi.waitFor(() => expect(statusLine(current)).toBe(""));
+  });
+
   it("clears the status line when the last active Review is stopped", async () => {
     harness = await reviewHarness(sdk);
     const current = harness;
