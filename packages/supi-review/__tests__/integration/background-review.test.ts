@@ -150,6 +150,48 @@ describe("Background Review through registered tools", () => {
     expect(current.pi.messages).toHaveLength(0);
   });
 
+  it.each(["tui", "rpc"] as const)(
+    "starts a Background Review by default in %s mode",
+    async (mode) => {
+      const current = await startHarness();
+      Object.assign(current.ctx, { mode });
+      const started = await current.invoke("review_run", { tasks: [task("alpha")] });
+      expect(started.details).toMatchObject({
+        mode: "background",
+        tasks: [{ taskId: "alpha", status: "running" }],
+      });
+      expect(started.usage).toBeUndefined();
+    },
+  );
+
+  it.each(["print", "json"] as const)(
+    "runs a Foreground Review by default in %s mode",
+    async (mode) => {
+      const current = await startHarness();
+      Object.assign(current.ctx, { mode });
+      const running = current.invoke("review_run", { tasks: [task("alpha")] });
+      await waitForReviewers(current, 1);
+      await submitReview(sdk, current, "alpha", [finding]);
+      const result = await running;
+      expect(text(result)).toContain("Verdict: ISSUES");
+      expect(result.usage?.totalTokens).toBe(15);
+      expect(current.pi.messages).toHaveLength(0);
+    },
+  );
+
+  it.each(["print", "json"] as const)(
+    "rejects an explicit background request in %s mode before any work",
+    async (mode) => {
+      const current = await startHarness();
+      Object.assign(current.ctx, { mode });
+      await expect(
+        current.invoke("review_run", { mode: "background", tasks: [task("alpha")] }),
+      ).rejects.toThrow("Background Review requires TUI or RPC mode.");
+      expect(reviewWorktrees(current.ctx.cwd)).toHaveLength(0);
+      expect(sdk.createAgentSession).not.toHaveBeenCalled();
+    },
+  );
+
   it.each([
     {
       name: "invalid input",

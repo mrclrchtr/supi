@@ -1,11 +1,16 @@
 diff --git a/skills/engineering/code-review/SKILL.md b/skills/engineering/code-review/SKILL.md
 --- a/skills/engineering/code-review/SKILL.md
 +++ b/skills/engineering/code-review/SKILL.md
-@@ -59,17 +59,19 @@
+@@ -59,17 +59,24 @@
 
  Issue both sub-agent calls together, in the foreground, and aggregate the reports they return.
 
-+Use `review_run` when available: one batch with `standards` and `spec` tasks, both with `mode: "change"`, using the pinned comparison and applicable `criteriaSources`. In each source summary, quote the rules or spec lines that apply.
++Use `review_run` when available: one Review with `standards` and `spec` tasks, both with `mode: "change"`, using the pinned comparison and applicable `criteriaSources`. In each source summary, quote the rules or spec lines that apply.
++
++`review_run` runs in one of two modes:
++
++- **Background (default in TUI and RPC):** the call returns a handle once the Review Target is frozen. End your turn there; do not poll. When the Completion Notice arrives, collect the report with `agent_result` and its `batchId`, run Finding Verification as the report's Post-Review Policy directs, then continue with step 5.
++- **Foreground (print and JSON, or `mode: "foreground"`):** the call waits and returns the report directly. Run Finding Verification as its Post-Review Policy directs, then continue with step 5.
 +
  **Standards sub-agent prompt** should include:
 

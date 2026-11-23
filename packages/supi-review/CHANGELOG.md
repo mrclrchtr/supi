@@ -1,5 +1,10 @@
 # Changelog
 
+## [15.0.0]
+
+- **Breaking:** in TUI and RPC, `review_run` now starts a Background Review by default. The call returns once the Review Target is frozen and any Dependency Bootstrap has finished, with a `batchId`, the task ids, and the Workspace Receipt instead of the report, so the Agent and the user can continue. One Completion Notice arrives when every Review Task is finished; the report, its Post-Review Policy, and the Reviewer Usage come from `agent_result`. `agent_cancel` stops a running Review, and the status line shows active Background Reviews. Print and JSON modes still wait for the report and reject `mode: "background"`. `/supi-review` is unchanged. Migration: pass `mode: "foreground"` to `review_run` to keep waiting for the report in the call ([#636](https://github.com/mrclrchtr/supi/issues/636)).
+- The **Agent tools** setting also turns `agent_result` and `agent_cancel` off, unless the Agent extension still needs them.
+
 ## [14.3.0]
 
 - Reviewer Run retrospective Debug events record which tools the run started with (`metrics.availableTools`), so a tool the task did not use can be told apart from one it did not have. The retrospective prompt (revision 3) no longer asks every run to comment on Code Intelligence: a run mentions `code_*` tools only for a faulty result or when it answered a symbol question with another tool.

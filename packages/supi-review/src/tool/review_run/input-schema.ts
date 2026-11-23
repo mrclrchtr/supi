@@ -72,7 +72,7 @@ export const runReviewSchema = Type.Object(
       Type.Enum(["background", "foreground"], {
         type: "string",
         description:
-          "Default: foreground. background returns a batch handle once the target is frozen; collect the report with agent_result after the Completion Notice. TUI/RPC only.",
+          "Default: background in TUI/RPC, foreground in print/JSON, where background is rejected. foreground waits and returns the report.",
       }),
     ),
     ...reviewInputSchema.properties,
@@ -93,7 +93,7 @@ export interface RunReviewToolInput {
   target: ReviewTargetSpec;
   scope: ReviewScope;
   review: ReviewInput;
-  /** Requested mode; omitted means the default (foreground). */
+  /** Requested mode; omitted means background in TUI and RPC mode, foreground otherwise. */
   mode?: ReviewRunMode;
 }
 

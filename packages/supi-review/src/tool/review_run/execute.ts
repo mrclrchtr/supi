@@ -18,7 +18,7 @@ import {
 import type { ReviewArtifactStore } from "../../session/review-artifact-store.ts";
 import { resolveReviewThinkingLevel } from "../../thinking.ts";
 import { captureReviewerWebTools } from "../../web-access.ts";
-import { parseRunReviewToolInput } from "./input-schema.ts";
+import { parseRunReviewToolInput, type ReviewRunMode } from "./input-schema.ts";
 import { buildRunResult } from "./result.ts";
 import { prepareReview, type RunReviewInput, runReview } from "./workflow.ts";
 
@@ -148,6 +148,14 @@ async function startBackgroundReview(start: BackgroundReviewStart) {
   return buildBackgroundStartResult(handle, prepared.review);
 }
 
+/**
+ * Default Review mode: background where the session can deliver a Completion Notice (TUI, RPC),
+ * foreground in print and JSON mode, which end after the prompt.
+ */
+function defaultReviewRunMode(ctx: ToolContext): ReviewRunMode {
+  return ctx.mode === "tui" || ctx.mode === "rpc" ? "background" : "foreground";
+}
+
 /** Resolve configuration and models into one Review request for either mode. */
 function buildReviewRequest(
   ctx: ToolContext,
@@ -198,7 +206,7 @@ export function makeRunReviewExecute(
     const input = parseRunReviewToolInput(params);
     const config = loadReviewConfig(ctx.cwd);
     const request = buildReviewRequest(ctx, input, config, { ...options, signal });
-    if (input.mode === "background") {
+    if ((input.mode ?? defaultReviewRunMode(ctx)) === "background") {
       return startBackgroundReview({
         callId,
         owner: options.batchOwner?.(),

@@ -9,7 +9,7 @@ Status: Implemented. This document defines the approved behavior.
 - A Background Delegation Batch is a Background Run Batch owned by `supi-agent-runtime` ([runtime ADR 0014](../../supi-agent-runtime/docs/adr/0014-own-background-run-batches-and-result-collection.md)). The runtime owns session and launch-branch ownership, Completion Notice scheduling and delivery, parent-abort handling, waiting, Usage receipts, spill-file cleanup, and shutdown. `supi-agent` hands it each admitted batch with per-task notice granularity.
 - The runtime registers `agent_result` and `agent_cancel` once per Pi runtime and owns their names, parameters, guidance, handle checks, and collection ordering (wait, revalidate, assemble output, reserve Usage). `supi-agent` supplies the Delegation Batch Result, the cancellation result, Delegation Checkpoints at collection, the rendering, and the model-facing cancellation text. Both tools stay active when the Agent Run tool setting turns `agent_run` off.
 - Reuse Agent Run lifecycle controls, the session registry, and `/agents` from `supi-agent-runtime`.
-- Leave Review execution and admission policy unchanged.
+- Review is a second owner of Background Run Batches with once-per-batch notice granularity (Review [ADR 0018](../../supi-review/docs/adr/0018-run-reviews-in-the-background-by-default.md)). Its execution and admission policy stay in `supi-review`; this document does not define them.
 - Do not add durable workers, restart recovery, background writers, or workspace isolation.
 
 ## Execution policy
@@ -144,7 +144,7 @@ agent_cancel({ batchId })
 
 - A background start returns before a controlled child completes; foreground still waits.
 - Invalid input, unavailable background mode, invalid profiles, and insufficient capacity start no task.
-- Concurrent batch starts cannot exceed the session limit. Review policy is unchanged.
+- Concurrent batch starts cannot exceed the session limit. Reviewer Runs do not count against it.
 - Fast tasks notify and can be collected while siblings remain active.
 - Collection supports partial results, repeated reads, and an explicit full-batch wait.
 - Usage is counted once across repeated, concurrent, canceled, and failed collection paths.

@@ -129,4 +129,6 @@ The first owner that supplies `collection` registers `agent_result` and `agent_c
 
 `agent_cancel` lets the owner format the result (`cancel()`) and then requests the stop of active runs. The owner renders its own results (`renderResult()`, `renderCancel()`) and may set model-facing cancellation text (`canceledMessages`). The runtime renders errors and the call header.
 
+An owner states whether it needs both tools in the current session with `setCollectionToolsActive(active)`, for example from its own tool setting. They stay active while any collection owner needs them; an owner that never states a demand counts as needing them. Review turns its demand off with its **Agent tools** setting; Agent never does.
+
 Usage counts as reported only after Pi stores the `agent_result` result that carries it. The collection result's `details` must carry `batchId` and `tasks[].taskId`; `readResultCollection()` reads them back. The runtime reserves the `details` keys `runBatchOwner` and `usageReceipt` and the result's `usage`.

@@ -145,7 +145,8 @@ export function registerReviewSettings(
           kind: "boolean",
           key: "agentToolEnabled",
           label: "Agent tools",
-          description: "Enable review start and audit tools for agents.",
+          description:
+            "Enable review start and audit tools for agents, and the agent_result and agent_cancel tools that collect Background Reviews.",
         },
         {
           kind: "boolean",

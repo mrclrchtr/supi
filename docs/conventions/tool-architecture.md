@@ -203,13 +203,13 @@ Audit the effects, not the name:
 | `tui_render` | ✓ | – | ✓ | – | Renders a stored tool result through its TUI renderers in memory. It never runs the rendered tool. |
 | `review_output` | ✓ | – | ✓ | – | Reads an in-memory artifact. |
 | `review_audit` | ✓ | – | ✓ | – | Reads replays. A read prunes only expired SuPi-owned replay files. |
-| `review_run` | – | ✓ | – | ✓ | Starts model-backed Reviewer Sessions, optionally with Web tools, and may store replays. Reviewers get `bash`; inspection-only is a protocol, not access control. |
+| `review_run` | – | ✓ | – | ✓ | Starts model-backed Reviewer Sessions, optionally with Web tools, and may store replays; in TUI and RPC they run in the background by default. Reviewers get `bash`; inspection-only is a protocol, not access control. |
 | `submit_review`, `decline_review_recovery`, `submit_planner_draft` | – | – | – | – | Child-only. Each records one in-memory result and ends its child session; a second call conflicts or overwrites. |
 | `agent_run` | – | ✓ | – | ✓ | Starts child sessions. Depending on the profile, they get shell, edit, and Web tools. |
 | `agent_list` | ✓ | – | ✓ | – | Lists saved conversations. |
 | `git` | ✓ | – | ✓ | – | Child-only. Runs allowlisted read subcommands without a shell, pager, optional locks, or configured diff programs. |
-| `agent_result` | – | – | ✓ | – | Stores collected results, checkpoints, and Usage in the session once; repeated collection adds nothing. |
-| `agent_cancel` | – | – | ✓ | – | Stops background child work; repeated requests are harmless. |
+| `agent_result` | – | – | ✓ | – | Stores collected Delegation and Review results, checkpoints, and Usage in the session once; repeated collection adds nothing. |
+| `agent_cancel` | – | – | ✓ | – | Stops background Delegation Tasks and Reviews; repeated requests are harmless. |
 | `ask_user` | ✓ | – | ✓ | – | Shows a form to the user. It records only form metadata outside the model context. |
 | `consulting_run` | – | – | – | ✓ | Sends the prompt, and optionally workspace evidence, to an external agent with web access. Saves a continuation handle in the session. |
 

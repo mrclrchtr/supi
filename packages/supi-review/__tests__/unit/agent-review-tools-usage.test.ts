@@ -111,7 +111,7 @@ describe("agent review tool usage", () => {
 
     await getTool(pi, "review_run").execute(
       "call",
-      { tasks: [{ id: "spec", instructions: "Review.", mode: "change" }] },
+      { mode: "foreground", tasks: [{ id: "spec", instructions: "Review.", mode: "change" }] },
       undefined,
       undefined,
       ctx,
@@ -135,7 +135,7 @@ describe("agent review tool usage", () => {
 
     await getTool(pi, "review_run").execute(
       "call",
-      { tasks: [{ id: "spec", instructions: "Review.", mode: "change" }] },
+      { mode: "foreground", tasks: [{ id: "spec", instructions: "Review.", mode: "change" }] },
       undefined,
       undefined,
       reviewContext(),
@@ -152,6 +152,7 @@ describe("agent review tool usage", () => {
     await getTool(pi, "review_run").execute(
       "call",
       {
+        mode: "foreground",
         target: {},
         paths: ["src/a.ts"],
         tasks: [{ id: "spec", instructions: "Review.", mode: "change" }],
@@ -206,7 +207,7 @@ describe("agent review tool usage", () => {
 
     const output = (await getTool(pi, "review_run").execute(
       "call",
-      { tasks: [{ id: "spec", instructions: "Review.", mode: "change" }] },
+      { mode: "foreground", tasks: [{ id: "spec", instructions: "Review.", mode: "change" }] },
       undefined,
       undefined,
       reviewContext(),

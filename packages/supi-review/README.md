@@ -28,7 +28,32 @@ This package is beta software. Its interfaces can change.
 - `review_output` — read more parent-facing output
 - `review_audit` — navigate local reviewer replays when audit is enabled
 
-Changes to **Agent tools** apply immediately. Turning this setting off removes the agent start and audit tools from the active tool set. The output tool and the commands stay available.
+Changes to **Agent tools** apply immediately. Turning this setting off removes the agent start and audit tools from the active tool set. It also removes `agent_result` and `agent_cancel` unless another extension, such as `supi-agent`, still needs them. The output tool and the commands stay available.
+
+## Background and Foreground Reviews
+
+`review_run` takes an optional top-level `mode`:
+
+| Pi mode | Default | `mode: "foreground"` | `mode: "background"` |
+| --- | --- | --- | --- |
+| TUI or RPC | Background | Supported | Supported |
+| Print or JSON | Foreground | Supported | Rejected before any work starts |
+
+Both modes freeze the Review Target in its Review Workspace and run any configured Dependency Bootstrap before the call returns. Invalid input, an unresolvable target, and setup failures fail the call and leave no Review Workspace.
+
+A **Foreground Review** waits and returns the report, with its Usage and Post-Review Policy.
+
+A **Background Review** returns a handle instead: the `batchId`, each task id with its Review Mode and status, and the Workspace Receipt. No findings and no Usage. The Agent and the user can continue. Then:
+
+- One Completion Notice arrives when every Review Task is terminal. Collect the report with `agent_result` and the `batchId`; do not poll.
+- The collected report has the normal format, names the reviewed state from the receipt, and notes that the live checkout may differ. The complete report carries the Post-Review Policy.
+- A collection before completion lists each task's state and any finished task's result, marks the Review as still running, and omits the Post-Review Policy.
+- Reviewer Usage reaches the parent's totals at the first stored collection, including failed and canceled tasks.
+- `agent_cancel` stops the Review. Parent abort, leaving the launch branch, reload, session replacement, and shutdown stop it too. A Background Review does not survive a restart.
+- The Review Workspace is removed once every task is terminal, before collection. A cleanup warning is part of the collected result.
+- The status line shows `Background Review running (1 of 2 tasks finished)` while any Background Review is active, and summarizes several Reviews in one line.
+
+There is no limit on concurrent Reviews; each has its own Review Workspace and up to four Reviewer Sessions. Stop unwanted Reviewer Runs in `/agents`. `/supi-review` always runs in the foreground.
 
 ## Shared `/agents` viewer
 
@@ -162,7 +187,7 @@ Each task result includes its Review Mode, packet SHA-256, verdict, finding coun
 
 `blocksAcceptance` keeps its existing meaning. The Review Engine derives `issues` for a blocking finding. It derives `incomplete` for incomplete Criteria Coverage without a blocking finding, `pass_with_findings` for only non-blocking findings, and `pass` for no findings.
 
-Parent-facing output from `review_run` or `/supi-review` is stored as a bounded session artifact. Use `review_output` with its returned `artifactId` and offset to read more output. Artifacts retain the existing session limits and expire after 30 minutes, reload, resume, or a branch change.
+Parent-facing output from `review_run`, a Background Review collection, or `/supi-review` is stored as a bounded session artifact. Use `review_output` with its returned `artifactId` and offset to read more output. Artifacts retain the existing session limits and expire after 30 minutes, reload, resume, or a branch change.
 
 `review_output` declares a native output schema. Direct calls remain paged: `offset` and `limit` select the readable page, with continuation instructions when needed. Codemode receives `{ artifactId, text, totalCharacters }`, where `text` is the **complete stored report**, independent of that page selection. It contains no synthetic paging notice or empty-page marker. `totalCharacters` counts UTF-16 code units. This is formatted report text, not typed findings or Task Verdict data.
 
