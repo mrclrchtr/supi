@@ -142,7 +142,12 @@ async function collectRequestEvidence(
     }
     if (
       control?.signal?.aborted ||
-      (control?.deadline !== undefined && Date.now() >= control.deadline)
+      (control?.deadline !== undefined && Date.now() >= control.deadline) ||
+      // A timer can fire just before Date.now() reaches the deadline. When the
+      // caller's deadline binds, its deadline error is the caller's interruption.
+      (isCodeRequestDeadlineError(error) &&
+        control?.deadline !== undefined &&
+        control.deadline <= deadline)
     ) {
       throw error;
     }

@@ -755,6 +755,9 @@ export class ClientDiagnostics {
     try {
       await this.#ensureExplicitDocumentContent(filePath, content, contentIsAuthoritative, control);
     } catch (error) {
+      // A timer can fire just before Date.now() reaches the deadline, so trust
+      // the error itself before checking the clock.
+      if (isCodeRequestInterruption(error, control)) throw error;
       throwIfCodeRequestInterrupted(control);
       return unavailableAfterEnrollmentRetry(error);
     }
@@ -793,6 +796,7 @@ export class ClientDiagnostics {
           attempt,
         });
       } catch (error) {
+        if (isCodeRequestInterruption(error, options.control)) throw error;
         throwIfCodeRequestInterrupted(options.control);
         if (isSemanticInputEnrollmentError(error)) {
           // Enrollment can change cross-file diagnostics. Invalidate only the
