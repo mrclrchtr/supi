@@ -84,6 +84,34 @@ describe("Consulting runtime activation", () => {
     expect(context.ui.setStatus).toHaveBeenLastCalledWith(CONSULTING_FOOTER_KEY, "✦");
   });
 
+  it("shows one static checking frame outside the TUI and sends the status only on state changes", async () => {
+    vi.useFakeTimers();
+    const root = roots[0] as string;
+    const cwd = join(root, "repo");
+    await mkdir(cwd, { recursive: true });
+    const discovery = deferred<typeof availability>();
+    const pi = createPiMock();
+    const runtime = new ConsultingRuntime({
+      pi: pi as never,
+      adapter: makeAdapter(vi.fn(async () => discovery.promise)),
+      homeDir: root,
+    });
+    const context = makeCtx({ cwd });
+
+    const refreshing = runtime.startRefresh(cwd, { ui: context.ui, mode: "rpc" });
+    vi.advanceTimersByTime(SPINNER_INTERVAL_MS * 10);
+    expect(runtime.footerIcon).toBe(BRAILLE_SPINNER_FRAMES[0]);
+
+    discovery.resolve(availability);
+    await refreshing;
+    expect(vi.mocked(context.ui.setStatus).mock.calls).toEqual([
+      [CONSULTING_FOOTER_KEY, undefined],
+      [CONSULTING_FOOTER_KEY, BRAILLE_SPINNER_FRAMES[0]],
+      [CONSULTING_FOOTER_KEY, "✦"],
+    ]);
+    await runtime.shutdown();
+  });
+
   it("advances the footer spinner until discovery is ready", async () => {
     vi.useFakeTimers();
     const root = roots[0] as string;
@@ -98,7 +126,7 @@ describe("Consulting runtime activation", () => {
     });
     const context = makeCtx({ cwd });
 
-    const refreshing = runtime.startRefresh(cwd, { ui: context.ui });
+    const refreshing = runtime.startRefresh(cwd, { ui: context.ui, mode: "tui" });
     expect(runtime.footerIcon).toBe(BRAILLE_SPINNER_FRAMES[0]);
     vi.advanceTimersByTime(SPINNER_INTERVAL_MS);
     expect(runtime.footerIcon).toBe(BRAILLE_SPINNER_FRAMES[1]);

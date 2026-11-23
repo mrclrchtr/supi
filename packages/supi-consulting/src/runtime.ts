@@ -18,6 +18,8 @@ type FooterState = "idle" | "checking" | "ready";
 /** Context needed to report availability and update the footer. */
 export type ConsultingRefreshContext = {
   ui: Pick<ExtensionContext["ui"], "notify" | "setStatus">;
+  /** Run mode; the checking spinner animates only in `"tui"`, elsewhere it shows one static frame. */
+  mode?: ExtensionContext["mode"];
   isProjectTrusted?: ExtensionContext["isProjectTrusted"];
 };
 
@@ -34,6 +36,8 @@ export class ConsultingRuntime {
   #footerState: FooterState = "idle";
   #spinnerTimer: ReturnType<typeof setInterval> | undefined;
   #spinnerFrame = 0;
+  /** Whether the checking spinner animates: only in the TUI, where a frame is not a client record. */
+  #animateSpinner = false;
   #toolRegistered = false;
   #legacyConfigWarning: string | undefined;
 
@@ -85,7 +89,10 @@ export class ConsultingRuntime {
     this.#refreshAbort?.abort();
     const abortController = new AbortController();
     this.#refreshAbort = abortController;
-    if (context) this.#statusUi = context.ui;
+    if (context) {
+      this.#statusUi = context.ui;
+      this.#animateSpinner = context.mode === "tui";
+    }
     this.#stopSpinner();
     this.#setFooterState("idle");
     const projectTrusted = context?.isProjectTrusted?.() ?? true;
@@ -188,6 +195,8 @@ export class ConsultingRuntime {
     this.#stopSpinner();
     this.#spinnerFrame = 0;
     this.#setFooterState("checking");
+    // Outside the TUI every setStatus call is a record sent to the client, such as an RPC event.
+    if (!this.#animateSpinner) return;
     this.#spinnerTimer = setInterval(() => {
       if (this.#footerState !== "checking") return;
       this.#spinnerFrame = (this.#spinnerFrame + 1) % BRAILLE_SPINNER_FRAMES.length;

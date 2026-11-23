@@ -1,5 +1,9 @@
 # Changelog
 
+## [15.0.0]
+
+- In RPC, the footer shows a static `⠋` while Consulting checks agent availability at session start, instead of sending a `setStatus` record about every 80 ms. The TUI animation is unchanged.
+
 ## [14.0.0]
 
 - The SuPi footer shows the Consulting icon (`✦`, or its spinner while checking) before the model name instead of at the end of the stats line.
