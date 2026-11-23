@@ -74,6 +74,8 @@ jobs:
         with:
           version: 2026.11.12
           install_args: jactionlint shellcheck
+          # PR caches are scoped to the PR's merge ref; only main pushes save reusable entries.
+          cache_save: ${{ github.event_name != 'pull_request' }}
       # Configured in .github/jactionlint.yaml; ShellCheck checks run steps.
       - name: Lint GitHub Actions workflows
         env:
@@ -158,8 +160,6 @@ jobs:
           persist-credentials: false
       - name: Set up workspace dependencies
         uses: ./.github/actions/setup-pnpm
-      - name: Install ripgrep
-        run: sudo apt-get install -y ripgrep
       - name: Run test suite without real language servers
         run: pnpm test:ai --reporter=json --outputFile.json="$RUNNER_TEMP/vitest-results.json"
       # Per-file and per-test durations on the standard runner, for test-runtime comparisons.
@@ -186,34 +186,51 @@ jobs:
         with:
           ref: ${{ needs.ci-plan.outputs.sha }}
           persist-credentials: false
+      # Runs on the runner image's Node.js, so the background sampler can start before setup.
       - name: Load pinned language toolchains
         run: node scripts/language-baseline/ci-env.mjs >> "$GITHUB_ENV"
-      - name: Set up workspace dependencies
-        uses: ./.github/actions/setup-pnpm
       # CPU samples for judging the test worker counts against the runner's cores; printed at the end.
+      # The sampler never exits on its own; the "Stop runner load sampling" step cancels it. exec
+      # hands the cancel signal to Node directly instead of to the wrapping shell.
       - name: Sample runner load in background
-        run: node scripts/language-baseline/runner-load.mjs sample "$RUNNER_TEMP/runner-load.jsonl" &
-      - name: Set up Java
-        uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
-        with:
-          distribution: ${{ env.SUPI_BASELINE_JAVA_DISTRIBUTION }}
-          java-version: ${{ env.SUPI_BASELINE_JAVA_VERSION }}
-      - name: Set up Go
-        uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
-        with:
-          go-version: ${{ env.SUPI_BASELINE_GO_VERSION }}
-          # The repository has no root go.mod to key a module cache on; provisioning caches gopls itself.
-          cache: false
-      # PR runs restore the cache written on main; a PR that changes the key writes one scoped to its branch.
-      - name: Restore cached reference servers
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ${{ runner.temp }}/supi-language-baseline-cache
-          key: language-baseline-servers-${{ runner.os }}-${{ runner.arch }}-${{ env.SUPI_BASELINE_CACHE_KEY }}
+        id: runner-load
+        run: exec node scripts/language-baseline/runner-load.mjs sample "$RUNNER_TEMP/runner-load.jsonl"
+        background: true
+        continue-on-error: true
+      # Independent setups run side by side. Most of Go's setup time on macOS is the copy into the
+      # tool cache, because the image does not ship the pinned version.
+      - parallel:
+          - name: Set up workspace dependencies
+            uses: ./.github/actions/setup-pnpm
+          - name: Set up Java
+            uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
+            with:
+              distribution: ${{ env.SUPI_BASELINE_JAVA_DISTRIBUTION }}
+              java-version: ${{ env.SUPI_BASELINE_JAVA_VERSION }}
+          - name: Set up Go
+            uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
+            with:
+              go-version: ${{ env.SUPI_BASELINE_GO_VERSION }}
+              # The repository has no root go.mod to key a module cache on; provisioning caches gopls itself.
+              cache: false
+          # PR runs restore the cache written on main and never save one.
+          - name: Restore cached reference servers
+            id: server-cache
+            uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+            with:
+              path: ${{ runner.temp }}/supi-language-baseline-cache
+              key: language-baseline-servers-${{ runner.os }}-${{ runner.arch }}-${{ env.SUPI_BASELINE_CACHE_KEY }}
       - name: Provision pinned reference servers
         env:
           SUPI_LANGUAGE_BASELINE_CACHE: ${{ runner.temp }}/supi-language-baseline-cache
         run: node scripts/language-baseline/provision.mjs
+      # Saved right after provisioning, so a later test failure still keeps the installs.
+      - name: Save cached reference servers
+        if: github.event_name != 'pull_request' && steps.server-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/supi-language-baseline-cache
+          key: ${{ steps.server-cache.outputs.cache-primary-key }}
       - name: Verify TypeScript installation selection
         run: pnpm exec vitest run --reporter=agent packages/supi-lsp/__tests__/unit/typescript-launch.test.ts
       # Includes the TypeScript lifecycle tests; suites whose server is not provisioned skip.
@@ -231,6 +248,8 @@ jobs:
           retention-days: 14
       - name: Run required real-server acceptance suite
         run: pnpm test:language-baseline:acceptance
+      - name: Stop runner load sampling
+        cancel: runner-load
       - name: Show runner load samples
         if: ${{ always() && !cancelled() }}
         run: node scripts/language-baseline/runner-load.mjs summarize "$RUNNER_TEMP/runner-load.jsonl"

@@ -1,6 +1,6 @@
 # Shared workflow setup. Keep third-party actions pinned by SHA.
 name: Setup pnpm workspace
-description: Setup Node.js and pnpm, restore cache, and install dependencies
+description: Setup Node.js and pnpm, and install dependencies
 inputs:
   node-version:
     description: Node.js runtime version; overrides the version from .mise.toml
@@ -12,13 +12,16 @@ runs:
       uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
       # version omitted — reads from package.json's packageManager field
 
+    # No pnpm store cache: restoring it took 6–22 s and saving it up to 35 s, to make the frozen
+    # install 2–3 s faster. Its entries (130–260 MB per OS and ref) also pushed the repository past
+    # the cache size limit, which evicts the language-baseline server cache.
     - name: Setup Node.js
       uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
       with:
         node-version: ${{ inputs.node-version }}
         node-version-file: .mise.toml
         registry-url: "https://registry.npmjs.org"
-        cache: pnpm
+        package-manager-cache: false
 
     - name: Install dependencies
       shell: bash
