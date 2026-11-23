@@ -684,7 +684,7 @@ export class LspManager {
     if (!route) return null;
 
     const recovery = this.processCrashRecoveries.get(route.key);
-    if (recovery && (recovery.pending || recovery.statusReason)) {
+    if (recovery && (recovery.pending !== null || recovery.statusReason)) {
       if (!options.recoverProcessCrash) return null;
       return this.acquireProcessCrashReplacement(recovery, route, options.control);
     }
