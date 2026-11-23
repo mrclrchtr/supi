@@ -4,7 +4,7 @@ description: Setup Node.js and pnpm, restore cache, and install dependencies
 inputs:
   node-version:
     description: Node.js runtime version
-    default: "24"
+    default: "26"
 runs:
   using: composite
   steps:
