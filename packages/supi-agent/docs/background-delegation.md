@@ -6,7 +6,8 @@ Status: Implemented. This document defines the approved behavior.
 
 - Let the parent continue while read-only Delegation Tasks run.
 - Keep Agent Profile policy, admission, capacity, Delegation Conversations, Delegation Checkpoints, and the result format in `supi-agent`.
-- A Background Delegation Batch is a Background Run Batch owned by `supi-agent-runtime` ([runtime ADR 0014](../../supi-agent-runtime/docs/adr/0014-own-background-run-batches-and-result-collection.md)). The runtime owns session and launch-branch ownership, Completion Notice scheduling and delivery, parent-abort handling, waiting, Usage receipts, spill-file cleanup, and shutdown. `supi-agent` hands it each admitted batch.
+- A Background Delegation Batch is a Background Run Batch owned by `supi-agent-runtime` ([runtime ADR 0014](../../supi-agent-runtime/docs/adr/0014-own-background-run-batches-and-result-collection.md)). The runtime owns session and launch-branch ownership, Completion Notice scheduling and delivery, parent-abort handling, waiting, Usage receipts, spill-file cleanup, and shutdown. `supi-agent` hands it each admitted batch with per-task notice granularity.
+- The runtime registers `agent_result` and `agent_cancel` once per Pi runtime and owns their names, parameters, guidance, handle checks, and collection ordering (wait, revalidate, assemble output, reserve Usage). `supi-agent` supplies the Delegation Batch Result, the cancellation result, Delegation Checkpoints at collection, the rendering, and the model-facing cancellation text. Both tools stay active when the Agent Run tool setting turns `agent_run` off.
 - Reuse Agent Run lifecycle controls, the session registry, and `/agents` from `supi-agent-runtime`.
 - Leave Review execution and admission policy unchanged.
 - Do not add durable workers, restart recovery, background writers, or workspace isolation.
@@ -169,4 +170,4 @@ agent_cancel({ batchId })
 - [Earlier foreground decision](adr/0008-keep-agent-runs-foreground-and-awaited.md).
 - [Accepted background decision](adr/0010-own-background-delegation-in-the-containing-session.md).
 - [Runtime-owned Background Run Batches](../../supi-agent-runtime/docs/adr/0014-own-background-run-batches-and-result-collection.md).
-- `packages/supi-agent-runtime/src/background/`: the Background Run Batch controller and Usage receipts. `packages/supi-agent/src/delegation/controller.ts`: Agent admission and checkpoints.
+- `packages/supi-agent-runtime/src/background/`: the Background Run Batch controller and Usage receipts. `packages/supi-agent-runtime/src/tool/`: the `agent_result` and `agent_cancel` tools. `packages/supi-agent/src/delegation/controller.ts`: Agent admission and checkpoints. `packages/supi-agent/src/tool/agent_result/` and `agent_cancel/`: the Delegation result formats and rendering.

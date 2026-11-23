@@ -1,19 +1,24 @@
 import { rm, rmdir } from "node:fs/promises";
 import { dirname } from "node:path";
+import type { Usage } from "@earendil-works/pi-ai";
 import type {
   ContextEvent,
   ExtensionAPI,
   ExtensionContext,
   SessionEntry,
 } from "@earendil-works/pi-coding-agent";
-import { recordDebugEvent } from "@mrclrchtr/supi-core/debug";
 import type { AgentRunRegistry } from "../session/agent-run-registry.ts";
+import { syncCollectionToolActivation } from "../tool/activation.ts";
 import { readResultCollection } from "./collection.ts";
+import { findLaunchEntry, readNoticeTarget, sendCompletionNotice } from "./notices.ts";
 import type {
+  CollectableRunBatch,
   RunBatch,
+  RunBatchCollection,
   RunBatchHandle,
   RunBatchOwner,
   RunBatchOwnerOptions,
+  RunBatchUsageReceipt,
   StartRunBatchOptions,
 } from "./types.ts";
 import { RunBatchUsageReceipts } from "./usage-receipts.ts";
@@ -21,7 +26,7 @@ import { waitForRunBatch } from "./wait.ts";
 
 interface OwnerRecord {
   pi: ExtensionAPI;
-  options: RunBatchOwnerOptions<RunBatchHandle>;
+  options: RunBatchOwnerOptions<RunBatchHandle, unknown>;
 }
 
 /** One owned batch with the delivery state the runtime keeps for it. */
@@ -31,6 +36,8 @@ interface BatchRecord {
   readonly notified: Set<string>;
   acknowledged: boolean;
   abandoned: boolean;
+  /** Every task is terminal; once-per-batch notices wait for it. */
+  complete: boolean;
 }
 
 /**
@@ -56,12 +63,13 @@ export class BackgroundRunBatches {
   /** Register or replace one owner, keyed by its notice type. */
   registerOwner<THandle extends RunBatchHandle, TData>(
     pi: ExtensionAPI,
-    options: RunBatchOwnerOptions<THandle>,
+    options: RunBatchOwnerOptions<THandle, TData>,
   ): RunBatchOwner<THandle, TData> {
     const existing = this.#owners.get(options.noticeType);
-    const owner: OwnerRecord = existing ?? { pi, options: options as RunBatchOwnerOptions };
+    const owned = options as unknown as RunBatchOwnerOptions<RunBatchHandle, unknown>;
+    const owner: OwnerRecord = existing ?? { pi, options: owned };
     owner.pi = pi;
-    owner.options = options as RunBatchOwnerOptions;
+    owner.options = owned;
     this.#owners.set(options.noticeType, owner);
     return this.#ownerView<THandle, TData>(owner);
   }
@@ -73,42 +81,88 @@ export class BackgroundRunBatches {
     const records = () => [...this.#batches.values()].filter((record) => record.owner === owner);
     return {
       open: (ctx) => this.#open(ctx),
-      findLaunch: (callId, ctx) =>
-        ctx.sessionManager
-          .getBranch()
-          .find(
-            (entry) =>
-              entry.type === "message" &&
-              entry.message.role === "assistant" &&
-              entry.message.content.some((part) => part.type === "toolCall" && part.id === callId),
-          )?.id,
+      findLaunch: (callId, ctx) => findLaunchEntry(callId, ctx.sessionManager.getBranch()),
       start: (options) => this.#start(owner, options) as Promise<Batch>,
       batches: () => records().map((record) => record.batch as Batch),
       isOnBranch: (batch) => this.#onBranch(batch),
-      get: (batchId, ctx) => {
-        this.#open(ctx);
-        this.#receipts.reconcile(ctx.sessionManager.getEntries());
-        owner.options.reconcile?.(ctx.sessionManager.getBranch(), false);
-        const record = this.#batches.get(batchId);
-        if (this.#closed || !record || record.owner !== owner || record.batch.mode !== "background")
-          throw new Error("Unknown or expired background batch handle.");
-        if (!this.#onBranch(record.batch))
-          throw new Error("The batch launch is not on the active branch.");
-        return record.batch as Batch;
-      },
-      wait: async (batch, signal) => {
-        await waitForRunBatch(
-          batch.handle.result,
-          signal ? AbortSignal.any([signal, this.#shutdown.signal]) : this.#shutdown.signal,
-        );
-      },
-      prepareUsage: (callId, batch) =>
-        this.#receipts.prepare(callId, batch.handle.batchId, batch.handle.snapshot().results),
       usageReported: (batch, taskId) => this.#receipts.reported(batch.handle.batchId, taskId),
       retainOutput: (path) => {
         if (path) this.#outputPaths.add(path);
       },
+      syncCollectionTools: () => this.syncCollectionTools(owner.pi),
     };
+  }
+
+  /**
+   * Resolve a background batch whose owner serves Result Collection and whose launch is on the
+   * active branch, or throw. The same checks apply to every owner.
+   */
+  resolveCollection(batchId: string, ctx: ExtensionContext): CollectableRunBatch {
+    this.#open(ctx);
+    this.#receipts.reconcile(ctx.sessionManager.getEntries());
+    const record = this.#batches.get(batchId);
+    record?.owner.options.reconcile?.(ctx.sessionManager.getBranch(), false);
+    const collection = record?.owner.options.collection;
+    if (this.#closed || !record || !collection || record.batch.mode !== "background")
+      throw new Error("Unknown or expired background batch handle.");
+    if (!this.#onBranch(record.batch))
+      throw new Error("The batch launch is not on the active branch.");
+    return { batch: record.batch, collection, ownerKey: record.owner.options.noticeType };
+  }
+
+  /** Wait for every task while observing the caller signal and session shutdown. */
+  async wait(
+    batch: RunBatch<RunBatchHandle, unknown>,
+    signal: AbortSignal | undefined,
+    canceledMessage: string,
+  ): Promise<void> {
+    await waitForRunBatch(
+      batch.handle.result,
+      signal ? AbortSignal.any([signal, this.#shutdown.signal]) : this.#shutdown.signal,
+      canceledMessage,
+    );
+  }
+
+  /**
+   * Reserve the unreported Usage of finalized tasks for one collection result. It counts as
+   * reported only after Pi stores the `agent_result` call's result with that Usage.
+   */
+  prepareUsage(
+    callId: string,
+    batch: RunBatch<RunBatchHandle, unknown>,
+  ): { usage?: Usage; usageReceipt?: RunBatchUsageReceipt } {
+    return this.#receipts.prepare(callId, batch.handle.batchId, batch.handle.snapshot().results);
+  }
+
+  /**
+   * The collection that renders a stored or live result: the stamped owner, else the owner of the
+   * batch, else the first owner that serves collection.
+   */
+  collectionFor(
+    ownerKey: unknown,
+    batchId: unknown,
+  ): RunBatchCollection<RunBatchHandle, unknown> | undefined {
+    const stamped = typeof ownerKey === "string" ? this.#owners.get(ownerKey) : undefined;
+    const batchOwner = typeof batchId === "string" ? this.#batches.get(batchId)?.owner : undefined;
+    return (
+      stamped?.options.collection ??
+      batchOwner?.options.collection ??
+      [...this.#owners.values()].find((owner) => owner.options.collection)?.options.collection
+    );
+  }
+
+  /**
+   * Activate `agent_result` and `agent_cancel` while any registered owner needs them and
+   * deactivate them otherwise. Other active tools are preserved. While no owner states
+   * `toolsNeeded`, Pi's activation on registration and later user choices stand.
+   */
+  syncCollectionTools(pi: ExtensionAPI): void {
+    syncCollectionToolActivation(
+      pi,
+      [...this.#owners.values()].flatMap(({ options }) =>
+        options.collection ? [options.collection] : [],
+      ),
+    );
   }
 
   /** Bind the active session manager and parent operation; false once the session is closed. */
@@ -136,27 +190,36 @@ export class BackgroundRunBatches {
         this.#scheduleNotice();
       },
     });
-    const owned = startup.result.then((handle) => {
-      const batch: RunBatch<RunBatchHandle, unknown> = {
-        handle,
-        mode: options.mode,
-        callId: options.callId,
-        launchId: options.launchId,
-        data: options.data,
-      };
-      this.#batches.set(handle.batchId, {
-        batch,
-        owner,
-        notified: new Set(),
-        acknowledged: false,
-        abandoned: false,
-      });
-      return batch;
-    });
+    const owned = startup.result.then((handle) => this.#own(owner, options, handle));
     const settlement = Promise.allSettled([startup.settled, owned]).then(() => undefined);
     this.#starting.add(settlement);
     void settlement.then(() => this.#starting.delete(settlement));
     return owned;
+  }
+
+  #own(
+    owner: OwnerRecord,
+    options: StartRunBatchOptions<RunBatchHandle, unknown>,
+    handle: RunBatchHandle,
+  ): RunBatch<RunBatchHandle, unknown> {
+    const { mode, callId, launchId, data } = options;
+    const batch: RunBatch<RunBatchHandle, unknown> = { handle, mode, callId, launchId, data };
+    const record: BatchRecord = {
+      batch,
+      owner,
+      notified: new Set(),
+      acknowledged: false,
+      abandoned: false,
+      complete: false,
+    };
+    this.#batches.set(handle.batchId, record);
+    // Once-per-batch notices wait for every task to be terminal.
+    const markComplete = () => {
+      record.complete = true;
+      this.#scheduleNotice();
+    };
+    handle.result.then(markComplete, markComplete);
+    return batch;
   }
 
   /** Confirm launch results and collections only after Pi has stored them. */
@@ -325,6 +388,7 @@ export class BackgroundRunBatches {
       batch.mode !== "background" ||
       record.abandoned ||
       !record.acknowledged ||
+      (owner.options.noticeGranularity === "batch" && !record.complete) ||
       !this.#onBranch(batch)
     )
       return;
@@ -333,34 +397,6 @@ export class BackgroundRunBatches {
       .results.filter((task) => task.status !== "canceled" && !record.notified.has(task.taskId));
     if (!ready.length) return;
     for (const task of ready) record.notified.add(task.taskId);
-    try {
-      const notice = owner.options.buildNotice(batch.handle.batchId, ready);
-      owner.pi.sendMessage(
-        {
-          customType: owner.options.noticeType,
-          content: notice.content,
-          display: notice.display ?? true,
-          details: notice.details,
-        },
-        { deliverAs: "steer", triggerTurn: true },
-      );
-    } catch {
-      recordDebugEvent({
-        source: owner.options.source,
-        level: "warning",
-        category: "background-run-batch",
-        message: "Background completion delivery failed. Results remain available for collection.",
-      });
-    }
+    sendCompletionNotice(owner.pi, owner.options, batch.handle.batchId, ready);
   }
-}
-
-/** Read the batch and task IDs of stored notice details; malformed details count as stale. */
-function readNoticeTarget(
-  details: unknown,
-): { batchId: string; taskIds: readonly string[] } | undefined {
-  if (!details || typeof details !== "object") return undefined;
-  const { batchId, taskIds } = details as { batchId?: unknown; taskIds?: unknown };
-  if (typeof batchId !== "string" || !Array.isArray(taskIds)) return undefined;
-  return { batchId, taskIds: taskIds.filter((id): id is string => typeof id === "string") };
 }

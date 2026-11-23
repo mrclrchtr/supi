@@ -9,12 +9,15 @@ export { readResultCollection } from "./background/collection.ts";
 export { registerRunBatchOwner } from "./background/register.ts";
 export type {
   CompletionNotice,
+  CompletionNoticeGranularity,
   CompletionNoticeTarget,
   RunBatch,
+  RunBatchCollection,
   RunBatchHandle,
   RunBatchMode,
   RunBatchOwner,
   RunBatchOwnerOptions,
+  RunBatchResultRenderer,
   RunBatchStartControl,
   RunBatchTask,
   RunBatchTaskOf,

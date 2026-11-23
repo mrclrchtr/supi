@@ -115,8 +115,8 @@ When multiple SuPi packages need the same path, URI, config, or session helper s
 | `supi-ask-user` | per-tool `tool/ask_user/`; interactive form stays in `ui/` |
 | `supi-code-intelligence` | per-tool directories for the eight `code_*` tools + shared tool modules; keep `app/`, `session/`, `substrate/`, `analysis/`, `ui/` |
 | `supi-code-runtime` | library-only: flat source with `capability/` + `workspace/`; no pi extension |
-| `supi-agent` | per-tool `tool/agent_run/`, `tool/agent_result/`, `tool/agent_cancel/`; `delegation/` owns session policy; catalogue/resource policy stays at root |
-| `supi-agent-runtime` | library-only: flat lifecycle/diagnostics source; no pi extension |
+| `supi-agent` | per-tool `tool/agent_run/`, `tool/agent_list/`; `tool/agent_result/` and `tool/agent_cancel/` hold only the Delegation Batch result format and rendering; `delegation/` owns session policy; catalogue/resource policy stays at root |
+| `supi-agent-runtime` | library-only: flat lifecycle/diagnostics source, `background/` for Background Run Batches, and `tool/agent_result/` and `tool/agent_cancel/` (spec, guidance, execution ordering; owners supply results and rendering); no pi extension |
 | `supi-consulting` | per-tool `tool/consulting_run/`; private agent adapters in `agents/`; branch-aware handles in `conversation/` |
 | `supi-context` | root domains stay; per-tool `tool/<tool>/` layout |
 | `supi-core` | domain-first if reorganized: `config/`, `context/`, `settings/` |

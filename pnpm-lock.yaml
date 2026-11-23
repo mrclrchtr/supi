@@ -300,6 +300,9 @@ importers:
       '@mrclrchtr/supi-core':
         specifier: workspace:*
         version: link:../supi-core
+      typebox:
+        specifier: '*'
+        version: 1.4.7
     devDependencies:
       '@mrclrchtr/supi-ask-user':
         specifier: workspace:*

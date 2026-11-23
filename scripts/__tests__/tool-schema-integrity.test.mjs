@@ -33,10 +33,10 @@ async function collectTools() {
   add("supi-agent", "agent_run", { ...m.agentRunSpec, parameters: m.buildAgentRunParameters() });
   m = await import(`${PACKAGES}/supi-agent/src/tool/agent_list/spec.ts`);
   add("supi-agent", "agent_list", m.agentListSpec);
-  m = await import(`${PACKAGES}/supi-agent/src/tool/agent_result/spec.ts`);
-  add("supi-agent", "agent_result", m.agentResultSpec);
-  m = await import(`${PACKAGES}/supi-agent/src/tool/agent_cancel/spec.ts`);
-  add("supi-agent", "agent_cancel", m.agentCancelSpec);
+  m = await import(`${PACKAGES}/supi-agent-runtime/src/tool/agent_result/spec.ts`);
+  add("supi-agent-runtime", "agent_result", m.agentResultSpec);
+  m = await import(`${PACKAGES}/supi-agent-runtime/src/tool/agent_cancel/spec.ts`);
+  add("supi-agent-runtime", "agent_cancel", m.agentCancelSpec);
   m = await import(`${PACKAGES}/supi-agent/src/tool/git/spec.ts`);
   add("supi-agent", "git", m.gitSpec);
   m = await import(`${PACKAGES}/supi-web/src/tool/web_fetch_md/spec.ts`);

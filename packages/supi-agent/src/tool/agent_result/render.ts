@@ -5,7 +5,6 @@ import { renderFinal } from "../agent_run/render.ts";
 import { statusColor, statusLabel } from "../agent_run/render-format.ts";
 import { renderPartial } from "../agent_run/render-live.ts";
 import type { AgentRunResultDetails } from "../agent_run/result.ts";
-import { renderBatchCall, renderBatchError } from "../background-render.ts";
 import type { CompletionNoticeDetails } from "./result.ts";
 
 /**
@@ -38,12 +37,8 @@ export function renderCompletionNotice(
   return new Text(lines.join("\n"), 0, 0);
 }
 
-/** Render the collection handle without task instructions. */
-export function renderCall(args: unknown, theme: Theme): Text {
-  return renderBatchCall("Agent Result", args, theme);
-}
-
 /**
+ * Render a Delegation Batch `agent_result` result; the runtime renders errors and the call.
  * Waiting shows live task rows. Collected results reuse the Agent Run final layout (status and
  * output preview collapsed, full output expanded); still-pending tasks follow as status rows.
  */
@@ -51,9 +46,7 @@ export function renderResult(
   result: { details?: unknown; content?: { type: string; text?: string }[] },
   options: { expanded: boolean; isPartial: boolean },
   theme: Theme,
-  context: { isError?: boolean } = {},
 ): Container | Text {
-  if (context.isError) return renderBatchError(result, theme);
   if (options.isPartial) {
     const progress = result.details as Partial<BatchProgressState> | undefined;
     if (!progress?.tasks) return new Text(theme.fg("dim", "Waiting for agents…"), 0, 0);

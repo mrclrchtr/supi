@@ -11,10 +11,11 @@ import { type DelegationBatchData, DelegationController } from "./delegation/con
 import { agentProfilePages } from "./profile-pages.ts";
 import { registerProfileSettings } from "./profile-settings.ts";
 import { agentProfileCatalogueStore } from "./session.ts";
-import { registerAgentCancelTool } from "./tool/agent_cancel/register.ts";
+import { cancelDelegationBatch } from "./tool/agent_cancel/execute.ts";
+import { renderResult as renderCancelResult } from "./tool/agent_cancel/render.ts";
 import { registerAgentListTool } from "./tool/agent_list/register.ts";
-import { registerAgentResultTool } from "./tool/agent_result/register.ts";
-import { renderCompletionNotice } from "./tool/agent_result/render.ts";
+import { collectDelegationBatch, delegationProgress } from "./tool/agent_result/execute.ts";
+import { renderCompletionNotice, renderResult } from "./tool/agent_result/render.ts";
 import { buildCompletionNotice } from "./tool/agent_result/result.ts";
 import type { DelegationBatchHandle } from "./tool/agent_run/batch-types.ts";
 import { registerAgentRunTool } from "./tool/agent_run/register.ts";
@@ -45,17 +46,34 @@ export default function agentExtension(pi: ExtensionAPI): void {
         "warning",
       );
     }
+    const current = () => {
+      if (!controller) throw new Error("The delegation session is closed.");
+      return controller;
+    };
+    // The runtime registers agent_result and agent_cancel once and dispatches Delegation
+    // Batches here. They stay active independently of the Agent Run tool setting.
     const owned = registerRunBatchOwner<DelegationBatchHandle, DelegationBatchData>(pi, {
       source: "supi-agent",
       noticeType: AGENT_COMPLETION_MESSAGE_TYPE,
+      noticeGranularity: "task",
       buildNotice: buildCompletionNotice,
       reconcile: (branch, release) => controller?.reconcile(branch, release),
+      collection: {
+        collect: (callId, batch, ctx) => collectDelegationBatch(current(), callId, batch, ctx),
+        cancel: (batch, { requested }, ctx) =>
+          cancelDelegationBatch(current(), batch, requested, ctx),
+        progress: delegationProgress,
+        renderResult,
+        renderCancel: renderCancelResult,
+        canceledMessages: {
+          wait: "Delegation wait canceled.",
+          collection: "Delegation collection canceled.",
+        },
+      },
     });
     controller = new DelegationController(registry, owned);
     registerAgentRunTool(pi, controller);
     registerAgentListTool(pi, controller);
-    registerAgentResultTool(pi, controller);
-    registerAgentCancelTool(pi, controller);
     syncAgentRunTool(pi, ctx.cwd);
   });
 

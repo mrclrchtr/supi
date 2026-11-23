@@ -99,4 +99,15 @@ describe("background parent lifecycle", () => {
     });
     expect(collected.usage?.totalTokens).toBe(15);
   });
+
+  it("reports a parent-aborted result wait with the delegation wording", async () => {
+    harness = await backgroundHarness(sdk);
+    const parent = await harness.beginParent();
+    const start = await harness.invoke("agent_run", { tasks: [task()] });
+    await vi.waitFor(() => expect(harness?.children[0]?.session.isStreaming).toBe(true));
+    const waiting = harness.invoke("agent_result", { batchId: start.details.batchId, wait: true });
+    const assertion = expect(waiting).rejects.toThrow("Delegation wait canceled.");
+    parent.abort();
+    await assertion;
+  });
 });

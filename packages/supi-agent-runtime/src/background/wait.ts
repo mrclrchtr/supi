@@ -1,13 +1,17 @@
 /** Wait for owned work without delaying parent cancellation. The work itself remains owned. */
-export async function waitForRunBatch<T>(result: Promise<T>, signal?: AbortSignal): Promise<T> {
-  if (signal?.aborted) throw new Error("Run Batch wait canceled.");
+export async function waitForRunBatch<T>(
+  result: Promise<T>,
+  signal: AbortSignal | undefined,
+  canceledMessage: string,
+): Promise<T> {
+  if (signal?.aborted) throw new Error(canceledMessage);
   if (!signal) return result;
   let onAbort: (() => void) | undefined;
   try {
     return await Promise.race([
       result,
       new Promise<never>((_resolve, reject) => {
-        onAbort = () => reject(new Error("Run Batch wait canceled."));
+        onAbort = () => reject(new Error(canceledMessage));
         signal.addEventListener("abort", onAbort, { once: true });
       }),
     ]);

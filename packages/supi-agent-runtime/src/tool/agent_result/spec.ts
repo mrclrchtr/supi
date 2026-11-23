@@ -1,8 +1,6 @@
 import { Type } from "typebox";
 import { AGENT_RESULT_TOOL_NAME } from "../names.ts";
 
-export { makeAgentResultExecute } from "./execute.ts";
-
 /** Canonical public interface for background result collection. */
 export const agentResultSpec = {
   name: AGENT_RESULT_TOOL_NAME,

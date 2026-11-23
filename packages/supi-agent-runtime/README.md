@@ -110,12 +110,25 @@ If the Ask User tool opens a form while `/agents` is open, the viewer closes so 
 
 An owner package that lets its caller continue while runs are active hands each admitted Run Batch to the runtime ([ADR 0014](docs/adr/0014-own-background-run-batches-and-result-collection.md)). Call `registerRunBatchOwner(pi, options)` on every `session_start`; it returns the owner's access to the batches of the containing session. Bundled runtime copies share one set of batches, like the run registry.
 
-The owner supplies admission, a `RunBatchHandle` for its started runs, the launch call identity (`findLaunch()`), and a Completion Notice builder with its own custom message type. The runtime then owns:
+The owner supplies admission, a `RunBatchHandle` for its started runs, the launch call identity (`findLaunch()`), a Completion Notice builder with its own custom message type, and its Result Collection (`collection`). The runtime then owns:
 
-- session and launch-branch ownership: a batch whose launch leaves the active branch stops, and `get()` rejects unknown, expired, foreign, or off-branch handles;
-- Completion Notices: one notice for the tasks that became ready since the last one, sent only after Pi stores the successful launch result, and removed from model context once stale;
+- session and launch-branch ownership: a batch whose launch leaves the active branch stops;
+- Completion Notices, sent only after Pi stores the successful launch result and removed from model context once stale. `noticeGranularity: "task"` (default) sends one notice for the tasks that became ready since the last one; `"batch"` sends a single notice once every task is terminal;
 - parent abort: every active batch stops and notices pause until the next input that is not from an extension; normal parent completion leaves batches running;
-- waiting with cancellation (`wait()`), Usage receipts (`prepareUsage()`), and spill-file cleanup (`retainOutput()`);
+- Usage receipts and spill-file cleanup (`retainOutput()`);
 - close on session shutdown, which stops owned runs and suppresses late delivery.
 
-Usage counts as reported only after Pi stores the `agent_result` result that carries it. The collection result's `details` must carry `batchId` and `tasks[].taskId`; `readResultCollection()` reads them back. The owner still registers `agent_result` and formats collected results.
+### Result Collection tools
+
+The first owner that supplies `collection` registers `agent_result` and `agent_cancel` once per Pi runtime, as `registerAgentsCommand()` does for `/agents`. Both tools serve every owner. For each call the runtime:
+
+1. resolves the addressed batch and rejects unknown, expired, other-session, and off-branch handles for every owner;
+2. for `agent_result`, waits when `wait: true` (streaming the owner's `progress()`), then revalidates the handle;
+3. lets the owner assemble the result (`collect()`), which is where owner records such as checkpoints are prepared;
+4. reserves the unreported Usage of finalized tasks for that result.
+
+`agent_cancel` lets the owner format the result (`cancel()`) and then requests the stop of active runs. The owner renders its own results (`renderResult()`, `renderCancel()`) and may set model-facing cancellation text (`canceledMessages`). The runtime renders errors and the call header.
+
+Usage counts as reported only after Pi stores the `agent_result` result that carries it. The collection result's `details` must carry `batchId` and `tasks[].taskId`; `readResultCollection()` reads them back.
+
+Pi activates both tools on registration. An owner that implements `collection.toolsNeeded()` has them deactivated while no registered owner needs them; call `syncCollectionTools()` after its answer changes.

@@ -26,7 +26,7 @@ Multi-context monorepo. Each package is an independent context with its own `GLO
 - [supi-web](./packages/supi-web/GLOSSARY.md)
 
 Relationships:
-- **supi-agent → supi-agent-runtime**: Agent Profiles compile Delegation Tasks into Agent Runs; the runtime owns the shared session registry, temporary transcripts, and `/agents` viewer. A Background Delegation Batch is a Background Run Batch: the runtime owns its ownership, Completion Notices, waiting, and Usage; `supi-agent` keeps admission and the result format.
+- **supi-agent → supi-agent-runtime**: Agent Profiles compile Delegation Tasks into Agent Runs; the runtime owns the shared session registry, temporary transcripts, and `/agents` viewer. A Background Delegation Batch is a Background Run Batch: the runtime owns its ownership, Completion Notices, waiting, Usage, and the `agent_result` and `agent_cancel` tools; `supi-agent` keeps admission, per-task notice granularity, and the result format and rendering.
 - **supi-review → supi-agent-runtime**: Reviewer and Planner adapters resolve structured completions through Agent Runs. Reviewer Runs appear in the same registry; Review audit stays separate.
 - **supi-insights → supi-debug, supi-agent-runtime**: The Insights Report reads persisted Agent Run and Tooling Retrospectives as Retrospective Evidence; the producers do not know Session Facets ([ADR 0027](./docs/adr/0027-retrospective-evidence-sources.md)).
 - **supi-web → supi-agent, supi-review**: The loaded Web extension supplies Conditional Capabilities and Reviewer Web Access to child sessions; neither consumer depends on supi-web ([ADR 0026](./docs/adr/0026-session-provided-web-capabilities.md)).

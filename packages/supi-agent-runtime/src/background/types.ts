@@ -1,5 +1,12 @@
 import type { Usage } from "@earendil-works/pi-ai";
-import type { ExtensionContext, SessionEntry } from "@earendil-works/pi-coding-agent";
+import type {
+  AgentToolResult,
+  ExtensionContext,
+  SessionEntry,
+  Theme,
+  ToolRenderResultOptions,
+} from "@earendil-works/pi-coding-agent";
+import type { Component } from "@earendil-works/pi-tui";
 import type { AgentRunStatus } from "../types.ts";
 
 /** Minimal view of one finalized task in a Run Batch. Owners add their own result fields. */
@@ -59,8 +66,77 @@ export interface CompletionNotice {
   readonly details: CompletionNoticeTarget;
 }
 
+/**
+ * When the runtime sends Completion Notices: `task` sends one for the tasks that became ready since
+ * the last notice (Delegation); `batch` sends a single notice once every task is terminal.
+ */
+export type CompletionNoticeGranularity = "task" | "batch";
+
+/** Renderer of one collection tool result; `context` is Pi's tool render context. */
+export type RunBatchResultRenderer = (
+  result: AgentToolResult<unknown>,
+  options: ToolRenderResultOptions,
+  theme: Theme,
+  context: { readonly isError?: boolean },
+) => Component;
+
+/**
+ * An owner's part of Result Collection through the runtime-owned `agent_result` and
+ * `agent_cancel` tools. The runtime resolves the addressed batch, rejects unknown, expired, and
+ * off-branch handles, waits, revalidates, and reserves Usage; the owner formats and renders.
+ */
+export interface RunBatchCollection<
+  THandle extends RunBatchHandle = RunBatchHandle,
+  TData = undefined,
+> {
+  /**
+   * Assemble one collection result after waiting and revalidation, before Usage is reserved. Its
+   * `details` must carry `batchId` and `tasks[].taskId` (see `readResultCollection()`). Owner
+   * records that Pi must store with the result, such as checkpoints, are prepared here.
+   */
+  collect(
+    callId: string,
+    batch: RunBatch<THandle, TData>,
+    ctx: ExtensionContext,
+  ): AgentToolResult<Record<string, unknown>>;
+  /**
+   * Format the result of a cancellation request. `requested` is true when active runs remained;
+   * the runtime requests their stop after this call.
+   */
+  cancel(
+    batch: RunBatch<THandle, TData>,
+    request: { readonly requested: boolean },
+    ctx: ExtensionContext,
+  ): AgentToolResult<unknown>;
+  /** Partial result streamed while `agent_result` waits; repeated equal `details` are skipped. */
+  progress?(batch: RunBatch<THandle, TData>): AgentToolResult<Record<string, unknown>>;
+  /** Render this owner's partial and final `agent_result` results. Errors are runtime-rendered. */
+  renderResult: RunBatchResultRenderer;
+  /** Render this owner's `agent_cancel` results. Errors are runtime-rendered. */
+  renderCancel: RunBatchResultRenderer;
+  /** Model-facing errors when the caller cancels a wait or a collection after it. */
+  readonly canceledMessages?: { readonly wait?: string; readonly collection?: string };
+  /**
+   * Whether this owner currently needs `agent_result` and `agent_cancel` active; defaults to
+   * true. The tools are deactivated only while no registered owner needs them. Call
+   * {@link RunBatchOwner.syncCollectionTools} when the answer changes.
+   */
+  toolsNeeded?(): boolean;
+}
+
+/** A batch resolved for Result Collection, with the collection of its owner. Runtime-internal. */
+export interface CollectableRunBatch {
+  readonly batch: RunBatch<RunBatchHandle, unknown>;
+  readonly collection: RunBatchCollection<RunBatchHandle, unknown>;
+  /** Stable owner key; stamped into collection results so stored results render by owner. */
+  readonly ownerKey: string;
+}
+
 /** Owner policy that the runtime applies to every batch the owner hands over. */
-export interface RunBatchOwnerOptions<THandle extends RunBatchHandle = RunBatchHandle> {
+export interface RunBatchOwnerOptions<
+  THandle extends RunBatchHandle = RunBatchHandle,
+  TData = undefined,
+> {
   /** Debug-event source of the owner package, such as `supi-agent`. */
   readonly source: string;
   /**
@@ -70,6 +146,13 @@ export interface RunBatchOwnerOptions<THandle extends RunBatchHandle = RunBatchH
   readonly noticeType: string;
   /** Build one Completion Notice for the tasks of a batch that became ready since the last one. */
   buildNotice(batchId: string, tasks: readonly RunBatchTaskOf<THandle>[]): CompletionNotice;
+  /** Completion Notice granularity; defaults to `task`. */
+  readonly noticeGranularity?: CompletionNoticeGranularity;
+  /**
+   * Serve this owner's batches through the runtime-owned `agent_result` and `agent_cancel`. The
+   * first owner that supplies it registers both tools once for the Pi runtime.
+   */
+  readonly collection?: RunBatchCollection<THandle, TData>;
   /**
    * Reconcile owner state with the raw active branch before a collection (`releaseUnstored`
    * false) and after tree navigation or a parent turn (`releaseUnstored` true), when collection
@@ -131,20 +214,10 @@ export interface RunBatchOwner<THandle extends RunBatchHandle = RunBatchHandle, 
   batches(): RunBatch<THandle, TData>[];
   /** Whether the batch's launch is on the active branch. */
   isOnBranch(batch: RunBatch<THandle, TData>): boolean;
-  /** Resolve a background batch of this owner whose launch is on the active branch, or throw. */
-  get(batchId: string, ctx: ExtensionContext): RunBatch<THandle, TData>;
-  /** Wait for every task while observing the caller signal and session shutdown. */
-  wait(batch: RunBatch<THandle, TData>, signal?: AbortSignal): Promise<void>;
-  /**
-   * Reserve the unreported Usage of finalized tasks for one collection result. It counts as
-   * reported only after Pi stores the `agent_result` call's result with that Usage.
-   */
-  prepareUsage(
-    callId: string,
-    batch: RunBatch<THandle, TData>,
-  ): { usage?: Usage; usageReceipt?: RunBatchUsageReceipt };
   /** Whether Pi stored this task's Usage in a collection result. */
   usageReported(batch: RunBatch<THandle, TData>, taskId: string): boolean;
   /** Delete an internally generated spill file and its directory when the session closes. */
   retainOutput(path: string | undefined): void;
+  /** Reapply the activation of `agent_result` and `agent_cancel` after `toolsNeeded()` changed. */
+  syncCollectionTools(): void;
 }

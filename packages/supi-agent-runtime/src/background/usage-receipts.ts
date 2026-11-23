@@ -1,11 +1,12 @@
 import { randomUUID } from "node:crypto";
 import type { Usage } from "@earendil-works/pi-ai";
 import type { SessionEntry } from "@earendil-works/pi-coding-agent";
+import { AGENT_RESULT_TOOL_NAME } from "../tool/names.ts";
 import { combineAgentRunUsage } from "../usage.ts";
 import type { RunBatchTask, RunBatchUsageReceipt } from "./types.ts";
 
 /** Name of the Result Collection tool whose stored results report Usage. */
-export const RESULT_COLLECTION_TOOL_NAME = "agent_result";
+export const RESULT_COLLECTION_TOOL_NAME = AGENT_RESULT_TOOL_NAME;
 
 interface PendingReceipt {
   readonly receipt: RunBatchUsageReceipt;

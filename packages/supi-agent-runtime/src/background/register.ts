@@ -1,5 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { runtimeState } from "../session/runtime-state.ts";
+import { registerCollectionTools } from "../tool/register.ts";
 import { BackgroundRunBatches } from "./controller.ts";
 import type { RunBatchHandle, RunBatchOwner, RunBatchOwnerOptions } from "./types.ts";
 
@@ -8,17 +9,29 @@ import type { RunBatchHandle, RunBatchOwner, RunBatchOwnerOptions } from "./type
  * its access. Call it on every `session_start`: the batches belong to one session and close on
  * `session_shutdown`. All bundled runtime copies in a Pi runtime share one set of batches.
  * Registering again with the same `noticeType` replaces the owner's options.
+ *
+ * An owner that supplies `collection` asks for the runtime-owned `agent_result` and
+ * `agent_cancel`. The first such owner registers both tools once for the Pi runtime, like
+ * `/agents`; they then dispatch each call to the owner of the addressed batch. Pi activates them on
+ * registration; an owner that supplies `collection.toolsNeeded` has them deactivated while no
+ * registered owner needs them.
  */
 export function registerRunBatchOwner<THandle extends RunBatchHandle, TData = undefined>(
   pi: ExtensionAPI,
-  options: RunBatchOwnerOptions<THandle>,
+  options: RunBatchOwnerOptions<THandle, TData>,
 ): RunBatchOwner<THandle, TData> {
   const state = runtimeState(pi);
   if (!state.background) {
     state.background = new BackgroundRunBatches(state.registry);
     bindSessionEvents(pi, state.background);
   }
-  return state.background.registerOwner<THandle, TData>(pi, options);
+  const owner = state.background.registerOwner<THandle, TData>(pi, options);
+  if (options.collection && !state.collectionToolsRegistered) {
+    registerCollectionTools(pi);
+    state.collectionToolsRegistered = true;
+  }
+  if (options.collection) owner.syncCollectionTools();
+  return owner;
 }
 
 /**

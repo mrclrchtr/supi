@@ -20,6 +20,8 @@ export interface SharedRuntimeState {
   profilePages?: { readonly owner: object; readonly provider: AgentsProfilePages };
   /** Background Run Batches of the current session; created when the first owner registers. */
   background?: BackgroundRunBatches;
+  /** Whether an owner already registered `agent_result` and `agent_cancel` for this Pi runtime. */
+  collectionToolsRegistered?: boolean;
 }
 
 const sharedStateKey = Symbol.for("@mrclrchtr/supi-agent-runtime/agents-viewer");
