@@ -212,7 +212,17 @@ jobs:
         run: pnpm exec vitest run --reporter=agent packages/supi-lsp/__tests__/unit/typescript-launch.test.ts
       # Includes the TypeScript lifecycle tests; suites whose server is not provisioned skip.
       - name: Run real language-server integration tests
+        env:
+          SUPI_TEST_DEBUG_DIR: ${{ runner.temp }}/supi-test-debug
         run: pnpm exec vitest run --reporter=agent --project servers
+      - name: Upload debug events of failed server tests
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: language-baseline-debug-${{ matrix.os }}
+          path: ${{ runner.temp }}/supi-test-debug
+          if-no-files-found: ignore
+          retention-days: 14
       - name: Run required real-server acceptance suite
         run: pnpm test:language-baseline:acceptance
       - name: Remove isolated server installs

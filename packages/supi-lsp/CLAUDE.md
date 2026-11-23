@@ -53,6 +53,7 @@ See [ADR 0022](../../docs/adr/0022-request-confirmed-lsp-agnostic-diagnostics.md
 - Clear pull `resultId` state after file creation so cross-file diagnostics recompute. `didClose`, prune, refresh deletion, and shutdown must release pending waiters.
 - Workspace sentinels include `package.json`, root lockfiles, `tsconfig*`, and generated `*.d.ts` files. Successful `write`/`edit` calls trigger soft recovery for sentinels and configured source extensions.
 - Diagnostic timing records the request source. Publication counts remain bounded telemetry only.
+- Partial and unavailable file diagnostics originate in `client-diagnostic-collection.ts`, `incompleteDiagnosticResult()` in `client-diagnostic-evidence.ts`, and `#verifyDiagnosticInputs` in `client-diagnostics.ts`.
 
 ## Configuration
 
@@ -71,3 +72,5 @@ Thread `ctx.cwd` through manager and formatting code; do not use `process.cwd()`
 ## Tests
 
 Required TypeScript integration tests use `typescript-language-server` and `tsserver`. Python and Bash integration tests skip when their binaries are unavailable. All optional suites use `describe.skipIf(!HAS_COMMAND)`. `__tests__/integration/` runs in the root Vitest project `servers` (after the unit project, limited workers, 10 s test timeout); keep server-free tests out of it.
+
+To debug a `servers` failure, set `SUPI_TEST_DEBUG_DIR=<dir>`: `__tests__/helpers/server-test-debug.ts` writes each failed test's debug events as JSON there. Add `SUPI_TEST_DEBUG_PASSED=1` to also write passing runs and compare timelines of a flaky test. CI uploads the failure captures as the `language-baseline-debug-<os>` artifact.

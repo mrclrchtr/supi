@@ -20,6 +20,7 @@ When adding, changing, or reviewing tests, check:
 - Which assertion would fail for that fault, and does the test exercise the relevant real subject or artifact?
 - Is the expectation independent of the implementation, or is the relationship itself the required contract?
 - Does existing coverage or static validation already catch the same fault at this boundary?
+- For real language servers, does the test assert an eventual state after restarts, recovery, or server-initiated work with a bounded `waitFor`? Single-shot assertions fit only states the product guarantees immediately.
 
 Use judgment rather than blanket bans on mocks, literals, static checks, or unit tests. Demonstrating a test failing for the target fault can resolve uncertainty; new mutation-testing infrastructure is not required.
 

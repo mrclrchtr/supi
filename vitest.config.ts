@@ -107,6 +107,8 @@ export default defineConfig({
         test: {
           name: "servers",
           include: serverTests,
+          // Writes per-test LSP debug events when SUPI_TEST_DEBUG_DIR is set.
+          setupFiles: ["packages/supi-lsp/__tests__/helpers/server-test-debug.ts"],
           testTimeout: 10_000,
           hookTimeout: 30_000,
           maxWorkers: 3,
