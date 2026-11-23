@@ -1,5 +1,10 @@
 # Changelog
 
+## [14.3.0]
+
+- `gather-retrospectives` attributes each report to a project: the main working tree of the Git repository its session ran in, so sibling worktrees count as one project. The collector summary lists reports per project (`byProject`), and `--export` lines carry `project` and `session`. Evidence files written by earlier versions show each working directory as its own project.
+- The `gather-retrospectives` summary ranks themes by report count and gives each as a share of its producer's reports, with the number of sessions and, when several projects are mixed, the project it comes from. It names the concrete symptom, reports a proposal only when the cited report states one, moves citations into one source line, and adds the measured effort per producer. Questions the retrospective prompt asks, such as Code Intelligence use, are reported separately by the reasons given, next to the call count from the recorded metrics.
+
 ## [14.2.0]
 
 - `gather-retrospectives` carries the task `metrics` that delegated and Reviewer Run reports now record (duration, turns, tool executions and errors, executions per tool name, tokens, cost) into the evidence file and the `--export` lines, together with the run `label`. Older reports have no metrics.

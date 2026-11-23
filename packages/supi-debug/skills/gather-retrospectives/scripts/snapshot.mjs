@@ -2,15 +2,23 @@ import { readFile, writeFile } from "node:fs/promises";
 import { isAbsolute, relative } from "node:path";
 import { isProducer, PRODUCER_NAMES } from "./producers.mjs";
 
-/** Count deduplicated reports, not independent experiments or all sessions scanned. */
+// Snapshots written before projects were resolved carry only the session working directory.
+const projectOf = (record) => record.project ?? record.cwd ?? "unknown";
+
+/**
+ * Count deduplicated reports, not independent experiments or all sessions scanned. `byProject`
+ * lists report counts per project, largest first.
+ */
 export function summarize(records) {
   const bySource = Object.fromEntries(PRODUCER_NAMES.map((name) => [name, 0]));
   const byStatus = { completed: 0, failed: 0 };
+  const projects = new Map();
   let earliest = Infinity;
   let latest = -Infinity;
   for (const record of records) {
     bySource[record.source]++;
     byStatus[record.status]++;
+    projects.set(projectOf(record), (projects.get(projectOf(record)) ?? 0) + 1);
     earliest = Math.min(earliest, record.timestamp);
     latest = Math.max(latest, record.timestamp);
   }
@@ -19,6 +27,9 @@ export function summarize(records) {
     containingSessions: new Set(records.map((record) => record.sessionFile)).size,
     bySource,
     byStatus,
+    byProject: Object.fromEntries(
+      [...projects].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])),
+    ),
     earliest: records.length ? new Date(earliest).toISOString() : null,
     latest: records.length ? new Date(latest).toISOString() : null,
   };
@@ -100,6 +111,8 @@ function displayRecord(record, filters) {
       : {}),
     file: relative(filters.sessionsDir, record.sessionFile),
     line: record.line,
+    project: projectOf(record),
+    ...(record.sessionId === undefined ? {} : { session: record.sessionId }),
   };
 }
 

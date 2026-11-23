@@ -1,6 +1,7 @@
+import { execFileSync } from "node:child_process";
 import { readFile, realpath } from "node:fs/promises";
 import { homedir } from "node:os";
-import { join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 
 /** Resolve `~` and relative paths against the home and current directories. */
 export function localPath(path) {
@@ -16,6 +17,26 @@ export async function canonicalPath(path) {
   } catch (error) {
     if (error.code === "ENOENT") return absolute;
     throw error;
+  }
+}
+
+/**
+ * Project that owns a session working directory: the main working tree of its Git repository,
+ * so sibling worktrees count as one project. Falls back to `cwd` outside Git or when the
+ * directory no longer exists.
+ */
+export function projectRoot(cwd) {
+  // An inherited GIT_DIR (set inside Git hooks) would answer for the wrong repository.
+  const { GIT_DIR: _dir, GIT_WORK_TREE: _tree, GIT_COMMON_DIR: _common, ...env } = process.env;
+  try {
+    const commonDir = execFileSync(
+      "git",
+      ["-C", cwd, "rev-parse", "--path-format=absolute", "--git-common-dir"],
+      { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], env },
+    ).trim();
+    return basename(commonDir) === ".git" ? dirname(commonDir) : commonDir;
+  } catch {
+    return cwd;
   }
 }
 

@@ -4,7 +4,13 @@ import { writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { recordGather, recordSkipReason, sinceOptions } from "./gather-state.mjs";
-import { agentDirectory, canonicalPath, localPath, sessionDirectory } from "./paths.mjs";
+import {
+  agentDirectory,
+  canonicalPath,
+  localPath,
+  projectRoot,
+  sessionDirectory,
+} from "./paths.mjs";
 import {
   isProducer,
   isProducerEvent,
@@ -275,6 +281,11 @@ async function collect(config) {
   const sorted = [...reports.values()].sort(
     (a, b) => b.timestamp - a.timestamp || a.ref.localeCompare(b.ref),
   );
+  const projects = new Map();
+  for (const record of sorted) {
+    if (!projects.has(record.cwd)) projects.set(record.cwd, projectRoot(record.cwd));
+    record.project = projects.get(record.cwd);
+  }
   const { display: _display, output: _output, stateFile: _stateFile, ...filters } = config;
   return {
     version: 1,

@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { promisify } from "node:util";
@@ -128,6 +128,7 @@ describe("retrospective collector CLI", () => {
       containingSessions: 1,
       bySource: { "supi-agent": 1, "supi-review": 1, "supi-debug": 0 },
       byStatus: { completed: 2, failed: 0 },
+      byProject: { [workspace]: 2 },
       earliest: "1970-01-01T00:00:00.500Z",
       latest: "1970-01-01T00:00:01.000Z",
     });
@@ -290,6 +291,58 @@ describe("retrospective collector CLI", () => {
     await expect(collect(["--export", exportFile])).rejects.toMatchObject({ code: 1 });
   });
 
+  // Real Git processes; the default timeout is too tight under full parallel load.
+  it("attributes sibling worktrees to one project and keeps other directories apart", {
+    timeout: 10_000,
+  }, async () => {
+    const git = (...args: string[]) =>
+      execute(
+        "git",
+        ["-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", ...args],
+        { cwd: workspace },
+      );
+    await git("init", "-q");
+    await git("commit", "-q", "--allow-empty", "-m", "init");
+    const worktree = join(root, "project-wt1");
+    await git("worktree", "add", "-q", worktree);
+    const plain = join(root, "plain");
+    await mkdir(plain);
+    const gone = join(root, "gone");
+    await session("main.jsonl", workspace, [retrospective("main", "Main.")]);
+    await session("wt.jsonl", worktree, [retrospective("wt", "Worktree.", "supi-review")]);
+    await session("plain.jsonl", plain, [retrospective("plain", "Plain.")]);
+    await session("gone.jsonl", gone, [retrospective("gone", "Gone.")]);
+
+    await rm(output, { force: true });
+    const result = await execute(process.execPath, [
+      script.pathname,
+      "--sessions-dir",
+      sessions,
+      "--all-workspaces",
+      "--no-record",
+      "--output",
+      output,
+    ]);
+    const project = await realpath(workspace);
+    expect(JSON.parse(result.stdout).summary.byProject).toEqual({
+      [project]: 2,
+      [gone]: 1,
+      [plain]: 1,
+    });
+    const exportFile = join(root, "reports.jsonl");
+    await execute(process.execPath, [script.pathname, "--read", output, "--export", exportFile]);
+    const lines = (await readFile(exportFile, "utf8"))
+      .trimEnd()
+      .split("\n")
+      .map((line) => JSON.parse(line));
+    expect(Object.fromEntries(lines.map((line) => [line.session, line.project]))).toEqual({
+      "main.jsonl": project,
+      "wt.jsonl": project,
+      "plain.jsonl": plain,
+      "gone.jsonl": gone,
+    });
+  });
+
   it("summarizes an empty snapshot without a continuation or invented dates", async () => {
     const { preview } = await collect();
     expect(preview.summary).toEqual({
@@ -297,6 +350,7 @@ describe("retrospective collector CLI", () => {
       containingSessions: 0,
       bySource: { "supi-agent": 0, "supi-review": 0, "supi-debug": 0 },
       byStatus: { completed: 0, failed: 0 },
+      byProject: {},
       earliest: null,
       latest: null,
     });
