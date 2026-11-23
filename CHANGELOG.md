@@ -1,5 +1,27 @@
 # Changelog
 
+## [14.2.0](https://github.com/mrclrchtr/supi/compare/v14.1.0...v14.2.0) (2026-11-23)
+
+This release gives Reviewers and Agent Runs better footing — the full diff as a file, project instructions for explorers, and the right `sed` syntax — and adds measured task metrics and a sharper `/supi-tooling-retro`.
+
+### Agents & Review
+
+* Change reviews get the complete target change as `target.diff` beside the Review Workspace. The Reviewer Packet names it and shows the diff line where each changed path starts, so large diffs are no longer cut to their last 50 KB. The packet also states whether the configured Dependency Bootstrap ran.
+* The `explore` profile now loads project instruction files (AGENTS.md or CLAUDE.md) by default; global instruction files stay excluded. Set the profile's **Instructions** row in `/supi-settings` to `none` to restore the old behavior.
+* Sessions with `bash`, including Agent Runs and Reviewers, learn up front whether `sed` is GNU or BSD through a `<shell>` system prompt section, replacing the hint that appeared only after a BSD `sed` error.
+* Agent Run and Reviewer Run retrospectives now record task metrics: wall-clock duration, turns, tool executions and errors, executions per tool, and task-only Usage.
+
+### Debug
+
+* `/supi-tooling-retro` asks whether to run on a side branch (previous behavior, preselected) or on the main path as a normal turn, so the report stays in context for follow-up prompts.
+* `/supi-tooling-retro` also looks for slow navigation, unreachable information, and instructions that changed nothing; each category is reported only when its trigger occurred, and proposals prefer deterministic checks or tool changes over new guidance text.
+* `gather-retrospectives` carries the new task metrics and the run label into its evidence file and `--export` lines.
+
+### Maintenance
+
+* Dependency updates, including `unpdf` 2.2.1 and Node 24.22.3.
+* README screenshots refreshed, with GIF walkthroughs recorded through vhs.
+
 ## [14.1.0](https://github.com/mrclrchtr/supi/compare/v14.0.0...v14.1.0) (2026-11-21)
 
 This release makes Code Intelligence results more self-contained, with source lines in `code_graph`, larger default result limits, shorter handles, and sharper tool guidelines. It also improves prompt suggestions, `web_fetch_md` robustness, Review packets, and retrospective gathering.

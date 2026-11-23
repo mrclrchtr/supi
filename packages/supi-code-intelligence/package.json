@@ -1,6 +1,6 @@
 {
   "name": "@mrclrchtr/supi-code-intelligence",
-  "version": "14.1.0",
+  "version": "14.2.0",
   "description": "LSP and Tree-sitter code intelligence for the Pi coding agent: navigation, diagnostics, and semantic refactoring",
   "license": "MIT",
   "repository": {
