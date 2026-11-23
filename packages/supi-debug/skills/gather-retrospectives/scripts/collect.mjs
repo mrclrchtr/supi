@@ -225,6 +225,9 @@ function taskMetrics(value) {
       (tool) => typeof tool?.name === "string" && count(tool.uses) !== undefined,
     );
   }
+  if (Array.isArray(value.availableTools)) {
+    metrics.availableTools = value.availableTools.filter((name) => typeof name === "string");
+  }
   if (count(value.usage?.total) !== undefined) metrics.totalTokens = value.usage.total;
   if (typeof value.usage?.cost?.total === "number") metrics.cost = value.usage.cost.total;
   return Object.keys(metrics).length > 0 ? metrics : null;

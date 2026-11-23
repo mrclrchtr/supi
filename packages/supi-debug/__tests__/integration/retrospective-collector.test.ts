@@ -515,6 +515,7 @@ describe("retrospective collector CLI", () => {
           toolUses: 30,
           toolErrors: "2",
           tools: [{ name: "bash", uses: 25 }, { name: 7 }],
+          availableTools: ["bash", "code_graph", 7],
           usage: { total: 4000, cost: { total: 0.5 } },
         },
       }),
@@ -527,6 +528,7 @@ describe("retrospective collector CLI", () => {
       turns: 12,
       toolUses: 30,
       tools: [{ name: "bash", uses: 25 }],
+      availableTools: ["bash", "code_graph"],
       totalTokens: 4000,
       cost: 0.5,
     });

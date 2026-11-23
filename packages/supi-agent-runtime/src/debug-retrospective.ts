@@ -6,14 +6,14 @@ import type { AgentRunRetrospective } from "./types.ts";
  * Increment whenever RETROSPECTIVE_PROMPT changes so evidence collectors can
  * separate assessments answering different questions.
  */
-export const RETROSPECTIVE_PROMPT_REVISION = 2;
+export const RETROSPECTIVE_PROMPT_REVISION = 3;
 
 // Compact, tool-free adaptation of supi-debug's interactive /supi-tooling-retro prompt.
 const RETROSPECTIVE_PROMPT = `Reflect briefly on the task you just completed. Based only on the context available from this run, what would have made it more token/time efficient or more effective?
 
 Focus on missing or unnecessary context from the parent, unclear tool guidance, suboptimal tool results, and tool failures or misuse. For each useful finding, name the observed friction and the specific change that might help. Clearly distinguish observations from untested suggestions. Do not invent savings estimates or generic recommendations. If nothing notable occurred, say so.
 
-If this run had Code Intelligence (\`code_*\`) tools, also report each call whose result was incomplete, oversized, ambiguous, or failed: the tool, the problem, and the follow-up call it forced. If you chose other tools for a navigation question these tools cover, say briefly why.
+Mention Code Intelligence (\`code_*\`) tools only in these two cases. For each \`code_*\` call whose result was incomplete, oversized, ambiguous, or failed, report the tool, the problem, and the follow-up call it forced. If these tools were available and you answered a question about a code symbol (its definition, references, callers, or type) with another tool, name the question and say briefly why. Tool availability and call counts are recorded separately, so a statement that you made no such calls adds nothing.
 
 The task result has already been published. Do not continue the task, submit another result, use tools, or repeat sensitive task content unnecessarily. Return only this retrospective.`;
 

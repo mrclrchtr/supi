@@ -201,6 +201,11 @@ export interface AgentRunTaskMetrics {
   readonly toolErrors: number;
   /** Tool executions per tool name, most used first. */
   readonly tools: readonly { readonly name: string; readonly uses: number }[];
+  /**
+   * Names of the tools active when the task prompt was sent, sorted. Separates a tool the task
+   * did not use from one it did not have; continuation steps may narrow the set later.
+   */
+  readonly availableTools: readonly string[];
   /** Task-only Usage, excluding the assessment. */
   readonly usage?: Usage;
 }

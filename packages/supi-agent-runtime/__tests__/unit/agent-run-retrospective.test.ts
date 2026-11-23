@@ -167,6 +167,7 @@ it("reports task metrics frozen before the assessment turn", async () => {
       { name: "grep", uses: 2 },
       { name: "read", uses: 1 },
     ],
+    availableTools: ["read"],
   });
 });
 

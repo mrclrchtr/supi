@@ -1,5 +1,9 @@
 # Changelog
 
+## [14.3.0]
+
+- Agent Run retrospective Debug events record which tools the run started with (`metrics.availableTools`), so a tool the task did not use can be told apart from one it did not have. The retrospective prompt (revision 3) no longer asks every run to comment on Code Intelligence: a run mentions `code_*` tools only for a faulty result or when it answered a symbol question with another tool.
+
 ## [14.2.0]
 
 - The `explore` profile now loads project instruction files (AGENTS.md or CLAUDE.md) by default, so explorers know repository facts such as the dependency layout. Global instruction files stay excluded. To restore the old behavior, set the profile's **Instructions** row in `/supi-settings` to `none`.

@@ -58,7 +58,7 @@ Starting wording; not a new structured-output protocol:
 >
 > Focus on missing or unnecessary context from the parent, unclear tool guidance, suboptimal tool results, and tool failures or misuse. For each useful finding, name the observed friction and the specific change that might help. Clearly distinguish observations from untested suggestions. Do not invent savings estimates or generic recommendations. If nothing notable occurred, say so.
 >
-> If this run had Code Intelligence (`code_*`) tools, also report each call whose result was incomplete, oversized, ambiguous, or failed: the tool, the problem, and the follow-up call it forced. If you chose other tools for a navigation question these tools cover, say briefly why.
+> Mention Code Intelligence (`code_*`) tools only in these two cases. For each `code_*` call whose result was incomplete, oversized, ambiguous, or failed, report the tool, the problem, and the follow-up call it forced. If these tools were available and you answered a question about a code symbol (its definition, references, callers, or type) with another tool, name the question and say briefly why. Tool availability and call counts are recorded separately, so a statement that you made no such calls adds nothing.
 >
 > Do not continue the task, use tools, or repeat sensitive task content unnecessarily.
 
@@ -69,7 +69,7 @@ Adapt the existing [`/supi-tooling-retro` prompt](../../packages/supi-debug/src/
 - Use the existing Debug event persistence path in the containing session, not normal Agent Run Diagnostics or parent-facing result content.
 - Keep the event message static; put assessment prose in event `data` so it receives existing best-effort redaction. Do not use raw-only data, which is not persisted.
 - Include `runKey`, `caller`, `batchId`, `taskId`, and a readable `label` alongside retrospective text and Usage. Include `promptRevision` (`RETROSPECTIVE_PROMPT_REVISION`) and increment it whenever the assessment prompt changes, so collectors can separate answers to different questions. Delegation also includes `conversationId`; its label remains the saved conversation label on follow-ups. Reviewer labels identify the Review Mode.
-- Include `metrics` for the assessed task, frozen before the assessment turn: `durationMs` (wall-clock from Agent Run start, including session startup), `turns`, `toolUses`, `toolErrors`, `tools` (executions per tool name), and task-only `usage`. The sibling top-level `usage` covers the assessment turn only. Metrics carry counts and tool names, never tool arguments or results.
+- Include `metrics` for the assessed task, frozen before the assessment turn: `durationMs` (wall-clock from Agent Run start, including session startup), `turns`, `toolUses`, `toolErrors`, `tools` (executions per tool name), `availableTools` (names of the tools active when the task prompt was sent), and task-only `usage`. The sibling top-level `usage` covers the assessment turn only. Metrics carry counts and tool names, never tool arguments or results.
 - Correlation metadata belongs in sanitized Debug `data`, not parent tool results. Include identifiers and display labels only, never task instructions or inspected evidence.
 - Debug capture retains session entries outside automatic model context. Existing Debug access and retention behavior apply; assessment text may still contain sensitive task details.
 - Do not add a new durable transcript copy, replay store, background aggregation, or automatic feedback channel.

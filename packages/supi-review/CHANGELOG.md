@@ -1,5 +1,9 @@
 # Changelog
 
+## [14.3.0]
+
+- Reviewer Run retrospective Debug events record which tools the run started with (`metrics.availableTools`), so a tool the task did not use can be told apart from one it did not have. The retrospective prompt (revision 3) no longer asks every run to comment on Code Intelligence: a run mentions `code_*` tools only for a faulty result or when it answered a symbol question with another tool.
+
 ## [14.2.0]
 
 - Change reviews get the complete target change as a file. The Review Engine saves it as `target.diff` beside the Review Workspace, and the Reviewer Packet names it and adds the line where each changed path starts, for example `(diff line 412)`. Reviewers page it with `read`, which keeps the start of a long file. Before, a large `git diff` through `bash` returned only its last 50 KB and Reviewers fetched the start again. Binary changes take one line each.

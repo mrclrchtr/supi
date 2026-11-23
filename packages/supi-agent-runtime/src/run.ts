@@ -100,6 +100,7 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
   };
   const startedAt = Date.now();
   const toolUsesByName = new Map<string, number>();
+  let availableTools: readonly string[] = [];
   let lifecycle = new AgentRunLifecycleTraceCollector();
   let runtime: AgentSessionRuntime | undefined;
   let session: AgentSession | undefined;
@@ -694,6 +695,7 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
       tools: [...toolUsesByName]
         .map(([name, uses]) => ({ name, uses }))
         .sort((a, b) => b.uses - a.uses || a.name.localeCompare(b.name)),
+      availableTools,
       ...(taskOutcome.usage ? { usage: taskOutcome.usage } : {}),
     };
     if (timeoutId) clearTimeout(timeoutId);
@@ -1131,7 +1133,9 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
       if (options.inputs.initialActiveTools) {
         session.setActiveToolsByName([...options.inputs.initialActiveTools]);
       }
-      lifecycle = new AgentRunLifecycleTraceCollector(getRegisteredToolNames(session));
+      const registeredToolNames = getRegisteredToolNames(session);
+      availableTools = [...registeredToolNames].sort((a, b) => a.localeCompare(b));
+      lifecycle = new AgentRunLifecycleTraceCollector(registeredToolNames);
       unsubscribe = session.subscribe(dispatchEvent);
       const activeView = createAgentRunSessionView(session, options.inputs.cwd);
       view = activeView;
