@@ -44,7 +44,20 @@ Ask naturally, for example “gather retrospective feedback about `packages/supi
 /skill:gather-retrospectives collect feedback from delegated runs in this workspace
 ```
 
-The skill uses a bundled Node.js collector to read stored Agent Run assessments and `/supi-tooling-retro` reports. It defaults to the current workspace directory tree and all dates, preserves source references, deduplicates cloned runs, and saves paginated evidence in temporary files. Other projects and sibling worktrees require explicit scope. Source filters identify who produced an assessment, not which package it concerns. The collector displays complete assessments within a 16 KB stdout budget; `omittedRefs` identifies assessments that need a targeted read from the full evidence file.
+The skill uses a bundled Node.js collector to read stored Agent Run assessments and `/supi-tooling-retro` reports. It defaults to the current workspace directory tree and all dates, preserves source references, deduplicates cloned runs, and saves paginated evidence in temporary files. Other projects and sibling worktrees require explicit scope. Source filters identify who produced an assessment, not which package it concerns. The collector displays complete assessments within a 16 KB stdout budget and returns a `nextCommand` for the rest; `--export` writes all reports as JSONL for analysis in a script.
+
+Each report is attributed to a project, the main working tree of the Git repository its session ran in, so sibling worktrees count as one project. Delegated and Reviewer Run reports also carry the measured task `metrics`: duration, turns, tool executions and errors, executions per tool, the tools the run started with, tokens, and cost.
+
+The summary the skill writes has this shape:
+
+- one scope sentence with the report count per producer, the sessions they come from, and the count per project when several are mixed;
+- up to seven themes, most reports first, each with its share of the producer's reports, its session count, the concrete symptom, and a footnote; a proposal appears only when the cited report states one;
+- one line naming every further theme with its count, and every dropped theme with the reason;
+- one line per question the retrospective prompt itself asks, such as Code Intelligence use: the count from the recorded metrics, then the reasons the reports give;
+- one line each for positives and for measured effort per producer;
+- the footnote sources and the path of the evidence file.
+
+It stays within 250 words, not counting the source and evidence lines. Theme counts come from a classifier over self-reports: they vary slightly between runs, and each run cuts themes anew, so compare two summaries with care.
 
 `/supi-tooling-retro` reports written before the command stored them are not collected. The collector does not enable capture, execute new assessments, or verify historical claims. Stored prose may still contain sensitive task details. Run the bundled `skills/gather-retrospectives/scripts/collect.mjs` with `--help` for storage overrides and filters. Node and shell access are required; no extra runtime dependencies are needed.
 
