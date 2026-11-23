@@ -44,8 +44,8 @@ The planner also emits `release=true` when tag/release creation is authorized.
 
 ## Release safety and concurrency
 
-- Keep required PR check names `actionlint`, `conventional-commits`, and `verify` stable. The `actionlint` job runs [jactionlint](https://github.com/jdx/jactionlint) with ShellCheck, both pinned in `.mise.toml`/`mise.lock` and configured in `.github/jactionlint.yaml`; run it locally with `pnpm workflow:lint`.
-- `verify` requires successful planning, actionlint, Conventional Commits, workspace checks, tests, and both matrices in PR and full mode. Missing/unknown modes, missing results, cancellations, and skips fail verification.
+- Keep required PR check names `workflow-lint`, `conventional-commits`, and `verify` stable. The `workflow-lint` job runs [jactionlint](https://github.com/jdx/jactionlint) with ShellCheck, both pinned in `.mise.toml`/`mise.lock` and configured in `.github/jactionlint.yaml`; run it locally with `pnpm workflow:lint`.
+- `verify` requires successful planning, workflow linting, Conventional Commits, workspace checks, tests, and both matrices in PR and full mode. Missing/unknown modes, missing results, cancellations, and skips fail verification.
 - Tagging requires a successful full gate and a Release Commit candidate. Publishing requires that gate plus successful release creation, or an explicitly selected existing tag on a manual retry. Manual verification without inputs never releases.
 - Immediately before tagging, revalidate the candidate's checkout, package versions, Release Commit rules, ancestry on main, and first changelog entry.
 - Existing tags are never moved. Annotated tags are peeled to their commit. An existing tag at another SHA, a draft/mismatched release, or an API failure blocks release creation. Tag-only/fully-created releases can be recovered without deleting or recreating a tag/release.

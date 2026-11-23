@@ -16,7 +16,7 @@ function runGate(overrides = {}) {
       ...process.env,
       MODE: "full",
       PLAN_RESULT: "success",
-      ACTIONLINT_RESULT: "success",
+      WORKFLOW_LINT_RESULT: "success",
       COMMITS_RESULT: "success",
       WORKSPACE_RESULT: "success",
       TEST_RESULT: "success",
@@ -30,7 +30,7 @@ function runGate(overrides = {}) {
 describe("verification workflow contracts", () => {
   it("uses the immutable planned SHA for every check, including manual tag retries", () => {
     for (const name of [
-      "actionlint",
+      "workflow-lint",
       "conventional-commits",
       "workspace-checks",
       "tests",
@@ -59,7 +59,7 @@ describe("verification workflow contracts", () => {
 
   it.each([
     "PLAN_RESULT",
-    "ACTIONLINT_RESULT",
+    "WORKFLOW_LINT_RESULT",
     "COMMITS_RESULT",
     "WORKSPACE_RESULT",
     "TEST_RESULT",

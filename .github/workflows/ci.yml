@@ -53,7 +53,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: node scripts/ci-plan.mjs
 
-  actionlint:
+  workflow-lint:
     needs: ci-plan
     if: needs.ci-plan.outputs.mode != 'none'
     runs-on: ubuntu-latest
@@ -260,7 +260,7 @@ jobs:
 
   verify:
     if: always() && (needs.ci-plan.result != 'success' || needs.ci-plan.outputs.mode != 'none')
-    needs: [ci-plan, actionlint, conventional-commits, workspace-checks, tests, installer, language-baseline]
+    needs: [ci-plan, workflow-lint, conventional-commits, workspace-checks, tests, installer, language-baseline]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -268,7 +268,7 @@ jobs:
         env:
           PLAN_RESULT: ${{ needs.ci-plan.result }}
           MODE: ${{ needs.ci-plan.outputs.mode }}
-          ACTIONLINT_RESULT: ${{ needs.actionlint.result }}
+          WORKFLOW_LINT_RESULT: ${{ needs.workflow-lint.result }}
           COMMITS_RESULT: ${{ needs.conventional-commits.result }}
           WORKSPACE_RESULT: ${{ needs.workspace-checks.result }}
           TEST_RESULT: ${{ needs.tests.result }}
@@ -279,7 +279,7 @@ jobs:
             echo '::error::Unknown verification mode'
             exit 1
           fi
-          for result in "$PLAN_RESULT" "$ACTIONLINT_RESULT" "$COMMITS_RESULT" "$WORKSPACE_RESULT" "$TEST_RESULT" "$INSTALLER_RESULT" "$LANGUAGE_BASELINE_RESULT"; do
+          for result in "$PLAN_RESULT" "$WORKFLOW_LINT_RESULT" "$COMMITS_RESULT" "$WORKSPACE_RESULT" "$TEST_RESULT" "$INSTALLER_RESULT" "$LANGUAGE_BASELINE_RESULT"; do
             if [[ "$result" != success ]]; then
               echo '::error::Required verification checks did not succeed'
               exit 1
