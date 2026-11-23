@@ -41,7 +41,8 @@
     "extensions": [
       "./src/extension.ts",
       "node_modules/@mrclrchtr/supi-ask-user/src/extension.ts"
-    ]
+    ],
+    "image": "https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-prompt-improver/assets/social-preview.png"
   },
   "dependencies": {
     "@mrclrchtr/supi-ask-user": "workspace:*",

@@ -34,6 +34,7 @@ const SOCIAL_BADGES = {
   extras: ["/supi-stash", "/clone-session", "shortcuts"],
   insights: ["/supi-insights", "shareable HTML"],
   lsp: ["./api", "server lifecycle", "diagnostics"],
+  "prompt-improver": ["/supi-improve", "approved drafts", "/supi-settings"],
   "prompt-suggestions": ["ghost text", "/supi-settings"],
   review: ["/supi-review", "review_run", "review_audit"],
   settings: ["/supi-settings", "project/global"],
@@ -66,6 +67,10 @@ const SOCIAL_TAGLINES = {
   extras: ["Session comforts: prompt stash, tab spinner,", "shortcuts, clone, titles, git safety."],
   insights: ["Historical session reports — usage, cost,", "cache health — shareable as HTML."],
   lsp: ["Language-server lifecycle, live diagnostics,", "and semantic ops for code intelligence."],
+  "prompt-improver": [
+    "Turns rough drafts into clearer prompts, with",
+    "clarifying questions and your approval.",
+  ],
   "prompt-suggestions": [
     "Ghost-text next-prompt suggestions you can",
     "edit before sending. Optional.",

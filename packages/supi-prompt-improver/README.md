@@ -1,3 +1,9 @@
+<div align="center">
+  <a href="https://github.com/mrclrchtr/supi/tree/main/packages/supi-prompt-improver">
+    <img src="https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-prompt-improver/assets/social-preview.png" alt="SuPi Prompt Improver" width="100%">
+  </a>
+</div>
+
 # @mrclrchtr/supi-prompt-improver
 
 Command-based prompt improvement for the [Pi coding agent](https://github.com/earendil-works/pi).
