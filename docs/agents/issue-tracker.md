@@ -31,7 +31,7 @@ GitHub shares one number space across issues and PRs, so a bare `#42` may be eit
 
 ## Closing work
 
-Work lands on `main` by direct push, without a pull request. The last commit of a ticket carries a `Closes #<n>` footer, so the push closes the issue; earlier commits of the same ticket use `Refs #<n>`. Close a parent spec by hand once its last ticket is closed.
+Work lands on `main` without a pull request; see "Development model" in the root `CLAUDE.md`. The last commit of a ticket carries a `Closes #<n>` footer, so the push closes the issue; earlier commits of the same ticket use `Refs #<n>`. Close a parent spec by hand once its last ticket is closed.
 
 ## When a skill says "publish to the issue tracker"
 

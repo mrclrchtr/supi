@@ -6,6 +6,16 @@ Pi loads SuPi TypeScript extensions from the working tree; no build step. After 
 
 SuPi is released on npm and follows semver with one shared version. Breaking changes to APIs, commands, config, and extension behavior are allowed when they improve design, but each needs a major release, a `BREAKING CHANGE` commit footer, and a migration step in the affected package changelog. Retired packages are removed from the workspace, marked removal-only in the installer catalog, and deprecated on npm (`npm deprecate`).
 
+## Development model
+
+Trunk-based: `main` is the only long-lived branch and every commit on it must be releasable.
+
+- Work in a linked worktree on its own branch, and rebase that branch onto local `main` as `main` advances. Small changes may be committed on `main` directly.
+- Land finished work yourself; this is the ready-for-release step. Rebase onto `main`, run the checks for the change, then fast-forward `main` from the worktree that has it checked out (`git worktree list`): `git -C <main-worktree> merge --ff-only <branch>`. If the fast-forward fails, stop and report.
+- Verify each commit before it lands. CI checks only the tip of a push, and the maintainer pushes `main` in batches.
+- The maintainer pushes `main`. Push only in the release process, or to a separate remote branch that the work needs, such as research or prototype results.
+- Unfinished work on `main` stays unreachable for users: not registered as a tool, command, setting, or event handler, not exported through `./api` or `./extension`, and absent from READMEs and package changelogs. Tests may reach it. When a feature cannot be hidden this way, propose a feature-flag system before landing it.
+
 ## Pi docs-first rule
 
 - Before changing or advising on Pi behavior, read the relevant installed Pi docs (`README.md`, `docs/`, `examples/`) and linked `.md` references. They are in `node_modules/@earendil-works/pi-coding-agent/` at the root of each worktree. Start with `docs/index.md` there; never assume APIs or conventions from memory.
@@ -90,7 +100,7 @@ Register a `SettingsModule` with `registerSettings()` from `@mrclrchtr/supi-core
 - For dependency changes, run `pnpm install` before editing `.ts` files.
 
 ### Dev workflow
-- `hk` pre-commit autofixes with `stash = "none"`; unstaged changes in fixed files may be staged too. No pre-push hook. Branch checkouts, merges (including `git pull`), and rebases run `pnpm install --frozen-lockfile`.
+- `hk` pre-commit autofixes with `stash = "none"`; unstaged changes in fixed files may be staged too. No pre-push hook; CI on `main` is the first full verification. Branch checkouts, merges (including `git pull`), and rebases run `pnpm install --frozen-lockfile`.
 - `.pi/supi/config.json` is tracked. For live settings probes, merge one key into it and restore it with `git checkout -- .pi/supi/config.json`; never overwrite the whole file.
 - Use `pnpm exec jiti /tmp/script.mjs` for TS runtime probes; Node `--experimental-strip-types` breaks on TS parameter properties here.
 - Dependency install scripts use `allowBuilds` in `pnpm-workspace.yaml` (`true` allows, `false` skips); keep `tree-sitter-cli` enabled so its native binary is installed.

@@ -13,9 +13,10 @@ You are the editor. git-cliff writes a commit list; you turn it into notes a SuP
 
 ## 1. Prepare
 
-1. `git switch main && git pull --ff-only`. Stop and report if the tree is dirty.
-2. Run `pnpm release:prepare`, adding `--version X.Y.Z` only when the user named a version. Keep its stdout: the root draft, per-package drafts, and commit range are your editorial input.
-3. On error, report it verbatim and stop.
+1. Work in the worktree that has `main` checked out (`git worktree list`). `git pull --ff-only`. Stop and report if the tree is dirty.
+2. Check that CI passed for the tip: `gh run list --workflow ci.yml --commit $(git rev-parse HEAD) --limit 1 --json status,conclusion,url`. Wait for a run in progress (`gh run watch <id> --exit-status`). Stop and report a failed run; fix main before releasing.
+3. Run `pnpm release:prepare`, adding `--version X.Y.Z` only when the user named a version. Keep its stdout: the root draft, per-package drafts, and commit range are your editorial input.
+4. On error, report it verbatim and stop.
 
 Done when `package.json` carries the new version and `CHANGELOG.md` starts with its section.
 
@@ -60,7 +61,7 @@ Ask for approval. Apply requested edits and show the result again. Pushing publi
 2. Run the CI release gate locally:
    `RELEASE_SHA=$(git rev-parse HEAD) RELEASE_VERSION=X.Y.Z node scripts/release-validation.mjs`.
    On failure, fix it with `git commit --amend --no-edit` and rerun.
-3. `git push origin main`. If main only accepts PRs, open one and rebase-merge it, or squash it with the title exactly `chore: release X.Y.Z`; a `(#N)` suffix fails CI planning.
+3. `git push origin main`. If main only accepts PRs, open one and rebase-merge it. The repository does not squash-merge; a tip subject other than exactly `chore: release X.Y.Z`, such as one with a `(#N)` suffix, fails CI planning.
 
 ## 6. Watch CI
 

@@ -14,7 +14,7 @@ Implemented. Replaces Release Please. CI gates and retries are in [CI and releas
 
 | Concern | Decision |
 | --- | --- |
-| Development model | Trunk-based. A release is a **Release Commit** on `main`, pushed directly or merged through a PR as the tip commit with its exact subject (rebase merge, or squash titled exactly `chore: release X.Y.Z`). No release branch or bot PR. |
+| Development model | Trunk-based. A release is a **Release Commit** on `main`, pushed directly or rebase-merged through a PR as the tip commit with its exact subject. The repository does not squash-merge. No release branch or bot PR. |
 | Trigger | Manual and local: `pnpm release:prepare [--version X.Y.Z]`. |
 | Draft source | [git-cliff](https://git-cliff.org) (`cliff.toml`) computes the next version and drafts notes from Conventional Commits since the last `vX.Y.Z` tag. Only `feat`, `fix`, `perf`, `revert`, and breaking changes appear. |
 | Editorial step | An agent curates the draft and package changelogs in the working tree; the maintainer reviews the diff. Nothing regenerates notes after preparation. |

@@ -43,10 +43,11 @@ Pi loads the extensions directly from source; there is no build step. `.pi/setti
 | `pnpm verify` | `check`, language-server tests, WASM grammars, and package tarballs | Dependency, packaging, or cross-package changes |
 | `pnpm check:fix` | Biome fixes | Formatting or lint failures |
 
-Language-server tests need the matching servers on `PATH`. Scripts ending in `:ai` produce lower-noise output for coding agents. CI runs the PR gates in [CI and release gates](docs/conventions/ci-verification.md).
+Language-server tests need the matching servers on `PATH`. Scripts ending in `:ai` produce lower-noise output for coding agents. CI runs the gates in [CI and release gates](docs/conventions/ci-verification.md) on every PR and every push to `main`.
 
 ## Commits and versioning
 
+- Development is trunk-based: `main` is the only long-lived branch and stays releasable. Maintainers land work on `main` without a pull request. Outside contributions arrive as pull requests and are rebase-merged, so every commit of a PR lands unchanged.
 - Write commit messages as Conventional Commits; the `commit-msg` hook and CI enforce them.
 - All published packages share one semver version. Breaking changes need a `BREAKING CHANGE` commit footer and a migration step in the affected package changelog ([package changelogs](docs/conventions/package-changelogs.md)).
 - Maintainers release with `pnpm release:prepare` ([release preparation](docs/conventions/release-preparation.md)). Do not edit versions by hand.
