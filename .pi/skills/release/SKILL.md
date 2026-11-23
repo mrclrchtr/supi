@@ -27,7 +27,7 @@ Rewrite the body of the first `CHANGELOG.md` section. Keep its `## [X.Y.Z](compa
 - Open with one sentence naming the release's themes.
 - Group bullets under `###` headings by user-facing area (for example *Code Intelligence & LSP*, *Agents & Review*, *Web*), largest area first.
 - Each bullet states the user-visible effect, not the implementation. Merge commits that deliver one change into one bullet.
-- Put `### ⚠ BREAKING CHANGES` first when present, each with the required migration step.
+- Put `### ⚠ BREAKING CHANGES` first when present, each with the required migration step. A breaking footer bumps the version to a major one even when it affects only repository process, such as CI job names. When no breaking entry changes a published API, command, config, or extension behavior, ask the user whether to re-prepare as a minor release with `--version`, and drop that entry from the notes.
 - Keep issue links (`[#576](https://github.com/mrclrchtr/supi/issues/576)`); drop commit hashes.
 - Collapse routine dependency updates into one bullet; name Pi upgrades explicitly.
 - Read a commit with `git show --stat <sha>` whenever its subject leaves the user impact unclear.
@@ -66,6 +66,6 @@ Ask for approval. Apply requested edits and show the result again. Pushing publi
 ## 6. Watch CI
 
 1. Find the run: `gh run list --workflow ci.yml --commit $(git rev-parse HEAD) --limit 1`.
-2. `gh run watch <id> --exit-status`.
+2. `gh run watch <id> --exit-status`. It also exits non-zero on GitHub API errors such as HTTP 502; confirm the outcome with `gh api repos/mrclrchtr/supi/actions/runs/<id> --jq '.status + " " + .conclusion'`.
 3. Success: report the release URL (`gh release view vX.Y.Z --json url`).
-4. Failure: inspect `gh run view <id> --log-failed`, classify it as code or transient, and propose the matching recovery from the recovery table in `docs/conventions/release-preparation.md`. A code fix is a new ordinary commit followed by this skill again; the same version is re-prepared.
+4. Failure: print the failure excerpts with `node scripts/ci-failed-log.mjs <id>` (`--attempt N` for an earlier attempt), classify it as code or transient, and propose the matching recovery from the recovery table in `docs/conventions/release-preparation.md`. A code fix is a new ordinary commit followed by this skill again; the same version is re-prepared.
