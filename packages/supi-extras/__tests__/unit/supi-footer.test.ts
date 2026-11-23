@@ -1,5 +1,6 @@
+import { resetCapabilitiesCache, setCapabilities } from "@earendil-works/pi-tui";
 import { FOOTER_INVALIDATE_EVENT, footerContributions } from "@mrclrchtr/supi-core/footer-registry";
-import { createPiMock } from "@mrclrchtr/supi-test-utils";
+import { createPiMock, getHandlerOrThrow } from "@mrclrchtr/supi-test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import supiFooter from "../../src/supi-footer.ts";
 
@@ -53,6 +54,7 @@ type FooterFactory = (
 function defaultSessionManager(overrides: Record<string, unknown> = {}) {
   return {
     getEntries: vi.fn(() => []),
+    getBranch: vi.fn(() => [] as unknown[]),
     getCwd: vi.fn(() => "/home/user/project"),
     getSessionName: vi.fn(() => undefined as string | undefined),
     ...overrides,
@@ -349,6 +351,70 @@ describe("supiFooter extension", () => {
       const renderer = factory(mockTui, mockTheme, makeFooterData());
       const lines = renderer.render(120);
       expect(lines[1]).toContain("75.0%/128k");
+    });
+  });
+
+  describe("session issues", () => {
+    const issueMessage = (text: string) => ({
+      type: "message",
+      message: { role: "user", content: [{ type: "text", text }] },
+    });
+
+    async function renderPathLine(
+      branch: unknown[],
+      events: (pi: ReturnType<typeof createPiMock>) => void = () => {},
+    ) {
+      const pi = createPiMock();
+      supiFooter(pi as unknown as Parameters<typeof supiFooter>[0]);
+      let footerFactory: FooterFactory | undefined;
+      const ctx = makeFooterCtx({
+        sessionManager: { getBranch: vi.fn(() => branch) },
+        ui: uiCapturingFooter((f) => {
+          footerFactory = f;
+        }),
+      });
+      await getHandlerOrThrow(pi, "session_start")({}, ctx);
+      events(pi);
+      const renderer = (footerFactory as FooterFactory)(mockTui, mockTheme, makeFooterData());
+      return renderer.render(200)[0] ?? "";
+    }
+
+    afterEach(() => {
+      resetCapabilitiesCache();
+    });
+
+    it("links issues from the first user message when the terminal supports hyperlinks", async () => {
+      setCapabilities({ images: null, trueColor: true, hyperlinks: true });
+      const line = await renderPathLine([
+        issueMessage("Fix acme/app#12 and https://github.com/acme/lib/pull/3"),
+        issueMessage("Also acme/app#99"),
+      ]);
+
+      expect(line).toContain(
+        "\x1b]8;;https://github.com/acme/app/issues/12\x1b\\acme/app#12\x1b]8;;\x1b\\",
+      );
+      expect(line).toContain("https://github.com/acme/lib/issues/3");
+      expect(line).not.toContain("#99");
+    });
+
+    it("shows plain references without hyperlink support", async () => {
+      setCapabilities({ images: null, trueColor: true, hyperlinks: false });
+      const line = await renderPathLine([issueMessage("Fix acme/app#12")]);
+
+      expect(line).toContain("acme/app#12");
+      expect(line).not.toContain("\x1b]8;");
+    });
+
+    it("picks up the first user message when it arrives", async () => {
+      setCapabilities({ images: null, trueColor: true, hyperlinks: false });
+      const line = await renderPathLine([], (pi) => {
+        const onMessage = getHandlerOrThrow(pi, "message_end");
+        onMessage({ message: { role: "user", content: "Work on acme/app#7" } }, {});
+        onMessage({ message: { role: "user", content: "and acme/app#8" } }, {});
+      });
+
+      expect(line).toContain("acme/app#7");
+      expect(line).not.toContain("#8");
     });
   });
 

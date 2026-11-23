@@ -16,6 +16,7 @@ import {
 } from "@mrclrchtr/supi-core/footer-registry";
 import { formatGitCounts, GitCountsRefresher } from "./footer-git-status.ts";
 import { type FooterGlyphs, getFooterGlyphs, resolveIconMode } from "./footer-icons.ts";
+import { SessionIssueTracker } from "./session-issues.ts";
 import {
   type FooterConfig,
   loadFooterConfig,
@@ -49,8 +50,17 @@ export default function supiFooter(pi: ExtensionAPI) {
   pi.on("session_start", (_event, ctx) => {
     currentModel = ctx.model;
     unregisterInvalidates ??= registerFooterInvalidations(pi, () => requestRender?.());
-    decor.start(ctx.sessionManager.getCwd());
+    decor.start(ctx.sessionManager.getCwd(), ctx.sessionManager.getBranch());
     installFooter(ctx);
+  });
+
+  pi.on("session_tree", (_event, ctx) => {
+    decor.refreshIssues(ctx.sessionManager.getBranch());
+    requestRender?.();
+  });
+
+  pi.on("message_end", (event) => {
+    decor.onMessage(event.message);
   });
 
   pi.on("model_select", (event, _ctx) => {
@@ -167,16 +177,18 @@ export default function supiFooter(pi: ExtensionAPI) {
 }
 
 /**
- * Icons and Git counts for the path line.
+ * Icons, Git counts, and Session Issues for the path line.
  *
- * Owns the footer config, the resolved glyph set, and the throttled Git
- * reader. Tool executions request a refresh; `agent_end` flushes pending work.
+ * Owns the footer config, the resolved glyph set, the throttled Git reader,
+ * and the Session Issue tracker. Tool executions request a Git refresh;
+ * `agent_end` flushes pending work.
  */
 function createFooterDecor(pi: ExtensionAPI, rerender: () => void) {
   let cwd: string | undefined;
   let config: FooterConfig | undefined;
   let glyphs: FooterGlyphs | undefined;
   const git = new GitCountsRefresher(rerender);
+  const issues = new SessionIssueTracker(rerender);
 
   function apply(nextCwd: string): void {
     config = loadFooterConfig(nextCwd);
@@ -198,24 +210,33 @@ function createFooterDecor(pi: ExtensionAPI, rerender: () => void) {
   pi.on("agent_end", () => git.flush());
 
   return {
-    start(nextCwd: string): void {
+    start(nextCwd: string, branch: ReadonlyArray<{ type: string; message?: unknown }>): void {
       cwd = nextCwd;
       git.dispose();
       apply(nextCwd);
+      issues.start(nextCwd, branch);
     },
     stop(): void {
       cwd = undefined;
       git.dispose();
+      issues.stop();
     },
     refreshGit,
+    refreshIssues: (branch: ReadonlyArray<{ type: string; message?: unknown }>) =>
+      issues.fromBranch(branch),
+    onMessage: (message: unknown) => issues.onMessage(message),
     pwdParts(style: (color: ThemeColor, text: string) => string): {
       glyphs?: FooterGlyphs;
       gitStatus?: string;
+      sessionIssues?: string;
     } {
       const counts = config?.gitStatus ? git.current : null;
       return {
         glyphs,
         gitStatus: counts && glyphs ? formatGitCounts(counts, glyphs, style) : undefined,
+        sessionIssues: config?.issueLink
+          ? issues.render((text) => style("accent", text))
+          : undefined,
       };
     },
   };

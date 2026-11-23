@@ -17,6 +17,8 @@ export interface FooterGlyphs {
   /** Prefix for the Git branch; empty means the legacy `(branch)` format. */
   branch: string;
   session: string;
+  /** Prefix for Session Issues; empty means no icon. */
+  issue: string;
   ahead: string;
   behind: string;
   staged: string;
@@ -33,6 +35,7 @@ const NERD: FooterGlyphs = {
   cwd: "\u{F0256}", // nf-md-folder_outline
   branch: "\u{F062C}", // nf-md-source_branch
   session: "\u{F00C3}", // nf-md-bookmark_outline
+  issue: "\u{F02A4}", // nf-md-github
   ahead: "⇡",
   behind: "⇣",
   staged: "+",
@@ -50,6 +53,7 @@ const UNICODE: FooterGlyphs = {
   cwd: "▸",
   branch: "⎇",
   session: "•",
+  issue: "",
   ahead: "↑",
   behind: "↓",
   stashed: "≡",
@@ -60,6 +64,7 @@ const ASCII: FooterGlyphs = {
   cwd: "",
   branch: "",
   session: "•",
+  issue: "",
   ahead: "^",
   behind: "v",
   staged: "+",

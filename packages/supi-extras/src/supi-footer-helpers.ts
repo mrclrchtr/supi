@@ -335,7 +335,9 @@ export function buildPwdLine(
     sessionName: string | undefined;
     /** Pre-styled Git counts appended after the branch. */
     gitStatus?: string;
-    glyphs?: Pick<FooterGlyphs, "cwd" | "branch" | "session">;
+    /** Pre-styled Session Issues appended after the session name. */
+    sessionIssues?: string;
+    glyphs?: Pick<FooterGlyphs, "cwd" | "branch" | "session" | "issue">;
   },
   style: FooterStyle = plainStyle,
 ): string {
@@ -357,6 +359,10 @@ export function buildPwdLine(
   }
   if (params.sessionName) {
     parts.push(`${style("dim", glyphs?.session ?? "•")} ${style("text", params.sessionName)}`);
+  }
+  if (params.sessionIssues) {
+    const icon = glyphs?.issue ? `${style("accent", glyphs.issue)} ` : "";
+    parts.push(`${style("dim", "•")} ${icon}${params.sessionIssues}`);
   }
   return parts.join(" ");
 }

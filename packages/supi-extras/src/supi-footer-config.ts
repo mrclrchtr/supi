@@ -9,11 +9,14 @@ export interface FooterConfig extends Record<string, unknown> {
   icons: IconMode;
   /** Show ahead/behind, file counts, and branch stashes next to the branch. */
   gitStatus: boolean;
+  /** Show and link the Session Issues named in the first user message. */
+  issueLink: boolean;
 }
 
 export const FOOTER_DEFAULTS: FooterConfig = {
   icons: "auto",
   gitStatus: true,
+  issueLink: true,
 };
 
 export function loadFooterConfig(cwd: string, homeDir?: string): FooterConfig {
@@ -21,6 +24,7 @@ export function loadFooterConfig(cwd: string, homeDir?: string): FooterConfig {
   return {
     icons: isIconMode(raw.icons) ? raw.icons : FOOTER_DEFAULTS.icons,
     gitStatus: typeof raw.gitStatus === "boolean" ? raw.gitStatus : FOOTER_DEFAULTS.gitStatus,
+    issueLink: typeof raw.issueLink === "boolean" ? raw.issueLink : FOOTER_DEFAULTS.issueLink,
   };
 }
 
@@ -46,6 +50,12 @@ export function registerFooterSettings(pi: ExtensionAPI, afterPersist: () => voi
           key: "gitStatus",
           label: "Git status",
           description: "Show ahead/behind, staged/modified/untracked counts, and branch stashes",
+        },
+        {
+          kind: "boolean",
+          key: "issueLink",
+          label: "Issue link",
+          description: "Show and link GitHub issues named in the first user message",
         },
       ],
       afterPersist,

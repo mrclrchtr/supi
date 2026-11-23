@@ -117,6 +117,8 @@ The path line holds workspace state. It shows the Git branch with ahead/behind a
 
 The session line groups token totals, cache totals with the session cache-hit rate, cost, and context usage. Cache-hit and context values change color at their thresholds; context usage also shows a small bar unless icons are set to `ascii`. The model and thinking level appear on the right in theme colors, after status icons from other SuPi packages. When the window is narrow, the right side of each line shortens first.
 
+When the first user message on the current session branch names GitHub issues or pull requests, the path line shows them after the session name, for example `• #12 acme/app#5`. It recognizes `github.com` issue and pull request URLs, `owner/repo#12`, and a bare `#12`, which resolves against the `origin` remote when it points to GitHub. Expanded skills and code are ignored. If the terminal supports hyperlinks, each reference links to its GitHub page.
+
 Statuses that other extensions set with Pi's `setStatus()` appear on a third line.
 
 Configure the footer under `/supi-settings` → **Footer**:
@@ -125,6 +127,7 @@ Configure the footer under `/supi-settings` → **Footer**:
 | --- | --- | --- |
 | `icons` | `auto`, `nerd`, `unicode`, `ascii` | `auto` |
 | `gitStatus` | `true`, `false` | `true` |
+| `issueLink` | `true`, `false` | `true` |
 
 `auto` cannot detect the terminal font. It uses Nerd Font icons on a local UTF-8 terminal, Unicode symbols over SSH, and ASCII otherwise. If icons render as boxes, choose `unicode`. `ascii` keeps the former `path (branch)` layout.
 
