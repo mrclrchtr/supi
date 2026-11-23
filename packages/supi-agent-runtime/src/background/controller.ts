@@ -8,9 +8,14 @@ import type {
   SessionEntry,
 } from "@earendil-works/pi-coding-agent";
 import type { AgentRunRegistry } from "../session/agent-run-registry.ts";
-import { readResultCollection } from "./collection.ts";
+import { collectedTaskIds } from "./collection.ts";
 import { syncCollectionTools } from "./collection-tools.ts";
-import { findLaunchEntry, readNoticeTarget, sendCompletionNotice } from "./notices.ts";
+import {
+  findLaunchEntry,
+  readNoticeTarget,
+  sendCompletionNotice,
+  skipCollectedNotices,
+} from "./notices.ts";
 import type {
   CollectableRunBatch,
   RunBatch,
@@ -284,11 +289,7 @@ export class BackgroundRunBatches {
     this.#manager = ctx.sessionManager;
     const record = this.#batches.get(batchId);
     if (!record || !this.#onBranch(record.batch)) return false;
-    const collected = new Set<string>();
-    for (const entry of ctx.sessionManager.getBranch()) {
-      const result = readResultCollection(entry);
-      if (result?.batchId === batchId) for (const taskId of result.taskIds) collected.add(taskId);
-    }
+    const collected = collectedTaskIds(ctx.sessionManager.getBranch(), batchId);
     return record.batch.handle
       .snapshot()
       .results.some((task) => taskIds.includes(task.taskId) && !collected.has(task.taskId));
@@ -355,12 +356,10 @@ export class BackgroundRunBatches {
   }
 
   #markCollected(entries: readonly SessionEntry[]): void {
-    for (const entry of entries) {
-      const result = readResultCollection(entry);
-      if (!result) continue;
-      const record = this.#batches.get(result.batchId);
-      if (record) for (const taskId of result.taskIds) record.notified.add(taskId);
-    }
+    skipCollectedNotices(entries, (batchId) => {
+      const record = this.#batches.get(batchId);
+      return record && { notified: record.notified, source: record.owner.options.source };
+    });
   }
 
   #updateUsage(record?: BatchRecord): void {

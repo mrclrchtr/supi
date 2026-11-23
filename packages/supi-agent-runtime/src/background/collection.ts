@@ -27,3 +27,13 @@ export function readResultCollection(entry: SessionEntry): CompletionNoticeTarge
     ),
   };
 }
+
+/** Task IDs of one batch whose Result Collection Pi stored on the given branch. */
+export function collectedTaskIds(branch: readonly SessionEntry[], batchId: string): Set<string> {
+  const collected = new Set<string>();
+  for (const entry of branch) {
+    const result = readResultCollection(entry);
+    if (result?.batchId === batchId) for (const taskId of result.taskIds) collected.add(taskId);
+  }
+  return collected;
+}

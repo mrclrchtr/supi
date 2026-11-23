@@ -1,3 +1,8 @@
+import {
+  configureDebugRegistry,
+  getDebugEvents,
+  resetDebugRegistry,
+} from "@mrclrchtr/supi-core/debug";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ownerHarness } from "../helpers/run-batch-owner.ts";
 
@@ -13,7 +18,16 @@ afterEach(async () => {
   harness = undefined;
   vi.unstubAllEnvs();
   vi.clearAllMocks();
+  resetDebugRegistry();
 });
+
+/** Completion Notice decisions recorded in the Debug Registry, oldest first. */
+function noticeDecisions() {
+  return getDebugEvents({ category: "background-run-batch" })
+    .events.filter((event) => event.message.startsWith("Completion Notice"))
+    .reverse()
+    .map((event) => event.data);
+}
 
 async function startOne(taskIds = ["one"]) {
   if (!harness) throw new Error("Missing harness.");
@@ -102,6 +116,25 @@ describe("Completion Notice delivery", () => {
     await collecting;
     await flushNotices();
     expect(harness.pi.messages).toHaveLength(0);
+  });
+
+  it("records whether a Completion Notice was sent or skipped as a debug event", async () => {
+    configureDebugRegistry({ enabled: true });
+    harness = await ownerHarness(sdk);
+    const collectedId = await startOne(["one"]);
+    fakeNoticeTimers();
+    const collecting = harness.invoke("agent_result", { batchId: collectedId, wait: true });
+    harness.child("one").finish();
+    await collecting;
+    await flushNotices();
+    vi.useRealTimers();
+    const sentId = await startOne(["two"]);
+    harness.child("two").finish();
+    await vi.waitFor(() => expect(harness?.pi.messages).toHaveLength(1));
+    expect(noticeDecisions()).toEqual([
+      { batchId: collectedId, taskIds: ["one"], decision: "skipped", reason: "collected" },
+      { batchId: sentId, taskIds: ["two"], decision: "sent" },
+    ]);
   });
 
   it.each(["unstored", "failed"])("keeps the notice after an %s collection", async (kind) => {
