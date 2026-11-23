@@ -4,8 +4,8 @@ import type { DelegationController } from "../../delegation/controller.ts";
 import type { DelegationConversationCandidate } from "../../delegation/conversation-state.ts";
 import { agentProfileCatalogueStore } from "../../session.ts";
 import { currentProfileUnavailableReason } from "../agent_run/batch-preflight.ts";
+import { agentListParameters } from "./input.ts";
 import { type AgentListRow, buildAgentListResult } from "./result.ts";
-import { agentListSpec } from "./spec.ts";
 
 type Execute = NonNullable<Parameters<ExtensionAPI["registerTool"]>[0]["execute"]>;
 
@@ -13,7 +13,7 @@ type Execute = NonNullable<Parameters<ExtensionAPI["registerTool"]>[0]["execute"
 export function makeAgentListExecute(controller: DelegationController): Execute {
   // biome-ignore lint/complexity/useMaxParams: Pi execute requires five parameters.
   return async (_callId, input, _signal, _onUpdate, ctx) => {
-    if (!Value.Check(agentListSpec.parameters, input)) throw new Error("Invalid agent_list input.");
+    if (!Value.Check(agentListParameters, input)) throw new Error("Invalid agent_list input.");
     const params = input as { offset?: number; limit?: number };
     const catalogue = agentProfileCatalogueStore.get();
     if (!catalogue)

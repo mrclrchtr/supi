@@ -1,7 +1,8 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { renderCollapsibleTextResult, renderToolCall } from "../render.ts";
+import type { WebDocsSearchInput } from "./input.ts";
 import type { SearchDetails } from "./result.ts";
-import { WEB_DOCS_SEARCH_TOOL_NAME, type WebDocsSearchInput } from "./spec.ts";
+import { WEB_DOCS_SEARCH_TOOL_NAME } from "./spec.ts";
 
 /** Transcript renderer for web_docs_search tool calls. */
 export function renderSearchCall(args: unknown, theme: Theme) {

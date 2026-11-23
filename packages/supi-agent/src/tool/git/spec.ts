@@ -1,17 +1,7 @@
 import { Type } from "typebox";
+import { GIT_READ_SUBCOMMANDS } from "./input.ts";
 
 export const GIT_TOOL_NAME = "git";
-
-/** Git subcommands the tool admits; each one only reads repository state. */
-export const GIT_READ_SUBCOMMANDS = [
-  "diff",
-  "log",
-  "show",
-  "blame",
-  "status",
-  "rev-parse",
-  "ls-files",
-] as const;
 
 /** Maximum arguments in one call. */
 export const MAX_GIT_ARGS = 64;

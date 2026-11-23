@@ -1,13 +1,13 @@
 import type { AgentToolUpdateCallback, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { searchLibrary } from "../../context7-client.ts";
 import { limitModelVisibleOutput } from "../result.ts";
+import type { WebDocsSearchInput } from "./input.ts";
 import {
   buildNoResultsResult,
   buildSearchResult,
   formatSearchResults,
   type SearchResult,
 } from "./result.ts";
-import type { WebDocsSearchInput } from "./spec.ts";
 
 // biome-ignore lint/complexity/useMaxParams: pi ToolDefinition.execute signature
 export async function runSearch(

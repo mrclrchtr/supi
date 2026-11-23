@@ -176,6 +176,27 @@
           }
         }
       }
+    },
+    {
+      // docs/conventions/tool-architecture.md: execution modules receive the schema from register.ts.
+      "includes": ["packages/*/src/tool/**/execute.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["./spec.ts", "**/spec.ts"],
+                    "message": "Execution modules must not import spec.ts. Take the schema from register.ts and keep shared constants and types in a leaf module such as input.ts."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
     }
   ]
 }

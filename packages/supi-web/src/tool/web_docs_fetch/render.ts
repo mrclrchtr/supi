@@ -1,7 +1,8 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { renderCollapsibleTextResult, renderToolCall } from "../render.ts";
+import type { WebDocsFetchInput } from "./input.ts";
 import type { FetchDetails } from "./result.ts";
-import { WEB_DOCS_FETCH_TOOL_NAME, type WebDocsFetchInput } from "./spec.ts";
+import { WEB_DOCS_FETCH_TOOL_NAME } from "./spec.ts";
 
 /** Transcript renderer for web_docs_fetch tool calls. */
 export function renderFetchCall(args: unknown, theme: Theme) {

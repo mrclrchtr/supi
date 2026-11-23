@@ -1,6 +1,5 @@
-import { Type } from "typebox";
-import { DEFAULT_FINDINGS_LIMIT, MAX_FINDINGS_LIMIT } from "../../cache/forensics/types.ts";
 import { makeCacheForensicsExecute } from "./execute.ts";
+import { cacheForensicsParameters } from "./input.ts";
 import { cacheForensicsOutputSchema } from "./structured-schema.ts";
 
 export const CACHE_FORENSICS_TOOL_NAME = "cache_forensics";
@@ -16,43 +15,7 @@ export const cacheForensicsSpec = {
     idempotentHint: true,
     openWorldHint: false,
   },
-  parameters: Type.Object(
-    {
-      pattern: Type.Enum(["hotspots", "breakdown", "correlate", "idle"], {
-        type: "string",
-        description:
-          "Analysis pattern: breakdown=cause totals; hotspots=largest drops; correlate=preceding tool shapes; idle=drops after long gaps.",
-      }),
-      since: Type.Optional(
-        Type.String({
-          description: 'Duration string like "7d", "24h", "30m".',
-          default: "7d",
-        }),
-      ),
-      minDrop: Type.Optional(
-        Type.Number({
-          description: "Minimum hit-rate drop in percentage points to include.",
-          default: 0,
-        }),
-      ),
-      maxSessions: Type.Optional(
-        Type.Integer({
-          minimum: 1,
-          description: "Maximum sessions to scan.",
-          default: 100,
-        }),
-      ),
-      limit: Type.Optional(
-        Type.Integer({
-          minimum: 1,
-          maximum: MAX_FINDINGS_LIMIT,
-          description: "Maximum findings to return.",
-          default: DEFAULT_FINDINGS_LIMIT,
-        }),
-      ),
-    },
-    { additionalProperties: false },
-  ),
+  parameters: cacheForensicsParameters,
   outputSchema: cacheForensicsOutputSchema,
   execute: makeCacheForensicsExecute(),
 } as const;

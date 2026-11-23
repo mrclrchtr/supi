@@ -3,15 +3,16 @@ import type {
   ExtensionAPI,
   ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
-import type { Static } from "typebox";
 import { captureToolRow } from "./capture.ts";
-import { TUI_RENDER_DEFAULT_WIDTH, TUI_RENDER_MAX_WIDTH, TUI_RENDER_MIN_WIDTH } from "./input.ts";
+import {
+  TUI_RENDER_DEFAULT_WIDTH,
+  TUI_RENDER_MAX_WIDTH,
+  TUI_RENDER_MIN_WIDTH,
+  type TuiRenderParams,
+} from "./input.ts";
 import type { ToolRendererObserver } from "./observer.ts";
 import { buildTuiRenderResult, type TuiRenderToolResult, type TuiRenderView } from "./result.ts";
 import { selectToolResult, type ToolResultSelector } from "./select.ts";
-import type { tuiRenderSpec } from "./spec.ts";
-
-type TuiRenderParams = Static<(typeof tuiRenderSpec)["parameters"]>;
 
 /** Typed execute signature for tui_render. */
 // biome-ignore lint/complexity/useMaxParams: pi tool execute signature

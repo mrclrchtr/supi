@@ -6,10 +6,10 @@ import {
   promptGuidelines as docsFetchGuidelines,
   promptSnippet as docsFetchSnippet,
 } from "./web_docs_fetch/guidance.ts";
+import { webDocsFetchParameters } from "./web_docs_fetch/input.ts";
 import {
   WEB_DOCS_FETCH_TOOL_LABEL,
   WEB_DOCS_FETCH_TOOL_NAME,
-  webDocsFetchParameters,
   webDocsFetchSpec,
 } from "./web_docs_fetch/spec.ts";
 import {
@@ -17,10 +17,10 @@ import {
   promptGuidelines as searchGuidelines,
   promptSnippet as searchSnippet,
 } from "./web_docs_search/guidance.ts";
+import { webDocsSearchParameters } from "./web_docs_search/input.ts";
 import {
   WEB_DOCS_SEARCH_TOOL_LABEL,
   WEB_DOCS_SEARCH_TOOL_NAME,
-  webDocsSearchParameters,
   webDocsSearchSpec,
 } from "./web_docs_search/spec.ts";
 import {
@@ -47,9 +47,9 @@ import {
   webSearchSpec,
 } from "./web_search/spec.ts";
 
-export type { WebDocsFetchInput } from "./web_docs_fetch/spec.ts";
+export type { WebDocsFetchInput } from "./web_docs_fetch/input.ts";
 export { WEB_DOCS_FETCH_TOOL_NAME } from "./web_docs_fetch/spec.ts";
-export type { WebDocsSearchInput } from "./web_docs_search/spec.ts";
+export type { WebDocsSearchInput } from "./web_docs_search/input.ts";
 export { WEB_DOCS_SEARCH_TOOL_NAME } from "./web_docs_search/spec.ts";
 export type { WebFetchMdInput, WebFetchOutputMode } from "./web_fetch_md/spec.ts";
 export { WEB_FETCH_INLINE_MAX_CHARS, WEB_FETCH_MD_TOOL_NAME } from "./web_fetch_md/spec.ts";

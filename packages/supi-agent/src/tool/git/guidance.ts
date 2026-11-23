@@ -1,4 +1,4 @@
-import { GIT_READ_SUBCOMMANDS } from "./spec.ts";
+import { GIT_READ_SUBCOMMANDS } from "./input.ts";
 
 export const toolDescription = `Run one read-only Git query in the working directory without a shell: ${GIT_READ_SUBCOMMANDS.join(", ")}. Other subcommands, --output, --ext-diff, --textconv, and verbose status are rejected. Pipes, redirection, and globs are not interpreted.`;
 

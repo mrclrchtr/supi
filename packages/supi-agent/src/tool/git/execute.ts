@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { GIT_READ_SUBCOMMANDS } from "./spec.ts";
+import { GIT_READ_SUBCOMMANDS } from "./input.ts";
 
 const GIT_TIMEOUT_MS = 30_000;
 /**

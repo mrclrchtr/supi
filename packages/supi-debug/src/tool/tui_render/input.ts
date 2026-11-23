@@ -1,5 +1,8 @@
 // Leaf vocabulary for tui_render: shared by its spec, result schema, and runtime modules.
 
+import type { Static } from "typebox";
+import { Type } from "typebox";
+
 /** Output formats: visible text, raw terminal colors, or theme-token markers. */
 export const TUI_RENDER_FORMATS = ["plain", "ansi", "marked"] as const;
 export type TuiRenderFormat = (typeof TUI_RENDER_FORMATS)[number];
@@ -24,3 +27,56 @@ export type ShellBackground = (typeof SHELL_BACKGROUNDS)[number];
 export const TUI_RENDER_MIN_WIDTH = 20;
 export const TUI_RENDER_MAX_WIDTH = 400;
 export const TUI_RENDER_DEFAULT_WIDTH = 100;
+
+/** Parameter schema for tui_render, shared by its spec and execution. */
+export const tuiRenderParameters = Type.Object(
+  {
+    target: Type.Object(
+      {
+        tool: Type.Optional(
+          Type.Object(
+            {
+              name: Type.String({ minLength: 1, description: "Tool name, e.g. code_health" }),
+              index: Type.Optional(
+                Type.Integer({
+                  minimum: 0,
+                  description: "0 = latest result of this tool (default), 1 = the one before",
+                }),
+              ),
+            },
+            { additionalProperties: false },
+          ),
+        ),
+        toolCallId: Type.Optional(Type.String({ minLength: 1, description: "Exact tool call id" })),
+      },
+      {
+        description: "Exactly one: the latest results of a tool, or one tool call.",
+        minProperties: 1,
+        maxProperties: 1,
+        additionalProperties: false,
+      },
+    ),
+    expanded: Type.Optional(
+      Type.Boolean({ description: "Render the expanded view. Default: collapsed." }),
+    ),
+    width: Type.Optional(
+      Type.Integer({
+        minimum: TUI_RENDER_MIN_WIDTH,
+        maximum: TUI_RENDER_MAX_WIDTH,
+        description:
+          "Render width in terminal columns. Default: the terminal width, clamped to the allowed range.",
+      }),
+    ),
+    format: Type.Optional(
+      Type.Enum(TUI_RENDER_FORMATS, {
+        type: "string",
+        description:
+          "plain = visible text (default); ansi = raw terminal colors; marked = theme tokens such as [success]0[/success].",
+      }),
+    ),
+  },
+  { additionalProperties: false },
+);
+
+/** Validated tui_render parameters. */
+export type TuiRenderParams = Static<typeof tuiRenderParameters>;

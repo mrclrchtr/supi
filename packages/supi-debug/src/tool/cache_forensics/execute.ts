@@ -3,15 +3,13 @@ import type {
   AgentToolUpdateCallback,
   ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
-import type { Static } from "typebox";
 import { loadCacheForensicsConfig } from "../../cache/config.ts";
 import { runForensics } from "../../cache/forensics/forensics.ts";
 import { normalizeFindingsLimit } from "../../cache/forensics/types.ts";
+import type { CacheForensicsParams } from "./input.ts";
 import { buildForensicsResult, type ForensicsBoundQuery } from "./result.ts";
-import type { cacheForensicsSpec } from "./spec.ts";
 
 type ForensicsPattern = "hotspots" | "breakdown" | "correlate" | "idle";
-type CacheForensicsParams = Static<(typeof cacheForensicsSpec)["parameters"]>;
 
 /** Typed execute signature for cache_forensics. */
 // biome-ignore lint/complexity/useMaxParams: pi tool execute signature

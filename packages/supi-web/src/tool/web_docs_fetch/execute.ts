@@ -1,8 +1,8 @@
 import type { AgentToolUpdateCallback, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { getContext } from "../../context7-client.ts";
 import { limitModelVisibleOutput } from "../result.ts";
+import type { WebDocsFetchInput } from "./input.ts";
 import { buildFetchResult, type FetchResult } from "./result.ts";
-import type { WebDocsFetchInput } from "./spec.ts";
 
 // biome-ignore lint/complexity/useMaxParams: pi ToolDefinition.execute signature
 export async function runFetch(

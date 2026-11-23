@@ -1,10 +1,7 @@
-import type { Static } from "typebox";
 import type { ReviewArtifactStore } from "../../session/review-artifact-store.ts";
 import { pageText } from "../output-page.ts";
+import type { ReviewOutputParams } from "./input.ts";
 import { buildOutputPageResult } from "./result.ts";
-import type { reviewOutputSpec } from "./spec.ts";
-
-export type ReviewOutputParams = Static<(typeof reviewOutputSpec)["parameters"]>;
 
 /** Read a bounded direct-call page and the complete native report from one stored artifact. */
 export function executeReviewOutput(store: ReviewArtifactStore) {
