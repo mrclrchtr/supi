@@ -8,7 +8,7 @@ SuPi is released on npm and follows semver with one shared version. Breaking cha
 
 ## Pi docs-first rule
 
-- Before changing or advising on Pi behavior, read the relevant installed Pi docs (`README.md`, `docs/`, `examples/`) and linked `.md` references. Start with installed Pi's `docs/index.md`; never assume APIs or conventions from memory.
+- Before changing or advising on Pi behavior, read the relevant installed Pi docs (`README.md`, `docs/`, `examples/`) and linked `.md` references. They are in `node_modules/@earendil-works/pi-coding-agent/` at the root of each worktree. Start with `docs/index.md` there; never assume APIs or conventions from memory.
 - For request payloads, prompt caching, compaction, and context hooks verified here, see `docs/pi/context-architecture.md`.
 
 ## Documentation expectations
