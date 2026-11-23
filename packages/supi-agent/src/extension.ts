@@ -1,9 +1,13 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Box } from "@earendil-works/pi-tui";
-import { clearAgentsProfilePages, registerAgentsCommand } from "@mrclrchtr/supi-agent-runtime/api";
+import {
+  clearAgentsProfilePages,
+  registerAgentsCommand,
+  registerRunBatchOwner,
+} from "@mrclrchtr/supi-agent-runtime/api";
 import { registerShellHints } from "@mrclrchtr/supi-core/session";
 import { registerAgentSettings, syncAgentRunTool } from "./config.ts";
-import { DelegationController } from "./delegation/controller.ts";
+import { type DelegationBatchData, DelegationController } from "./delegation/controller.ts";
 import { agentProfilePages } from "./profile-pages.ts";
 import { registerProfileSettings } from "./profile-settings.ts";
 import { agentProfileCatalogueStore } from "./session.ts";
@@ -12,6 +16,7 @@ import { registerAgentListTool } from "./tool/agent_list/register.ts";
 import { registerAgentResultTool } from "./tool/agent_result/register.ts";
 import { renderCompletionNotice } from "./tool/agent_result/render.ts";
 import { buildCompletionNotice } from "./tool/agent_result/result.ts";
+import type { DelegationBatchHandle } from "./tool/agent_run/batch-types.ts";
 import { registerAgentRunTool } from "./tool/agent_run/register.ts";
 import { AGENT_COMPLETION_MESSAGE_TYPE } from "./tool/names.ts";
 
@@ -23,7 +28,6 @@ export default function agentExtension(pi: ExtensionAPI): void {
 
   // Catalogue, settings sections, and tool schema refresh on every session start/reload.
   pi.on("session_start", async (_event, ctx) => {
-    await controller?.close();
     disposeProfileSettings?.();
     const catalogue = await agentProfileCatalogueStore.reload({
       cwd: ctx.cwd,
@@ -41,12 +45,13 @@ export default function agentExtension(pi: ExtensionAPI): void {
         "warning",
       );
     }
-    controller = new DelegationController(registry, (batchId, tasks) => {
-      pi.sendMessage(buildCompletionNotice(batchId, tasks), {
-        deliverAs: "steer",
-        triggerTurn: true,
-      });
+    const owned = registerRunBatchOwner<DelegationBatchHandle, DelegationBatchData>(pi, {
+      source: "supi-agent",
+      noticeType: AGENT_COMPLETION_MESSAGE_TYPE,
+      buildNotice: buildCompletionNotice,
+      reconcile: (branch, release) => controller?.reconcile(branch, release),
     });
+    controller = new DelegationController(registry, owned);
     registerAgentRunTool(pi, controller);
     registerAgentListTool(pi, controller);
     registerAgentResultTool(pi, controller);
@@ -54,25 +59,8 @@ export default function agentExtension(pi: ExtensionAPI): void {
     syncAgentRunTool(pi, ctx.cwd);
   });
 
-  pi.on("session_tree", (_event, ctx) => controller?.refresh(ctx));
-  pi.on("context", (event, ctx) => {
-    const messages = event.messages.filter(
-      (message) =>
-        message.role !== "custom" ||
-        message.customType !== AGENT_COMPLETION_MESSAGE_TYPE ||
-        controller?.noticeVisible(message.details, ctx),
-    );
-    // Preserve Pi's unchanged-context path when every notice remains useful on this branch.
-    return messages.length === event.messages.length ? undefined : { messages };
-  });
-  pi.on("agent_start", (_event, ctx) => controller?.observeParent(ctx.signal));
-  pi.on("agent_settled", (event, ctx) => controller?.settleParent(event.aborted, ctx));
-  pi.on("input", (event) => {
-    if (event.source !== "extension") controller?.resumeDelivery();
-  });
-  pi.on("turn_end", (_event, ctx) => controller?.refresh(ctx));
-  pi.on("session_shutdown", async () => {
-    await controller?.close();
+  // Parent turn, branch, context, and input events reach the runtime-owned batches directly.
+  pi.on("session_shutdown", () => {
     controller = undefined;
     disposeProfileSettings?.();
     disposeProfileSettings = undefined;

@@ -77,34 +77,4 @@ describe("background replacement and cleanup", () => {
       release();
     }
   });
-
-  it("does not restart an aborted parent for an already queued notice or expose it on another branch", async () => {
-    harness = await backgroundHarness(sdk);
-    const parent = await harness.beginParent();
-    await harness.invoke("agent_run", { tasks: [task()] });
-    await vi.waitFor(() => expect(harness?.children[0]?.session.isStreaming).toBe(true));
-    harness.child("one").finish();
-    await vi.waitFor(() => expect(harness?.queued).toHaveLength(1));
-    expect(harness.turnsStarted).toBe(0);
-    parent.abort();
-    await harness.endParent(true);
-    expect(await harness.deliverQueued()).toEqual([]);
-    expect(harness.turnsStarted).toBe(0);
-    harness.manager.resetLeaf();
-    await harness.pi.emit("session_tree", { type: "session_tree" }, harness.ctx);
-    await harness.beginParent();
-    expect(await harness.deliverQueued()).toEqual([]);
-    expect(harness.pi.messages).toHaveLength(1);
-  });
-
-  it("starts one idle parent turn when a task finishes after normal settlement", async () => {
-    harness = await backgroundHarness(sdk);
-    await harness.beginParent();
-    await harness.invoke("agent_run", { tasks: [task()] });
-    await vi.waitFor(() => expect(harness?.children[0]?.session.isStreaming).toBe(true));
-    await harness.endParent();
-    harness.child("one").finish();
-    await vi.waitFor(() => expect(harness?.turnsStarted).toBe(1));
-    expect(harness.queued).toHaveLength(0);
-  });
 });

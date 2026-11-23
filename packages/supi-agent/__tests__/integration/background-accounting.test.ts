@@ -15,56 +15,6 @@ afterEach(async () => {
 });
 
 describe("background collection receipts", () => {
-  it.each([{ isError: true }, { details: {} }, { isError: true, details: {} }])(
-    "does not report stored Usage again after a result hook changes delivery: %j",
-    async (patch) => {
-      harness = await backgroundHarness(sdk);
-      const start = await harness.invoke("agent_run", { tasks: [task()] });
-      await vi.waitFor(() => expect(harness?.children[0]?.session.isStreaming).toBe(true));
-      harness.child("one").finish("Retryable output");
-      const first = await harness.invoke(
-        "agent_result",
-        { batchId: start.details.batchId, wait: true },
-        { resultHook: () => patch },
-      );
-      expect(first.usage?.totalTokens).toBe(15);
-      const retry = await harness.invoke("agent_result", { batchId: start.details.batchId });
-      expect(retry.usage).toBeUndefined();
-      expect(retry.content).toEqual(first.content);
-      expect(harness.registry.snapshot().runs[0]?.result?.display?.usageStatus).toBe("reported");
-    },
-  );
-  it("does not send a late completion notice for an already collected result", async () => {
-    harness = await backgroundHarness(sdk);
-    const start = await harness.invoke("agent_run", { tasks: [task()] });
-    await vi.waitFor(() => expect(harness?.children[0]?.session.isStreaming).toBe(true));
-    const collecting = harness.invoke("agent_result", {
-      batchId: start.details.batchId,
-      wait: true,
-    });
-    harness.child("one").finish();
-    await collecting;
-    await new Promise((resolve) => setTimeout(resolve, 10));
-    expect(harness.pi.messages).toHaveLength(0);
-  });
-  it("does not mark an unstored collection reported and permits a later retry", async () => {
-    harness = await backgroundHarness(sdk);
-    const start = await harness.invoke("agent_run", { tasks: [task()] });
-    await vi.waitFor(() => expect(harness?.children[0]?.session.isStreaming).toBe(true));
-    harness.child("one").finish();
-    const lost = await harness.invoke(
-      "agent_result",
-      { batchId: start.details.batchId, wait: true },
-      false,
-    );
-    expect(lost.usage?.totalTokens).toBe(15);
-    expect(harness.registry.snapshot().runs[0]?.result?.display?.usageStatus).toBe("uncollected");
-    await harness.endParent();
-    const retry = await harness.invoke("agent_result", { batchId: start.details.batchId });
-    expect(retry.usage?.totalTokens).toBe(15);
-    expect(harness.registry.snapshot().runs[0]?.result?.display?.usageStatus).toBe("reported");
-  });
-
   it("reports Usage only once for concurrent collections", async () => {
     harness = await backgroundHarness(sdk);
     const start = await harness.invoke("agent_run", { tasks: [task()] });

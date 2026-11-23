@@ -2,7 +2,7 @@
 
 ## Scope
 
-`@mrclrchtr/supi-agent-runtime` is a library-only package. It owns Agent Run session mechanics, the shared session-local run registry, and temporary transcripts. Callers own resources, capabilities, completion, and evidence policy.
+`@mrclrchtr/supi-agent-runtime` is a library-only package. It owns Agent Run session mechanics, the shared session-local run registry, temporary transcripts, and Background Run Batches (`src/background/`). Callers own resources, capabilities, completion, and evidence policy.
 
 ## Guidelines
 
@@ -14,4 +14,5 @@
 - Usage aggregation must include nested tool and summary calls.
 - Keep the package library-only. It may provide `registerAgentsCommand()` for extension callers, but it must not add a Pi extension entry.
 - Keep Agent Profile pages optional and caller-owned. Do not move profile policy or Review audit into the runtime.
+- Background Run Batches hold no admission, Profile, conversation, or checkpoint policy. Owners reconcile their own claims through `RunBatchOwnerOptions.reconcile`. Test them through an artificial owner (`__tests__/helpers/run-batch-owner.ts`).
 - Test through `startAgentRun()` and its returned Handle; use controlled Pi session factories and fake timers.

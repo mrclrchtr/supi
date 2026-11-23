@@ -1,9 +1,9 @@
 import { randomUUID } from "node:crypto";
 import type { SessionEntry } from "@earendil-works/pi-coding-agent";
 import type { AgentRunContext } from "@mrclrchtr/supi-agent-runtime/api";
+import { readResultCollection } from "@mrclrchtr/supi-agent-runtime/api";
 import type { BatchTaskProgress, BatchTaskResult } from "../tool/agent_run/batch-types.ts";
 import type { AgentRunTaskInput } from "../tool/agent_run/schema.ts";
-import { AGENT_RESULT_TOOL_NAME } from "../tool/names.ts";
 import type { DelegationCheckpoint } from "./checkpoints.ts";
 import { readSavedDelegationConversations } from "./checkpoints.ts";
 import type { ManagedBatch } from "./controller.ts";
@@ -236,7 +236,7 @@ export class DelegationConversationState {
         throw new Error(`Conversation "${target.conversationId}" already has an active Agent Run.`);
       }
       for (const batch of activeBatches) {
-        const priorTaskId = [...batch.taskConversations].find(
+        const priorTaskId = [...batch.data.taskConversations].find(
           ([, conversationId]) => conversationId === target.conversationId,
         )?.[0];
         if (!priorTaskId) continue;
@@ -266,7 +266,7 @@ function addBatchActivity(
   onBranch: boolean,
 ): void {
   const progress = new Map(batch.handle.progress().tasks.map((task) => [task.taskId, task]));
-  for (const [taskId, conversationId] of batch.taskConversations) {
+  for (const [taskId, conversationId] of batch.data.taskConversations) {
     const task = progress.get(taskId);
     if (!task) continue;
     const liveDetails = { label: task.conversationLabel, profileId: task.profileId };
@@ -312,7 +312,7 @@ function hasPendingCollection(
 ): boolean {
   if (batch.mode !== "background") return false;
   const collected = branch.some((entry) => {
-    const collection = getSuccessfulCollection(entry);
+    const collection = readResultCollection(entry);
     return collection?.batchId === batch.handle.batchId && collection.taskIds.includes(taskId);
   });
   if (!collected) return true;
@@ -337,28 +337,4 @@ function hasToolResult(branch: readonly SessionEntry[], callId: string): boolean
       entry.message.role === "toolResult" &&
       entry.message.toolCallId === callId,
   );
-}
-
-/** Read delivered result identities, independently of whether their Usage was reported. */
-export function getSuccessfulCollection(
-  entry: SessionEntry,
-): { batchId: string; taskIds: string[] } | undefined {
-  if (
-    entry.type !== "message" ||
-    entry.message.role !== "toolResult" ||
-    entry.message.toolName !== AGENT_RESULT_TOOL_NAME ||
-    entry.message.isError
-  ) {
-    return undefined;
-  }
-  const details = entry.message.details as
-    | { batchId?: unknown; tasks?: ({ taskId?: unknown } | null)[] }
-    | undefined;
-  if (typeof details?.batchId !== "string" || !Array.isArray(details.tasks)) return undefined;
-  return {
-    batchId: details.batchId,
-    taskIds: details.tasks.flatMap((task) =>
-      typeof task?.taskId === "string" ? [task.taskId] : [],
-    ),
-  };
 }

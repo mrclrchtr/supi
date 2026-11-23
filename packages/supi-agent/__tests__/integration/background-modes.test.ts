@@ -60,19 +60,4 @@ describe("delegation execution modes", () => {
     ).rejects.toThrow(/Invalid/);
     expect(harness.registry.snapshot().runs).toHaveLength(0);
   });
-
-  it("keeps children after normal parent completion and cancels them on session shutdown", async () => {
-    harness = await backgroundHarness(sdk);
-    await harness.beginParent();
-    const start = await harness.invoke("agent_run", { tasks: [task()] });
-    await vi.waitFor(() => expect(harness?.children[0]?.session.isStreaming).toBe(true));
-    await harness.endParent();
-    expect(harness.child("one").session.isStreaming).toBe(true);
-    await harness.close();
-    expect(harness.child("one").runtime.dispose).toHaveBeenCalled();
-    expect(harness.pi.messages).toHaveLength(0);
-    await expect(
-      harness.invoke("agent_result", { batchId: start.details.batchId }),
-    ).rejects.toThrow(/expired/);
-  });
 });

@@ -105,3 +105,17 @@ In Conversation or Details, Alt+Left and Alt+Right cycle through the filtered ru
 If the Ask User tool opens a form while `/agents` is open, the viewer closes so the form is visible. This does not cancel the agent turn. Run `/agents` again to reopen the viewer.
 
 `startRegisteredAgentRun()` returns one handle. `stop()` waits for bounded Agent Run disposal, not transcript writes. `result` resolves after final transcript writes finish. A storage failure marks the transcript incomplete and does not change the Agent Run outcome. Without a registry, the runtime does not create a transcript. A closed registry stops the run.
+
+## Background Run Batches
+
+An owner package that lets its caller continue while runs are active hands each admitted Run Batch to the runtime ([ADR 0014](docs/adr/0014-own-background-run-batches-and-result-collection.md)). Call `registerRunBatchOwner(pi, options)` on every `session_start`; it returns the owner's access to the batches of the containing session. Bundled runtime copies share one set of batches, like the run registry.
+
+The owner supplies admission, a `RunBatchHandle` for its started runs, the launch call identity (`findLaunch()`), and a Completion Notice builder with its own custom message type. The runtime then owns:
+
+- session and launch-branch ownership: a batch whose launch leaves the active branch stops, and `get()` rejects unknown, expired, foreign, or off-branch handles;
+- Completion Notices: one notice for the tasks that became ready since the last one, sent only after Pi stores the successful launch result, and removed from model context once stale;
+- parent abort: every active batch stops and notices pause until the next input that is not from an extension; normal parent completion leaves batches running;
+- waiting with cancellation (`wait()`), Usage receipts (`prepareUsage()`), and spill-file cleanup (`retainOutput()`);
+- close on session shutdown, which stops owned runs and suppresses late delivery.
+
+Usage counts as reported only after Pi stores the `agent_result` result that carries it. The collection result's `details` must carry `batchId` and `tasks[].taskId`; `readResultCollection()` reads them back. The owner still registers `agent_result` and formats collected results.

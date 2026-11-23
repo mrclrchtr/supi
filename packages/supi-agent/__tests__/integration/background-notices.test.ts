@@ -14,38 +14,6 @@ afterEach(async () => {
 });
 
 describe("queued background completion notices", () => {
-  it.each(["unstored", "failed"])("keeps the notice after an %s collection", async (kind) => {
-    harness = await backgroundHarness(sdk);
-    await harness.beginParent();
-    const start = await harness.invoke("agent_run", { tasks: [task()] });
-    await vi.waitFor(() => expect(harness?.children[0]?.session.isStreaming).toBe(true));
-    harness.child("one").finish();
-    await vi.waitFor(() => expect(harness?.queued).toHaveLength(1));
-    await harness.invoke(
-      "agent_result",
-      { batchId: start.details.batchId },
-      kind === "unstored" ? false : { resultHook: () => ({ isError: true }) },
-    );
-    expect(await harness.deliverQueued()).toHaveLength(1);
-  });
-
-  it.each(["compaction", "branch before collection"])(
-    "checks raw branch collection state after %s",
-    async (navigation) => {
-      harness = await backgroundHarness(sdk);
-      await harness.beginParent();
-      const start = await harness.invoke("agent_run", { tasks: [task()] });
-      const launchLeaf = harness.manager.getLeafId();
-      await vi.waitFor(() => expect(harness?.children[0]?.session.isStreaming).toBe(true));
-      harness.child("one").finish();
-      await vi.waitFor(() => expect(harness?.queued).toHaveLength(1));
-      await harness.invoke("agent_result", { batchId: start.details.batchId });
-      if (navigation === "compaction") harness.manager.appendCompaction("Summary", null, 100);
-      else harness.manager.branch(launchLeaf as string);
-      expect(await harness.deliverQueued()).toHaveLength(navigation === "compaction" ? 0 : 1);
-    },
-  );
-
   it("omits a queued notice after its task is collected, even while a sibling remains active", async () => {
     harness = await backgroundHarness(sdk);
     await harness.beginParent();

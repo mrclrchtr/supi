@@ -190,6 +190,6 @@ agent_run({
 - Installed Pi `dist/modes/interactive/interactive-mode.js`: `/clone` forks at the active leaf.
 - `packages/supi-agent-runtime/src/run.ts` and `context.ts`: restored in-memory session creation, finalized context capture, and terminal disposal.
 - `packages/supi-agent-runtime/src/usage.ts`: run-only Usage accounting with an imported-history baseline.
-- `packages/supi-agent/src/delegation/controller.ts` and `usage-receipts.ts`: current live batch ownership and stored-result accounting.
+- `packages/supi-agent/src/delegation/controller.ts`: Delegation admission and checkpoint claims. `packages/supi-agent-runtime/src/background/controller.ts` and `usage-receipts.ts`: live batch ownership and stored-result accounting.
 - [Background delegation](background-delegation.md): existing execution, mode, capacity, cancellation, and collection rules.
 - [Checkpoint persistence decision](adr/0011-store-delegation-checkpoints-with-parent-results.md): accepted storage and retention trade-off.

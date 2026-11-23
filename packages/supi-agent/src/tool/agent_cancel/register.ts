@@ -17,7 +17,7 @@ export function registerAgentCancelTool(pi: ExtensionAPI, controller: Delegation
     async execute(_callId, params, _signal, _onUpdate, ctx) {
       if (!Value.Check(agentCancelSpec.parameters, params))
         throw new Error("Invalid agent_cancel input.");
-      const batch = controller.get(params.batchId, ctx);
+      const batch = controller.batches.get(params.batchId, ctx);
       const requested = controller.registry
         .snapshot()
         .runs.some((run) => run.batchId === batch.handle.batchId && run.active);

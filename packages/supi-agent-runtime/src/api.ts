@@ -5,6 +5,22 @@ export type {
   AgentRunStartupRace,
 } from "./auxiliary-models.ts";
 export { captureAgentRunAuxiliaryModels, raceAgentRunStartup } from "./auxiliary-models.ts";
+export { readResultCollection } from "./background/collection.ts";
+export { registerRunBatchOwner } from "./background/register.ts";
+export type {
+  CompletionNotice,
+  CompletionNoticeTarget,
+  RunBatch,
+  RunBatchHandle,
+  RunBatchMode,
+  RunBatchOwner,
+  RunBatchOwnerOptions,
+  RunBatchStartControl,
+  RunBatchTask,
+  RunBatchTaskOf,
+  RunBatchUsageReceipt,
+  StartRunBatchOptions,
+} from "./background/types.ts";
 export { cloneAgentRunContext } from "./context.ts";
 export { createDebugAgentRunRetrospective } from "./debug-retrospective.ts";
 export type { AgentRunDiagnosticErrorRow } from "./diagnostics.ts";

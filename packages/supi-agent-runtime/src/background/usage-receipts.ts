@@ -1,25 +1,20 @@
 import { randomUUID } from "node:crypto";
 import type { Usage } from "@earendil-works/pi-ai";
 import type { SessionEntry } from "@earendil-works/pi-coding-agent";
-import { combineAgentRunUsage } from "@mrclrchtr/supi-agent-runtime/api";
-import type { BatchTaskResult } from "../tool/agent_run/batch-types.ts";
-import { AGENT_RESULT_TOOL_NAME } from "../tool/names.ts";
+import { combineAgentRunUsage } from "../usage.ts";
+import type { RunBatchTask, RunBatchUsageReceipt } from "./types.ts";
 
-/** Identity for Usage prepared by a collection, outside model context. */
-export interface UsageReceipt {
-  readonly token: string;
-  readonly batchId: string;
-  readonly taskIds: readonly string[];
-}
+/** Name of the Result Collection tool whose stored results report Usage. */
+export const RESULT_COLLECTION_TOOL_NAME = "agent_result";
 
 interface PendingReceipt {
-  readonly receipt: UsageReceipt;
+  readonly receipt: RunBatchUsageReceipt;
   readonly callId: string;
   readonly usage: Usage;
 }
 
 /** Reserve Usage once, but commit it only from a stored Pi tool result. */
-export class DelegationUsageReceipts {
+export class RunBatchUsageReceipts {
   readonly #pending = new Map<string, PendingReceipt>();
   readonly #reported = new Set<string>();
 
@@ -27,8 +22,8 @@ export class DelegationUsageReceipts {
   prepare(
     callId: string,
     batchId: string,
-    tasks: readonly BatchTaskResult[],
-  ): { usage?: Usage; usageReceipt?: UsageReceipt } {
+    tasks: readonly RunBatchTask[],
+  ): { usage?: Usage; usageReceipt?: RunBatchUsageReceipt } {
     const reserved = new Set(
       [...this.#pending.values()].flatMap(({ receipt }) =>
         receipt.taskIds.map((id) => key(receipt.batchId, id)),
@@ -42,7 +37,7 @@ export class DelegationUsageReceipts {
     );
     const usage = combineAgentRunUsage(unreported.map((task) => task.usage));
     if (!usage) return {};
-    const receipt: UsageReceipt = {
+    const receipt: RunBatchUsageReceipt = {
       token: randomUUID(),
       batchId,
       taskIds: unreported.map((task) => task.taskId),
@@ -65,7 +60,7 @@ export class DelegationUsageReceipts {
         // Pi counts stored Usage even if a result hook changes isError or replaces details.
         // The owned call ID and prepared Usage identify accounting separately from delivery.
         if (
-          message.toolName === AGENT_RESULT_TOOL_NAME &&
+          message.toolName === RESULT_COLLECTION_TOOL_NAME &&
           message.usage &&
           containsUsage(message.usage, pending.usage)
         ) {
@@ -75,12 +70,6 @@ export class DelegationUsageReceipts {
         this.#pending.delete(token);
       } else if (releaseUnstored) this.#pending.delete(token);
     }
-  }
-
-  /** Release a claim when result assembly or collection fails. */
-  release(callId: string): void {
-    for (const [token, pending] of this.#pending)
-      if (pending.callId === callId) this.#pending.delete(token);
   }
 
   /** Whether Pi has stored this task's Usage, independent of result delivery status. */

@@ -42,19 +42,19 @@ export function makeAgentResultExecute(
   return async (callId, input, signal, onUpdate, ctx) => {
     if (!Value.Check(parameters, input)) throw new Error("Invalid agent_result input.");
     const params = input as { batchId: string; wait?: boolean };
-    const batch = controller.get(params.batchId, ctx);
+    const batch = controller.batches.get(params.batchId, ctx);
     if (params.wait) {
       const stopProgress = onUpdate
         ? streamProgress(batch.handle, params.batchId, onUpdate)
         : undefined;
       try {
-        await controller.wait(batch, signal ?? ctx.signal);
+        await controller.batches.wait(batch, signal ?? ctx.signal);
       } finally {
         stopProgress?.();
       }
     }
     if ((signal ?? ctx.signal)?.aborted) throw new Error("Delegation collection canceled.");
-    controller.get(params.batchId, ctx);
+    controller.batches.get(params.batchId, ctx);
     const checkpointTasks = controller.prepareCheckpointTasks(callId, batch, ctx);
     const result = buildCollectedResult(
       batch.handle,
@@ -63,11 +63,7 @@ export function makeAgentResultExecute(
     );
     if (typeof result.details.fullOutputPath === "string")
       controller.retainOutput(result.details.fullOutputPath);
-    const receipt = controller.receipts.prepare(
-      callId,
-      params.batchId,
-      batch.handle.snapshot().results,
-    );
+    const receipt = controller.batches.prepareUsage(callId, batch);
     return {
       ...result,
       usage: receipt.usage,
