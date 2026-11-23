@@ -2,17 +2,19 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Box } from "@earendil-works/pi-tui";
 import { type RunBatchOwner, registerRunBatchOwner } from "@mrclrchtr/supi-agent-runtime/api";
 import type { ReviewArtifactStore } from "../session/review-artifact-store.ts";
-import type { ReviewBatchHandle } from "./handle.ts";
-import { renderReviewCollection, renderReviewText } from "./render.ts";
+import { cancelReviewBatch } from "../tool/agent_cancel/result.ts";
 import {
   buildReviewCompletionNotice,
-  cancelReviewBatch,
   collectReviewBatch,
+  reviewBatchProgress,
+} from "../tool/agent_result/result.ts";
+import {
   REVIEW_COMPLETION_MESSAGE_TYPE,
   type ReviewBatchData,
-  reviewBatchProgress,
   reviewNeedsCollection,
-} from "./result.ts";
+} from "./batch.ts";
+import type { ReviewBatchHandle } from "./handle.ts";
+import { renderReviewCollection, renderReviewText } from "./render.ts";
 
 /** Review's access to the Background Run Batches of the containing session. */
 export type ReviewBatchOwner = RunBatchOwner<ReviewBatchHandle, ReviewBatchData>;

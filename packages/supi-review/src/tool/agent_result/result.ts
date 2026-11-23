@@ -1,58 +1,21 @@
-import type { AgentToolResult, SessionEntry } from "@earendil-works/pi-coding-agent";
-import {
-  type CompletionNotice,
-  type RunBatch,
-  readResultCollection,
-} from "@mrclrchtr/supi-agent-runtime/api";
-import type { PostReviewPolicy } from "../config.ts";
-import type { ReviewArtifactStore } from "../session/review-artifact-store.ts";
-import { createReviewOutput } from "../tool/output-page.ts";
-import { formatReviewBatch, formatWorkspaceReceipt } from "../tool/review_run/format.ts";
-import { buildRunResult } from "../tool/review_run/result.ts";
-import type { PreparedReview } from "../tool/review_run/workflow.ts";
-import type { ReviewTaskResult } from "../types.ts";
-import type { ReviewBatchHandle } from "./handle.ts";
+import type { AgentToolResult } from "@earendil-works/pi-coding-agent";
+import type { CompletionNotice } from "@mrclrchtr/supi-agent-runtime/api";
+import type { ReviewRunBatch } from "../../background/batch.ts";
+import type { ReviewBatchHandle } from "../../background/handle.ts";
+import type { ReviewArtifactStore } from "../../session/review-artifact-store.ts";
+import type { ReviewTaskResult } from "../../types.ts";
+import { createReviewOutput } from "../output-page.ts";
+import { formatReviewBatch } from "../review_run/format.ts";
+import { buildRunResult } from "../review_run/result.ts";
 
-/** Custom message type of Background Review Completion Notices. */
-export const REVIEW_COMPLETION_MESSAGE_TYPE = "supi-review-completion";
-
-/** Review data kept with each Background Review. */
-export interface ReviewBatchData {
-  /** Post-Review Policy configured when the Review started; applied to the complete report. */
-  readonly postReviewPolicy: PostReviewPolicy;
-}
-
-/** One session-owned Background Review. */
-export type ReviewRunBatch = RunBatch<ReviewBatchHandle, ReviewBatchData>;
+/**
+ * Review's `agent_result` results for Background Reviews: collections, `wait` progress, and the
+ * Completion Notice. The runtime owns the tool; Review supplies these results as batch owner.
+ */
 
 /** Note on every collected report: findings describe the frozen state, not the live checkout. */
 export const REVIEWED_STATE_NOTE =
   "Reviewed state: the frozen Review Workspace in the receipt above. The live checkout may differ since the Review started; check each finding against it before acting.";
-
-/** Start result of a Background Review: handle, tasks, and receipt, without findings or Usage. */
-export function buildBackgroundStartResult(
-  handle: ReviewBatchHandle,
-  prepared: PreparedReview,
-): AgentToolResult<Record<string, unknown>> {
-  const tasks = handle.tasks.map((task) => ({ ...task, status: "running" as const }));
-  const text = [
-    `Background Review started: batch ${handle.batchId}.`,
-    `Target: ${prepared.snapshot.title}`,
-    formatWorkspaceReceipt(prepared.workspace.receipt),
-    `Tasks: ${tasks.map((task) => `${task.taskId} (${task.mode}, running)`).join(", ")}`,
-    `One Completion Notice follows when every Review Task is terminal. Then collect the report with agent_result ${JSON.stringify({ batchId: handle.batchId })}; do not poll.`,
-  ].join("\n");
-  return {
-    content: [{ type: "text", text }],
-    details: {
-      mode: "background",
-      batchId: handle.batchId,
-      targetTitle: prepared.snapshot.title,
-      tasks,
-      workspaceReceipt: prepared.workspace.receipt,
-    },
-  };
-}
 
 /** Build the single Completion Notice of a Review: identifiers and terminal status only. */
 export function buildReviewCompletionNotice(
@@ -138,51 +101,5 @@ export function collectReviewBatch(
       tasks: [],
       taskStates: reviewTaskStates(handle),
     },
-  };
-}
-
-/**
- * Whether a Background Review still has results or Usage to collect: it is incomplete, or a
- * successful stored collection on the active branch is missing a task or its Usage receipt.
- */
-export function reviewNeedsCollection(
-  batch: ReviewRunBatch,
-  branch: readonly SessionEntry[],
-  usageReported: (taskId: string) => boolean,
-): boolean {
-  const { handle } = batch;
-  if (!handle.outcome()) return true;
-  const collected = new Set<string>();
-  for (const entry of branch) {
-    const result = readResultCollection(entry);
-    if (result?.batchId === handle.batchId) for (const id of result.taskIds) collected.add(id);
-  }
-  return handle
-    .snapshot()
-    .results.some(
-      (task) => !collected.has(task.taskId) || (task.usage && !usageReported(task.taskId)),
-    );
-}
-
-/** Format a Background Review stop request; the runtime requests the stop afterwards. */
-export function cancelReviewBatch(
-  batch: ReviewRunBatch,
-  requested: boolean,
-  needsCollection: boolean,
-): AgentToolResult<unknown> {
-  const status = requested
-    ? "Stop requested. Cleanup may still be active."
-    : "No active work remains.";
-  const collection = needsCollection
-    ? " Collect the report, including canceled tasks and Usage, with agent_result."
-    : "";
-  return {
-    content: [
-      {
-        type: "text",
-        text: `Background Review ${batch.handle.batchId}: ${status}${collection}`,
-      },
-    ],
-    details: { batchId: batch.handle.batchId, requested, needsCollection },
   };
 }

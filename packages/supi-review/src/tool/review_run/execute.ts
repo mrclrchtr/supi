@@ -7,7 +7,6 @@ import { StatusSpinner } from "@mrclrchtr/supi-core/status-spinner";
 import type { LocalReviewAuditStore } from "../../audit/local-review-audit-store.ts";
 import { type ReviewBatchHandle, startReviewBatch } from "../../background/handle.ts";
 import type { ReviewBatchOwner } from "../../background/owner.ts";
-import { buildBackgroundStartResult } from "../../background/result.ts";
 import type { BackgroundReviewStatus } from "../../background/status.ts";
 import { loadReviewConfig, type PostReviewPolicy } from "../../config.ts";
 import {
@@ -19,7 +18,7 @@ import type { ReviewArtifactStore } from "../../session/review-artifact-store.ts
 import { resolveReviewThinkingLevel } from "../../thinking.ts";
 import { captureReviewerWebTools } from "../../web-access.ts";
 import { parseRunReviewToolInput, type ReviewRunMode } from "./input-schema.ts";
-import { buildRunResult } from "./result.ts";
+import { buildBackgroundStartResult, buildRunResult } from "./result.ts";
 import { prepareReview, type RunReviewInput, runReview } from "./workflow.ts";
 
 function resolveReviewerModel(
@@ -113,7 +112,7 @@ interface BackgroundReviewStart {
  */
 async function startBackgroundReview(start: BackgroundReviewStart) {
   const { callId, owner, ctx } = start;
-  if (ctx.mode !== "tui" && ctx.mode !== "rpc")
+  if (!supportsBackgroundReview(ctx))
     throw new Error("Background Review requires TUI or RPC mode.");
   if (!owner?.open(ctx)) throw new Error("The Review session is closed.");
   const launchId = owner.findLaunch(callId, ctx);
@@ -148,12 +147,17 @@ async function startBackgroundReview(start: BackgroundReviewStart) {
   return buildBackgroundStartResult(handle, prepared.review);
 }
 
+/** Whether the session can deliver a Completion Notice after the prompt (TUI, RPC). */
+function supportsBackgroundReview(ctx: ToolContext): boolean {
+  return ctx.mode === "tui" || ctx.mode === "rpc";
+}
+
 /**
  * Default Review mode: background where the session can deliver a Completion Notice (TUI, RPC),
  * foreground in print and JSON mode, which end after the prompt.
  */
 function defaultReviewRunMode(ctx: ToolContext): ReviewRunMode {
-  return ctx.mode === "tui" || ctx.mode === "rpc" ? "background" : "foreground";
+  return supportsBackgroundReview(ctx) ? "background" : "foreground";
 }
 
 /** Resolve configuration and models into one Review request for either mode. */

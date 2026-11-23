@@ -22,6 +22,7 @@ import type {
   ReviewExecutionProgressDetails,
 } from "./execution.ts";
 import { formatTargetDivergence } from "./format.ts";
+import { type BackgroundStartDetails, isBackgroundStart } from "./result.ts";
 import { REVIEW_RUN_TOOL_NAME } from "./spec.ts";
 
 function formatTaskCollapsed(result: ReviewTaskResult, theme: Theme): string {
@@ -220,17 +221,6 @@ export function renderRunResult(
   }
   if (isBackgroundStart(details)) return renderBackgroundStart(details, options.expanded, theme);
   return options.expanded ? buildExpanded(details, theme) : buildCollapsed(details, theme);
-}
-
-interface BackgroundStartDetails {
-  mode: "background";
-  batchId: string;
-  targetTitle?: string;
-  tasks?: Array<{ taskId: string; mode: string; status: string }>;
-}
-
-function isBackgroundStart(details: unknown): details is BackgroundStartDetails {
-  return isRecord(details) && details.mode === "background" && typeof details.batchId === "string";
 }
 
 /** A Background Review start: tasks run on; the report arrives through agent_result. */

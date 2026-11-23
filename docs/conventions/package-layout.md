@@ -125,7 +125,7 @@ When multiple SuPi packages need the same path, URI, config, or session helper s
 | `supi-insights` | flat source is fine; move tests to package-level `__tests__/unit/` |
 | `supi-installer` | CLI-only: `bin/supi-installer.mjs`, checked `src/*.mjs`, `ui/`, and package-level tests; no Pi extension or library API |
 | `supi-lsp` | hybrid large-package layout with `client/`, `config/`, `diagnostics/`, `manager/`, `provider/`, `session/` |
-| `supi-review` | per-tool `tool/review_run/`, `tool/review_output/`, `tool/review_audit/` + shared tool modules; keep package domains (`audit/`, `target/`, `history/`) |
+| `supi-review` | per-tool `tool/review_run/`, `tool/review_output/`, `tool/review_audit/` + shared tool modules; `tool/agent_result/` and `tool/agent_cancel/` hold only the Background Review result format; `background/` owns the batch handle, owner wiring, and status; keep package domains (`audit/`, `target/`, `history/`) |
 | `supi-skill-patches` | private maintenance package: flat patch, upstream sync, and root skill catalog validation |
 | `supi-skills` | flat skill controls and input shortcuts domain |
 | `supi-test-utils` | stay flat utility package |
