@@ -128,6 +128,14 @@ export default function tabSpinner(pi: ExtensionAPI) {
     cachedCwd = ctx.cwd;
   }
 
+  function sessionNameOf(ctx: ExtensionContext): string | undefined {
+    try {
+      return ctx.sessionManager.getSessionName();
+    } catch {
+      return undefined;
+    }
+  }
+
   function getSessionNameSafe(): string | undefined {
     try {
       // Call pi.getSessionName() as a canary — throws if context is stale.
@@ -156,12 +164,12 @@ export default function tabSpinner(pi: ExtensionAPI) {
   }
 
   /** Restore the base title, or show the review icon if one is active. */
-  function stop() {
+  function stop(sessionName = getSessionNameSafe()) {
     clearPendingAgentEnd();
     clearSpinnerTimer();
     frame = 0;
     if (applyReviewTitle()) return;
-    safelySetTitle(title());
+    safelySetTitle(formatTitle(sessionName, cachedCwd));
   }
 
   /** Show the ✓ done symbol, or the review icon if one is active. */
@@ -276,7 +284,8 @@ export default function tabSpinner(pi: ExtensionAPI) {
     clearReviewTitle();
     activeCount = 0;
     rememberContext(ctx);
-    stop();
+    // The shared session-name tracker may already have reset on this event; read the name directly.
+    stop(sessionNameOf(ctx));
     currentCtx = undefined;
   });
 

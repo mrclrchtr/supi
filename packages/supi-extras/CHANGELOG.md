@@ -3,6 +3,7 @@
 ## [15.0.0]
 
 - In RPC, the tab title spinner no longer sends a `setTitle` record about every 80 ms. While the agent works, the title shows a static `⠋` and is sent again only when its text changes, for example after `/name`. The TUI animation is unchanged ([#663](https://github.com/mrclrchtr/supi/issues/663)).
+- When a session ends, the restored tab title keeps the session name, for example `π - my-feature - repo` instead of `π - repo`.
 
 ## [14.3.0]
 

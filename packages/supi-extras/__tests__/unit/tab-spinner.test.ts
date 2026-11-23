@@ -177,6 +177,28 @@ describe("tabSpinner extension", () => {
     expect(lastTitle).toBe("π - tmp");
   });
 
+  it("keeps the session name in the title it restores on session_shutdown", async () => {
+    const pi = createPiMock({ sessionName: "named" });
+    tabSpinner(pi as unknown as Parameters<typeof tabSpinner>[0]);
+
+    const titles: string[] = [];
+    const ctx = makeCtx({
+      cwd: "/tmp",
+      ui: { setTitle: (title: string) => titles.push(title) },
+      sessionManager: { getBranch: () => [], getSessionName: () => "named" },
+    });
+    const fire = async (event: string) => {
+      for (const h of pi.getHandlers(event)) await (h as (...args: unknown[]) => unknown)({}, ctx);
+    };
+
+    await fire("session_start");
+    await fire("agent_start");
+    vi.advanceTimersByTime(80);
+    // The shared session-name tracker resets on session_shutdown before this handler runs.
+    await fire("session_shutdown");
+    expect(titles.at(-1)).toBe("π - named - tmp");
+  });
+
   it("unregisters event-bus listeners on session_shutdown", async () => {
     const pi = createPiMock({ sessionName: "after-reload" });
     tabSpinner(pi as unknown as Parameters<typeof tabSpinner>[0]);
