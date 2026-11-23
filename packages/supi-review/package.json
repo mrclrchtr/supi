@@ -63,6 +63,7 @@
     }
   },
   "devDependencies": {
+    "@mrclrchtr/supi-agent": "workspace:*",
     "@mrclrchtr/supi-test-utils": "workspace:*",
     "vitest": "5.1.0"
   },

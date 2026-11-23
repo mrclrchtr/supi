@@ -10,6 +10,7 @@ import {
   collectReviewBatch,
   REVIEW_COMPLETION_MESSAGE_TYPE,
   type ReviewBatchData,
+  reviewBatchProgress,
   reviewNeedsCollection,
 } from "./result.ts";
 
@@ -44,6 +45,7 @@ export function registerReviewBatchOwner(
                 current.usageReported(batch, taskId),
               ),
             ),
+          progress: reviewBatchProgress,
           renderResult: renderReviewCollection,
           renderCancel: (result, options, theme) => renderReviewText(result, options, theme),
           canceledMessages: {

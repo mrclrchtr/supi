@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ToolDefinition } from "@earendil-works/pi-coding-agent";
 import {
   type BackgroundHarness,
   backgroundHarness,
@@ -23,7 +23,11 @@ export function reviewWorktrees(cwd: string): string[] {
 }
 
 /** Initialize the parent directory as a Git repository with an uncommitted change. */
-function prepareRepository(cwd: string, review: Record<string, unknown> = {}): void {
+function prepareRepository(
+  cwd: string,
+  review: Record<string, unknown> = {},
+  config: Record<string, unknown> = {},
+): void {
   git(cwd, "init");
   git(cwd, "config", "user.email", "test@example.com");
   git(cwd, "config", "user.name", "Test");
@@ -49,6 +53,7 @@ function prepareRepository(cwd: string, review: Record<string, unknown> = {}): v
         postReviewPolicy: "verify",
         ...review,
       },
+      ...config,
     }),
   );
 }
@@ -68,16 +73,26 @@ export const finding = {
   confidence: 0.8,
 };
 
+/** Additional extensions and SuPi config sections loaded beside the Review extension. */
+export interface ReviewHarnessExtras {
+  readonly extensions?: readonly ((pi: ExtensionAPI) => void)[];
+  readonly config?: Record<string, unknown>;
+}
+
 /** A background harness around the real Review extension and a real Git repository. */
 export function reviewHarness(
   sdk: ControlledSdk,
   review: Record<string, unknown> = {},
+  extras: ReviewHarnessExtras = {},
 ): Promise<BackgroundHarness> {
   return backgroundHarness({
     sdk,
-    extension: reviewExtension,
+    extension: (pi) => {
+      reviewExtension(pi);
+      for (const extension of extras.extensions ?? []) extension(pi);
+    },
     childPrompt: (id) => `Review ${id} carefully.`,
-    prepare: ({ directory }) => prepareRepository(directory, review),
+    prepare: ({ directory }) => prepareRepository(directory, review, extras.config),
   });
 }
 

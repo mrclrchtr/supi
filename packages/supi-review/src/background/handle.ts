@@ -1,8 +1,12 @@
 import { randomUUID } from "node:crypto";
 import type { RunBatchHandle } from "@mrclrchtr/supi-agent-runtime/api";
 import type { CompletedReviewOutcome } from "../tool/review_run/result.ts";
-import { executePreparedReview, type PreparedReview } from "../tool/review_run/workflow.ts";
-import type { ReviewMode, ReviewTaskResult } from "../types.ts";
+import {
+  executePreparedReview,
+  type PreparedReview,
+  reviewBatchDetails,
+} from "../tool/review_run/workflow.ts";
+import type { ReviewBatchDetails, ReviewMode, ReviewTaskResult } from "../types.ts";
 
 /** Identity of one Review Task in a Background Review. */
 export interface ReviewBatchTask {
@@ -17,6 +21,8 @@ export interface ReviewBatchHandle extends RunBatchHandle<ReviewTaskResult> {
   readonly result: Promise<CompletedReviewOutcome>;
   /** The complete Review, once {@link result} resolved. */
   outcome(): CompletedReviewOutcome | undefined;
+  /** Review details with the finished task results only, for a collection before completion. */
+  partialDetails(): ReviewBatchDetails;
 }
 
 /** Session controls for one started Background Review. */
@@ -59,15 +65,15 @@ export function startReviewBatch(
     return completed;
   });
   let stopping: Promise<void> | undefined;
+  const results = () => tasks.flatMap((task) => finished.get(task.taskId) ?? []);
   return {
     batchId,
     runKeys,
     tasks,
     result,
     outcome: () => outcome,
-    snapshot: () => ({
-      results: tasks.flatMap((task) => finished.get(task.taskId) ?? []),
-    }),
+    partialDetails: () => reviewBatchDetails(prepared, results()),
+    snapshot: () => ({ results: results() }),
     stop: () => {
       if (!stopping) {
         abort.abort();

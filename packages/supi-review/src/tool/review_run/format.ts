@@ -113,6 +113,21 @@ export function formatWorkspaceReceipt(receipt: ReviewBatchDetails["workspaceRec
 export interface ReviewBatchFormatOptions {
   /** Line placed under the receipt, such as the reviewed-state note of a Background Review. */
   readonly reviewedStateNote?: string;
+  /**
+   * Format a Review whose tasks are not all terminal: the heading says so, and each task without a
+   * result appears in task order with `Status: running`.
+   */
+  readonly running?: boolean;
+}
+
+function formatTaskSections(details: ReviewBatchDetails, running: boolean): string[] {
+  if (!running) return details.results.flatMap(formatTaskResult);
+  return details.review.tasks.flatMap((task) => {
+    const result = details.results.find((candidate) => candidate.taskId === task.id);
+    return result
+      ? formatTaskResult(result)
+      : ["", `## ${task.id}`, `Review Mode: ${task.mode}`, "Status: running"];
+  });
 }
 
 /** Format complete Review Engine output for parent-facing Markdown and continuation storage. */
@@ -121,7 +136,7 @@ export function formatReviewBatch(
   options: ReviewBatchFormatOptions = {},
 ): string {
   const lines = [
-    "# Review Finished",
+    options.running ? "# Review Still Running" : "# Review Finished",
     "",
     `Provenance: ${details.provenance}`,
     `Target: ${details.snapshot.title}`,
@@ -147,6 +162,6 @@ export function formatReviewBatch(
       `Recovery: ${details.cleanupWarning.recoveryCommand}`,
     );
   }
-  for (const result of details.results) lines.push(...formatTaskResult(result));
+  lines.push(...formatTaskSections(details, options.running ?? false));
   return lines.join("\n");
 }

@@ -9,7 +9,10 @@ const firstText = (content: unknown): string => {
   return typeof part?.text === "string" ? part.text : "";
 };
 
-/** Render a Background Review `agent_result`: the Review report once complete, else its status. */
+/**
+ * Render a Background Review `agent_result`: the Review report once complete, else the status line
+ * that leads a partial report or a `wait` progress update.
+ */
 export function renderReviewCollection(
   result: AgentToolResult<unknown>,
   options: { expanded: boolean; isPartial: boolean },
@@ -17,7 +20,7 @@ export function renderReviewCollection(
 ) {
   const details = result.details as { complete?: unknown } | undefined;
   if (details?.complete === true) return renderRunResult(result, options, theme);
-  return new Text(theme.fg("dim", firstText(result.content)), 0, 0);
+  return new Text(theme.fg("dim", firstText(result.content).split("\n", 1)[0] ?? ""), 0, 0);
 }
 
 /** Render a Background Review `agent_cancel` result or Completion Notice as its plain text. */

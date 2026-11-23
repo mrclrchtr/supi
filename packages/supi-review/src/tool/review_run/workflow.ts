@@ -509,7 +509,22 @@ export async function executePreparedReview(
   } finally {
     cleanupWarning = await workspace.cleanup();
   }
-  const details: ReviewBatchDetails = {
+  const details = reviewBatchDetails(prepared, results, cleanupWarning);
+  const usage = combineAgentRunUsage(results.map((result) => result.usage));
+  return { kind: "completed" as const, details, ...(usage ? { usage } : {}) };
+}
+
+/**
+ * Review Engine details of a prepared Review with the given task results. A running Background
+ * Review passes only its finished results.
+ */
+export function reviewBatchDetails(
+  prepared: PreparedReview,
+  results: ReviewTaskResult[],
+  cleanupWarning?: ReviewBatchDetails["cleanupWarning"],
+): ReviewBatchDetails {
+  const { request, snapshot, review, scope, workspace } = prepared;
+  return {
     kind: "review-batch",
     provenance: prepared.provenance,
     snapshot: summarizeReviewSnapshot(snapshot),
@@ -520,8 +535,6 @@ export async function executePreparedReview(
     ...(cleanupWarning ? { cleanupWarning } : {}),
     results,
   };
-  const usage = combineAgentRunUsage(results.map((result) => result.usage));
-  return { kind: "completed" as const, details, ...(usage ? { usage } : {}) };
 }
 
 /** Execute one caller-defined Review in the foreground: prepare it, then run it to completion. */

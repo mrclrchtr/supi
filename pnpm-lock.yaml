@@ -669,6 +669,9 @@ importers:
         specifier: '*'
         version: 1.4.7
     devDependencies:
+      '@mrclrchtr/supi-agent':
+        specifier: workspace:*
+        version: link:../supi-agent
       '@mrclrchtr/supi-test-utils':
         specifier: workspace:*
         version: link:../supi-test-utils

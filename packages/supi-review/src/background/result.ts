@@ -6,7 +6,8 @@ import {
 } from "@mrclrchtr/supi-agent-runtime/api";
 import type { PostReviewPolicy } from "../config.ts";
 import type { ReviewArtifactStore } from "../session/review-artifact-store.ts";
-import { formatWorkspaceReceipt } from "../tool/review_run/format.ts";
+import { createReviewOutput } from "../tool/output-page.ts";
+import { formatReviewBatch, formatWorkspaceReceipt } from "../tool/review_run/format.ts";
 import { buildRunResult } from "../tool/review_run/result.ts";
 import type { PreparedReview } from "../tool/review_run/workflow.ts";
 import type { ReviewTaskResult } from "../types.ts";
@@ -69,10 +70,36 @@ export function buildReviewCompletionNotice(
   };
 }
 
+/** Per-task state of a Background Review: the finished status, else `running`. */
+function reviewTaskStates(handle: ReviewBatchHandle) {
+  const finished = handle.snapshot().results;
+  return handle.tasks.map((task) => {
+    const result = finished.find((candidate) => candidate.taskId === task.taskId);
+    return { taskId: task.taskId, mode: task.mode, status: result?.status ?? "running" };
+  });
+}
+
+function stillRunningLine(handle: ReviewBatchHandle): string {
+  const states = reviewTaskStates(handle);
+  return `Background Review ${handle.batchId} is still running: ${states.map((task) => `${task.taskId} (${task.status})`).join(", ")}. The Post-Review Policy applies only to the complete report: wait for the Completion Notice or use wait: true; do not poll.`;
+}
+
+/** Status-only `agent_result` progress while a `wait: true` collection blocks. */
+export function reviewBatchProgress(
+  batch: ReviewRunBatch,
+): AgentToolResult<Record<string, unknown>> {
+  const { handle } = batch;
+  return {
+    content: [{ type: "text", text: stillRunningLine(handle) }],
+    details: { batchId: handle.batchId, complete: false, taskStates: reviewTaskStates(handle) },
+  };
+}
+
 /**
  * Assemble one Background Review collection. A complete Review returns the Foreground Review
  * report, with the reviewed-state note and the Post-Review Policy. Before completion, the result
- * lists task state and omits the policy.
+ * reports the finished task results beside the running tasks and omits the policy. Each collection
+ * stores its report as a new Review Output Artifact, so a late collection still pages.
  */
 export function collectReviewBatch(
   artifactStore: ReviewArtifactStore,
@@ -94,24 +121,22 @@ export function collectReviewBatch(
       },
     };
   }
-  const finished = handle.snapshot().results;
-  const states = handle.tasks.map((task) => {
-    const result = finished.find((candidate) => candidate.taskId === task.taskId);
-    return { taskId: task.taskId, mode: task.mode, status: result?.status ?? "running" };
-  });
+  const details = handle.partialDetails();
+  const output = createReviewOutput(
+    artifactStore,
+    formatReviewBatch(details, { reviewedStateNote: REVIEWED_STATE_NOTE, running: true }),
+  );
   return {
-    content: [
-      {
-        type: "text",
-        text: `Background Review ${handle.batchId} is still running: ${states.map((task) => `${task.taskId} (${task.status})`).join(", ")}. Wait for the Completion Notice or use wait: true; do not poll.`,
-      },
-    ],
+    content: [{ type: "text", text: `${stillRunningLine(handle)}\n\n${output.text}` }],
     details: {
+      ...details,
+      output: output.reference,
       batchId: handle.batchId,
       complete: false,
-      // No task result is delivered before completion, so no task counts as collected.
+      // Only the complete report counts as collected: the Completion Notice still names every
+      // task, and the report with the Post-Review Policy stays due. Usage receipts are separate.
       tasks: [],
-      pending: states.filter((task) => task.status === "running"),
+      taskStates: reviewTaskStates(handle),
     },
   };
 }
