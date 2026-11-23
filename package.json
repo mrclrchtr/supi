@@ -33,6 +33,7 @@
     "biome:ci": "biome ci",
     "biome:ai": "biome ci --colors=off --reporter=github",
     "lint": "biome lint .",
+    "workflow:lint": "mise exec -- jactionlint",
     "lint:fix": "biome lint --write .",
     "format": "biome format --write .",
     "format:check": "biome format .",

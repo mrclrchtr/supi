@@ -64,8 +64,16 @@ jobs:
         with:
           ref: ${{ needs.ci-plan.outputs.sha }}
           persist-credentials: false
+      - name: Install pinned workflow tools
+        uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
+        with:
+          version: 2026.11.12
+          install_args: jactionlint shellcheck
+      # Configured in .github/jactionlint.yaml; ShellCheck checks run steps.
       - name: Lint GitHub Actions workflows
-        uses: rhysd/actionlint@914e7df21a07ef503a81201c76d2b11c789d3fca # v1.7.12
+        env:
+          MISE_EXEC_AUTO_INSTALL: "false"
+        run: mise exec -- jactionlint
 
   conventional-commits:
     needs: ci-plan

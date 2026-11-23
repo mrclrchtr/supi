@@ -4,7 +4,7 @@
 
 | Event | Checks | Release effects |
 | --- | --- | --- |
-| PR | Actionlint, Conventional Commits, Biome, TypeScript, skills, WASM consistency, test suite, both full cross-platform matrices | None |
+| PR | jactionlint, Conventional Commits, Biome, TypeScript, skills, WASM consistency, test suite, both full cross-platform matrices | None |
 | Ordinary main push | Release Commit detection from Git only | None |
 | Release Commit pushed to main | The PR checks plus staged tarball verification | Tag/release creation, then npm publishing, only after verification succeeds |
 | Manual CI run without inputs | Same release verification at the selected event commit | None |
@@ -44,7 +44,7 @@ The planner also emits `release=true` when tag/release creation is authorized.
 
 ## Release safety and concurrency
 
-- Keep required PR check names `actionlint`, `conventional-commits`, and `verify` stable.
+- Keep required PR check names `actionlint`, `conventional-commits`, and `verify` stable. The `actionlint` job runs [jactionlint](https://github.com/jdx/jactionlint) with ShellCheck, both pinned in `.mise.toml`/`mise.lock` and configured in `.github/jactionlint.yaml`; run it locally with `pnpm workflow:lint`.
 - `verify` requires successful planning, actionlint, Conventional Commits, workspace checks, tests, and both matrices in PR and full mode. Missing/unknown modes, missing results, cancellations, and skips fail verification.
 - Tagging requires a successful full gate and a Release Commit candidate. Publishing requires that gate plus successful release creation, or an explicitly selected existing tag on a manual retry. Manual verification without inputs never releases.
 - Immediately before tagging, revalidate the candidate's checkout, package versions, Release Commit rules, ancestry on main, and first changelog entry.

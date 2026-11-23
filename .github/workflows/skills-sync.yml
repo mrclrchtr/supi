@@ -86,6 +86,7 @@ jobs:
       - name: Validate and commit generated changes
         env:
           PATCH_FILE: ${{ runner.temp }}/skills-sync/skills.patch
+        shell: bash
         run: |
           git apply --index --whitespace=nowarn -- "$PATCH_FILE"
           while IFS= read -r -d '' path; do
