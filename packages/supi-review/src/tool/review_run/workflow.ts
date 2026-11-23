@@ -36,7 +36,11 @@ import {
   materializeReviewWorkspace,
   type ReviewWorkspace,
 } from "../../workspace/review-workspace.ts";
-import { executeReviewTasks, type ReviewExecutionUpdate } from "./execution.ts";
+import {
+  executeReviewTasks,
+  type ReviewExecutionBatch,
+  type ReviewExecutionUpdate,
+} from "./execution.ts";
 import { PLANNER_PROMPT_VERSION, runPlanner } from "./planner.ts";
 import { buildPlannerPrompt } from "./planner-input.ts";
 
@@ -389,6 +393,8 @@ export type PrepareReviewOutcome =
 export interface ExecutePreparedReviewControl {
   signal?: AbortSignal;
   onUpdate?: OnUpdate;
+  /** Batch identity and per-task result observer of a Background Review. */
+  batch?: ReviewExecutionBatch;
 }
 
 /**
@@ -498,6 +504,7 @@ export async function executePreparedReview(
       prepared.authorizedAuxiliaryModels,
       request.reviewerWebTools,
       workspace.targetDiff,
+      control.batch,
     );
   } finally {
     cleanupWarning = await workspace.cleanup();

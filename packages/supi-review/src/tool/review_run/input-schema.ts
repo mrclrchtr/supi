@@ -68,20 +68,33 @@ export const runReviewSchema = Type.Object(
   {
     target: Type.Optional(targetSchema),
     paths: Type.Optional(scopePathsSchema),
+    mode: Type.Optional(
+      Type.Enum(["background", "foreground"], {
+        type: "string",
+        description:
+          "Default: foreground. background returns a batch handle once the target is frozen; collect the report with agent_result after the Completion Notice. TUI/RPC only.",
+      }),
+    ),
     ...reviewInputSchema.properties,
   },
   { additionalProperties: false },
 );
 
+/** Whether `review_run` waits for the report or returns a Background Review handle. */
+export type ReviewRunMode = "background" | "foreground";
+
 interface RawRunReviewInput extends ReviewInput {
   target?: ReviewTargetSpec;
   paths?: string[];
+  mode?: ReviewRunMode;
 }
 
 export interface RunReviewToolInput {
   target: ReviewTargetSpec;
   scope: ReviewScope;
   review: ReviewInput;
+  /** Requested mode; omitted means the default (foreground). */
+  mode?: ReviewRunMode;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -146,8 +159,13 @@ function invalidInputError(input: unknown): Error {
   ) {
     return new Error("Review input must not use removed Prepared Review fields.");
   }
-  if ("findingScope" in input || "mode" in input) {
+  if ("findingScope" in input) {
     return new Error("Review input must not use removed Finding Scope fields.");
+  }
+  if ("mode" in input && input.mode !== "background" && input.mode !== "foreground") {
+    return new Error(
+      "review_run mode must be background or foreground; set Review Mode on each task.",
+    );
   }
   return (
     oldTargetError(input.target) ??
@@ -166,7 +184,7 @@ function normalizeTarget(target: ReviewTargetSpec | undefined): ReviewTargetSpec
 export function parseRunReviewToolInput(input: unknown): RunReviewToolInput {
   if (!Value.Check(runReviewSchema, input)) throw invalidInputError(input);
   const parsed = input as RawRunReviewInput;
-  const { target, paths, ...review } = parsed;
+  const { target, paths, mode, ...review } = parsed;
   const normalizedTarget = normalizeTarget(target);
   const scope = normalizeReviewScope(paths ? { paths } : undefined);
   const endpoints = reviewTargetEndpoints(normalizedTarget);
@@ -177,5 +195,5 @@ export function parseRunReviewToolInput(input: unknown): RunReviewToolInput {
   if (endpoints.kind === "committed" && change && endpoints.from === undefined) {
     throw new Error("A committed change Review Target requires an explicit from endpoint.");
   }
-  return { target: normalizedTarget, scope, review };
+  return { target: normalizedTarget, scope, review, ...(mode ? { mode } : {}) };
 }

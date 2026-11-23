@@ -33,7 +33,13 @@ describe("agent review schemas", () => {
 
   it("guides compact handoffs through existing fields without expanding the wire shape", () => {
     const schema = JSON.parse(JSON.stringify(runReviewSchema));
-    expect(Object.keys(schema.properties)).toEqual(["target", "paths", "sharedContext", "tasks"]);
+    expect(Object.keys(schema.properties)).toEqual([
+      "target",
+      "paths",
+      "mode",
+      "sharedContext",
+      "tasks",
+    ]);
     expect(Object.keys(schema.properties.tasks.items.properties)).toEqual([
       "id",
       "instructions",
@@ -189,14 +195,17 @@ describe("agent review schemas", () => {
     );
   });
 
-  it.each(["findingScope", "mode"])(
-    "rejects the removed top-level task policy field %s",
-    (field) => {
-      expect(() => parseRunReviewToolInput({ [field]: "change-only", tasks })).toThrow(
-        "Review input must not use removed Finding Scope fields.",
-      );
-    },
-  );
+  it("rejects the removed top-level task policy field findingScope", () => {
+    expect(() => parseRunReviewToolInput({ findingScope: "change-only", tasks })).toThrow(
+      "Review input must not use removed Finding Scope fields.",
+    );
+  });
+
+  it("points a task-policy value in the top-level mode to the per-task Review Mode", () => {
+    expect(() => parseRunReviewToolInput({ mode: "change-only", tasks })).toThrow(
+      "review_run mode must be background or foreground; set Review Mode on each task.",
+    );
+  });
 
   it.each([
     { target: { workingTree: { from: " " } }, endpoint: "workingTree.from" },

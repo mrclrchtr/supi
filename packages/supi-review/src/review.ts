@@ -3,6 +3,7 @@ import { Box } from "@earendil-works/pi-tui";
 import { registerAgentsCommand } from "@mrclrchtr/supi-agent-runtime/api";
 import { registerShellHints } from "@mrclrchtr/supi-core/session";
 import { LocalReviewAuditStore } from "./audit/local-review-audit-store.ts";
+import { registerReviewBatchOwner } from "./background/owner.ts";
 import { registerReviewSettings, syncReviewAgentTools } from "./config.ts";
 import { ReviewArtifactStore } from "./session/review-artifact-store.ts";
 import { registerReviewAuditTool } from "./tool/review_audit/register.ts";
@@ -22,7 +23,13 @@ export default function reviewExtension(pi: ExtensionAPI): void {
   registerReviewSettings(pi);
   registerShellHints(pi);
   registerReviewOutputTool(pi, artifactStore);
-  registerReviewRunTool(pi, artifactStore, auditStore, registry);
+  // Background Reviews are owned by the containing session; collection uses agent_result.
+  const batchOwner = registerReviewBatchOwner(pi, artifactStore);
+  registerReviewRunTool(pi, artifactStore, {
+    localAuditStore: auditStore,
+    registry,
+    batchOwner,
+  });
   registerReviewAuditTool(pi, auditStore);
   pi.on("session_start", (_event, ctx) => syncReviewAgentTools(pi, ctx.cwd));
   registerReviewWorkspaceCleanupCommand(pi);

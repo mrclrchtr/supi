@@ -218,7 +218,35 @@ export function renderRunResult(
   if (context.isError || !details) {
     return renderError(`${REVIEW_RUN_TOOL_NAME} failed`, theme);
   }
+  if (isBackgroundStart(details)) return renderBackgroundStart(details, options.expanded, theme);
   return options.expanded ? buildExpanded(details, theme) : buildCollapsed(details, theme);
+}
+
+interface BackgroundStartDetails {
+  mode: "background";
+  batchId: string;
+  targetTitle?: string;
+  tasks?: Array<{ taskId: string; mode: string; status: string }>;
+}
+
+function isBackgroundStart(details: unknown): details is BackgroundStartDetails {
+  return isRecord(details) && details.mode === "background" && typeof details.batchId === "string";
+}
+
+/** A Background Review start: tasks run on; the report arrives through agent_result. */
+function renderBackgroundStart(
+  details: BackgroundStartDetails,
+  expanded: boolean,
+  theme: Theme,
+): Text {
+  const tasks = (details.tasks ?? [])
+    .map((task) => `${theme.fg("accent", task.taskId)} ${theme.fg("dim", `(${task.mode})`)}`)
+    .join(` ${theme.fg("dim", "·")} `);
+  const lines = [`${theme.fg("warning", "● Background Review started")} ${tasks}`];
+  if (details.targetTitle) lines.push(theme.fg("dim", details.targetTitle));
+  if (expanded)
+    lines.push(theme.fg("dim", `Batch ${details.batchId} · results collected with agent_result`));
+  return new Text(lines.join("\n"), 0, 0);
 }
 
 function buildCollapsed(details: ReviewBatchDetails, theme: Theme): Text {

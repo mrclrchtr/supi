@@ -49,6 +49,17 @@ export interface ReviewExecutionProgressDetails extends Record<string, unknown> 
   taskStates?: Record<string, ReviewExecutionPartialTaskState>;
 }
 
+/**
+ * Caller-owned identity of one Review's Reviewer Runs: the `/agents` batch, a run key per task,
+ * and an observer for each finished task result. Generated or omitted when absent.
+ */
+export interface ReviewExecutionBatch {
+  readonly batchId: string;
+  readonly runKeys: ReadonlyMap<string, string>;
+  /** Called once per task with its final result; observer errors are ignored. */
+  onTaskResult?(result: ReviewTaskResult): void;
+}
+
 /** Progress callback shared by batch workflow adapters. */
 export type ReviewExecutionUpdate = (result: {
   content: Array<{ type: "text"; text: string }>;
@@ -103,6 +114,12 @@ function toTaskResult(
   };
 }
 
+/** The caller-owned registry run key of one task, when the caller supplied one. */
+function runKeyFor(batch: ReviewExecutionBatch | undefined, taskId: string): { runKey?: string } {
+  const runKey = batch?.runKeys.get(taskId);
+  return runKey ? { runKey } : {};
+}
+
 function emitUpdate(
   onUpdate: ReviewExecutionUpdate | undefined,
   result: Parameters<ReviewExecutionUpdate>[0],
@@ -136,12 +153,21 @@ export async function executeReviewTasks(
   authorizedAuxiliaryModels?: AgentRunAuxiliaryModelSnapshot,
   reviewerWebTools?: ChildWebToolProvision,
   targetDiff?: ReviewTargetDiffFile,
+  batch?: ReviewExecutionBatch,
 ): Promise<ReviewTaskResult[]> {
   const review = normalizeReviewInput(reviewInput);
   let completedCount = 0;
   const totalCount = review.tasks.length;
   const effectiveThinkingLevel = clampReviewThinkingLevel(model.model, reviewerThinkingLevel);
-  const runGroupId = randomUUID();
+  const runGroupId = batch?.batchId ?? randomUUID();
+  const settle = (taskResult: ReviewTaskResult): ReviewTaskResult => {
+    try {
+      batch?.onTaskResult?.(taskResult);
+    } catch {
+      // Result observers cannot change review execution semantics.
+    }
+    return taskResult;
+  };
   // Partial tool output is replaced repeatedly; retain the review context and task state for expanded views.
   const presentation = {
     targetTitle: snapshot.title,
@@ -220,6 +246,7 @@ export async function executeReviewTasks(
           ...(dependencyBootstrapConfigured ? { dependencyBootstrapConfigured } : {}),
           signal,
           runGroupId,
+          ...runKeyFor(batch, task.id),
           onProgress: (progress) => {
             taskStates[task.id] = { status: "running", progress };
             emitUpdate(onUpdate, {
@@ -244,7 +271,7 @@ export async function executeReviewTasks(
           ],
           details: progressDetails(),
         });
-        return taskResult;
+        return settle(taskResult);
       } catch {
         const taskResult: ReviewTaskResult = {
           status: "failed",
@@ -266,7 +293,7 @@ export async function executeReviewTasks(
           ],
           details: progressDetails(),
         });
-        return taskResult;
+        return settle(taskResult);
       }
     }),
   );

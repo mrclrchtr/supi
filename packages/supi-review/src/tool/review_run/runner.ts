@@ -51,7 +51,7 @@ function reviewerRunDisplay(
   tools: readonly string[],
 ): AgentRunDisplayMetadata & { readonly runKey: string; readonly batchId: string } {
   return {
-    runKey: randomUUID(),
+    runKey: invocation.runKey ?? randomUUID(),
     batchId: invocation.runGroupId ?? randomUUID(),
     taskId: invocation.task.id,
     kind: "Reviewer",

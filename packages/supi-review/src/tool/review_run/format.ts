@@ -97,10 +97,9 @@ function formatTaskResult(result: ReviewTaskResult): string[] {
   return lines;
 }
 
-/** Format complete Review Engine output for parent-facing Markdown and continuation storage. */
-export function formatReviewBatch(details: ReviewBatchDetails): string {
-  const receipt = details.workspaceReceipt;
-  const workspaceReceipt = [
+/** One-line Review Workspace Receipt: the exact frozen state the Reviewers inspected. */
+export function formatWorkspaceReceipt(receipt: ReviewBatchDetails["workspaceReceipt"]): string {
+  return [
     `Workspace receipt: ${receipt.status}`,
     `from ${receipt.fromCommit ?? "none"}`,
     `to ${receipt.toCommit}`,
@@ -108,14 +107,28 @@ export function formatReviewBatch(details: ReviewBatchDetails): string {
     `${receipt.changedPathCount} changed paths`,
     receipt.observedDiffHash,
   ].join(" · ");
+}
+
+/** Presentation options for one formatted Review report. */
+export interface ReviewBatchFormatOptions {
+  /** Line placed under the receipt, such as the reviewed-state note of a Background Review. */
+  readonly reviewedStateNote?: string;
+}
+
+/** Format complete Review Engine output for parent-facing Markdown and continuation storage. */
+export function formatReviewBatch(
+  details: ReviewBatchDetails,
+  options: ReviewBatchFormatOptions = {},
+): string {
   const lines = [
     "# Review Finished",
     "",
     `Provenance: ${details.provenance}`,
     `Target: ${details.snapshot.title}`,
     `Focus: ${formatScopeFocus(details.scope)}`,
-    workspaceReceipt,
+    formatWorkspaceReceipt(details.workspaceReceipt),
   ];
+  if (options.reviewedStateNote) lines.push(options.reviewedStateNote);
   const divergence = formatTargetDivergence(details.snapshot);
   if (divergence) lines.push(`Target warning: ${divergence}`);
   if (details.planning) {

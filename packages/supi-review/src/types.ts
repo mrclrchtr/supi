@@ -298,6 +298,8 @@ export interface ReviewerInvocation {
   onProgress?: (progress: ReviewProgress) => void;
   /** Shared viewer group for the independent Reviewer Sessions in one Review. */
   runGroupId?: string;
+  /** Agent Run Registry key for this Reviewer Run; generated when omitted. */
+  runKey?: string;
   /** Registry for the Pi runtime that owns this Reviewer. */
   registry?: AgentRunRegistry;
 }

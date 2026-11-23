@@ -3,7 +3,7 @@ import type { PostReviewPolicy } from "../../config.ts";
 import type { ReviewArtifactStore } from "../../session/review-artifact-store.ts";
 import type { ReviewBatchDetails, ReviewOutputReference } from "../../types.ts";
 import { createReviewOutput, MAX_PAGE_CHARACTERS, MAX_PAGE_LINES } from "../output-page.ts";
-import { formatReviewBatch } from "./format.ts";
+import { formatReviewBatch, type ReviewBatchFormatOptions } from "./format.ts";
 import { withPostReviewInstruction } from "./post-policy.ts";
 import type { runReview } from "./workflow.ts";
 
@@ -23,13 +23,14 @@ export function buildRunResult(
   artifactStore: ReviewArtifactStore,
   outcome: CompletedReviewOutcome,
   postReviewPolicy: PostReviewPolicy,
+  format: ReviewBatchFormatOptions = {},
 ): AgentToolResult<ReviewRunResultDetails> {
   const hasFindings = outcome.details.results.some(
     (result) => result.status === "completed" && result.findings.length > 0,
   );
   const output = createReviewOutput(
     artifactStore,
-    formatReviewBatch(outcome.details),
+    formatReviewBatch(outcome.details, format),
     hasFindings
       ? {
           firstPageCharacters: MAX_PAGE_CHARACTERS - POST_REVIEW_POLICY_CHARACTER_RESERVE,
