@@ -199,12 +199,14 @@ jobs:
         uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
         with:
           go-version: ${{ env.SUPI_BASELINE_GO_VERSION }}
+          # The repository has no root go.mod to key a module cache on; provisioning caches gopls itself.
+          cache: false
       # PR runs restore the cache written on main; a PR that changes the key writes one scoped to its branch.
-      - name: Restore pinned LLVM subset
+      - name: Restore cached reference servers
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ runner.temp }}/supi-language-baseline-cache
-          key: language-baseline-llvm-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/language-baseline/pins.json', 'scripts/language-baseline/clang-artifacts.mjs') }}
+          key: language-baseline-servers-${{ runner.os }}-${{ runner.arch }}-${{ env.SUPI_BASELINE_CACHE_KEY }}
       - name: Provision pinned reference servers
         env:
           SUPI_LANGUAGE_BASELINE_CACHE: ${{ runner.temp }}/supi-language-baseline-cache

@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import {
   appendFileSync,
   chmodSync,
+  copyFileSync,
   createReadStream,
   createWriteStream,
   existsSync,
@@ -31,11 +32,10 @@ const pins = JSON.parse(readFileSync(new URL("./pins.json", import.meta.url), "u
 const clangArtifact = selectClangArtifact(pins, process.platform, process.arch);
 const home = join(process.env.RUNNER_TEMP, "supi-language-baseline");
 const bin = join(home, "bin");
-const jdtlsHome = join(home, "jdtls");
 const pythonHome = join(home, "basedpyright");
 const rustupHome = join(home, "rustup");
 const cargoHome = join(home, "cargo");
-// Optional directory restored by actions/cache; its key includes every pinned artifact hash.
+// Optional directory restored by actions/cache; ci-env.mjs derives its key from the cached pins.
 const cacheRoot = process.env.SUPI_LANGUAGE_BASELINE_CACHE;
 
 rmSync(home, { recursive: true, force: true });
@@ -90,25 +90,41 @@ function rustHost() {
   return `${architecture}-${operatingSystem}`;
 }
 
-async function installClangToolchain(pin) {
-  const destination = cacheRoot ? join(cacheRoot, "llvm", pin.sha256) : join(home, "llvm");
-  const marker = join(destination, ".artifact.json");
-  if (!existsSync(marker)) {
-    const archive = join(home, pin.file);
+/**
+ * Install one pinned artifact into the cache directory, or reuse it when its marker exists.
+ * `identity` names the directory, so a changed pin never reuses an older install. The marker is
+ * written last so an interrupted install is never reused from the cache.
+ */
+async function installCached(name, identity, marker, install) {
+  const destination = cacheRoot ? join(cacheRoot, name, identity) : join(home, name);
+  const markerFile = join(destination, ".artifact.json");
+  if (!existsSync(markerFile)) {
     rmSync(destination, { recursive: true, force: true });
-    await download(pin.url, archive, pin.sha256);
     mkdirSync(destination, { recursive: true });
-    run("tar", [
-      "-xJf",
-      archive,
-      "-C",
-      destination,
-      ...clangArchiveMembers(pin, pins.referenceServers.clangd.version, process.platform),
-    ]);
-    rmSync(archive, { force: true });
-    // Written last so an interrupted extraction is never reused from the cache.
-    writeFileSync(marker, `${JSON.stringify({ file: pin.file, sha256: pin.sha256 })}\n`);
+    await install(destination);
+    writeFileSync(markerFile, `${JSON.stringify(marker)}\n`);
   }
+  return destination;
+}
+
+async function installClangToolchain(pin) {
+  const destination = await installCached(
+    "llvm",
+    pin.sha256,
+    { file: pin.file, sha256: pin.sha256 },
+    async (directory) => {
+      const archive = join(home, pin.file);
+      await download(pin.url, archive, pin.sha256);
+      run("tar", [
+        "-xJf",
+        archive,
+        "-C",
+        directory,
+        ...clangArchiveMembers(pin, pins.referenceServers.clangd.version, process.platform),
+      ]);
+      rmSync(archive, { force: true });
+    },
+  );
 
   const llvmBin = findClangBin(destination);
   if (!llvmBin) {
@@ -133,18 +149,23 @@ function findClangBin(directory) {
 
 async function installJdtls() {
   const pin = pins.referenceServers.jdtls;
-  const archive = join(home, pin.artifact);
-  await download(pin.url, archive, pin.sha256);
-  mkdirSync(jdtlsHome, { recursive: true });
-  run("tar", ["-xzf", archive, "-C", jdtlsHome]);
-  const launcher = join(jdtlsHome, "bin", "jdtls");
+  // The launcher gets per-workspace -data and -configuration directories, so the install stays
+  // unchanged and can be cached.
+  const destination = await installCached(
+    "jdtls",
+    pin.sha256,
+    { version: pin.version, artifact: pin.artifact, sha256: pin.sha256 },
+    async (directory) => {
+      const archive = join(home, pin.artifact);
+      await download(pin.url, archive, pin.sha256);
+      run("tar", ["-xzf", archive, "-C", directory]);
+      rmSync(archive, { force: true });
+    },
+  );
+  const launcher = join(destination, "bin", "jdtls");
   if (!existsSync(launcher))
     throw new Error(`The pinned JDTLS archive has no launcher: ${launcher}`);
   chmodSync(launcher, 0o755);
-  writeFileSync(
-    join(jdtlsHome, ".artifact.json"),
-    `${JSON.stringify({ version: pin.version, artifact: pin.artifact, sha256: pin.sha256 })}\n`,
-  );
   return launcher;
 }
 
@@ -167,22 +188,33 @@ async function installBasedpyright() {
   return executable;
 }
 
-function installGopls() {
-  const destination = join(bin, "gopls");
-  run(
-    "go",
-    ["install", `${pins.referenceServers.gopls.module}@v${pins.referenceServers.gopls.version}`],
-    {
-      env: {
-        ...process.env,
-        GOBIN: bin,
-        GOPATH: join(home, "gopath"),
-        GOMODCACHE: join(home, "gomodcache"),
-        GOCACHE: join(home, "gocache"),
-      },
+async function installGopls() {
+  const pin = pins.referenceServers.gopls;
+  // `go install` compiles gopls, which takes most of the provisioning time; cache the binary by
+  // the gopls and Go versions that produced it.
+  const identity = `${pin.version}-go${pins.toolchains.go}`;
+  const built = await installCached(
+    "gopls",
+    identity,
+    { version: pin.version, go: pins.toolchains.go },
+    (directory) => {
+      run("go", ["install", `${pin.module}@v${pin.version}`], {
+        env: {
+          ...process.env,
+          GOBIN: directory,
+          GOPATH: join(home, "gopath"),
+          GOMODCACHE: join(home, "gomodcache"),
+          GOCACHE: join(home, "gocache"),
+        },
+      });
     },
   );
-  if (!existsSync(destination)) throw new Error(`Missing pinned gopls: ${destination}`);
+  const source = join(built, "gopls");
+  if (!existsSync(source)) throw new Error(`Missing pinned gopls: ${source}`);
+  // Server tests find gopls on PATH, so it lives in the shared bin directory.
+  const destination = join(bin, "gopls");
+  copyFileSync(source, destination);
+  chmodSync(destination, 0o755);
   return destination;
 }
 
@@ -247,7 +279,7 @@ async function installRustAnalyzer() {
 const clangd = await installClangToolchain(clangArtifact);
 const jdtls = await installJdtls();
 const basedpyright = await installBasedpyright();
-const gopls = installGopls();
+const gopls = await installGopls();
 const rustAnalyzer = await installRustAnalyzer();
 const typescriptLanguageServer = join(root, "node_modules", ".bin", "typescript-language-server");
 for (const executable of [
