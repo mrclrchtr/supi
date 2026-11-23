@@ -358,7 +358,11 @@ describe("Antigravity Consulting Agent adapter", () => {
       }),
     ).rejects.toMatchObject({ name: "AntigravityProcessError", kind: "timeout" });
     const childPid = Number(await readFile(childPidFile, "utf8"));
-    expect(() => process.kill(childPid, 0)).toThrow();
+    // The group signal reaches the orphaned grandchild asynchronously; `close` only covers the direct child.
+    await vi.waitFor(() => expect(() => process.kill(childPid, 0)).toThrow(), {
+      timeout: 2_000,
+      interval: 25,
+    });
     expect(
       (await schemaDirectories(schemaParent)).filter((name) => !before.includes(name)),
     ).toEqual([]);
