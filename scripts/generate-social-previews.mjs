@@ -170,7 +170,7 @@ function frameSvg({ title, desc, content }) {
     <rect x="304" y="182" width="46" height="170" rx="8"/>
   </g>
   <text x="252" y="440" fill="#cad3f5" font-family="Futura, Avenir Next, ui-sans-serif, sans-serif" font-size="62" font-weight="700" text-anchor="middle">SuPi</text>
-  <text x="252" y="478" fill="#a5adcb" font-family="Futura, Avenir Next, ui-sans-serif, sans-serif" font-size="17" font-weight="600" letter-spacing="3" text-anchor="middle">SUPER Pi</text>
+  <text x="252" y="478" fill="#a5adcb" font-family="Futura, Avenir Next, ui-sans-serif, sans-serif" font-size="17" font-weight="600" letter-spacing="3" text-anchor="middle">SUPER PI</text>
 
 ${content}
 
