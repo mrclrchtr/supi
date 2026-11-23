@@ -32,7 +32,10 @@ import type {
   ReviewTaskResult,
 } from "../../types.ts";
 import { runDependencyBootstrap } from "../../workspace/dependency-bootstrap.ts";
-import { materializeReviewWorkspace } from "../../workspace/review-workspace.ts";
+import {
+  materializeReviewWorkspace,
+  type ReviewWorkspace,
+} from "../../workspace/review-workspace.ts";
 import { executeReviewTasks, type ReviewExecutionUpdate } from "./execution.ts";
 import { PLANNER_PROMPT_VERSION, runPlanner } from "./planner.ts";
 import { buildPlannerPrompt } from "./planner-input.ts";
@@ -222,7 +225,7 @@ function workspaceFailureReason(error: unknown): string {
 }
 
 type MaterializedReviewWorkspace =
-  | { kind: "ready"; workspace: Awaited<ReturnType<typeof materializeReviewWorkspace>> }
+  | { kind: "ready"; workspace: ReviewWorkspace }
   | { kind: "invalid"; reason: string };
 
 /** Materialize the frozen after state and validate its batch Review Scope before fan-out. */
@@ -231,7 +234,7 @@ async function materializeReviewWorkspaceWithScope(
   scope: ReviewScope,
   signal?: AbortSignal,
 ): Promise<MaterializedReviewWorkspace> {
-  let workspace: Awaited<ReturnType<typeof materializeReviewWorkspace>>;
+  let workspace: ReviewWorkspace;
   try {
     workspace = await materializeReviewWorkspace(snapshot, signal);
   } catch (error) {
@@ -357,8 +360,43 @@ function captureReviewerAuxiliaryModels(
   return captureAgentRunAuxiliaryModels(providerAuthority);
 }
 
-/** Execute one caller-defined Review. */
-export async function runReview(input: RunReviewInput) {
+/**
+ * A Review that passed the start boundary: its target is frozen in a verified Review Workspace,
+ * any configured Dependency Bootstrap has run, and its tasks are resolved. The owner must pass it
+ * to {@link executePreparedReview}, which removes the workspace once every task is terminal.
+ */
+export interface PreparedReview {
+  /** Execution settings from the original request; `signal` and `onUpdate` are not retained. */
+  readonly request: Omit<RunReviewInput, "signal" | "onUpdate">;
+  /** Resolved snapshot, with the after-state title applied for all-state batches. */
+  readonly snapshot: ReviewSnapshot;
+  readonly review: ReviewInput;
+  readonly scope: ReviewScope;
+  /** Frozen workspace and its Review Workspace Receipt. */
+  readonly workspace: ReviewWorkspace;
+  readonly provenance: ReviewBatchDetails["provenance"];
+  readonly dependencyBootstrapConfigured: boolean;
+  readonly authorizedAuxiliaryModels?: AgentRunAuxiliaryModelSnapshot;
+}
+
+/** Result of {@link prepareReview}: a prepared Review or the reason no Review can start. */
+export type PrepareReviewOutcome =
+  | { kind: "prepared"; review: PreparedReview }
+  | { kind: "no-target"; reason: string }
+  | { kind: "invalid"; reason: string };
+
+/** Cancellation and progress for executing one prepared Review. */
+export interface ExecutePreparedReviewControl {
+  signal?: AbortSignal;
+  onUpdate?: OnUpdate;
+}
+
+/**
+ * Run the Review start boundary: validate input, resolve the Review Target, materialize and verify
+ * the Review Workspace, and run any configured Dependency Bootstrap. Any failure removes the
+ * workspace; cancellation rejects after that cleanup.
+ */
+export async function prepareReview(input: RunReviewInput): Promise<PrepareReviewOutcome> {
   input.signal?.throwIfAborted();
   const capture = captureReviewerAuxiliaryModels(
     input.reviewerCodemodeEnabled,
@@ -410,6 +448,31 @@ export async function runReview(input: RunReviewInput) {
     return { kind: "invalid" as const, reason: "Configured Dependency Bootstrap failed." };
   }
 
+  const { signal: _signal, onUpdate: _onUpdate, ...request } = input;
+  return {
+    kind: "prepared",
+    review: {
+      request,
+      snapshot,
+      review,
+      scope,
+      workspace,
+      provenance,
+      dependencyBootstrapConfigured,
+      ...(authorizedAuxiliaryModels ? { authorizedAuxiliaryModels } : {}),
+    },
+  };
+}
+
+/**
+ * Run the Reviewer Sessions of a prepared Review in its frozen workspace, then remove the workspace
+ * once every Review Task is terminal. A cleanup failure becomes the result's cleanup warning.
+ */
+export async function executePreparedReview(
+  prepared: PreparedReview,
+  control: ExecutePreparedReviewControl = {},
+) {
+  const { request, snapshot, review, scope, workspace } = prepared;
   let results: ReviewTaskResult[];
   let cleanupWarning: Awaited<ReturnType<typeof workspace.cleanup>>;
   try {
@@ -418,22 +481,22 @@ export async function runReview(input: RunReviewInput) {
       snapshot,
       review,
       scope,
-      input.reviewerModel,
-      input.reviewerThinkingLevel,
-      input.projectTrusted,
-      input.signal,
-      input.onUpdate,
-      input.auditStore
-        ? { store: input.auditStore, workspaceReceipt: workspace.receipt }
+      request.reviewerModel,
+      request.reviewerThinkingLevel,
+      request.projectTrusted,
+      control.signal,
+      control.onUpdate,
+      request.auditStore
+        ? { store: request.auditStore, workspaceReceipt: workspace.receipt }
         : undefined,
-      dependencyBootstrapConfigured,
-      input.providerAuthority,
-      input.recoveryModel,
-      input.recoveryModelId,
-      input.registry,
-      input.reviewerCodemodeEnabled ?? false,
-      authorizedAuxiliaryModels,
-      input.reviewerWebTools,
+      prepared.dependencyBootstrapConfigured,
+      request.providerAuthority,
+      request.recoveryModel,
+      request.recoveryModelId,
+      request.registry,
+      request.reviewerCodemodeEnabled ?? false,
+      prepared.authorizedAuxiliaryModels,
+      request.reviewerWebTools,
       workspace.targetDiff,
     );
   } finally {
@@ -441,15 +504,25 @@ export async function runReview(input: RunReviewInput) {
   }
   const details: ReviewBatchDetails = {
     kind: "review-batch",
-    provenance,
+    provenance: prepared.provenance,
     snapshot: summarizeReviewSnapshot(snapshot),
     review,
     ...(scope.paths?.length ? { scope } : {}),
     workspaceReceipt: workspace.receipt,
-    ...(input.planning ? { planning: input.planning } : {}),
+    ...(request.planning ? { planning: request.planning } : {}),
     ...(cleanupWarning ? { cleanupWarning } : {}),
     results,
   };
   const usage = combineAgentRunUsage(results.map((result) => result.usage));
   return { kind: "completed" as const, details, ...(usage ? { usage } : {}) };
+}
+
+/** Execute one caller-defined Review in the foreground: prepare it, then run it to completion. */
+export async function runReview(input: RunReviewInput) {
+  const prepared = await prepareReview(input);
+  if (prepared.kind !== "prepared") return prepared;
+  return executePreparedReview(prepared.review, {
+    ...(input.signal ? { signal: input.signal } : {}),
+    ...(input.onUpdate ? { onUpdate: input.onUpdate } : {}),
+  });
 }
