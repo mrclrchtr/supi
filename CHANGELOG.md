@@ -1,5 +1,26 @@
 # Changelog
 
+## [14.3.0](https://github.com/mrclrchtr/supi/compare/v14.2.0...v14.3.0) (2026-11-23)
+
+This release adds Session Issues to the footer and makes gathered retrospectives easier to act on: reports are attributed to projects and sessions, and Agent and Reviewer Runs record the tools they had.
+
+### Footer
+
+* The footer path line shows the GitHub issues and pull requests named in the first user message after the session name, for example `• #12 acme/app#5`, linked to GitHub in terminals that support hyperlinks. A bare `#12` resolves against a GitHub `origin` remote. Turn it off under `/supi-settings` → **Footer** → **Issue link**.
+
+### Debug & Retrospectives
+
+* `gather-retrospectives` attributes each report to a project (the main working tree of its Git repository, so sibling worktrees count as one) and to its session. The summary lists reports per project, and `--export` lines carry `project` and `session`.
+* The `gather-retrospectives` summary ranks themes by report count, gives each as a share with its session count and project, reports a proposal only when the cited report states one, and separates prompt-asked questions from measured effort. It details at most seven themes and names the rest instead of silently dropping them.
+
+### Agents & Review
+
+* Agent Run and Reviewer Run retrospectives record the tools the run started with (`metrics.availableTools`), so a tool the task did not use can be told apart from one it did not have. The retrospective prompt (revision 3) asks about Code Intelligence only for a faulty `code_*` result or a symbol question answered with another tool.
+
+### Dependencies
+
+* Routine dependency updates, including `@upstash/context7-sdk` 0.7.1.
+
 ## [14.2.0](https://github.com/mrclrchtr/supi/compare/v14.1.0...v14.2.0) (2026-11-23)
 
 This release gives Reviewers and Agent Runs better footing — the full diff as a file, project instructions for explorers, and the right `sed` syntax — and adds measured task metrics and a sharper `/supi-tooling-retro`.

@@ -1,6 +1,6 @@
 {
   "name": "@mrclrchtr/supi-settings",
-  "version": "14.2.0",
+  "version": "14.3.0",
   "description": "One project/global settings UI for SuPi packages in the Pi coding agent",
   "license": "MIT",
   "repository": {
