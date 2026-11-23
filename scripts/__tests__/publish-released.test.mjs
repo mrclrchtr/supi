@@ -3,6 +3,7 @@ import { existsSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "nod
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { validateReleaseIdentity } from "../release-validation.mjs";
 import { createReleaseFixture } from "./helpers/release-fixture.mjs";
 
 let fixture;
@@ -34,8 +35,19 @@ describe("release identity validation", () => {
     ["RELEASE_VERSION", "6.3.1-01"],
     ["RELEASE_VERSION", "6.3.1 "],
     ["RELEASE_VERSION", "6.3.1\n"],
-  ])("rejects invalid %s value %j before npm access", (field, value) => {
-    expectBlocked(fixture.run({ [field]: value }), [field, "expected", "actual"]);
+  ])("rejects invalid %s value %j", (field, value) => {
+    const identity = { RELEASE_SHA: fixture.sha, RELEASE_VERSION: "6.3.1", [field]: value };
+    expect(() => validateReleaseIdentity(identity.RELEASE_SHA, identity.RELEASE_VERSION)).toThrow(
+      new RegExp(`^${field}: expected .+; actual `),
+    );
+  });
+
+  it("rejects an invalid release identity before npm access", () => {
+    expectBlocked(fixture.run({ RELEASE_VERSION: "v6.3.1" }), [
+      "RELEASE_VERSION",
+      "expected",
+      "actual",
+    ]);
   });
 
   it("rejects another commit even when package versions match", () => {

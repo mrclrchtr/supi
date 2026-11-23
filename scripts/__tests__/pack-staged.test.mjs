@@ -1,8 +1,17 @@
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
+import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { dirname, join } from "node:path";
+import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import { makeNestedPackageFixture } from "./helpers/pack-fixture.mjs";
 
 // pack-staged runs npm pack which is slow
@@ -23,6 +32,32 @@ function listTarballEntries(tarballPath) {
     encoding: "utf8",
   });
   return listing.trim().split("\n").filter(Boolean);
+}
+
+// Packing a workspace package copies its bundled dependencies and runs npm pack, which takes
+// seconds. Tests only read the tarballs, so each package is packed at most once per file.
+const sharedOutDir = mkdtempSync(join(tmpdir(), "supi-pack-shared-"));
+const packedWorkspacePackages = new Map();
+afterAll(() => {
+  rmSync(sharedOutDir, { recursive: true, force: true });
+});
+
+function packWorkspacePackage(packageDir) {
+  if (!packedWorkspacePackages.has(packageDir)) {
+    const outDir = mkdtempSync(join(sharedOutDir, "pack-"));
+    packedWorkspacePackages.set(packageDir, packStaged(packageDir, { outDir }));
+  }
+  return packedWorkspacePackages.get(packageDir);
+}
+
+/** Install a tarball into an empty project and return a resolver as seen from that project. */
+function installForResolution(tarballPath, packageName, projectDir) {
+  const unpackDir = mkdtempSync(join(projectDir, "unpack-"));
+  execFileSync("tar", ["-xzf", tarballPath, "-C", unpackDir]);
+  const destDir = join(projectDir, "node_modules", ...packageName.split("/"));
+  mkdirSync(dirname(destDir), { recursive: true });
+  renameSync(join(unpackDir, "package"), destDir);
+  return createRequire(join(projectDir, "entry.ts"));
 }
 
 function writeJson(path, value) {
@@ -98,8 +133,6 @@ function expectExplicitSurface(pkg, entries) {
 }
 
 describe("packStaged clean manifest", () => {
-  /** @type {string | null} */
-  let tarball = null;
   let outDir = null;
 
   beforeEach(() => {
@@ -175,7 +208,7 @@ describe("packStaged clean manifest", () => {
   }, async () => {
     const packageDir = makePackageWithBrokenBinLink(outDir);
 
-    tarball = await packStaged(packageDir, { outDir });
+    const tarball = await packStaged(packageDir, { outDir });
 
     const entries = listTarballEntries(tarball);
     expect(entries).toContain("package/src/index.js");
@@ -184,7 +217,7 @@ describe("packStaged clean manifest", () => {
   it("rewrites LSP root and bundled manifests and preserves bundled dependencies", {
     timeout: SLOW_TIMEOUT,
   }, async () => {
-    tarball = await packStaged("packages/supi-lsp", { outDir });
+    const tarball = await packWorkspacePackage("packages/supi-lsp");
 
     const pkg = extractJson(tarball, "package/package.json");
     expect(JSON.stringify(pkg)).not.toContain("workspace:");
@@ -206,7 +239,7 @@ describe("packStaged clean manifest", () => {
   it("rewrites nested workspace bundles without copying a transitive development cycle", {
     timeout: SLOW_TIMEOUT,
   }, async () => {
-    tarball = await packStaged(makeNestedPackageFixture(outDir), { outDir });
+    const tarball = await packStaged(makeNestedPackageFixture(outDir), { outDir });
     const childPath = "package/node_modules/@mrclrchtr/fixture-child";
     const leafPath = `${childPath}/node_modules/@mrclrchtr/fixture-leaf`;
     const entries = listTarballEntries(tarball);
@@ -233,7 +266,7 @@ describe("packStaged clean manifest", () => {
   it("publishes explicit api and extension subpaths for packages/supi-ask-user", {
     timeout: SLOW_TIMEOUT,
   }, async () => {
-    tarball = await packStaged("packages/supi-ask-user", { outDir });
+    const tarball = await packWorkspacePackage("packages/supi-ask-user");
 
     const pkg = extractJson(tarball, "package/package.json");
     const entries = listTarballEntries(tarball);
@@ -248,7 +281,7 @@ describe("packStaged clean manifest", () => {
   it("publishes library-only surface for packages/supi-core", {
     timeout: SLOW_TIMEOUT,
   }, async () => {
-    tarball = await packStaged("packages/supi-core", { outDir });
+    const tarball = await packWorkspacePackage("packages/supi-core");
 
     const pkg = extractJson(tarball, "package/package.json");
     const entries = listTarballEntries(tarball);
@@ -266,7 +299,7 @@ describe("packStaged clean manifest", () => {
   it("publishes explicit api and extension subpaths for packages/supi-web", {
     timeout: SLOW_TIMEOUT,
   }, async () => {
-    tarball = await packStaged("packages/supi-web", { outDir });
+    const tarball = await packWorkspacePackage("packages/supi-web");
 
     const pkg = extractJson(tarball, "package/package.json");
     const entries = listTarballEntries(tarball);
@@ -276,10 +309,46 @@ describe("packStaged clean manifest", () => {
   it("publishes explicit api and extension subpaths for packages/supi-settings", {
     timeout: SLOW_TIMEOUT,
   }, async () => {
-    tarball = await packStaged("packages/supi-settings", { outDir });
+    const tarball = await packWorkspacePackage("packages/supi-settings");
 
     const pkg = extractJson(tarball, "package/package.json");
     const entries = listTarballEntries(tarball);
     expectExplicitSurface(pkg, entries);
+  });
+});
+
+describe("packed package import surfaces", { timeout: SLOW_TIMEOUT }, () => {
+  let projectDir;
+
+  beforeEach(() => {
+    projectDir = mkdtempSync(join(tmpdir(), "supi-import-test-"));
+  });
+
+  afterEach(() => {
+    rmSync(projectDir, { recursive: true, force: true });
+  });
+
+  it.each([
+    ["supi-lsp", "src/lsp.ts"],
+    ["supi-core", "src/api.ts"],
+  ])("resolves only the /api subpath of library package %s", async (name, deepFile) => {
+    const packageName = `@mrclrchtr/${name}`;
+    const tarball = await packWorkspacePackage(`packages/${name}`);
+    const projectRequire = installForResolution(tarball, packageName, projectDir);
+
+    expect(() => projectRequire.resolve(`${packageName}/api`)).not.toThrow();
+    expect(() => projectRequire.resolve(`${packageName}/extension`)).toThrow();
+    expect(() => projectRequire.resolve(packageName)).toThrow();
+    expect(() => projectRequire.resolve(`${packageName}/${deepFile}`)).toThrow();
+  });
+
+  it("resolves explicit /api and /extension subpaths for an extension package", async () => {
+    const packageName = "@mrclrchtr/supi-web";
+    const tarball = await packWorkspacePackage("packages/supi-web");
+    const projectRequire = installForResolution(tarball, packageName, projectDir);
+
+    expect(() => projectRequire.resolve(`${packageName}/api`)).not.toThrow();
+    expect(() => projectRequire.resolve(`${packageName}/extension`)).not.toThrow();
+    expect(() => projectRequire.resolve(packageName)).toThrow();
   });
 });
