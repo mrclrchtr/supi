@@ -131,30 +131,84 @@ function emitUpdate(
   }
 }
 
+/** Inputs of one Review Task fan-out against an already-frozen Review Workspace. */
+export interface ReviewTaskExecution {
+  readonly workspaceCwd: string;
+  readonly snapshot: ReviewSnapshot;
+  readonly review: ReviewInput;
+  readonly scope: ReviewScope;
+  readonly model: ReviewModelSelection;
+  /** Defaults to the Reviewer default thinking level. */
+  readonly reviewerThinkingLevel?: ReviewThinkingLevel;
+  readonly projectTrusted?: boolean;
+  readonly signal?: AbortSignal;
+  readonly onUpdate?: ReviewExecutionUpdate;
+  readonly audit?: ReviewerAuditRequest;
+  /** Defaults to `false`. */
+  readonly dependencyBootstrapConfigured?: boolean;
+  readonly providerAuthority?: AgentRunProviderAuthority;
+  readonly recoveryModel?: ReviewModelSelection;
+  readonly recoveryModelId?: string;
+  readonly registry?: AgentRunRegistry;
+  /** Defaults to `false`. */
+  readonly reviewerCodemodeEnabled?: boolean;
+  readonly authorizedAuxiliaryModels?: AgentRunAuxiliaryModelSnapshot;
+  readonly reviewerWebTools?: ChildWebToolProvision;
+  readonly targetDiff?: ReviewTargetDiffFile;
+  readonly batch?: ReviewExecutionBatch;
+}
+
+/** Reviewer Session options shared by every task of one fan-out. */
+function sharedReviewerOptions(
+  execution: ReviewTaskExecution,
+  requestedThinkingLevel: ReviewThinkingLevel,
+  runGroupId: string,
+) {
+  const {
+    authorizedAuxiliaryModels,
+    reviewerWebTools,
+    recoveryModel,
+    recoveryModelId,
+    registry,
+    audit,
+    dependencyBootstrapConfigured,
+  } = execution;
+  return {
+    cwd: execution.workspaceCwd,
+    snapshot: execution.snapshot,
+    model: execution.model,
+    requestedThinkingLevel,
+    reviewerCodemodeEnabled: execution.reviewerCodemodeEnabled ?? false,
+    ...(authorizedAuxiliaryModels ? { authorizedAuxiliaryModels } : {}),
+    ...(reviewerWebTools ? { reviewerWebTools } : {}),
+    ...(recoveryModel ? { recoveryModel } : {}),
+    ...(recoveryModelId ? { recoveryModelId } : {}),
+    ...(registry ? { registry } : {}),
+    providerAuthority: execution.providerAuthority,
+    projectTrusted: execution.projectTrusted,
+    ...(audit ? { audit } : {}),
+    ...(dependencyBootstrapConfigured ? { dependencyBootstrapConfigured } : {}),
+    signal: execution.signal,
+    runGroupId,
+  };
+}
+
 /** Run all caller-defined tasks concurrently against one already-frozen Review Workspace. */
-// biome-ignore lint/complexity/useMaxParams: compact internal fan-out helper
 export async function executeReviewTasks(
-  workspaceCwd: string,
-  snapshot: ReviewSnapshot,
-  reviewInput: ReviewInput,
-  scope: ReviewScope,
-  model: ReviewModelSelection,
-  reviewerThinkingLevel: ReviewThinkingLevel = REVIEWER_DEFAULT_THINKING_LEVEL,
-  projectTrusted?: boolean,
-  signal?: AbortSignal,
-  onUpdate?: ReviewExecutionUpdate,
-  audit?: ReviewerAuditRequest,
-  dependencyBootstrapConfigured = false,
-  providerAuthority?: AgentRunProviderAuthority,
-  recoveryModel?: ReviewModelSelection,
-  recoveryModelId?: string,
-  registry?: AgentRunRegistry,
-  reviewerCodemodeEnabled = false,
-  authorizedAuxiliaryModels?: AgentRunAuxiliaryModelSnapshot,
-  reviewerWebTools?: ChildWebToolProvision,
-  targetDiff?: ReviewTargetDiffFile,
-  batch?: ReviewExecutionBatch,
+  execution: ReviewTaskExecution,
 ): Promise<ReviewTaskResult[]> {
+  const {
+    workspaceCwd,
+    snapshot,
+    review: reviewInput,
+    scope,
+    model,
+    reviewerThinkingLevel = REVIEWER_DEFAULT_THINKING_LEVEL,
+    onUpdate,
+    dependencyBootstrapConfigured = false,
+    targetDiff,
+    batch,
+  } = execution;
   const review = normalizeReviewInput(reviewInput);
   let completedCount = 0;
   const totalCount = review.tasks.length;
@@ -191,12 +245,7 @@ export async function executeReviewTasks(
     content: [{ type: "text", text: "Reviewing frozen Review Workspace…" }],
     details: progressDetails(),
   });
-  const reviewerCapabilities = {
-    reviewerCodemodeEnabled,
-    ...(authorizedAuxiliaryModels ? { authorizedAuxiliaryModels } : {}),
-    ...(reviewerWebTools ? { reviewerWebTools } : {}),
-  };
-
+  const reviewerOptions = sharedReviewerOptions(execution, reviewerThinkingLevel, runGroupId);
   const packetWorkspace: ReviewPacketWorkspace = {
     ...(targetDiff ? { targetDiff } : {}),
     dependencyBootstrapRan: dependencyBootstrapConfigured,
@@ -229,23 +278,10 @@ export async function executeReviewTasks(
       });
       try {
         const result = await runReviewer({
-          cwd: workspaceCwd,
-          snapshot,
+          ...reviewerOptions,
           task,
           prompt: packet.prompt,
           packetHash: packet.packetHash,
-          model,
-          requestedThinkingLevel: reviewerThinkingLevel,
-          ...reviewerCapabilities,
-          ...(recoveryModel ? { recoveryModel } : {}),
-          ...(recoveryModelId ? { recoveryModelId } : {}),
-          ...(registry ? { registry } : {}),
-          providerAuthority,
-          projectTrusted,
-          ...(audit ? { audit } : {}),
-          ...(dependencyBootstrapConfigured ? { dependencyBootstrapConfigured } : {}),
-          signal,
-          runGroupId,
           ...runKeyFor(batch, task.id),
           onProgress: (progress) => {
             taskStates[task.id] = { status: "running", progress };

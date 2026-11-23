@@ -482,30 +482,30 @@ export async function executePreparedReview(
   let results: ReviewTaskResult[];
   let cleanupWarning: Awaited<ReturnType<typeof workspace.cleanup>>;
   try {
-    results = await executeReviewTasks(
-      workspace.cwd,
+    results = await executeReviewTasks({
+      workspaceCwd: workspace.cwd,
       snapshot,
       review,
       scope,
-      request.reviewerModel,
-      request.reviewerThinkingLevel,
-      request.projectTrusted,
-      control.signal,
-      control.onUpdate,
-      request.auditStore
+      model: request.reviewerModel,
+      reviewerThinkingLevel: request.reviewerThinkingLevel,
+      projectTrusted: request.projectTrusted,
+      signal: control.signal,
+      onUpdate: control.onUpdate,
+      audit: request.auditStore
         ? { store: request.auditStore, workspaceReceipt: workspace.receipt }
         : undefined,
-      prepared.dependencyBootstrapConfigured,
-      request.providerAuthority,
-      request.recoveryModel,
-      request.recoveryModelId,
-      request.registry,
-      request.reviewerCodemodeEnabled ?? false,
-      prepared.authorizedAuxiliaryModels,
-      request.reviewerWebTools,
-      workspace.targetDiff,
-      control.batch,
-    );
+      dependencyBootstrapConfigured: prepared.dependencyBootstrapConfigured,
+      providerAuthority: request.providerAuthority,
+      recoveryModel: request.recoveryModel,
+      recoveryModelId: request.recoveryModelId,
+      registry: request.registry,
+      reviewerCodemodeEnabled: request.reviewerCodemodeEnabled ?? false,
+      authorizedAuxiliaryModels: prepared.authorizedAuxiliaryModels,
+      reviewerWebTools: request.reviewerWebTools,
+      targetDiff: workspace.targetDiff,
+      batch: control.batch,
+    });
   } finally {
     cleanupWarning = await workspace.cleanup();
   }
