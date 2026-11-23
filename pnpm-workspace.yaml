@@ -74,3 +74,11 @@ minimumReleaseAgeExclude:
 patchedDependencies:
   # Apply the patch to new upstream versions and fail when it no longer applies.
   "mattpocock-skills@*": packages/supi-skill-patches/patches/mattpocock-skills/combined.patch
+permissions:
+  mattpocock-skills@https://codeload.github.com/mattpocock/skills/tar.gz/d1478fcb140db0b93c0c8df17bcfd311844749d0:
+    skills: [ask-matt, code-review, codebase-design, diagnosing-bugs, domain-modeling, grill-with-docs, implement, implement-spec, improve-codebase-architecture, pr, prototype, research, retro, setup-matt-pocock-skills, tdd, to-spec, to-tickets, triage, wayfinder, wizard, chief-of-staff, claude-handoff, loop-me, setup-ts-deep-modules, writing-beats, writing-fragments, writing-shape, git-guardrails-claude-code, migrate-to-shoehorn, scaffold-exercises, setup-pre-commit, grill-me, grilling, handoff, teach, to-questionnaire, wait-what, writing-for-agents]
+skills:
+  dirs:
+    - .agents/skills
+    - .claude/skills
+    - .pi/skills
