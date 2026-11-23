@@ -33,6 +33,8 @@ You do not need to learn the tool-call syntax. Try asking Pi:
 - “Fetch this long reference page to a file, then read only the relevant section.”
 - “Compare this library's current docs with the code in the repository.”
 
+![Agent finding a library ID with web_docs_search](https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-web.png)
+
 ## Agent tools
 
 The package adds four tools that Pi selects as needed:

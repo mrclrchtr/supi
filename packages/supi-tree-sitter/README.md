@@ -26,8 +26,6 @@ npm install @mrclrchtr/supi-tree-sitter
 
 Structural analysis always runs in a Node.js child process. Under Bun, including compiled applications such as Pi-Bolt, install Node.js and make the `node` executable available on `PATH`. SuPi validates that executable before it starts the process host. If Node.js is unavailable, structural analysis reports an installation error. There is no Bun Worker or main-thread parser fallback.
 
-![Tree-sitter outline in action](https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-tree-sitter.png)
-
 ## What you get
 
 This package provides the parser-backed structural substrate consumed by `@mrclrchtr/supi-code-intelligence`:

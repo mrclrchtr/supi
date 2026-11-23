@@ -22,6 +22,8 @@ For local development:
 pi install ./packages/supi-context
 ```
 
+![Context Usage Report](https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-context.png)
+
 ## Two concepts, two surfaces
 
 - A **Context Pressure Snapshot** is a small point-in-time capacity reading for deciding whether a session has room for another operation.
