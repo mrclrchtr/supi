@@ -34,17 +34,17 @@ describe("fast PR verification", () => {
       overrides: { GITHUB_EVENT_NAME: "pull_request" },
     });
     expect(result.status, result.stderr).toBe(0);
-    expect(result.outputs).toEqual({ mode: "pr", sha: repo.sha, version: "", release: "" });
+    expect(result.outputs).toEqual({ mode: "checks", sha: repo.sha, version: "", release: "" });
     expect(result.calls).toEqual([]);
   });
 });
 
 describe("release candidate planning", () => {
-  it("does no heavy work or API access on an ordinary main push", () => {
+  it("selects the PR checks without release effects or API access on an ordinary main push", () => {
     const sha = ordinaryCommit();
     const result = push(sha, {});
     expect(result.status, result.stderr).toBe(0);
-    expect(result.outputs.mode).toBe("none");
+    expect(result.outputs).toEqual({ mode: "checks", sha, version: "", release: "" });
     expect(result.calls).toEqual([]);
   });
 

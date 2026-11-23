@@ -64,12 +64,13 @@ function pushPlan(event, repository, plan) {
   if (process.env.GITHUB_REF !== "refs/heads/main" || event.after !== plan.sha) {
     throw new Error("Unexpected main push");
   }
+  // Ordinary pushes run the PR checks: direct pushes to main have no PR to verify them.
   // Release-shaped commits that fail validation fail planning instead of passing as ordinary pushes.
   if (!isReleaseShaped(plan.sha)) return plan;
   return releaseCandidate(repository, plan, plan.sha);
 }
 
-/** Select PR checks or release verification pinned to an immutable release candidate. */
+/** Select the checks of a PR or ordinary main push, or release verification pinned to an immutable release candidate. */
 export function createPlan() {
   const {
     GITHUB_EVENT_NAME: eventName,
@@ -80,10 +81,10 @@ export function createPlan() {
     throw new Error("Checkout does not match the event commit");
   }
   const event = JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, "utf8"));
-  const plan = { mode: "none", sha, version: "", release: "" };
+  const plan = { mode: "checks", sha, version: "", release: "" };
   switch (eventName) {
     case "pull_request":
-      return { ...plan, mode: "pr" };
+      return plan;
     case "workflow_dispatch":
       return manualPlan(event, repository, plan);
     case "push":

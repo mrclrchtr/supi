@@ -206,8 +206,7 @@ describe("release and publishing authorization", () => {
       { verify: "failure" },
       { verify: "cancelled" },
       { verify: "skipped" },
-      { mode: "pr" },
-      { mode: "none" },
+      { mode: "checks" },
       { ref: "refs/heads/other" },
       { cancelled: true },
     ]) {

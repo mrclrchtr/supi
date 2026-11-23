@@ -21,10 +21,16 @@ on:
 permissions:
   contents: read
 
-# PR updates supersede old checks. Distinct main commits must not replace queued release candidates.
+# PR updates and newer ordinary main pushes supersede old checks. Release-shaped pushes and manual
+# runs get their own group, so nothing replaces a queued release candidate.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: >-
+    ${{ github.workflow }}-${{
+      github.event.pull_request.number ||
+      (github.event_name == 'push' && !startsWith(github.event.head_commit.message, 'chore: release') && github.ref) ||
+      github.run_id
+    }}
+  cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
 
 jobs:
   ci-plan:
@@ -55,7 +61,6 @@ jobs:
 
   workflow-lint:
     needs: ci-plan
-    if: needs.ci-plan.outputs.mode != 'none'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -77,7 +82,6 @@ jobs:
 
   conventional-commits:
     needs: ci-plan
-    if: needs.ci-plan.outputs.mode != 'none'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -87,16 +91,6 @@ jobs:
           ref: ${{ needs.ci-plan.outputs.sha }}
           fetch-depth: 0
           persist-credentials: false
-      - name: Validate PR title
-        if: github.event_name == 'pull_request'
-        env:
-          PR_TITLE: ${{ github.event.pull_request.title }}
-        run: |
-          REGEX='^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([^)]+\))?(!)?: .+$'
-          if [[ ! "$PR_TITLE" =~ $REGEX ]]; then
-            echo "PR title must follow Conventional Commits. Got: $PR_TITLE"
-            exit 1
-          fi
       - name: Set up pnpm without workspace dependencies
         uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
       - name: Set up Node.js without workspace dependencies
@@ -106,17 +100,18 @@ jobs:
           package-manager-cache: false
       # Installs only commitlint, at the versions pinned in package.json, instead of the workspace.
       # The workspace lockfile does not pin its transitive dependencies.
+      # Lints every commit of the PR or push. Manual runs, and pushes whose previous tip is not
+      # in the checkout, lint only the verification commit.
       - name: Validate commits
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          FROM_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          TO_SHA: ${{ github.event.pull_request.head.sha || needs.ci-plan.outputs.sha }}
         run: |
           cli="@commitlint/cli@$(jq -r '.devDependencies["@commitlint/cli"]' package.json)"
           config="@commitlint/config-conventional@$(jq -r '.devDependencies["@commitlint/config-conventional"]' package.json)"
-          if [[ "$GITHUB_EVENT_NAME" == pull_request ]]; then
-            range="--from $BASE_SHA --to $HEAD_SHA"
-          else
-            range="--last"
+          range="--last"
+          if [[ -n "$FROM_SHA" ]] && git cat-file -e "$FROM_SHA^{commit}" 2>/dev/null; then
+            range="--from $FROM_SHA --to $TO_SHA"
           fi
           # NODE_PATH lets commitlint.config.mjs resolve the shared config from the dlx install.
           pnpm --package "$cli" --package "$config" dlx -c \
@@ -124,7 +119,6 @@ jobs:
 
   workspace-checks:
     needs: ci-plan
-    if: needs.ci-plan.outputs.mode != 'none'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
@@ -154,7 +148,6 @@ jobs:
   # Runs for PRs too. The language-baseline job runs the `servers` project with every server provisioned.
   tests:
     needs: ci-plan
-    if: needs.ci-plan.outputs.mode != 'none'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -181,7 +174,6 @@ jobs:
 
   language-baseline:
     needs: ci-plan
-    if: needs.ci-plan.outputs.mode != 'none'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 120
     strategy:
@@ -244,7 +236,6 @@ jobs:
 
   installer:
     needs: ci-plan
-    if: needs.ci-plan.outputs.mode != 'none'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10
     strategy:
@@ -268,7 +259,7 @@ jobs:
         run: pnpm vitest run packages/supi-installer/ scripts/__tests__/patch-checkout.test.mjs --reporter=agent
 
   verify:
-    if: always() && (needs.ci-plan.result != 'success' || needs.ci-plan.outputs.mode != 'none')
+    if: always()
     needs: [ci-plan, workflow-lint, conventional-commits, workspace-checks, tests, installer, language-baseline]
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -284,7 +275,7 @@ jobs:
           INSTALLER_RESULT: ${{ needs.installer.result }}
           LANGUAGE_BASELINE_RESULT: ${{ needs.language-baseline.result }}
         run: |
-          if [[ "$MODE" != full && "$MODE" != pr ]]; then
+          if [[ "$MODE" != full && "$MODE" != checks ]]; then
             echo '::error::Unknown verification mode'
             exit 1
           fi

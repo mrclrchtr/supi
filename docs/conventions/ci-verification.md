@@ -5,13 +5,13 @@
 | Event | Checks | Release effects |
 | --- | --- | --- |
 | PR | jactionlint, Conventional Commits, Biome, TypeScript, skills, WASM consistency, test suite, both full cross-platform matrices | None |
-| Ordinary main push | Release Commit detection from Git only | None |
+| Ordinary main push | The PR checks | None |
 | Release Commit pushed to main | The PR checks plus staged tarball verification | Tag/release creation, then npm publishing, only after verification succeeds |
 | Manual CI run without inputs | Same release verification at the selected event commit | None |
 | Manual `release_sha` retry | Same release verification at that Release Commit | Recover tag/release creation and publishing |
 | Manual `publish_tag` retry | Same release verification at the existing release tag's commit | Retry npm publishing only |
 
-PRs run every check except staged tarball verification, which stays a release gate. The `servers` Vitest project runs only in the language-baseline job, where every server is provisioned. Ordinary pushes to `main` run no checks, so commits pushed without a PR are first verified at release. Run manual full verification for earlier feedback on them.
+PRs and ordinary pushes to `main` run every check except staged tarball verification, which stays a release gate. Work lands on `main` without a PR and is pushed in batches, so the push run is its first CI verification and covers only the pushed tip; a rebase-merged PR is verified again on `main`. The `servers` Vitest project runs only in the language-baseline job, where every server is provisioned.
 
 ## Workflow ownership
 
@@ -27,14 +27,13 @@ PRs run every check except staged tarball verification, which stays a release ga
 
 | Mode | Selection |
 | --- | --- |
-| `pr` | Any PR |
+| `checks` | Any PR, or an ordinary main push |
 | `full` | Release Commit on main, or manual full verification/retry |
-| `none` | Ordinary main push; no duplicate PR checks |
 
 The planner also emits `release=true` when tag/release creation is authorized.
 
-- A Release Commit has the subject `chore: release X.Y.Z`, root `package.json#version` X.Y.Z, and a first `CHANGELOG.md` section for X.Y.Z with nonempty notes ([`scripts/release-candidate.mjs`](../../scripts/release-candidate.mjs)). Trust is write access to `main`; direct pushes and merged PRs are equivalent when the Release Commit is the pushed tip with its exact subject (direct push, rebase merge, or squash merge titled exactly `chore: release X.Y.Z`).
-- A pushed tip whose subject starts with `chore: release` but breaks any rule, such as a squash title `chore: release X.Y.Z (#N)`, fails planning; it never passes as an ordinary push.
+- A Release Commit has the subject `chore: release X.Y.Z`, root `package.json#version` X.Y.Z, and a first `CHANGELOG.md` section for X.Y.Z with nonempty notes ([`scripts/release-candidate.mjs`](../../scripts/release-candidate.mjs)). Trust is write access to `main`; direct pushes and merged PRs are equivalent when the Release Commit is the pushed tip with its exact subject (direct push or rebase merge; the repository does not squash-merge).
+- A pushed tip whose subject starts with `chore: release` but breaks any rule, such as `chore: release X.Y.Z (#N)`, fails planning; it never passes as an ordinary push.
 - Only the newest Release Commit for a version on main may be tagged; earlier ones for the same version are superseded and fail planning and release creation.
 - A version is consumed only by its tag. An existing tag at another commit fails planning; an existing tag at the candidate lets tag/release recovery finish. API errors fail planning.
 - Every source check and published package uses the planner's SHA, including manual retries. A newer main commit is never substituted for a candidate or existing tag. Release/publishing tooling is checked out separately from the immutable workflow-event SHA, so retries of older candidates retain current safety policy without changing package contents.
@@ -45,11 +44,11 @@ The planner also emits `release=true` when tag/release creation is authorized.
 ## Release safety and concurrency
 
 - Keep required PR check names `workflow-lint`, `conventional-commits`, and `verify` stable. The `workflow-lint` job runs [jactionlint](https://github.com/jdx/jactionlint) with ShellCheck, both pinned in `.mise.toml`/`mise.lock` and configured in `.github/jactionlint.yaml`; run it locally with `pnpm workflow:lint`.
-- `verify` requires successful planning, workflow linting, Conventional Commits, workspace checks, tests, and both matrices in PR and full mode. Missing/unknown modes, missing results, cancellations, and skips fail verification.
+- `verify` requires successful planning, workflow linting, Conventional Commits, workspace checks, tests, and both matrices in both modes. Missing/unknown modes, missing results, cancellations, and skips fail verification.
 - Tagging requires a successful full gate and a Release Commit candidate. Publishing requires that gate plus successful release creation, or an explicitly selected existing tag on a manual retry. Manual verification without inputs never releases.
 - Immediately before tagging, revalidate the candidate's checkout, package versions, Release Commit rules, ancestry on main, and first changelog entry.
 - Existing tags are never moved. Annotated tags are peeled to their commit. An existing tag at another SHA, a draft/mismatched release, or an API failure blocks release creation. Tag-only/fully-created releases can be recovered without deleting or recreating a tag/release.
-- PR checks cancel superseded runs. Distinct main runs do not replace queued verification candidates. Creation serializes by version; npm publishing uses one cross-version concurrency group because packages share dist-tags. GitHub concurrency is not a durable FIFO: newer arrivals can replace pending publication jobs; retry their tag explicitly if needed.
+- A newer PR update or ordinary main push cancels the superseded run, so a quick series of pushes verifies only its newest tip. Pushes whose tip subject starts with `chore: release` and manual runs each get their own concurrency group; nothing replaces a queued verification candidate. Creation serializes by version; npm publishing uses one cross-version concurrency group because packages share dist-tags. GitHub concurrency is not a durable FIFO: newer arrivals can replace pending publication jobs; retry their tag explicitly if needed.
 - npm resolves whether a newer stable package version exists. Stable releases with no newer version publish with `--tag latest`; older recovery and prereleases use a version-specific `release-<version>` tag and never move `latest` backwards. Registry failures other than an explicit E404 block publication. Already-published versions are skipped.
 
 ## Manual operations
@@ -81,8 +80,8 @@ gh workflow run ci.yml --repo mrclrchtr/supi --ref main -f publish_tag=v1.2.3
 ## Runner policy
 
 - All jobs use free GitHub-hosted runners (`ubuntu-latest`, `macos-latest`, `windows-latest`); the repository is public, so standard runner minutes cost nothing. Larger runners are billed even for public repositories; do not use them.
-- `ci.yml` ignores `pull_request` `edited` events so body-only edits do not rerun every check. `pr-title.yml` revalidates title-only edits without dependencies.
-- `conventional-commits` runs commitlint through `pnpm dlx` at the versions pinned in the root `package.json` instead of installing the workspace. The lockfile does not pin commitlint's transitive dependencies in that job.
+- `ci.yml` ignores `pull_request` `edited` events so title and body edits do not rerun every check. PR titles are not validated: the repository only rebase-merges, so a title never becomes a commit subject.
+- `conventional-commits` lints every commit of a PR or push (`base..head` or `before..after`); manual runs lint the verification commit. It runs commitlint through `pnpm dlx` at the versions pinned in the root `package.json` instead of installing the workspace. The lockfile does not pin commitlint's transitive dependencies in that job.
 - Language-baseline provisioning extracts only the LLVM members it needs (clangd, clang drivers, builtin and libc++ headers) and caches them by OS, architecture, and the hashes of `pins.json` and `clang-artifacts.mjs`. A completion marker prevents reusing an interrupted extraction; other servers are still provisioned fresh.
 - Language acceptance retains Linux and macOS. Installer verification retains Linux, macOS, Windows, and the minimum Node runtime, including the skill-patch line-ending regression.
 - npm publishing uses the official GitHub-hosted `ubuntu-latest` runner for trusted publishing, for automatic releases and manual retries.
