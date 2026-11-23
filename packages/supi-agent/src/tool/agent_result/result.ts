@@ -1,11 +1,11 @@
 import type { AgentToolResult } from "@earendil-works/pi-coding-agent";
+import type { CompletionNotice, CompletionNoticeTarget } from "@mrclrchtr/supi-agent-runtime/api";
 import type {
   BatchTaskResult,
   BatchTaskStatus,
   DelegationBatchHandle,
 } from "../agent_run/batch-types.ts";
 import { buildAgentRunResult } from "../agent_run/result.ts";
-import { AGENT_COMPLETION_MESSAGE_TYPE } from "../names.ts";
 
 /** Build a bounded snapshot. The collected flag applies to available results, not pending tasks. */
 export function buildCollectedResult(
@@ -50,14 +50,15 @@ export interface CompletionNoticeTask {
 }
 
 /** Completion notice details: `taskIds` drives context filtering, `tasks` drives rendering. */
-export interface CompletionNoticeDetails {
-  batchId: string;
-  taskIds: string[];
-  tasks: CompletionNoticeTask[];
+export interface CompletionNoticeDetails extends CompletionNoticeTarget {
+  readonly tasks: CompletionNoticeTask[];
 }
 
 /** Build a completion notice whose model-facing content excludes task output and Usage. */
-export function buildCompletionNotice(batchId: string, tasks: readonly BatchTaskResult[]) {
+export function buildCompletionNotice(
+  batchId: string,
+  tasks: readonly BatchTaskResult[],
+): CompletionNotice {
   const details: CompletionNoticeDetails = {
     batchId,
     taskIds: tasks.map((task) => task.taskId),
@@ -73,7 +74,6 @@ export function buildCompletionNotice(batchId: string, tasks: readonly BatchTask
     ),
   };
   return {
-    customType: AGENT_COMPLETION_MESSAGE_TYPE,
     content: `Background batch ${batchId}: ${tasks.map((task) => `${JSON.stringify(task.taskId)} ${task.status}`).join(", ")}. Collect available results and Usage with agent_result.`,
     display: true,
     details,

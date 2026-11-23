@@ -28,7 +28,7 @@ import { getTools } from "./tool-utils.ts";
 
 export { controlledSession } from "./background-session.ts";
 
-/** Usage every controlled child bills unless a test passes its own. */
+/** Usage every controlled child bills. */
 export const controlledUsage: Usage = {
   input: 10,
   output: 5,
@@ -52,10 +52,6 @@ export interface BackgroundHarnessOptions {
   extension: (pi: ExtensionAPI) => void;
   /** Persist the parent session to disk so `reopenParent()` reopens the file. */
   persistentParent?: boolean;
-  /** Usage billed by controlled children; defaults to {@link controlledUsage}. */
-  childUsage?: Usage;
-  /** Base parent context; defaults to a neutral test model context. */
-  baseContext?: () => ExtensionContext;
   /** Maps a `child(key)` lookup to text contained in that child's first prompt; defaults to the key. */
   childPrompt?: (key: string) => string;
   /** Runs after the temporary Pi agent directory is configured and before the extension loads. */
@@ -84,8 +80,6 @@ export type BackgroundHarness = Awaited<ReturnType<typeof backgroundHarness>>;
 /** Controlled SDK sessions and parent turn boundaries; all extension code under test remains real. */
 export async function backgroundHarness(options: BackgroundHarnessOptions) {
   const { sdk } = options;
-  const childUsage = options.childUsage ?? controlledUsage;
-  const baseContext = options.baseContext ?? testModelContext;
   const childPrompt = options.childPrompt ?? ((key: string) => key);
   const directory = await mkdtemp(join(tmpdir(), "supi-background-"));
   const agentDir = join(directory, "agent");
@@ -95,10 +89,10 @@ export async function backgroundHarness(options: BackgroundHarnessOptions) {
   const parentManager = options.persistentParent
     ? SessionManager.create(directory, join(directory, "sessions"))
     : SessionManager.inMemory(directory);
-  const { children, holdNextStartup } = controlSdk(sdk, childUsage);
+  const { children, holdNextStartup } = controlSdk(sdk);
   const pi = createPiMock();
   const parentContext = (cwd: string, manager: SessionManager) =>
-    createParentContext(baseContext(), cwd, manager);
+    createParentContext(testModelContext(), cwd, manager);
   let ctx = parentContext(directory, parentManager);
   let aborted = false;
   let turnsStarted = 0;
@@ -110,7 +104,7 @@ export async function backgroundHarness(options: BackgroundHarnessOptions) {
   });
   options.extension(pi as unknown as ExtensionAPI);
   await pi.emit("session_start", { type: "session_start", reason: "startup" }, ctx);
-  const turns = parentTurns(pi, () => ctx, childUsage);
+  const turns = parentTurns(pi, () => ctx, controlledUsage);
   return {
     pi,
     children,
@@ -200,7 +194,7 @@ export async function backgroundHarness(options: BackgroundHarnessOptions) {
 }
 
 /** Answer the extension's SDK child-session requests with controlled sessions. */
-function controlSdk(sdk: ControlledSdk, childUsage: Usage) {
+function controlSdk(sdk: ControlledSdk) {
   const children: ControlledChild[] = [];
   let startup: StartupGate | undefined;
   sdk.createAgentSession.mockImplementation(async (inputs) => {
@@ -212,7 +206,7 @@ function controlSdk(sdk: ControlledSdk, childUsage: Usage) {
     }
     const child = controlledSession(
       inputs.tools,
-      childUsage,
+      controlledUsage,
       inputs.sessionManager,
       inputs.settingsManager,
     );
@@ -236,7 +230,7 @@ function controlSdk(sdk: ControlledSdk, childUsage: Usage) {
 }
 
 /** A neutral parent context with one test model that has configured auth. */
-function testModelContext(): ExtensionContext {
+export function testModelContext(): ExtensionContext {
   const model = {
     provider: "test",
     id: "model",

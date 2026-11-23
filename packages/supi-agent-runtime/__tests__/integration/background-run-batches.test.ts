@@ -8,6 +8,7 @@ vi.mock("@earendil-works/pi-coding-agent", async (importOriginal) => ({
 }));
 let harness: Awaited<ReturnType<typeof ownerHarness>> | undefined;
 afterEach(async () => {
+  vi.useRealTimers();
   await harness?.close();
   harness = undefined;
   vi.unstubAllEnvs();
@@ -23,6 +24,16 @@ async function startOne(taskIds = ["one"]) {
     ),
   );
   return start.details.batchId as string;
+}
+
+/** Fake the notice timer so `flushNotices()` can run every pending delivery deterministically. */
+function fakeNoticeTimers() {
+  vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+}
+
+/** Run every pending timer, including a delayed notice, and the microtasks they queue. */
+async function flushNotices() {
+  await vi.runAllTimersAsync();
 }
 
 describe("Background Run Batch ownership", () => {
@@ -85,10 +96,11 @@ describe("Completion Notice delivery", () => {
   it("does not send a late notice for an already collected result", async () => {
     harness = await ownerHarness(sdk);
     const batchId = await startOne();
+    fakeNoticeTimers();
     const collecting = harness.invoke("agent_result", { batchId, wait: true });
     harness.child("one").finish();
     await collecting;
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await flushNotices();
     expect(harness.pi.messages).toHaveLength(0);
   });
 
@@ -144,6 +156,7 @@ describe("Completion Notice delivery", () => {
 describe("Completion Notice pause after parent abort", () => {
   it("holds a result that finished at abort until the next user input", async () => {
     harness = await ownerHarness(sdk);
+    fakeNoticeTimers();
     const parent = await harness.beginParent();
     // The launch result is stored but its turn has not ended, so no notice is due yet.
     await harness.invoke("test_run", { tasks: ["one"] }, { endTurn: false });
@@ -152,13 +165,14 @@ describe("Completion Notice pause after parent abort", () => {
     await vi.waitFor(() => expect(harness?.registry.snapshot().runs[0]?.status).toBe("completed"));
     parent.abort();
     await harness.endParent(true);
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await flushNotices();
     expect(harness.pi.messages).toHaveLength(0);
     await harness.pi.emit("input", { type: "input", source: "extension" }, harness.ctx);
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await flushNotices();
     expect(harness.pi.messages).toHaveLength(0);
     await harness.pi.emit("input", { type: "input", source: "interactive" }, harness.ctx);
-    await vi.waitFor(() => expect(harness?.pi.messages).toHaveLength(1));
+    await flushNotices();
+    expect(harness.pi.messages).toHaveLength(1);
   });
 });
 

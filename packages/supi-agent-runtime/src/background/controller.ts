@@ -8,7 +8,6 @@ import type {
   SessionEntry,
 } from "@earendil-works/pi-coding-agent";
 import type { AgentRunRegistry } from "../session/agent-run-registry.ts";
-import { syncCollectionToolActivation } from "../tool/activation.ts";
 import { readResultCollection } from "./collection.ts";
 import { findLaunchEntry, readNoticeTarget, sendCompletionNotice } from "./notices.ts";
 import type {
@@ -89,7 +88,6 @@ export class BackgroundRunBatches {
       retainOutput: (path) => {
         if (path) this.#outputPaths.add(path);
       },
-      syncCollectionTools: () => this.syncCollectionTools(owner.pi),
     };
   }
 
@@ -151,18 +149,11 @@ export class BackgroundRunBatches {
     );
   }
 
-  /**
-   * Activate `agent_result` and `agent_cancel` while any registered owner needs them and
-   * deactivate them otherwise. Other active tools are preserved. While no owner states
-   * `toolsNeeded`, Pi's activation on registration and later user choices stand.
-   */
-  syncCollectionTools(pi: ExtensionAPI): void {
-    syncCollectionToolActivation(
-      pi,
-      [...this.#owners.values()].flatMap(({ options }) =>
-        options.collection ? [options.collection] : [],
-      ),
-    );
+  /** Whether any Agent Run of the batch is still active in the Agent Run Registry. */
+  hasActiveRuns(batch: RunBatch<RunBatchHandle, unknown>): boolean {
+    return this.registry
+      .snapshot()
+      .runs.some((run) => run.batchId === batch.handle.batchId && run.active);
   }
 
   /** Bind the active session manager and parent operation; false once the session is closed. */

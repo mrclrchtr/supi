@@ -2,7 +2,8 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type { TSchema } from "typebox";
 import { Value } from "typebox/value";
 import type { CollectableRunBatch } from "../../background/types.ts";
-import { RUN_BATCH_OWNER_KEY, requireRunBatches } from "../batches.ts";
+import { requireRunBatches } from "../batches.ts";
+import { stampOwnedResult } from "../result.ts";
 
 type Execute = NonNullable<Parameters<ExtensionAPI["registerTool"]>[0]["execute"]>;
 type OnUpdate = NonNullable<Parameters<Execute>[3]>;
@@ -56,15 +57,6 @@ export function makeAgentResultExecute(pi: ExtensionAPI, parameters: TSchema): E
       throw new Error(collection.canceledMessages?.collection ?? "Run Batch collection canceled.");
     requireRunBatches(pi).resolveCollection(params.batchId, ctx);
     const result = collection.collect(callId, batch, ctx);
-    const receipt = batches.prepareUsage(callId, batch);
-    return {
-      ...result,
-      usage: receipt.usage,
-      details: {
-        ...result.details,
-        usageReceipt: receipt.usageReceipt,
-        [RUN_BATCH_OWNER_KEY]: resolved.ownerKey,
-      },
-    };
+    return stampOwnedResult(result, resolved.ownerKey, batches.prepareUsage(callId, batch));
   };
 }

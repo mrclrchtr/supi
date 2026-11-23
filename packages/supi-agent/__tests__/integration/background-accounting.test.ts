@@ -15,6 +15,24 @@ afterEach(async () => {
 });
 
 describe("background collection receipts", () => {
+  it.each([{ isError: true }, { details: {} }])(
+    "returns the same content for a retry after a failed delivery and does not mark it collected: %j",
+    async (patch) => {
+      harness = await backgroundHarness(sdk);
+      const start = await harness.invoke("agent_run", { tasks: [task()] });
+      await vi.waitFor(() => expect(harness?.children[0]?.session.isStreaming).toBe(true));
+      harness.child("one").finish("Retryable output");
+      const first = await harness.invoke(
+        "agent_result",
+        { batchId: start.details.batchId, wait: true },
+        { resultHook: () => patch },
+      );
+      const retry = await harness.invoke("agent_result", { batchId: start.details.batchId });
+      expect(retry.content).toEqual(first.content);
+      expect(retry.details.alreadyCollected).toBe(false);
+    },
+  );
+
   it("reports Usage only once for concurrent collections", async () => {
     harness = await backgroundHarness(sdk);
     const start = await harness.invoke("agent_run", { tasks: [task()] });

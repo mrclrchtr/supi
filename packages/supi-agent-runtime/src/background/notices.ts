@@ -1,6 +1,11 @@
 import type { ExtensionAPI, SessionEntry } from "@earendil-works/pi-coding-agent";
 import { recordDebugEvent } from "@mrclrchtr/supi-core/debug";
-import type { RunBatchHandle, RunBatchOwnerOptions, RunBatchTask } from "./types.ts";
+import type {
+  CompletionNoticeTarget,
+  RunBatchHandle,
+  RunBatchOwnerOptions,
+  RunBatchTask,
+} from "./types.ts";
 
 /** Send one owner-built Completion Notice; a failed send leaves results collectable. */
 export function sendCompletionNotice(
@@ -31,9 +36,7 @@ export function sendCompletionNotice(
 }
 
 /** Read the batch and task IDs of stored notice details; malformed details count as stale. */
-export function readNoticeTarget(
-  details: unknown,
-): { batchId: string; taskIds: readonly string[] } | undefined {
+export function readNoticeTarget(details: unknown): CompletionNoticeTarget | undefined {
   if (!details || typeof details !== "object") return undefined;
   const { batchId, taskIds } = details as { batchId?: unknown; taskIds?: unknown };
   if (typeof batchId !== "string" || !Array.isArray(taskIds)) return undefined;

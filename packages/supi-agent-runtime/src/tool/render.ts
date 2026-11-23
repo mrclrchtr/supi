@@ -6,7 +6,8 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 import { type Component, Text } from "@earendil-works/pi-tui";
 import { renderBatchError } from "./background-render.ts";
-import { currentRunBatches, RUN_BATCH_OWNER_KEY } from "./batches.ts";
+import { currentRunBatches } from "./batches.ts";
+import { RUN_BATCH_OWNER_KEY } from "./result.ts";
 
 /**
  * Render a collection tool result: errors here, everything else through the owner of the

@@ -105,7 +105,7 @@ agent_cancel({ batchId })
 
 - The containing session owns background batches. A completed starting tool does not release them.
 - Normal parent completion does not cancel active background batches.
-- Any parent abort requests cancellation of all active background Delegation Batches owned by `supi-agent` in that session.
+- `@mrclrchtr/supi-agent-runtime` owns the session's Background Run Batches for every owner package, including Delegation Batches. Any parent abort requests cancellation of every owner's active Background Run Batches in that session, not only Delegation Batches.
 - Pi does not identify the abort source. Apply this rule to Escape, RPC abort, and other parent aborts equally.
 - After parent abort, pause automatic completion delivery until a later user-originated prompt. Retain completed and canceled task results and Usage for later collection.
 - Do not restart stopped parent work because a completion races with cancellation.

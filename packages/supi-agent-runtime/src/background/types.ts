@@ -93,6 +93,9 @@ export interface RunBatchCollection<
    * Assemble one collection result after waiting and revalidation, before Usage is reserved. Its
    * `details` must carry `batchId` and `tasks[].taskId` (see `readResultCollection()`). Owner
    * records that Pi must store with the result, such as checkpoints, are prepared here.
+   *
+   * The runtime reserves the result's `usage` and the `details` keys `runBatchOwner` and
+   * `usageReceipt`; it overwrites them after this call.
    */
   collect(
     callId: string,
@@ -101,7 +104,8 @@ export interface RunBatchCollection<
   ): AgentToolResult<Record<string, unknown>>;
   /**
    * Format the result of a cancellation request. `requested` is true when active runs remained;
-   * the runtime requests their stop after this call.
+   * the runtime requests their stop after this call. The runtime reserves the `details` key
+   * `runBatchOwner` and overwrites it after this call.
    */
   cancel(
     batch: RunBatch<THandle, TData>,
@@ -116,12 +120,6 @@ export interface RunBatchCollection<
   renderCancel: RunBatchResultRenderer;
   /** Model-facing errors when the caller cancels a wait or a collection after it. */
   readonly canceledMessages?: { readonly wait?: string; readonly collection?: string };
-  /**
-   * Whether this owner currently needs `agent_result` and `agent_cancel` active; defaults to
-   * true. The tools are deactivated only while no registered owner needs them. Call
-   * {@link RunBatchOwner.syncCollectionTools} when the answer changes.
-   */
-  toolsNeeded?(): boolean;
 }
 
 /** A batch resolved for Result Collection, with the collection of its owner. Runtime-internal. */
@@ -218,6 +216,4 @@ export interface RunBatchOwner<THandle extends RunBatchHandle = RunBatchHandle, 
   usageReported(batch: RunBatch<THandle, TData>, taskId: string): boolean;
   /** Delete an internally generated spill file and its directory when the session closes. */
   retainOutput(path: string | undefined): void;
-  /** Reapply the activation of `agent_result` and `agent_cancel` after `toolsNeeded()` changed. */
-  syncCollectionTools(): void;
 }

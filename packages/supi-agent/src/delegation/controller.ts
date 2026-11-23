@@ -76,9 +76,8 @@ export class DelegationController {
       activeBranch,
       onBranch,
     );
+    // The runtime rejects a background batch whose launch is not on the active branch.
     const launchId = this.batches.findLaunch(callId, ctx);
-    if (mode === "background" && !launchId)
-      throw new Error("The background launch is not on the active branch.");
     const active = this.registry
       .snapshot()
       .runs.filter(
@@ -160,10 +159,5 @@ export class DelegationController {
       ctx.sessionManager.getBranch(),
       (batch) => this.batches.isOnBranch(batch),
     );
-  }
-
-  /** Retain only internally generated spill files until session cleanup. */
-  retainOutput(path: string | undefined): void {
-    this.batches.retainOutput(path);
   }
 }

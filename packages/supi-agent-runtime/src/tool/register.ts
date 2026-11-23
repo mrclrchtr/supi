@@ -26,6 +26,6 @@ export function registerCollectionTools(pi: ExtensionAPI): void {
     description: cancelDescription,
     renderCall: renderCancelCall,
     renderResult: renderOwnedResult(pi, "renderCancel"),
-    execute: makeAgentCancelExecute(pi),
+    execute: makeAgentCancelExecute(pi, agentCancelSpec.parameters),
   });
 }

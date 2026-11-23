@@ -1,8 +1,4 @@
-import type {
-  AgentSessionEvent,
-  ExtensionAPI,
-  ExtensionContext,
-} from "@earendil-works/pi-coding-agent";
+import type { AgentSessionEvent, ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type {
   AgentRunHandle,
   AgentRunMessage,
@@ -11,7 +7,8 @@ import type {
   StartAgentRunOptions,
 } from "@mrclrchtr/supi-agent-runtime/api";
 import { getAgentRunRegistry } from "@mrclrchtr/supi-agent-runtime/api";
-import { createPiMock, getTool, makeCtx, type ToolDef } from "@mrclrchtr/supi-test-utils";
+import { createPiMock, getTool, type ToolDef } from "@mrclrchtr/supi-test-utils";
+import { testModelContext as context } from "@mrclrchtr/supi-test-utils/background";
 import { vi } from "vitest";
 
 export type Renderable = { render: (width: number) => string[] };
@@ -107,31 +104,8 @@ export function runDouble(
   };
 }
 
-export function context(): ExtensionContext {
-  const model = {
-    provider: "test",
-    id: "model",
-    name: "Test",
-    api: "openai-completions",
-    reasoning: false,
-    input: ["text"],
-    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-    contextWindow: 32_000,
-    maxTokens: 4_000,
-  };
-  return makeCtx({
-    cwd: "/repo",
-    model,
-    modelRegistry: {
-      find: () => model,
-      hasConfiguredAuth: () => true,
-    },
-    thinkingLevel: "medium",
-    scopedModels: [],
-    isProjectTrusted: () => false,
-    signal: undefined,
-  }) as unknown as ExtensionContext;
-}
+/** The neutral parent test context, shared with the background harness. */
+export { context };
 
 export async function registerAgentRunToolForTest(
   extension: (pi: ExtensionAPI) => void,

@@ -43,10 +43,6 @@ export interface TestOwnerOptions {
   readonly startTool: string;
   readonly noticeType: string;
   readonly noticeGranularity?: CompletionNoticeGranularity;
-  /** Whether this owner needs the collection tools; omitted means it states no preference. */
-  readonly toolsNeeded?: () => boolean;
-  /** Receives the owner access after each registration. */
-  readonly onOwner?: (owner: RunBatchOwner<TestHandle>) => void;
 }
 
 /**
@@ -103,10 +99,8 @@ export function createTestOwner(
           renderResult: () => new Text(`${label} result`, 0, 0),
           renderCancel: () => new Text(`${label} cancel`, 0, 0),
           canceledMessages: { wait: `${label} wait canceled.` },
-          ...(options.toolsNeeded ? { toolsNeeded: options.toolsNeeded } : {}),
         },
       });
-      options.onOwner?.(owner);
     });
     pi.registerTool({
       name: options.startTool,

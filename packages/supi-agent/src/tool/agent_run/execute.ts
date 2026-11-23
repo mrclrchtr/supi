@@ -56,7 +56,7 @@ export function makeAgentRunExecute(
     });
     if (batch.mode === "background") return buildBackgroundStartResult(batch.handle);
     const result = buildAgentRunResult(await batch.handle.result, toolParams.sharedContext);
-    controller.retainOutput(result.details.fullOutputPath);
+    controller.batches.retainOutput(result.details.fullOutputPath);
     return result;
   };
 }

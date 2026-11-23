@@ -22,6 +22,7 @@ describe("current profile policy for saved conversations", () => {
     const conversationId = await saveA("explore");
     const profileRoot = join(harness.agentDir, "supi", "agents");
     await writeProfile(profileRoot, "explore", { tools: ["read"] });
+    await harness.pi.emit("session_shutdown", { type: "session_shutdown" }, harness.ctx);
     await harness.pi.emit(
       "session_start",
       { type: "session_start", reason: "reload" },
@@ -39,6 +40,7 @@ describe("current profile policy for saved conversations", () => {
     await followUp;
 
     await writeProfile(profileRoot, "explore", { enabled: false, tools: ["read"] });
+    await harness.pi.emit("session_shutdown", { type: "session_shutdown" }, harness.ctx);
     await harness.pi.emit(
       "session_start",
       { type: "session_start", reason: "reload" },

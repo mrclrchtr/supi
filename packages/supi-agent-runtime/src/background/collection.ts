@@ -1,4 +1,5 @@
 import type { SessionEntry } from "@earendil-works/pi-coding-agent";
+import type { CompletionNoticeTarget } from "./types.ts";
 import { RESULT_COLLECTION_TOOL_NAME } from "./usage-receipts.ts";
 
 /**
@@ -6,9 +7,7 @@ import { RESULT_COLLECTION_TOOL_NAME } from "./usage-receipts.ts";
  * whether its Usage was reported. The collection result's `details` must carry `batchId` and
  * `tasks[].taskId`.
  */
-export function readResultCollection(
-  entry: SessionEntry,
-): { batchId: string; taskIds: string[] } | undefined {
+export function readResultCollection(entry: SessionEntry): CompletionNoticeTarget | undefined {
   if (
     entry.type !== "message" ||
     entry.message.role !== "toolResult" ||

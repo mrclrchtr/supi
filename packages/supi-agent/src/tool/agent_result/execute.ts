@@ -27,6 +27,6 @@ export function collectDelegationBatch(
     controller.isCollected(batch, ctx),
   );
   if (typeof result.details.fullOutputPath === "string")
-    controller.retainOutput(result.details.fullOutputPath);
+    controller.batches.retainOutput(result.details.fullOutputPath);
   return result;
 }

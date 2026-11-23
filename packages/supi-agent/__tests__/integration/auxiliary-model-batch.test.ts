@@ -42,6 +42,7 @@ describe("Agent Run auxiliary-model batch policy", () => {
     harness = await backgroundHarness(sdk);
     const profiles = join(harness.agentDir, "supi", "agents");
     await writeProfile(profiles, "explore", { tools: ["read", "codemode"] });
+    await harness.pi.emit("session_shutdown", { type: "session_shutdown" }, harness.ctx);
     await harness.pi.emit(
       "session_start",
       { type: "session_start", reason: "reload" },
@@ -96,6 +97,7 @@ describe("Agent Run auxiliary-model batch policy", () => {
     const profiles = join(harness.agentDir, "supi", "agents");
     await writeProfile(profiles, "explore", { tools: ["read", "codemode"] });
     await writeProfile(profiles, "general", { tools: ["read"] });
+    await harness.pi.emit("session_shutdown", { type: "session_shutdown" }, harness.ctx);
     await harness.pi.emit(
       "session_start",
       { type: "session_start", reason: "reload" },
@@ -151,6 +153,7 @@ describe("Agent Run auxiliary-model batch policy", () => {
       systemPrompt: "native",
       instructionScopes: [],
     });
+    await harness.pi.emit("session_shutdown", { type: "session_shutdown" }, harness.ctx);
     await harness.pi.emit(
       "session_start",
       { type: "session_start", reason: "reload" },

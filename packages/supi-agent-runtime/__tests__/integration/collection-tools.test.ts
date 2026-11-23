@@ -11,6 +11,7 @@ vi.mock("@earendil-works/pi-coding-agent", async (importOriginal) => ({
 }));
 let harness: Awaited<ReturnType<typeof ownerHarness>> | undefined;
 afterEach(async () => {
+  vi.useRealTimers();
   await harness?.close();
   harness = undefined;
   vi.unstubAllEnvs();
@@ -23,12 +24,16 @@ type RenderingTool = {
 };
 const theme = { fg: (_color: string, text: string) => text, bold: (text: string) => text };
 
+type LoadOrder = "alpha first" | "beta first";
+const loadOrders: LoadOrder[] = ["alpha first", "beta first"];
+
 /**
  * Two owner packages on one extension event bus: Alpha sends per-task notices through the
  * runtime under test, Beta sends one notice per batch through a separately loaded runtime copy
- * and a distinct extension API, as a second bundled installation would.
+ * and a distinct extension API, as a second bundled installation would. Either owner can load
+ * first, so either runtime copy can create the shared batches and register the tools.
  */
-async function twoOwners() {
+async function twoOwners(order: LoadOrder) {
   vi.resetModules();
   const bundledCopy = (await import("../../src/api.ts")) as RuntimeApi;
   const alpha = createTestOwner(runtimeApi, {
@@ -42,18 +47,32 @@ async function twoOwners() {
     noticeType: "beta-notice",
     noticeGranularity: "batch",
   });
-  const betaRegistrations: string[] = [];
-  harness = await ownerHarness(sdk, (pi) => {
-    alpha(pi);
-    beta({
+  const registrations = { alpha: [] as string[], beta: [] as string[] };
+  const recording = (pi: ExtensionAPI, names: string[]) =>
+    ({
       ...pi,
       registerTool: (tool: { name: string }) => {
-        betaRegistrations.push(tool.name);
+        names.push(tool.name);
         pi.registerTool(tool as never);
       },
-    } as ExtensionAPI);
+    }) as ExtensionAPI;
+  harness = await ownerHarness(sdk, (pi) => {
+    const loadAlpha = () => alpha(recording(pi, registrations.alpha));
+    const loadBeta = () => beta(recording(pi, registrations.beta));
+    if (order === "alpha first") {
+      loadAlpha();
+      loadBeta();
+    } else {
+      loadBeta();
+      loadAlpha();
+    }
   });
-  return { harness, betaRegistrations };
+  return { harness, registrations };
+}
+
+/** Run every pending timer, including a delayed notice, and the microtasks they queue. */
+async function flushNotices() {
+  await vi.runAllTimersAsync();
 }
 
 async function start(tool: string, taskIds: string[]) {
@@ -70,17 +89,21 @@ async function start(tool: string, taskIds: string[]) {
 
 const text = (result: { content: unknown }) => JSON.stringify(result.content);
 
-describe("runtime-owned collection tools", () => {
+describe.each(loadOrders)("runtime-owned collection tools (%s)", (order) => {
   it("registers agent_result and agent_cancel once for two owners on one event bus", async () => {
-    const { harness, betaRegistrations } = await twoOwners();
+    const { harness, registrations } = await twoOwners(order);
     const names = getTools(harness.pi).map((tool) => tool.name);
     expect(names.filter((name) => name === "agent_result")).toHaveLength(1);
     expect(names.filter((name) => name === "agent_cancel")).toHaveLength(1);
-    expect(betaRegistrations).toEqual(["beta_run"]);
+    const first = order === "alpha first" ? registrations.alpha : registrations.beta;
+    const second = order === "alpha first" ? registrations.beta : registrations.alpha;
+    expect(first).toEqual(expect.arrayContaining(["agent_result", "agent_cancel"]));
+    expect(second).not.toContain("agent_result");
+    expect(second).not.toContain("agent_cancel");
   });
 
   it("collects and cancels each owner's batch in that owner's format", async () => {
-    const { harness } = await twoOwners();
+    const { harness } = await twoOwners(order);
     const alphaBatch = await start("alpha_run", ["a1"]);
     const betaBatch = await start("beta_run", ["b1"]);
     harness.child("a1").finish("Alpha output");
@@ -115,7 +138,7 @@ describe("runtime-owned collection tools", () => {
   });
 
   it("rejects unknown, off-branch, and other-session handles for every owner", async () => {
-    const { harness } = await twoOwners();
+    const { harness } = await twoOwners(order);
     await expect(harness.invoke("agent_result", { batchId: "missing" })).rejects.toThrow(
       /Unknown or expired/,
     );
@@ -138,21 +161,26 @@ describe("runtime-owned collection tools", () => {
   });
 });
 
-describe("Completion Notice granularity", () => {
+describe.each(loadOrders)("Completion Notice granularity (%s)", (order) => {
   it("sends one notice for a once-per-batch owner only after its last task is terminal", async () => {
-    const { harness } = await twoOwners();
+    const { harness } = await twoOwners(order);
     await start("beta_run", ["b1", "b2"]);
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     harness.child("b1").finish("First");
     await vi.waitFor(() =>
       expect(harness.registry.snapshot().runs.find((run) => run.taskId === "b1")?.status).toBe(
         "completed",
       ),
     );
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await flushNotices();
     expect(harness.pi.messages).toHaveLength(0);
     harness.child("b2").finish("Second");
-    await vi.waitFor(() => expect(harness.pi.messages).toHaveLength(1));
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await vi.waitFor(() =>
+      expect(harness.registry.snapshot().runs.find((run) => run.taskId === "b2")?.status).toBe(
+        "completed",
+      ),
+    );
+    await flushNotices();
     expect(harness.pi.messages).toEqual([
       expect.objectContaining({
         customType: "beta-notice",
@@ -162,7 +190,7 @@ describe("Completion Notice granularity", () => {
   });
 
   it("keeps per-task notices for a per-task owner", async () => {
-    const { harness } = await twoOwners();
+    const { harness } = await twoOwners(order);
     await start("alpha_run", ["a1", "a2"]);
     harness.child("a1").finish("First");
     await vi.waitFor(() => expect(harness.pi.messages).toHaveLength(1));
@@ -170,48 +198,5 @@ describe("Completion Notice granularity", () => {
       customType: "alpha-notice",
       details: { taskIds: ["a1"] },
     });
-  });
-});
-
-describe("collection tool activation", () => {
-  it("follows owners that state whether they need the tools and keeps other active tools", async () => {
-    let needed = false;
-    let owner: { syncCollectionTools(): void } | undefined;
-    harness = await ownerHarness(sdk, (pi) => {
-      pi.setActiveTools(["read"]);
-      createTestOwner(runtimeApi, {
-        label: "gated",
-        startTool: "gated_run",
-        noticeType: "gated-notice",
-        toolsNeeded: () => needed,
-        onOwner: (access) => {
-          owner = access;
-        },
-      })(pi);
-    });
-    expect(harness.pi.getActiveTools()).toEqual(["read"]);
-    needed = true;
-    owner?.syncCollectionTools();
-    expect(harness.pi.getActiveTools()).toEqual(["read", "agent_result", "agent_cancel"]);
-    needed = false;
-    owner?.syncCollectionTools();
-    expect(harness.pi.getActiveTools()).toEqual(["read"]);
-  });
-
-  it("keeps the tools active while another owner needs them", async () => {
-    harness = await ownerHarness(sdk, (pi) => {
-      createTestOwner(runtimeApi, {
-        label: "gated",
-        startTool: "gated_run",
-        noticeType: "gated-notice",
-        toolsNeeded: () => false,
-      })(pi);
-      createTestOwner(runtimeApi, {
-        label: "always",
-        startTool: "always_run",
-        noticeType: "always-notice",
-      })(pi);
-    });
-    expect(harness.pi.getActiveTools()).toEqual(["agent_result", "agent_cancel"]);
   });
 });

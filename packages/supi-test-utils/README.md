@@ -129,7 +129,8 @@ await harness.close();
 - `beginParent()` / `endParent(aborted?)` / `deliverQueued()` model a running parent turn, its settlement, and delivery of queued custom messages through the extension's `context` handler.
 - `replaceSession()`, `reopenParent()`, and `openParent(manager)` shut down and restart the parent session.
 - `children` and `child(key)` expose controlled sessions; `finish()`, `fail()`, `failProvider()`, and `holdDisposal()` drive a child. `holdNextStartup()` pauses the next child creation.
-- Options: `childPrompt` maps a `child(key)` lookup to prompt text, `prepare` writes files into the temporary agent directory before the extension loads, `baseContext` replaces the default test model context, `childUsage` replaces `controlledUsage`, and `persistentParent` stores the parent session on disk.
+- Options: `childPrompt` maps a `child(key)` lookup to prompt text, `prepare` writes files into the temporary agent directory before the extension loads, and `persistentParent` stores the parent session on disk.
+- Every controlled child bills `controlledUsage`. `testModelContext()` returns the neutral parent context with one authenticated test model; tests that call tools without the harness can use it too.
 
 The harness does not depend on any SuPi package. Read shared state such as the Agent Run Registry in the owner's test helper from `harness.pi`.
 

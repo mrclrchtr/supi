@@ -6,15 +6,16 @@ import type { RunBatchHandle, RunBatchOwner, RunBatchOwnerOptions } from "./type
 
 /**
  * Register an owner package for the Background Run Batches of the containing session and return
- * its access. Call it on every `session_start`: the batches belong to one session and close on
- * `session_shutdown`. All bundled runtime copies in a Pi runtime share one set of batches.
- * Registering again with the same `noticeType` replaces the owner's options.
+ * its access. Call it on every `session_start`: the batches belong to one session. All bundled
+ * runtime copies in a Pi runtime share one set of batches. Registering again with the same
+ * `noticeType` replaces the owner's options and keeps its batches.
+ *
+ * `session_shutdown` is the only stop boundary: it stops every owner's batches and expires their
+ * handles. A `session_start` without a preceding shutdown stops nothing.
  *
  * An owner that supplies `collection` asks for the runtime-owned `agent_result` and
  * `agent_cancel`. The first such owner registers both tools once for the Pi runtime, like
- * `/agents`; they then dispatch each call to the owner of the addressed batch. Pi activates them on
- * registration; an owner that supplies `collection.toolsNeeded` has them deactivated while no
- * registered owner needs them.
+ * `/agents`; they then dispatch each call to the owner of the addressed batch.
  */
 export function registerRunBatchOwner<THandle extends RunBatchHandle, TData = undefined>(
   pi: ExtensionAPI,
@@ -30,7 +31,6 @@ export function registerRunBatchOwner<THandle extends RunBatchHandle, TData = un
     registerCollectionTools(pi);
     state.collectionToolsRegistered = true;
   }
-  if (options.collection) owner.syncCollectionTools();
   return owner;
 }
 

@@ -100,7 +100,7 @@ describe("background parent lifecycle", () => {
     expect(collected.usage?.totalTokens).toBe(15);
   });
 
-  it("reports a parent-aborted result wait with the delegation wording", async () => {
+  it("reports a parent-aborted result wait with the delegation wording and a complete collection", async () => {
     harness = await backgroundHarness(sdk);
     const parent = await harness.beginParent();
     const start = await harness.invoke("agent_run", { tasks: [task()] });
@@ -109,5 +109,14 @@ describe("background parent lifecycle", () => {
     const assertion = expect(waiting).rejects.toThrow("Delegation wait canceled.");
     parent.abort();
     await assertion;
+    await harness.endParent(true);
+    const canceled = await harness.invoke("agent_result", {
+      batchId: start.details.batchId,
+      wait: true,
+    });
+    expect(canceled.details).toMatchObject({
+      complete: true,
+      tasks: [expect.objectContaining({ status: "canceled" })],
+    });
   });
 });
