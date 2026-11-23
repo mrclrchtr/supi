@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Pi loads SuPi TypeScript extensions from this session's working tree; no build step. After edits, `/reload` or restart Pi. Before a live probe, check out the commit under test in this worktree, then `/reload`.
+Pi loads SuPi TypeScript extensions from this session's working tree; no build step. After edits, `/reload` or restart Pi. Before a live probe, check out the commit under test in this worktree, then `/reload`. For RPC-level probes (background turns, notices, status records), use `scripts/pi-rpc-probe.mjs`.
 
 ## Development status
 
