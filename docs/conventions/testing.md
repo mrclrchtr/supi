@@ -24,6 +24,12 @@ When adding, changing, or reviewing tests, check:
 
 Use judgment rather than blanket bans on mocks, literals, static checks, or unit tests. Demonstrating a test failing for the target fault can resolve uncertainty; new mutation-testing infrastructure is not required.
 
+## Process-spawning tests
+
+- Test pure validation and parsing tables of a script CLI through the exported function. Keep one spawned-CLI case per failure route to cover the wiring.
+- Build expensive fixtures (Git checkouts, packed tarballs) at most once per test file and treat them as read-only; give each test its own copy or scratch directory. Examples: the templates in `scripts/__tests__/helpers/release-fixture.mjs` and `packWorkspacePackage` in `scripts/__tests__/pack-staged.test.mjs`.
+- CI uploads per-file and per-test durations of the `tests` job as the `vitest-results` artifact (`gh run download <run-id> -n vitest-results`). Compare it before and after runtime changes.
+
 ## Cleanup
 
 - Delete tests with no distinct protection; deletion does not automatically require a replacement test.
