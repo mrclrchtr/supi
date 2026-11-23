@@ -316,6 +316,9 @@ jobs:
           client-id: ${{ vars.MRCLRCHTR_BOT_CLIENT_ID }}
           private-key: ${{ secrets.MRCLRCHTR_BOT_PRIVATE_KEY }}
           permission-contents: write
+          # Re-runs can tag a release commit whose workflow files differ from main;
+          # GitHub then requires the workflows permission to create the tag ref.
+          permission-workflows: write
       - name: Checkout release tooling from the workflow commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
