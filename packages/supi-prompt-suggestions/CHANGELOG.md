@@ -1,5 +1,9 @@
 # Changelog
 
+## [15.0.0]
+
+- When suggestion generation ends, its status entry is removed instead of being set to empty text, so no blank status line remains in the footer ([#663](https://github.com/mrclrchtr/supi/issues/663)).
+
 ## [14.1.0]
 
 - Suggestions are shorter and read like a message you would type: no lead-ins such as "I'd say:", no copied long commands, and no steps the assistant did not mention. They follow the language of the assistant's message. Suggestions no longer announce what you are about to do, such as "I'll check…", and appear more often instead of being dropped.

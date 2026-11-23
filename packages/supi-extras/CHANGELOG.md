@@ -1,5 +1,9 @@
 # Changelog
 
+## [15.0.0]
+
+- In RPC, the tab title spinner no longer sends a `setTitle` record about every 80 ms. While the agent works, the title shows a static `⠋` and is sent again only when its text changes, for example after `/name`. The TUI animation is unchanged ([#663](https://github.com/mrclrchtr/supi/issues/663)).
+
 ## [14.3.0]
 
 - The footer path line shows the GitHub issues and pull requests named in the first user message after the session name, for example `• #12 acme/app#5`, linked to GitHub in terminals that support hyperlinks. A bare `#12` resolves against a GitHub `origin` remote. Turn it off under `/supi-settings` → **Footer** → **Issue link**.

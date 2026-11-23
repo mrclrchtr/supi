@@ -168,7 +168,7 @@ describe("SessionLifecycle suggestion notifications", () => {
       "Prompt suggestion unavailable for provider/model: authentication failed",
       "warning",
     );
-    expect(ctx.ui.setStatus).toHaveBeenLastCalledWith("supi-prompt-suggestions", "");
+    expect(ctx.ui.setStatus).toHaveBeenLastCalledWith("supi-prompt-suggestions", undefined);
   });
 
   it("formats a safe HTTP status in a warning", () => {

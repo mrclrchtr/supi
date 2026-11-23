@@ -13,34 +13,6 @@ export interface BackgroundReviewStatus {
   refresh(): void;
 }
 
-/** A status line that is either animated (TUI) or set once per label change (other modes). */
-interface StatusLine {
-  update(label: string): void;
-  stop(): void;
-}
-
-/**
- * Animate only in the TUI. A Background Review runs while the session is idle, so in RPC an
- * animated spinner would stream about twelve `setStatus` records per second to the client.
- */
-function createStatusLine(ctx: ExtensionContext, label: string): StatusLine {
-  if (ctx.mode === "tui") {
-    const spinner = new StatusSpinner(ctx, BACKGROUND_REVIEW_STATUS_KEY);
-    spinner.start(label);
-    return { update: (next) => spinner.update(next), stop: () => spinner.stop() };
-  }
-  let current = label;
-  ctx.ui.setStatus(BACKGROUND_REVIEW_STATUS_KEY, current);
-  return {
-    update(next) {
-      if (next === current) return;
-      current = next;
-      ctx.ui.setStatus(BACKGROUND_REVIEW_STATUS_KEY, current);
-    },
-    stop: () => ctx.ui.setStatus(BACKGROUND_REVIEW_STATUS_KEY, ""),
-  };
-}
-
 /**
  * Keep one status line visible while any Background Review of the session is active. It counts
  * finished tasks across every active Review and clears when the last one settles or the session
@@ -48,7 +20,7 @@ function createStatusLine(ctx: ExtensionContext, label: string): StatusLine {
  */
 export function registerBackgroundReviewStatus(pi: ExtensionAPI): BackgroundReviewStatus {
   const active = new Set<ReviewBatchHandle>();
-  let spinner: StatusLine | undefined;
+  let spinner: StatusSpinner | undefined;
 
   const label = () => {
     const handles = [...active];
@@ -78,7 +50,8 @@ export function registerBackgroundReviewStatus(pi: ExtensionAPI): BackgroundRevi
     track(handle, ctx) {
       active.add(handle);
       if (!spinner) {
-        spinner = createStatusLine(ctx, label());
+        spinner = new StatusSpinner(ctx, BACKGROUND_REVIEW_STATUS_KEY);
+        spinner.start(label());
       } else render();
       const settle = () => {
         // A Review of an ended session no longer owns the status line.

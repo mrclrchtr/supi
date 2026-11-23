@@ -8,6 +8,10 @@
  * Also activates during long-running extension tasks such as `supi-review`.
  * When the agent turn ends, a ✓ symbol is shown persistently until the next
  * agent starts or the session shuts down.
+ *
+ * The spinner animates only in the TUI. In other modes every `setTitle` call is a
+ * record sent to the client, so the title shows the first spinner frame statically
+ * and is sent only when its text changes.
  */
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { createSessionNameTracker } from "@mrclrchtr/supi-core/session";
@@ -33,6 +37,10 @@ export default function tabSpinner(pi: ExtensionAPI) {
   const getSessionName = createSessionNameTracker(pi);
 
   let timer: ReturnType<typeof setInterval> | null = null;
+  /** Whether the working title is shown: animated by `timer` in the TUI, static elsewhere. */
+  let spinning = false;
+  /** Last title sent outside the TUI, to send only changed titles. */
+  let lastStaticTitle: string | undefined;
   let pendingAgentEndTimer: ReturnType<typeof setTimeout> | null = null;
   let frame = 0;
   let activeCount = 0;
@@ -51,7 +59,7 @@ export default function tabSpinner(pi: ExtensionAPI) {
 
   /** Set the terminal title to the review-phase icon if one is active. */
   function applyReviewTitle(): boolean {
-    if (timer) return false; // spinner is active, don't override
+    if (spinning) return false; // spinner is active, don't override
 
     const baseTitle = title();
     const icon = reviewTitleIcon();
@@ -91,10 +99,20 @@ export default function tabSpinner(pi: ExtensionAPI) {
   }
 
   function clearSpinnerTimer() {
+    spinning = false;
     if (timer) {
       clearInterval(timer);
       timer = null;
     }
+  }
+
+  function animates(): boolean {
+    return currentCtx?.mode === "tui";
+  }
+
+  /** The working title outside the TUI: the first spinner frame, never animated. */
+  function showStaticSpinner() {
+    safelySetTitle(`${BRAILLE_SPINNER_FRAMES[0]} ${title()}`);
   }
 
   function handleStaleContext() {
@@ -124,6 +142,12 @@ export default function tabSpinner(pi: ExtensionAPI) {
 
   function safelySetTitle(nextTitle: string) {
     if (!currentCtx) return;
+    // In the TUI Pi also writes the terminal title directly (e.g. on `/name`), so a
+    // repeated title is not redundant there.
+    if (!animates()) {
+      if (nextTitle === lastStaticTitle) return;
+      lastStaticTitle = nextTitle;
+    }
     try {
       currentCtx.ui.setTitle(nextTitle);
     } catch {
@@ -147,16 +171,17 @@ export default function tabSpinner(pi: ExtensionAPI) {
     frame = 0;
     if (!currentCtx) return;
     if (applyReviewTitle()) return;
-    try {
-      signalDone(currentCtx, title());
-    } catch {
-      handleStaleContext();
-    }
+    signalDone({ ui: { setTitle: safelySetTitle } }, title());
   }
 
-  /** Start the spinner interval. Overwrites any ✓ shown. */
+  /** Start the spinner. Overwrites any ✓ shown. */
   function start() {
-    if (timer || !currentCtx) return;
+    if (spinning || !currentCtx) return;
+    spinning = true;
+    if (!animates()) {
+      showStaticSpinner();
+      return;
+    }
     timer = setInterval(() => {
       const icon = BRAILLE_SPINNER_FRAMES[frame % BRAILLE_SPINNER_FRAMES.length];
       const baseTitle = title();
@@ -214,7 +239,13 @@ export default function tabSpinner(pi: ExtensionAPI) {
   }
 
   pi.on("session_start", async (_event, ctx) => {
+    lastStaticTitle = undefined;
     rememberContext(ctx);
+  });
+
+  // The TUI animation picks up a renamed session on its next tick; a static title must be re-sent.
+  pi.on("session_info_changed", async () => {
+    if (spinning && !timer) showStaticSpinner();
   });
 
   pi.on("agent_start", async (_event, ctx) => {

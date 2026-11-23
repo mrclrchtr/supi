@@ -393,4 +393,39 @@ describe("tabSpinner extension", () => {
     vi.advanceTimersByTime(80);
     expect(titles[0]).toMatch(/^[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏] π - after - tmp$/);
   });
+
+  it("sends a static working title outside the TUI only when the title text changes", async () => {
+    const pi = createPiMock({ sessionName: "before" });
+    tabSpinner(pi as unknown as Parameters<typeof tabSpinner>[0]);
+
+    const titles: string[] = [];
+    const ctx = makeCtx({
+      cwd: "/tmp",
+      mode: "rpc",
+      ui: { setTitle: (t: string) => titles.push(t) },
+    });
+    const fire = async (event: string, payload: unknown = {}) => {
+      for (const h of pi.getHandlers(event))
+        await (h as (...args: unknown[]) => unknown)(payload, ctx);
+    };
+
+    await fire("session_start");
+    await fire("agent_start");
+    expect(titles).toEqual(["⠋ π - before - tmp"]);
+
+    // Spinner frames pass, and nested work starts and ends: the title text stays the same.
+    vi.advanceTimersByTime(800);
+    pi.events.emit("supi:working:start", { source: "supi-test" });
+    pi.events.emit("supi:working:end", { source: "supi-test" });
+    expect(titles).toEqual(["⠋ π - before - tmp"]);
+
+    // A rename changes the text, so the title is re-sent once.
+    await fire("session_info_changed", { name: "after" });
+    vi.advanceTimersByTime(800);
+    expect(titles).toEqual(["⠋ π - before - tmp", "⠋ π - after - tmp"]);
+
+    await fire("agent_settled");
+    vi.advanceTimersByTime(200);
+    expect(titles).toEqual(["⠋ π - before - tmp", "⠋ π - after - tmp", "✓ π - after - tmp"]);
+  });
 });

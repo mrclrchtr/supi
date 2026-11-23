@@ -263,7 +263,7 @@ describe("SuggestionGenerator warning policy", () => {
     lifecycle.onAgentSettled(ctx);
     await vi.waitFor(() => expect(complete).toHaveBeenCalledTimes(2));
     await vi.waitFor(() =>
-      expect(ctx.ui.setStatus).toHaveBeenLastCalledWith("supi-prompt-suggestions", ""),
+      expect(ctx.ui.setStatus).toHaveBeenLastCalledWith("supi-prompt-suggestions", undefined),
     );
     expect(ctx.ui.notify).toHaveBeenCalledOnce();
 

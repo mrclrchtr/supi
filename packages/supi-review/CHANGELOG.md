@@ -4,6 +4,7 @@
 
 - **Breaking:** in TUI and RPC, `review_run` now starts a Background Review by default. The call returns once the Review Target is frozen and any Dependency Bootstrap has finished, with a `batchId`, the task ids, and the Workspace Receipt instead of the report, so the Agent and the user can continue. One Completion Notice arrives when every Review Task is finished; the report, its Post-Review Policy, and the Reviewer Usage come from `agent_result`. `agent_cancel` stops a running Review, and the status line shows active Background Reviews. Print and JSON modes still wait for the report and reject `mode: "background"`. `/supi-review` is unchanged. Migration: pass `mode: "foreground"` to `review_run` to keep waiting for the report in the call ([#636](https://github.com/mrclrchtr/supi/issues/636)).
 - The **Agent tools** setting also turns `agent_result` and `agent_cancel` off, unless the Agent extension still needs them.
+- In RPC, the Foreground Review status line is sent once per progress change instead of about twelve times per second; the TUI animation is unchanged. A finished Review now removes its status entry instead of leaving an empty one ([#663](https://github.com/mrclrchtr/supi/issues/663)).
 
 ## [14.3.0]
 
