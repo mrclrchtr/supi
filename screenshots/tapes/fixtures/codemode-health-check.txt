@@ -1,0 +1,10 @@
+// Health check for supi-extras: diagnostics, file outlines, focused tests
+const health = await tools.code_health({ scope: "packages/supi-extras" });
+const files = ["codemode-compact", "codemode-call-detail", "supi-footer", "prompt-stash", "tab-spinner"];
+const outlines = [];
+for (const name of files) {
+  const result = await tools.code_resolve({ target: { file: `packages/supi-extras/src/${name}.ts` } });
+  outlines.push(`${name}: ${result.targets.length}`);
+}
+const tests = await tools.bash({ command: 'pnpm vitest run packages/supi-extras/__tests__/unit/codemode-compact.test.ts 2>&1 | grep -E "Tests "' });
+return `diagnostics: ${health.diagnostics?.length ?? 0} files | declarations — ${outlines.join(", ")} | ${tests.output.trim()}`;

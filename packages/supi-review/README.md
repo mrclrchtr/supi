@@ -18,6 +18,8 @@ pi install npm:@mrclrchtr/supi-review
 
 This package is beta software. Its interfaces can change.
 
+![/supi-review picking a commit, drafting tasks with the Planner, and showing verdicts](https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-review.gif)
+
 ## Surfaces
 
 - `/supi-review` — interactive review with optional Planner Draft help

@@ -8,8 +8,10 @@
 # Requires: vhs, ImageMagick (magick), Google Chrome (insights report only),
 # FiraCode Nerd Font Mono, and a Pi login for the model below.
 #
-# The script temporarily sets `quietStartup` in .pi/settings.json and replaces
-# ~/.pi/agent/supi/prompt-stash.json with demo entries; both are restored on exit.
+# The script temporarily sets `quietStartup` in .pi/settings.json, routes child
+# sessions to the screenshot model in .pi/supi/config.json and .pi/supi/agents/,
+# and replaces ~/.pi/agent/supi/prompt-stash.json with demo entries. Everything
+# is restored on exit.
 # Screenshots show real local data (paths, session statistics). Review every
 # image for sensitive content before committing.
 set -euo pipefail
@@ -28,8 +30,15 @@ export SCREENSHOT_THEME="${SCREENSHOT_THEME:-catppuccin-latte/catppuccin-macchia
 cd "$ROOT"
 mkdir -p "$TMP"
 
+if [[ -e .pi/supi/agents ]]; then
+  echo ".pi/supi/agents already exists; refusing to overwrite it" >&2
+  exit 1
+fi
+
 settings_backup="$TMP/settings.json"
+config_backup="$TMP/supi-config.json"
 cp .pi/settings.json "$settings_backup"
+cp .pi/supi/config.json "$config_backup"
 restore_stash() {
   if [[ -f "$TMP/stash-backup.json" ]]; then
     cp "$TMP/stash-backup.json" "$STASH_FILE"
@@ -40,10 +49,32 @@ restore_stash() {
 }
 restore() {
   cp "$settings_backup" .pi/settings.json
+  cp "$config_backup" .pi/supi/config.json
+  rm -rf .pi/supi/agents
   restore_stash
 }
 trap restore EXIT
 jq '. + {quietStartup: true}' "$settings_backup" > .pi/settings.json
+
+# Route every child session (reviewers, planner, agent runs, suggestions,
+# improver) to the screenshot model so recordings stay cheap and repeatable.
+CHILD_MODEL="${SCREENSHOT_MODEL%%:*}"
+# Prompt suggestions stay off except in their own tape, so other recordings
+# do not show unrelated ghost text.
+write_config() {
+  local suggestion_model=$1
+  jq --arg m "$CHILD_MODEL" --arg s "$suggestion_model" '
+    .review += {agentModel: $m, plannerModel: $m, reviewerThinkingLevel: "off",
+                plannerThinkingLevel: "off", recoveryModel: "disabled",
+                postReviewPolicy: "report", auditEnabled: false}
+    | .promptSuggestions = {model: $s}
+    | .promptImprover = {model: $m}
+  ' "$config_backup" > .pi/supi/config.json
+}
+for profile in explore general; do
+  mkdir -p ".pi/supi/agents/$profile"
+  printf '{ "model": "%s", "thinking": "off" }\n' "$CHILD_MODEL" > ".pi/supi/agents/$profile/profile.json"
+done
 
 seed_stash() {
   mkdir -p "$(dirname "$STASH_FILE")"
@@ -101,15 +132,30 @@ run_tape() {
   local name=$1
   echo "==> $name"
   [[ $name == supi-extras-stash ]] && seed_stash
+  if [[ $name == supi-prompt-suggestions ]]; then write_config "$CHILD_MODEL"; else write_config disabled; fi
   touch "$TMP/marker"
   vhs "$TAPES/$name.tape" > "$TMP/$name.log" 2>&1 || { tail -5 "$TMP/$name.log"; return 1; }
   case $name in
     supi-extras-stash) restore_stash ;;
     supi-context)
       # Keep the report header: summary, usage by category, system prompt composition.
-      magick "$TMP/supi-context-full.png" -crop 1400x460+0+130 +repage \
+      # The report heading starts with an accent-colored diamond at x=30; find
+      # its first row and crop from just above it.
+      local y top=""
+      for ((y = 20; y < 1200; y += 2)); do
+        if [[ $(magick "$TMP/supi-context-full.png" -format "%[pixel:p{30,$y}]" info:) == "srgb(136,173,246)" ]]; then
+          top=$y
+          break
+        fi
+      done
+      [[ -n $top ]] || { echo "supi-context: report heading not found" >&2; return 1; }
+      magick "$TMP/supi-context-full.png" -crop "1400x460+0+$((top - 10))" +repage \
         -bordercolor '#24273a' -border 0x20 "$SHOTS/supi-context.png" ;;
     supi-insights) render_insights ;;
+    supi-extras-codemode)
+      # Keep only the codemode row and the reply below it.
+      magick "$TMP/supi-extras-codemode-full.png" -crop 1400x310+0+100 +repage \
+        -bordercolor '#24273a' -border 0x10 "$SHOTS/supi-extras-codemode.png" ;;
   esac
   # Palette-reduce new images; the pre-commit hook rejects files over 500 KB.
   # (BSD find ends -exec at an argument after {} that starts with "+", so loop.)
@@ -117,6 +163,15 @@ run_tape() {
   for img in "$SHOTS"/*.png; do
     if [[ $img -nt "$TMP/marker" ]]; then
       magick "$img" +dither -colors 256 -define png:compression-level=9 "PNG8:$img"
+    fi
+  done
+  # GIFs: 6 fps, 75% scale, 32-color palette, only changed rectangles per frame.
+  for img in "$SHOTS"/*.gif; do
+    if [[ $img -nt "$TMP/marker" ]]; then
+      ffmpeg -loglevel error -y -i "$img" -vf \
+        "fps=6,scale=iw*3/4:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=32:stats_mode=diff[p];[b][p]paletteuse=dither=none:diff_mode=rectangle" \
+        "$TMP/optimized.gif"
+      mv "$TMP/optimized.gif" "$img"
     fi
   done
 }

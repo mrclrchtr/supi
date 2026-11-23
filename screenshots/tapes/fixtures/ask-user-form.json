@@ -1,0 +1,68 @@
+{
+  "title": "Project scaffolding",
+  "intro": "I am about to scaffold a new TypeScript project. I need your preferences before I create the config files.",
+  "questions": [
+    {
+      "type": "choice",
+      "id": "pm",
+      "header": "Package manager",
+      "prompt": "Which package manager should I use?",
+      "options": [
+        {
+          "value": "pnpm",
+          "label": "pnpm",
+          "description": "Fast, disk-efficient, strict monorepo support",
+          "details": "pnpm uses content-addressable storage and never downloads the same package twice. Best for monorepos with workspace protocol support."
+        },
+        {
+          "value": "yarn",
+          "label": "Yarn",
+          "description": "Mature, Plug and Play, Berry features",
+          "details": "Yarn Berry adds Plug and Play and zero-installs."
+        },
+        {
+          "value": "npm",
+          "label": "npm",
+          "description": "Default, pre-installed with Node.js",
+          "details": "npm ships with Node.js and needs no extra install."
+        }
+      ],
+      "recommendation": "pnpm"
+    },
+    {
+      "type": "choice",
+      "id": "features",
+      "header": "Features",
+      "prompt": "Which tools should I scaffold?",
+      "multi": true,
+      "options": [
+        {
+          "value": "biome",
+          "label": "Biome",
+          "description": "Lint and format in one tool",
+          "details": "One fast binary replaces ESLint and Prettier."
+        },
+        {
+          "value": "vitest",
+          "label": "Vitest",
+          "description": "Vite-native test runner",
+          "details": "Jest-compatible API with native ESM and TypeScript."
+        },
+        {
+          "value": "husky",
+          "label": "Husky",
+          "description": "Git hooks",
+          "details": "Runs checks before commits."
+        }
+      ],
+      "recommendation": ["biome", "vitest"]
+    },
+    {
+      "type": "text",
+      "id": "config",
+      "header": "Custom config",
+      "prompt": "Any compiler settings I should use?",
+      "recommendation": "target ES2024, strict mode"
+    }
+  ]
+}

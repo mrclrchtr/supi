@@ -43,6 +43,8 @@ Completed forms have the `decision` label in Pi's session tree. The result remai
 
 ## See it in action
 
+![Agent asking one form with a single choice, a multi-select, a text answer, and a review step](https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-ask-user.gif)
+
 <table>
   <tr>
     <td align="center">

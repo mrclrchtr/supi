@@ -36,6 +36,8 @@ Suggestions only appear when:
 
 ## Using suggestions
 
+![Suggested next prompt shown as ghost text in the empty editor](https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-prompt-suggestions.png)
+
 | Key | Action |
 |-----|--------|
 | `→` / Right Arrow / `Tab` | Accept the suggestion into the editor without submitting it |

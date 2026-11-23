@@ -1,4 +1,5 @@
-# Tall capture; record.sh crops it to the report header.
+# Tall capture; record.sh crops it to the report header (summary, usage by
+# category, system prompt composition). One turn first so token counts exist.
 Output "/tmp/supi-screenshots/supi-context.gif"
 Set Width 1400
 Set Height 2400

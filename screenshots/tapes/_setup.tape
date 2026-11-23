@@ -6,8 +6,10 @@ Set FontSize 16
 Set Padding 20
 Set Theme "Catppuccin Macchiato"
 Set TypingSpeed 15ms
+Set WaitTimeout 120s
 Hide
-Type 'clear && pi --no-session --model "$SCREENSHOT_MODEL" --use-theme "$SCREENSHOT_THEME"'
+Type 'clear && pi --no-session --model "$SCREENSHOT_MODEL" --use-theme "$SCREENSHOT_THEME" --append-system-prompt "Always reply in English. Keep replies short."'
 Enter
-Sleep 8s
+Wait+Screen /thinking off/
+Sleep 3s
 Show

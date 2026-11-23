@@ -350,6 +350,8 @@ The headless factory registers only `code_resolve`, `code_inspect`, `code_orient
 
 ## See it in action
 
+![Agent finding references with code_graph and previewing a rename with code_refactor_plan](https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-code-intelligence.gif)
+
 Select any screenshot to open it at full resolution.
 
 ### Understand the workspace

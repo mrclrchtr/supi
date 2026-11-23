@@ -41,6 +41,8 @@ The screen is available in Pi interactive TUI mode. Print, JSON, and RPC modes d
 
 ## Use the settings screen
 
+![Searching and switching scope in /supi-settings](https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-settings.gif)
+
 The screen starts in project scope.
 
 | Input | Action |

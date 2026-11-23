@@ -19,6 +19,8 @@ Built-in profiles:
 
 Profile sources overlay fields by ID with project → global → package precedence. A partial user manifest can pin only `model` or `thinking`; package tools and prompts continue to flow through. An invalid source falls through with a bounded diagnostic. Profiles are context-isolated, not permission- or filesystem-sandboxed.
 
+![The model delegating a search to an explore Agent Run and using its result](https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-agent.gif)
+
 ## Prompts and instruction files
 
 The built-in profiles use package-owned system prompts written for a delegated run: the reader is the calling agent, only the final message reaches it, and nobody can answer questions during the run.

@@ -23,6 +23,8 @@ Open `/supi-settings` → **Prompt improver** → **Improver model**. The defaul
 
 ## Use
 
+![/supi-improve asking clarifying questions and proposing a sharper request](https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-prompt-improver.gif)
+
 1. Run `/supi-improve [draft]` while Pi is idle in TUI mode.
 2. Enter or edit the draft in the local form. Command arguments prefill this form.
 3. Confirm the draft. The command copies it to the main editor before improvement starts.
