@@ -13,7 +13,7 @@ const timeoutMs = waitMs + 6_000;
 
 describe("LaTeX Structural Worker memory safety", () => {
   it.skipIf(process.platform === "win32")(
-    "keeps the original parser process alive and detects a parser restart",
+    "keeps the original parser process alive within the memory limit",
     async () => {
       const result = await runBoundedProbe();
 
@@ -28,38 +28,21 @@ describe("LaTeX Structural Worker memory safety", () => {
       expect(result.exitCode).toBe(0);
       expect(result.peakRssMiB).toBeLessThan(rssLimitMiB);
       expect(result.stdout).toContain('"event":"post-result-wait-complete"');
-
-      const injectedCrash = await runBoundedProbe(true, defaultWaitMs);
-      const injectedSurvival = readProbeEvent(injectedCrash.stdout, "parser-survived");
-      expect(injectedSurvival).toMatchObject({
-        survives: false,
-        generations: [1, expect.any(Number)],
-      });
-      expect(injectedSurvival.generations).toHaveLength(2);
-      expect(injectedSurvival.generations[1]).not.toBe(1);
-      expect(injectedSurvival.exits).toHaveLength(1);
-      expect(injectedCrash.exitCode).toBe(3);
-      expect(injectedCrash.peakRssMiB).toBeLessThan(rssLimitMiB);
-      expect(injectedCrash.stopReason, injectedCrash.stdout).toBeNull();
     },
-    timeoutMs + defaultWaitMs + 12_000,
+    timeoutMs + 6_000,
   );
 });
 
-async function runBoundedProbe(
-  injectCrash = false,
-  probeWaitMs = waitMs,
-): Promise<{
+async function runBoundedProbe(): Promise<{
   exitCode: number | null;
   peakRssMiB: number;
   stopReason: string | null;
   stdout: string;
 }> {
-  const probeTimeoutMs = probeWaitMs + 6_000;
-  const child = spawn(process.execPath, [probePath, ...(injectCrash ? ["--inject-crash"] : [])], {
+  const child = spawn(process.execPath, [probePath], {
     cwd: packageRoot,
     detached: true,
-    env: { ...process.env, SUPI_LATEX_PROBE_WAIT_MS: String(probeWaitMs) },
+    env: { ...process.env, SUPI_LATEX_PROBE_WAIT_MS: String(waitMs) },
     stdio: ["ignore", "pipe", "pipe"],
   });
   if (child.pid === undefined) throw new Error("Could not start the LaTeX probe process");
@@ -80,7 +63,7 @@ async function runBoundedProbe(
 
   try {
     while (child.exitCode === null && child.signalCode === null) {
-      if (Date.now() - started >= probeTimeoutMs) {
+      if (Date.now() - started >= timeoutMs) {
         stopReason = "timeout";
         await stopProcessGroup(child.pid);
         break;

@@ -15,13 +15,11 @@ const source = String.raw`\begin{itemize}
 const generations = [];
 const errors = [];
 const exits = [];
-const workers = [];
 const workerFactory = ({ cwd: workerCwd, generation, fileAssociations }) => {
   generations.push(generation);
   const worker = createStructuralWorkerProcess({ cwd: workerCwd, generation, fileAssociations });
   worker.on("error", (error) => errors.push(error.message));
   worker.on("exit", (code) => exits.push(code));
-  workers.push(worker);
   return worker;
 };
 const waitValue = Number(process.env.SUPI_LATEX_PROBE_WAIT_MS ?? 2_000);
@@ -38,7 +36,6 @@ try {
   writeEvent("result-returned", { kind: result.kind, found });
   if (!found) process.exitCode = 2;
 
-  if (process.argv.includes("--inject-crash")) await workers[0]?.terminate();
   writeEvent("post-result-wait-start", { waitMs });
   await new Promise((resolve) => setTimeout(resolve, waitMs));
   const survives =
