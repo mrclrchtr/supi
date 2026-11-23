@@ -4,12 +4,17 @@ import { describe, expect, it } from "vitest";
 
 const PACKAGES_DIR = new URL("../../packages", import.meta.url).pathname;
 
-// These packages bundle Code Intelligence only to pass its headless inspection
-// factory into managed child sessions. Loading its full interactive extension in
-// the parent would duplicate the separately installed Code Intelligence surface.
-const CHILD_ONLY_BUNDLED_DEPENDENCIES = new Map([
+// API-only bundled dependencies: the consumer uses only the dependency's library
+// entry points (./api, ./headless), not its registered tools, commands, or hooks.
+// They stay bundled but are not forwarded through pi.extensions, so installing the
+// consumer adds no extension surface the user did not install. See CLAUDE.md
+// Packaging conventions.
+const API_ONLY_BUNDLED_DEPENDENCIES = new Map([
+  // Headless inspection factory for managed child sessions.
   ["@mrclrchtr/supi-agent", new Set(["@mrclrchtr/supi-code-intelligence"])],
   ["@mrclrchtr/supi-review", new Set(["@mrclrchtr/supi-code-intelligence"])],
+  // Ask User form API for the clarification round.
+  ["@mrclrchtr/supi-prompt-improver", new Set(["@mrclrchtr/supi-ask-user"])],
 ]);
 
 function readJson(filePath) {
@@ -42,7 +47,7 @@ describe("bundled extension references", () => {
     const bundled = (pkg.bundledDependencies ?? []).filter(
       (dependency) =>
         dependency.startsWith("@mrclrchtr/") &&
-        !CHILD_ONLY_BUNDLED_DEPENDENCIES.get(pkg.name)?.has(dependency),
+        !API_ONLY_BUNDLED_DEPENDENCIES.get(pkg.name)?.has(dependency),
     );
     if (bundled.length === 0) continue;
 
@@ -78,12 +83,17 @@ describe("bundled extension references", () => {
     });
   }
 
-  it("keeps child-only Code Intelligence profiles out of parent extensions", () => {
-    for (const packageName of ["supi-agent", "supi-review"]) {
-      const pkg = readJson(join(PACKAGES_DIR, packageName, "package.json"));
-      expect(pkg.pi?.extensions).not.toContain(
-        "node_modules/@mrclrchtr/supi-code-intelligence/src/extension.ts",
+  for (const [packageName, dependencies] of API_ONLY_BUNDLED_DEPENDENCIES) {
+    it(`${packageName} bundles its API-only dependencies without forwarding their extensions`, () => {
+      const pkg = readJson(
+        join(PACKAGES_DIR, packageName.replace("@mrclrchtr/", ""), "package.json"),
       );
-    }
-  });
+      for (const dependency of dependencies) {
+        expect(pkg.bundledDependencies ?? []).toContain(dependency);
+        expect(pkg.pi?.extensions ?? []).not.toContain(
+          `node_modules/${dependency}/src/extension.ts`,
+        );
+      }
+    });
+  }
 });

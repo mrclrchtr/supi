@@ -51,8 +51,7 @@ The root Pi manifest serves development/local/git installs; published runtime pa
 - Library-only packages expose neither `./extension` nor `pi.extensions` and use normal npm dependency resolution.
 - `pi.extensions` / `pi.prompts` / `pi.skills` / `pi.themes` entries must be **real package-relative paths**, not `exports` aliases.
 - Installable packages list every `@mrclrchtr/supi-*` dependency in both `dependencies` and `bundledDependencies`: [Pi module isolation](https://github.com/earendil-works/pi/blob/main/docs/packages.md) makes transitive npm resolution unreliable.
-- Forward bundled extension-bearing packages through `pi.extensions` via `node_modules/<pkg>/src/extension.ts`. Standalone installs load only the top-level package's extension manifest; library-only dependencies have no extension to forward.
-- Child-only adapters (`supi-agent`, `supi-review`) may bundle Code Intelligence only to pass its headless factory to owned child sessions; never load the full parent extension. See `scripts/__tests__/bundled-extension-refs.test.mjs` for this exception.
+- Forward a bundled extension-bearing package through `pi.extensions` via `node_modules/<pkg>/src/extension.ts` only when the consumer depends on its registered extension behavior (tools, commands, hooks); standalone installs load only the top-level package's extension manifest. Consumers that use only its library entry points (`./api`, `./headless`) bundle it without forwarding, so installing them adds no surface the user did not install, and list it as API-only in `scripts/__tests__/bundled-extension-refs.test.mjs`.
 - Runtime dependencies belong in the publishing package; root-only tooling belongs in root `devDependencies`, not `dependencies`.
 - For packing/publishing, see **Publish pipeline** below.
 

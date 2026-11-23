@@ -15,7 +15,7 @@ pi install npm:@mrclrchtr/supi-prompt-improver
 pi install npm:@mrclrchtr/supi-settings
 ```
 
-The model picker is provided by `@mrclrchtr/supi-settings`. Install it separately. Prompt improver does not bundle that extension because another installed copy may already register `/supi-settings`. After both installs, run `/reload` in Pi to use the model picker. The package also loads the shared Ask User form that it needs for clarification.
+The model picker is provided by `@mrclrchtr/supi-settings`. Install it separately. Prompt improver does not bundle that extension because another installed copy may already register `/supi-settings`. After both installs, run `/reload` in Pi to use the model picker. The package bundles the shared Ask User form that it needs for clarification, but not the `ask_user` tool. To give the agent that tool, install `@mrclrchtr/supi-ask-user` separately.
 
 ## Configuration
 
