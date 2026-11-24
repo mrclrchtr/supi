@@ -5,7 +5,7 @@ import {
   parseAgentWorkspaceMarker,
 } from "./marker.ts";
 import { AgentWorkspaceError, type AgentWorkspaceOwner } from "./types.ts";
-import { listWorktrees, resolveWorktreeRoot, type WorktreeRecord } from "./worktrees.ts";
+import { describeWorktree, listWorktrees, type WorktreeRecord } from "./worktrees.ts";
 
 /** An exclusive `git worktree lock` on an existing caller-provided linked worktree. */
 export interface WorktreeLease {
@@ -33,33 +33,29 @@ function lockedError(root: string, reason: string): AgentWorkspaceError {
   if (!marker) {
     return new AgentWorkspaceError(
       "locked-foreign",
-      `Worktree ${root} is locked by another tool: ${reason || "(no reason)"}.`,
+      `Worktree ${root} is locked by another tool (${reason || "no reason"}).`,
       reason,
     );
   }
   if (markerOwnerStatus(marker) === "absent") {
     return new AgentWorkspaceError(
       "locked-orphaned",
-      `Worktree ${root} carries an orphaned SuPi lock whose owner has exited; clean it up before reuse.`,
+      `Worktree ${root} carries an orphaned SuPi lock (${reason}) whose owner has exited; run /supi-agent-cleanup to release it.`,
       reason,
     );
   }
   return new AgentWorkspaceError(
     "locked-active",
-    `Worktree ${root} is locked by an active SuPi owner: ${reason}.`,
+    `Worktree ${root} is held by an active SuPi owner (${reason}).`,
     reason,
   );
 }
 
 async function findRecord(root: string, signal?: AbortSignal) {
-  const records = await listWorktrees(root, signal);
-  return { main: records[0], record: records.find((record) => record.path === root) };
+  return (await listWorktrees(root, signal)).find((record) => record.path === root);
 }
 
-function refuseUnavailable(root: string, main?: WorktreeRecord, record?: WorktreeRecord): void {
-  if (main?.path === root) {
-    throw new AgentWorkspaceError("main-worktree", `Git cannot lock the main worktree ${root}.`);
-  }
+function refuseUnavailable(root: string, record?: WorktreeRecord): void {
   if (!record) throw new Error(`Git does not list ${root} as a worktree.`);
   if (record.lockReason !== undefined) throw lockedError(root, record.lockReason);
 }
@@ -73,12 +69,14 @@ export async function acquireWorktreeLease(
   options: AcquireWorktreeLeaseOptions,
 ): Promise<WorktreeLease> {
   const { signal } = options;
-  const root = await resolveWorktreeRoot(options.cwd, signal);
-  const before = await findRecord(root, signal);
-  refuseUnavailable(root, before.main, before.record);
+  const { root, linked } = await describeWorktree(options.cwd, signal);
+  if (!linked) {
+    throw new AgentWorkspaceError("main-worktree", `Git cannot lock the main worktree ${root}.`);
+  }
+  refuseUnavailable(root, await findRecord(root, signal));
   const marker = createAgentWorkspaceMarker(options.owner);
   const unlockOwn = async (): Promise<void> => {
-    const { record } = await findRecord(root);
+    const record = await findRecord(root);
     if (record?.lockReason === marker) await runGitAllowFatal(root, ["worktree", "unlock", root]);
   };
   signal?.throwIfAborted();
@@ -88,8 +86,8 @@ export async function acquireWorktreeLease(
   } catch (error) {
     // Another process may have locked it between the inventory and the lock.
     const after = await findRecord(root);
-    if (after.record?.lockReason === marker) await unlockOwn();
-    else refuseUnavailable(root, after.main, after.record);
+    if (after?.lockReason === marker) await unlockOwn();
+    else refuseUnavailable(root, after);
     throw error;
   }
   if (signal?.aborted) {

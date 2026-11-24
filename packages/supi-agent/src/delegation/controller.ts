@@ -268,8 +268,8 @@ function beginWithLeases(
   };
   const acquired = acquireWorktreeClaimLeases(claims, signal).then((acquisition) => {
     if ("failure" in acquisition) {
-      const { taskId, root, message } = acquisition.failure;
-      throw rejection([`${taskId}: Worktree ${root} ${message}.`]);
+      const { taskId, message } = acquisition.failure;
+      throw rejection([`${taskId}: ${message}`]);
     }
     leases = acquisition.leases;
     return start(releaseAll, () => {

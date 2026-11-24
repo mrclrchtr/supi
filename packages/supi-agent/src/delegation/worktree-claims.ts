@@ -1,15 +1,12 @@
-import { execFile } from "node:child_process";
 import { realpath } from "node:fs/promises";
 import { resolve } from "node:path";
-import { promisify } from "node:util";
 import {
   AgentWorkspaceError,
   acquireWorktreeLease,
-  resolveWorktreeRoot,
+  describeWorktree,
+  type WorktreeDescription,
   type WorktreeLease,
 } from "@mrclrchtr/supi-agent-runtime/workspace";
-
-const execFileAsync = promisify(execFile);
 
 /** One Delegation Task as seen by Worktree Claim resolution. */
 export interface WorktreeClaimTask {
@@ -67,7 +64,7 @@ export async function resolveWorktreeClaims(
   const conflicts: WorktreeClaimConflict[] = [];
   const batchHolders = new Map<string, string>();
   writers.forEach((task, index) => {
-    const { root, linked } = located[index] as LocatedWorktree;
+    const { root, linked } = located[index] as WorktreeDescription;
     const heldBy = options.activeClaims.get(root) ?? batchHolders.get(root);
     if (heldBy !== undefined) {
       conflicts.push({ taskId: task.taskId, root, heldBy });
@@ -84,6 +81,7 @@ export async function resolveWorktreeClaims(
 export interface WorktreeLeaseFailure {
   readonly taskId: string;
   readonly root: string;
+  /** Actionable sentence that names the worktree and its holder. */
   readonly message: string;
 }
 
@@ -103,69 +101,31 @@ export async function acquireWorktreeClaimLeases(
     } catch (error) {
       await Promise.allSettled(leases.map((lease) => lease.release()));
       return {
-        failure: { taskId: claim.taskId, root: claim.root, message: leaseFailure(error) },
+        failure: {
+          taskId: claim.taskId,
+          root: claim.root,
+          message: leaseFailure(claim.root, error),
+        },
       };
     }
   }
   return { leases };
 }
 
-function leaseFailure(error: unknown): string {
-  if (!(error instanceof AgentWorkspaceError)) {
-    return "could not be locked for this writer";
-  }
-  const reason = error.heldBy ?? "(no reason)";
-  switch (error.code) {
-    case "locked-foreign":
-      return `is locked by another tool (${reason})`;
-    case "locked-active":
-      return `is held by an active SuPi owner (${reason})`;
-    case "locked-orphaned":
-      return `carries an orphaned SuPi lock (${reason}); run /supi-agent-cleanup to release it`;
-    default:
-      return "could not be locked for this writer";
-  }
+function leaseFailure(root: string, error: unknown): string {
+  // The runtime message names the holder and, for an orphaned lock, the cleanup command.
+  return error instanceof AgentWorkspaceError
+    ? error.message
+    : `Worktree ${root} could not be locked for this writer.`;
 }
 
-interface LocatedWorktree {
-  readonly root: string;
-  /** True for a linked worktree, which Git can lock; false for the main worktree or no Git. */
-  readonly linked: boolean;
-}
-
-async function locateWorktree(cwd: string, signal?: AbortSignal): Promise<LocatedWorktree> {
-  let root: string;
+async function locateWorktree(cwd: string, signal?: AbortSignal): Promise<WorktreeDescription> {
   try {
-    root = await resolveWorktreeRoot(cwd, signal);
+    return await describeWorktree(cwd, signal);
   } catch {
+    // A directory outside Git takes a session claim on its own path.
     return { root: await realpath(cwd).catch(() => resolve(cwd)), linked: false };
   }
-  // A linked worktree has its own Git directory below the common one; the main worktree does not.
-  const output = await runGit(
-    root,
-    ["rev-parse", "--path-format=absolute", "--git-dir", "--git-common-dir"],
-    signal,
-  );
-  const [gitDir, commonDir] = output.trim().split("\n");
-  if (!gitDir || !commonDir) return { root, linked: false };
-  const [canonicalGitDir, canonicalCommonDir] = await Promise.all([
-    realpath(gitDir).catch(() => gitDir),
-    realpath(commonDir).catch(() => commonDir),
-  ]);
-  return { root, linked: canonicalGitDir !== canonicalCommonDir };
-}
-
-async function runGit(cwd: string, args: string[], signal?: AbortSignal): Promise<string> {
-  // Inherited GIT_* variables (for example from a hook) would redirect Git to another repository.
-  const env = { ...process.env };
-  for (const key of Object.keys(env)) if (key.startsWith("GIT_")) delete env[key];
-  const { stdout } = await execFileAsync("git", args, {
-    cwd,
-    env,
-    timeout: 30_000,
-    ...(signal ? { signal } : {}),
-  });
-  return stdout;
 }
 
 /**

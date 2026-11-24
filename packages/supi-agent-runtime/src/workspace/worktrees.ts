@@ -51,3 +51,24 @@ export async function resolveWorktreeRoot(cwd: string, signal?: AbortSignal): Pr
   if (!root) throw new Error(`No Git worktree contains ${cwd}.`);
   return realpath(root);
 }
+
+/** Canonical root of a worktree and whether it is a linked worktree. */
+export interface WorktreeDescription {
+  /** Canonical worktree root, as returned by {@link resolveWorktreeRoot}. */
+  root: string;
+  /** True for a linked worktree, which Git can lock; false for the main worktree. */
+  linked: boolean;
+}
+
+/**
+ * Describe the worktree that contains `cwd`. Rejects when no Git worktree contains it. The main
+ * worktree is the first entry of `git worktree list`; every other entry is linked.
+ */
+export async function describeWorktree(
+  cwd: string,
+  signal?: AbortSignal,
+): Promise<WorktreeDescription> {
+  const root = await resolveWorktreeRoot(cwd, signal);
+  const [main] = await listWorktrees(root, signal);
+  return { root, linked: main !== undefined && main.path !== root };
+}

@@ -20,4 +20,5 @@ export type {
   AgentWorkspaceOwnerStatus,
 } from "./workspace/types.ts";
 export { AgentWorkspaceError } from "./workspace/types.ts";
-export { resolveWorktreeRoot } from "./workspace/worktrees.ts";
+export type { WorktreeDescription } from "./workspace/worktrees.ts";
+export { describeWorktree, resolveWorktreeRoot } from "./workspace/worktrees.ts";
