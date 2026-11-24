@@ -203,7 +203,12 @@ describe("/supi-plan-critique", () => {
     ]);
     expect(options?.inputs.model).toMatchObject({ provider: "test", id: "model" });
     expect(options?.inputs.thinkingLevel).toBe("off");
-    expect(options?.registration.metadata).toMatchObject({ kind: "Plan Critic", cwd });
+    expect(options?.registration.metadata).toMatchObject({
+      taskId: "Plan Critique",
+      kind: "Plan Critic",
+      label: "Plan",
+      cwd,
+    });
 
     await options?.inputs.resourceLoader?.reload();
     const loader = options?.inputs.resourceLoader;
@@ -215,6 +220,17 @@ describe("/supi-plan-critique", () => {
       "project rules",
     ]);
     expect(loader?.getSkills().skills).toEqual([]);
+  });
+
+  it("labels the run in /agents with a short excerpt of the plan", async () => {
+    const long = "x".repeat(80);
+    await invoke({
+      branch: [assistant([{ type: "text", text: `\n\n- **Rename** the  loader\n${long}` }])],
+    });
+    await invoke({ branch: [assistant([{ type: "text", text: `1. ${long}` }])] });
+
+    expect(run.calls[0]?.registration.metadata.label).toBe("Rename the loader");
+    expect(run.calls[1]?.registration.metadata.label).toBe(`${"x".repeat(59)}…`);
   });
 
   it("sends the closing message inside the fixed frame and pairs the working events", async () => {

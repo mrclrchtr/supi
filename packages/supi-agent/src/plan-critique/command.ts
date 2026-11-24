@@ -19,6 +19,7 @@ import { buildPlanCriticPrompt, framePlanCritique } from "./prompt.ts";
 export const PLAN_CRITIQUE_COMMAND = "supi-plan-critique";
 
 const WORKING_SOURCE = "supi-agent";
+const EXCERPT_CHARS = 60;
 
 /** Result of reading the Plan Author's last answer from the active branch. */
 type LastAnswer = { kind: "text"; text: string } | { kind: "refused"; message: string };
@@ -89,9 +90,9 @@ async function runPlanCritique(pi: ExtensionAPI, ctx: ExtensionCommandContext): 
             metadata: {
               runKey,
               batchId,
-              taskId: PLAN_CRITIC_PROFILE_ID,
+              taskId: "Plan Critique",
               kind: "Plan Critic",
-              label: "plan critique",
+              label: planExcerpt(answer.text),
               cwd: resolved.inputs.cwd,
               modelId: `${resolved.model.provider}/${resolved.model.id}`,
               thinkingLevel: resolved.thinkingLevel,
@@ -165,6 +166,25 @@ function displayResult(outcome: AgentRunOutcome<string | undefined>) {
   if (outcome.kind === "success") return outcome.value ? { finalText: outcome.value } : {};
   if (outcome.kind === "failed") return { failureCode: outcome.failureCode };
   return { failureCode: outcome.kind };
+}
+
+/**
+ * Short human-only label for `/agents`: the plan's first non-empty line without Markdown
+ * markers, capped. Debug data keeps fixed identifiers and never receives plan text.
+ */
+export function planExcerpt(plan: string): string {
+  const line =
+    plan
+      .split("\n")
+      .map((candidate) =>
+        candidate
+          .replace(/^\s*(?:#{1,6}\s+|[-*+]\s+|\d+[.)]\s+|>\s*)*/, "")
+          .replaceAll("**", "")
+          .replace(/\s+/g, " ")
+          .trim(),
+      )
+      .find((candidate) => candidate.length > 0) ?? "";
+  return line.length > EXCERPT_CHARS ? `${line.slice(0, EXCERPT_CHARS - 1).trimEnd()}…` : line;
 }
 
 /**
