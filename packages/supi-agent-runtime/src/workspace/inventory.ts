@@ -7,15 +7,15 @@ import {
 } from "./disposable.ts";
 import { runGit, runGitAllowFatal } from "./git.ts";
 import { markerOwnerStatus, parseAgentWorkspaceMarker } from "./marker.ts";
-import type { AgentWorkspaceOwnerStatus } from "./types.ts";
+import type { AgentWorkspaceOwner, AgentWorkspaceOwnerStatus } from "./types.ts";
 import { listWorktrees } from "./worktrees.ts";
 
 /** One SuPi-marked worktree from Git's worktree inventory. */
 export interface AgentWorkspaceEntry {
   /** Canonical worktree path. */
   path: string;
-  /** Owner named by the marker (`review` for legacy markers); undefined when unreadable. */
-  owner?: string;
+  /** Owner named by the marker (`review` for legacy markers); undefined when unreadable or unknown. */
+  owner?: AgentWorkspaceOwner;
   /** True for a legacy `supi-review:` marker. */
   legacy: boolean;
   ownerStatus: AgentWorkspaceOwnerStatus;

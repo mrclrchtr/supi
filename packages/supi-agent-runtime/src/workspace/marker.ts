@@ -6,10 +6,12 @@ export const AGENT_WORKSPACE_MARKER_PREFIX = "supi-agent:";
 /** Prefix written by Review before Agent Workspaces existed; still recognized for cleanup. */
 export const LEGACY_REVIEW_MARKER_PREFIX = "supi-review:";
 
+const AGENT_WORKSPACE_OWNERS: readonly AgentWorkspaceOwner[] = ["review", "delegation"];
+
 /** Parsed SuPi lock reason. */
 export interface ParsedAgentWorkspaceMarker {
-  /** Owner named by the marker; legacy markers are `review`; undefined when unreadable. */
-  owner?: string;
+  /** Owner named by the marker; legacy markers are `review`; undefined when unreadable or unknown. */
+  owner?: AgentWorkspaceOwner;
   /** True for a legacy `supi-review:` marker. */
   legacy: boolean;
   pid?: number;
@@ -35,8 +37,9 @@ export function parseAgentWorkspaceMarker(reason: string): ParsedAgentWorkspaceM
   if (reason.startsWith(AGENT_WORKSPACE_MARKER_PREFIX)) {
     const match = /^supi-agent:([^:;]+):[^;]+;pid=(\d+);started=/.exec(reason);
     if (!match) return { legacy: false, disposable: false };
+    const owner = AGENT_WORKSPACE_OWNERS.find((candidate) => candidate === match[1]);
     return {
-      owner: match[1],
+      ...(owner ? { owner } : {}),
       legacy: false,
       pid: Number(match[2]),
       disposable: /;disposable(;|$)/.test(reason),

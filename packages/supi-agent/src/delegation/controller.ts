@@ -116,26 +116,30 @@ export class DelegationController {
         signal: ctx.signal,
         begin: (control) => {
           begun = true;
-          return beginWithLeases(claims, releaseClaims, control.signal, (onDisposed, claimed) =>
-            startDelegationBatchWithAuxiliaryModels(
-              {
-                params,
-                tasks: preflight.tasks,
-                cwd: ctx.cwd,
-                registry: this.registry,
-                ...(mode === "foreground" ? { signal: ctx.signal, onUpdate } : {}),
-                onTaskResult: (_result, batchId) => control.taskSettled(batchId),
-                onDisposed,
-              },
-              () => {
-                if (!control.isOpen() || ctx.signal?.aborted) return false;
-                const branch = ctx.sessionManager.getBranch();
-                this.#conversationState.assertCurrentBranch(preflight.tasks, launchId, branch);
-                claimed();
-                return true;
-              },
-              control.signal,
-            ),
+          return beginWithLeases(
+            claims,
+            releaseClaims,
+            control.signal,
+            (onDisposed, handOffRelease) =>
+              startDelegationBatchWithAuxiliaryModels(
+                {
+                  params,
+                  tasks: preflight.tasks,
+                  cwd: ctx.cwd,
+                  registry: this.registry,
+                  ...(mode === "foreground" ? { signal: ctx.signal, onUpdate } : {}),
+                  onTaskResult: (_result, batchId) => control.taskSettled(batchId),
+                  onDisposed,
+                },
+                () => {
+                  if (!control.isOpen() || ctx.signal?.aborted) return false;
+                  const branch = ctx.sessionManager.getBranch();
+                  this.#conversationState.assertCurrentBranch(preflight.tasks, launchId, branch);
+                  handOffRelease();
+                  return true;
+                },
+                control.signal,
+              ),
           );
         },
       })
@@ -246,9 +250,9 @@ function admitMode(
 }
 
 /**
- * Acquire the batch's leases, then start it. Until the runner takes over (`claimed()`), any failure
- * releases the leases and the session claims here; afterwards the runner calls `onDisposed` once
- * every started run has released its resources.
+ * Acquire the batch's leases, then start it. Until `start` hands release ownership to the runner
+ * (`handOffRelease()`), any failure releases the leases and the session claims here; afterwards
+ * the runner calls `onDisposed` once every started run has released its resources.
  */
 function beginWithLeases(
   claims: readonly WorktreeClaim[],
@@ -256,7 +260,7 @@ function beginWithLeases(
   signal: AbortSignal,
   start: (
     onDisposed: () => Promise<void>,
-    claimed: () => void,
+    handOffRelease: () => void,
   ) => { result: Promise<DelegationBatchHandle>; settled: Promise<void> },
 ): { result: Promise<DelegationBatchHandle>; settled: Promise<void> } {
   let leases: WorktreeLease[] = [];
