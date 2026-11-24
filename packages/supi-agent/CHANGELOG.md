@@ -4,6 +4,8 @@
 
 - Agent Run retrospectives keep the run's tools declared and block calls instead of removing them. The system prompt and tool list stay unchanged, so models without mid-conversation system messages, such as DeepSeek, read the run from the prompt cache instead of re-reading it uncached.
 - With **Debug → Enabled**, each context compaction of an Agent Run records an `agent-run-compaction` Debug event with the run, the reason, and the context size before and after, without conversation content.
+- `/agents` fits the run name column to the longest name (24–64 columns), so long run names are no longer cut after about 30 characters.
+- With **Debug → Enabled**, each Completion Notice of a background Run Batch is recorded as a Debug event, `sent` or `skipped` because its result was already collected, so the `debug` tool can tell whether a notice was delivered.
 
 ## [14.3.0]
 

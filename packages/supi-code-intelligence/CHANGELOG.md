@@ -1,5 +1,9 @@
 # Changelog
 
+## [15.0.0]
+
+- When a caller's time limit fires during file diagnostics, the request now fails as an interruption instead of reporting the file as unavailable (`Diagnostic collection failed closed: Code request deadline exceeded`) ([#660](https://github.com/mrclrchtr/supi/issues/660)).
+
 ## [14.1.0]
 
 - `code_graph` shows the source line of every reference and implementation site, so a result answers how a symbol is used without a follow-up `read` or `rg`. Sites are listed one row per source line under their file (``  - L120:25 — `const stashes = await git(["stash", "list", "--format=%gs"], cwd);` ``) instead of as bare positions (`L117:24, L120:25`). Structured output adds an optional `text` to each item of these relations, and the expanded transcript shows the same line. Lines are trimmed and shortened when long; a site whose file cannot be read keeps the position-only form. Callee rows are unchanged.

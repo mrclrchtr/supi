@@ -1,5 +1,44 @@
 # Changelog
 
+## [15.0.0](https://github.com/mrclrchtr/supi/compare/v14.3.0...v15.0.0) (2026-11-24)
+
+This release runs `review_run` in the background by default, makes Reviewer and Agent Runs more robust and cache-friendly, and stops spinners from flooding RPC clients.
+
+### ⚠ BREAKING CHANGES
+
+* **Review:** in TUI and RPC, `review_run` returns a Background Review handle instead of the report. Migration: collect the report with `agent_result` after the Completion Notice, or pass `mode: "foreground"` to keep waiting for the report in the call ([#646](https://github.com/mrclrchtr/supi/issues/646)).
+* **Prompt Improver:** standalone `@mrclrchtr/supi-prompt-improver` installs no longer provide the `ask_user` tool; `/supi-improve` keeps its clarification form. Migration: install the tool separately with `pi install npm:@mrclrchtr/supi-ask-user` ([#665](https://github.com/mrclrchtr/supi/issues/665)).
+
+### Agents & Review
+
+* Background Reviews: `review_run` returns once the Review Target is frozen, so the Agent and the user can continue. One Completion Notice arrives when every Review Task is finished; `agent_result` collects the report, its Post-Review Policy, and Reviewer Usage, even before completion. `agent_cancel`, an abort, or loss of ownership stops a running Review, and the status line shows active Background Reviews. Print and JSON modes keep waiting and reject `mode: "background"`; `/supi-review` is unchanged ([#642](https://github.com/mrclrchtr/supi/issues/642), [#643](https://github.com/mrclrchtr/supi/issues/643), [#644](https://github.com/mrclrchtr/supi/issues/644), [#645](https://github.com/mrclrchtr/supi/issues/645), [#646](https://github.com/mrclrchtr/supi/issues/646)).
+* The **Agent tools** setting also turns `agent_result` and `agent_cancel` off, unless the Agent extension still needs them.
+* Reviewer sessions retry transient provider failures, such as rate limits or overload, and compact their context instead of failing when it outgrows the model's context window.
+* Reviewers now see the usage rules of their tools, such as when to use `code_resolve` instead of `rg`, which the Reviewer Protocol prompt previously dropped ([#667](https://github.com/mrclrchtr/supi/issues/667)).
+* Reviewer replays (`review.auditEnabled`) record the system prompts the Reviewer actually received in `trace.systemPrompts`.
+* Agent Run and Reviewer retrospectives keep the run's tools declared and block calls instead of removing them, so models without mid-conversation system messages, such as DeepSeek, read the run from the prompt cache.
+* `/agents` widens the run name column to fit the longest name (24–64 columns), so long run names are no longer cut after about 30 characters.
+
+### Debug & Retrospectives
+
+* With **Debug → Enabled**, each context compaction of an Agent or Reviewer Run records an `agent-run-compaction` event with the reason and the context size before and after.
+* Each Background Run Completion Notice is recorded as a Debug event, `sent` or `skipped` because its result was already collected.
+* Failed retrospectives record why they failed (`failureReason`: `tool-call`, `request-limit`, `prompt-rejected`, `provider-error`, or `no-response`). `gather-retrospectives` carries the reason into its evidence and `--export` lines and counts failed reports per reason (`byFailureReason`).
+
+### Footer & Status
+
+* In RPC, status and tab title spinners (Review, Consulting, tab title) no longer send a record about every 80 ms; they show a static `⠋` and update only when their text changes. The TUI animation is unchanged ([#663](https://github.com/mrclrchtr/supi/issues/663)).
+* Finished Reviews and prompt suggestion runs remove their status entry instead of leaving an empty footer line ([#663](https://github.com/mrclrchtr/supi/issues/663)).
+* When a session ends, the restored tab title keeps the session name, for example `π - my-feature - repo` instead of `π - repo`.
+
+### Code Intelligence & LSP
+
+* File diagnostics report a caller's time limit as an interruption instead of an unavailable file when the deadline fires, so diagnostic checks no longer report a broken file after a timeout ([#660](https://github.com/mrclrchtr/supi/issues/660)).
+
+### Dependencies
+
+* Routine tooling updates, including hk 2.14.0 and mise 2026.11.13.
+
 ## [14.3.0](https://github.com/mrclrchtr/supi/compare/v14.2.0...v14.3.0) (2026-11-23)
 
 This release adds Session Issues to the footer and makes gathered retrospectives easier to act on: reports are attributed to projects and sessions, and Agent and Reviewer Runs record the tools they had.

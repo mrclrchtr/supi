@@ -9,6 +9,8 @@
 - Reviewer replays (`review.auditEnabled`) record the system prompts the Reviewer actually received in `trace.systemPrompts`, including sections Pi adds to the Reviewer Protocol such as `<tool_rules>` and `<shell>`. `protocolPrompt` keeps only the package-owned protocol text.
 - Reviewer and Planner sessions now retry transient provider failures, such as rate limits or overload, instead of failing the Review Task, and compact their context instead of failing when it outgrows the model's context window. With **Debug → Enabled**, each compaction records an `agent-run-compaction` Debug event, so a Review that needed one can be analyzed.
 - In RPC, the Foreground Review status line is sent once per progress change instead of about twelve times per second; the TUI animation is unchanged. A finished Review now removes its status entry instead of leaving an empty one ([#663](https://github.com/mrclrchtr/supi/issues/663)).
+- `/agents` fits the run name column to the longest name (24–64 columns), so long run names are no longer cut after about 30 characters.
+- With **Debug → Enabled**, each Completion Notice of a background Run Batch is recorded as a Debug event, `sent` or `skipped` because its result was already collected, so the `debug` tool can tell whether a notice was delivered.
 
 ## [14.3.0]
 

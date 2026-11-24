@@ -1,6 +1,6 @@
 {
   "name": "@mrclrchtr/supi-prompt-improver",
-  "version": "14.3.0",
+  "version": "15.0.0",
   "description": "Command-based prompt improvement with user-approved drafts for the Pi coding agent",
   "license": "MIT",
   "repository": {
