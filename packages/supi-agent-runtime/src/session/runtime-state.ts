@@ -11,6 +11,11 @@ interface SharedProcessState {
 /**
  * Session-local state shared by every bundled runtime copy in one Pi runtime. Copies discover it
  * through the Pi event bus, so the shape must stay compatible across runtime versions.
+ *
+ * It is the once-per-runtime registration record for every shared surface (`/agents`, the
+ * collection tools, `/supi-agent-cleanup`), not only the viewer. The `agents-viewer` names of its
+ * process key and discovery channels are historical and stay unchanged so that older bundled
+ * copies keep finding it.
  */
 export interface SharedRuntimeState {
   readonly id: string;

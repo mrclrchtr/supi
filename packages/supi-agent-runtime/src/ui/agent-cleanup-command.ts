@@ -8,7 +8,7 @@ import {
 } from "../workspace/inventory.ts";
 
 /** Name of the shared recovery command for SuPi-marked worktrees. */
-export const AGENT_CLEANUP_COMMAND = "supi-agent-cleanup";
+const AGENT_CLEANUP_COMMAND = "supi-agent-cleanup";
 const CLEANUP_MESSAGE_TYPE = "supi-agent-cleanup";
 
 /** What the command did with one SuPi-marked worktree. */
@@ -74,14 +74,19 @@ async function cleanUp(cwd: string, candidates: AgentWorkspaceEntry[]): Promise<
             ...owner,
             outcome: "failed",
             reason:
-              removal.reason === "not-marked"
-                ? "no longer SuPi-marked"
-                : "Git refused; run git worktree unlock and git worktree remove --force manually",
+              removal.reason === "not-marked" ? "no longer SuPi-marked" : gitFailedHint(fresh),
           }
         : { path: candidate.path, ...owner, outcome: removal.outcome },
     );
   }
   return rows;
+}
+
+/** Manual recovery for a failed cleanup; a caller-provided worktree is never removed. */
+function gitFailedHint(entry: AgentWorkspaceEntry): string {
+  return entry.disposable
+    ? `Git refused; run git worktree unlock ${entry.path} and git worktree remove --force ${entry.path} manually`
+    : `Git refused; run git worktree unlock ${entry.path} manually`;
 }
 
 const OUTCOME_TEXT: Record<CleanupOutcome, string> = {
@@ -149,7 +154,7 @@ function rowLine(row: CleanupRow, theme: Theme): string {
 }
 
 /** One status row per worktree; falls back to the stored text for reports without details. */
-export function renderAgentCleanupMessage(
+function renderAgentCleanupMessage(
   message: { content: unknown; details?: unknown },
   theme: Theme,
 ): Text {
