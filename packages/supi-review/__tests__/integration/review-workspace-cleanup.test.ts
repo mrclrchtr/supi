@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -57,5 +57,31 @@ describe("Review Workspace cleanup", () => {
     });
     expect(await listReviewWorkspaces(cwd)).toEqual([]);
     expect(existsSync(dirname(workspace.cwd))).toBe(false);
+  });
+
+  it("marks new workspaces as Review-owned Agent Workspaces", async () => {
+    writeFileSync(join(cwd, "tracked.txt"), "reviewed\n");
+    const workspace = await materializeReviewWorkspace(await resolveReviewSnapshot(cwd, {}));
+    try {
+      expect(git(cwd, "worktree", "list", "--porcelain")).toContain(`locked supi-agent:review:`);
+    } finally {
+      await workspace.cleanup();
+    }
+  });
+
+  it("still lists and removes a workspace with a legacy supi-review marker", async () => {
+    const parent = realpathSync(mkdtempSync(join(tmpdir(), "supi-review-workspace-")));
+    const legacy = join(parent, "workspace");
+    git(cwd, "worktree", "add", "--detach", legacy, "HEAD");
+    git(cwd, "worktree", "lock", "--reason", "supi-review:old;pid=999999999;started=t", legacy);
+
+    const candidates = await listReviewWorkspaces(cwd);
+    expect(candidates).toEqual([{ workspacePath: legacy, owner: "absent" }]);
+
+    await expect(removeReviewWorkspace(cwd, candidates[0]!)).resolves.toEqual({
+      workspacePath: legacy,
+      removed: true,
+    });
+    expect(existsSync(parent)).toBe(false);
   });
 });

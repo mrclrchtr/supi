@@ -11,6 +11,7 @@ import {
   createUnobservedAgentRunDiagnostics,
   raceAgentRunStartup,
 } from "@mrclrchtr/supi-agent-runtime/api";
+import { runDependencyBootstrap } from "@mrclrchtr/supi-agent-runtime/workspace";
 import { resolveInstructionFileNames } from "@mrclrchtr/supi-code-intelligence/instruction-files";
 import type { ChildWebToolProvision } from "@mrclrchtr/supi-core/session";
 import type { LocalReviewAuditStore } from "../../audit/local-review-audit-store.ts";
@@ -36,7 +37,6 @@ import type {
   ReviewTask,
   ReviewTaskResult,
 } from "../../types.ts";
-import { runDependencyBootstrap } from "../../workspace/dependency-bootstrap.ts";
 import {
   materializeReviewWorkspace,
   type ReviewWorkspace,
