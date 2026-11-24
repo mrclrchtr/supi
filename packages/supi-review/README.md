@@ -23,7 +23,7 @@ This package is beta software. Its interfaces can change.
 ## Surfaces
 
 - `/supi-review` — interactive review with optional Planner Draft help
-- `/supi-review-cleanup` — remove marked Review Workspaces after an interrupted cleanup
+- `/supi-agent-cleanup` — clean up SuPi-marked worktrees, including Review Workspaces, after an interrupted cleanup; shared with `supi-agent`
 - `review_run` — run one caller-defined Review
 - `review_output` — read more parent-facing output
 - `review_audit` — navigate local reviewer replays when audit is enabled
@@ -127,7 +127,7 @@ The engine verifies the linked worktree before it starts Reviewer Sessions. The 
 
 For a change target, the engine also saves the complete change as `target.diff` beside the workspace and names it in the Reviewer Packet, with the line where each changed path starts. Reviewers page that file with `read`, which keeps the start of a long file; a large `git diff` through `bash` keeps only its end. The file is outside the worktree, so it is not Target Evidence, and binary changes appear as one line each.
 
-Workspaces are marked and locked in the Git worktree list. Normal cleanup removes them. Use `/supi-review-cleanup` if cleanup stops early.
+Workspaces are marked and locked in the Git worktree list. Normal cleanup removes them. If cleanup stops early, run `/supi-agent-cleanup` after the Pi session that started the Review has ended. It removes SuPi-marked workspaces whose owner process has exited, including workspaces from older versions, and leaves those of a running session alone. `/supi-agent-cleanup` replaces `/supi-review-cleanup`.
 
 ## Settings
 

@@ -2,6 +2,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Box } from "@earendil-works/pi-tui";
 import {
   clearAgentsProfilePages,
+  registerAgentCleanupCommand,
   registerAgentsCommand,
   registerRunBatchOwner,
 } from "@mrclrchtr/supi-agent-runtime/api";
@@ -93,4 +94,5 @@ export default function agentExtension(pi: ExtensionAPI): void {
   });
   registerAgentSettings(pi);
   registerAgentsCommand(pi, { profilePages: agentProfilePages });
+  registerAgentCleanupCommand(pi);
 }

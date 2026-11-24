@@ -22,7 +22,7 @@ Caller-defined code review tasks run in managed, Inspection-only Reviewer Sessio
 - A state task receives only the frozen after state. An all-state batch rejects explicit `from` and can review a root `to`. A change task needs a non-empty canonical change; a committed change rejects a root `to`; a root `from` is valid.
 - Materialization re-compiles the linked workspace through the canonical patch compiler. Its receipt records exact endpoint state, uncommitted-change inclusion, expected and observed checkout, patch hashes, and changed-path count. After that, the caller checkout can change without changing Target Evidence.
 - For a target with a before commit and changes, materialization also writes a text diff to `target.diff` beside the workspace (never inside it) and indexes each path's start line. The Reviewer Packet names the file by its fixed relative path, so packet hashes stay reproducible. The canonical `--binary` patch stays the hashed evidence; the text copy is a reading aid.
-- Workspaces are disposable Agent Workspaces from `@mrclrchtr/supi-agent-runtime/workspace`, locked with the `supi-agent:review:` marker; Review keeps target resolution, the canonical patch compiler, `target.diff`, and its receipt mapping. Cleanup is best-effort; `/supi-review-cleanup` lists only Review-marked worktrees (new and legacy `supi-review:` markers) and removes selected candidates after confirmation; it never auto-prunes.
+- Workspaces are disposable Agent Workspaces from `@mrclrchtr/supi-agent-runtime/workspace`, locked with the `supi-agent:review:` marker; Review keeps target resolution, the canonical patch compiler, `target.diff`, and its receipt mapping. Cleanup is best-effort; Review registers the shared runtime `/supi-agent-cleanup` (`registerAgentCleanupCommand()`) for recovery and never auto-prunes.
 
 ## Reviewer sessions
 
@@ -54,5 +54,5 @@ Use the agreed seams:
 2. Review Workspace materialization/cleanup against real Git
 3. Inline Planner Draft provenance, failure, and Review Snapshot drift behavior
 4. Headless Code Intelligence registration and Workspace provider-host leases
-5. `/supi-review-cleanup` command and picker behavior
+5. Review Workspace markers recognized by the runtime Agent Workspace inventory and cleanup
 6. Reviewer codemode resource opt-in, shared auxiliary snapshot, no indirect submission exposure, and Planner/recovery exclusion

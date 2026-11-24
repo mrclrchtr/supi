@@ -1,6 +1,9 @@
 import { type ExtensionAPI, getAgentDir } from "@earendil-works/pi-coding-agent";
 import { Box } from "@earendil-works/pi-tui";
-import { registerAgentsCommand } from "@mrclrchtr/supi-agent-runtime/api";
+import {
+  registerAgentCleanupCommand,
+  registerAgentsCommand,
+} from "@mrclrchtr/supi-agent-runtime/api";
 import { registerShellHints } from "@mrclrchtr/supi-core/session";
 import { LocalReviewAuditStore } from "./audit/local-review-audit-store.ts";
 import { registerReviewBatchOwner } from "./background/owner.ts";
@@ -12,7 +15,6 @@ import { registerReviewOutputTool } from "./tool/review_output/register.ts";
 import { registerReviewRunTool } from "./tool/review_run/register.ts";
 import { renderRunResult } from "./tool/review_run/render.ts";
 import { runReviewCommand } from "./tui/review-command.ts";
-import { registerReviewWorkspaceCleanupCommand } from "./workspace/cleanup-command.ts";
 
 /** Register the interactive and agent-owned Review surfaces. */
 export default function reviewExtension(pi: ExtensionAPI): void {
@@ -42,7 +44,7 @@ export default function reviewExtension(pi: ExtensionAPI): void {
   });
   registerReviewAuditTool(pi, auditStore);
   pi.on("session_start", (_event, ctx) => syncCollectionTools(syncReviewAgentTools(pi, ctx.cwd)));
-  registerReviewWorkspaceCleanupCommand(pi);
+  registerAgentCleanupCommand(pi);
 
   pi.registerMessageRenderer("supi-review", (message, options, theme) => {
     const result = renderRunResult(

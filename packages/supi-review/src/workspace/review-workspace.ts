@@ -158,7 +158,10 @@ export async function materializeReviewWorkspace(
       if (!failure) return undefined;
       return {
         workspacePath: failure.workspacePath,
-        message: "Review Workspace cleanup failed; completed review findings remain valid.",
+        // /supi-agent-cleanup leaves workspaces of a running owner alone, so it applies only
+        // after this Pi session ends; the recovery command works immediately.
+        message:
+          "Review Workspace cleanup failed; completed review findings remain valid. Run the recovery command now, or /supi-agent-cleanup after this Pi session ends.",
         recoveryCommand: failure.recoveryCommand,
       };
     },

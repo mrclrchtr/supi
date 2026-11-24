@@ -1,4 +1,5 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import agentExtension from "@mrclrchtr/supi-agent/extension";
 import { createPiMock, getTool, getTools } from "@mrclrchtr/supi-test-utils";
 import { describe, expect, it, vi } from "vitest";
 
@@ -31,9 +32,22 @@ describe("supi-review extension", () => {
     }
     expect(mocks.syncReviewAgentTools).not.toHaveBeenCalled();
     expect(pi.commands.has("supi-review")).toBe(true);
-    expect(pi.commands.has("supi-review-cleanup")).toBe(true);
+    expect(pi.commands.has("supi-agent-cleanup")).toBe(true);
+    expect(pi.commands.has("supi-review-cleanup")).toBe(false);
 
     await pi.emit("session_start", { type: "session_start", reason: "startup" }, { cwd: "/repo" });
     expect(mocks.syncReviewAgentTools).toHaveBeenCalledWith(pi, "/repo");
+  });
+
+  it("shares one /supi-agent-cleanup command with the Agent extension", async () => {
+    const pi = createPiMock();
+    reviewExtension(pi as unknown as ExtensionAPI);
+    agentExtension(pi as unknown as ExtensionAPI);
+
+    const cleanupRegistrations = vi
+      .mocked(pi.registerCommand)
+      .mock.calls.filter(([name]) => name === "supi-agent-cleanup");
+    expect(cleanupRegistrations).toHaveLength(1);
+    await pi.emit("session_shutdown", { type: "session_shutdown", reason: "quit" }, {});
   });
 });

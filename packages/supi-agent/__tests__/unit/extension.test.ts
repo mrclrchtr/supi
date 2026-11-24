@@ -69,6 +69,7 @@ describe("supi-agent extension", () => {
       exposure: "model-only",
     });
     expect(mocks.syncAgentRunTool).toHaveBeenCalledWith(pi, process.cwd());
+    expect(pi.commands.has("supi-agent-cleanup")).toBe(true);
     await sessionShutdown({ type: "session_shutdown", reason: "quit" }, {} as never);
   });
 
