@@ -383,7 +383,7 @@ describe("registered code-tool external source paths", () => {
     );
     expect(Value.Check(tool.outputSchema, result.structuredContent)).toBe(true);
     expect(result.structuredContent).toMatchObject({
-      instructions: [expect.objectContaining({ path: "rules/main.md", truncated: true })],
+      instructions: [expect.objectContaining({ path: "rules/main.md", truncated: false })],
     });
     expect(result.details).toMatchObject({
       data: {
@@ -393,8 +393,8 @@ describe("registered code-tool external source paths", () => {
       },
     });
     const text = result.content.map((block) => block.text ?? "").join("\n");
-    expect(text).toContain("Read `rules/main.md`");
-    expect(text).not.toContain("Read `AGENTS.md`");
+    expect(text).toContain("### rules/main.md");
+    expect(text).not.toContain("### AGENTS.md");
     const second = await tool.execute(
       "same-directory",
       { focus: { path: "." } },

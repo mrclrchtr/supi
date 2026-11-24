@@ -259,10 +259,10 @@ describe("code_orientation instruction-file limits and deduplication", () => {
     expect(result.details?.data?.instructions).toBeUndefined();
   });
 
-  it("truncates each instruction file to 200 lines", async () => {
+  it("supplies an instruction file longer than 200 lines in full when it fits the output limit", async () => {
     writeJson("packages/foo/package.json", { name: "foo" });
     writeFile("packages/foo/src/index.ts", "export const foo = 1;\n");
-    const lines = Array.from({ length: 205 }, (_, index) => `line ${index + 1}`);
+    const lines = Array.from({ length: 500 }, (_, index) => `line ${index + 1}`);
     writeFile("packages/foo/CLAUDE.md", lines.join("\n"));
 
     const pi = createPiMock();
@@ -270,11 +270,10 @@ describe("code_orientation instruction-file limits and deduplication", () => {
 
     const result = await orientDirectory(pi, "packages/foo");
 
-    expect(result.text).toContain("line 200");
-    expect(result.text).not.toContain("line 201");
-    expect(result.text).toContain("truncated to 200 of 205 lines");
+    expect(result.text).toContain("line 500");
+    expect(result.text).not.toContain("truncated to");
     expect(result.details?.data?.instructions).toMatchObject({
-      files: [{ shownLines: 200, totalLines: 205, truncated: true }],
+      files: [{ shownLines: 500, totalLines: 500, truncated: false }],
     });
   });
 
@@ -425,6 +424,48 @@ describe("code_orientation instruction-file reconstruction", () => {
     expect((await orientDirectory(pi, "packages/foo")).text).not.toContain("## Instructions");
   });
 
+  it("does not reconstruct a cut instruction file as surfaced", async () => {
+    writeJson("packages/foo/package.json", { name: "foo" });
+    writeFile("packages/foo/CLAUDE.md", "# Foo\n");
+
+    const pi = createPiMock();
+    extensionWithIsolatedHome(pi);
+    await pi.emit(
+      "session_start",
+      {},
+      makeCtx({
+        cwd: tmpDir,
+        sessionManager: {
+          getBranch: () => [orientationResultEntry("packages/foo", { truncated: true })],
+        },
+      }),
+    );
+
+    expect((await orientDirectory(pi, "packages/foo")).text).toContain("## Instructions");
+  });
+
+  it("reconstructs a file over the output limit as surfaced", async () => {
+    writeJson("packages/foo/package.json", { name: "foo" });
+    writeFile("packages/foo/CLAUDE.md", "# Foo\n");
+
+    const pi = createPiMock();
+    extensionWithIsolatedHome(pi);
+    await pi.emit(
+      "session_start",
+      {},
+      makeCtx({
+        cwd: tmpDir,
+        sessionManager: {
+          getBranch: () => [
+            orientationResultEntry("packages/foo", { truncated: true, exceedsOutputLimit: true }),
+          ],
+        },
+      }),
+    );
+
+    expect((await orientDirectory(pi, "packages/foo")).text).not.toContain("## Instructions");
+  });
+
   it("reconstructs full reads of instruction files after the latest compaction", async () => {
     writeJson("packages/foo/package.json", { name: "foo" });
     writeJson("packages/bar/package.json", { name: "bar" });
@@ -500,7 +541,10 @@ describe("code_orientation instruction-file reconstruction", () => {
   });
 });
 
-function orientationResultEntry(directory: string) {
+function orientationResultEntry(
+  directory: string,
+  file: { truncated?: boolean; exceedsOutputLimit?: boolean } = {},
+) {
   return {
     type: "message",
     message: {
@@ -510,7 +554,7 @@ function orientationResultEntry(directory: string) {
         type: "context",
         data: {
           instructions: {
-            files: [{ directory }],
+            files: [{ directory, ...file }],
           },
         },
       },

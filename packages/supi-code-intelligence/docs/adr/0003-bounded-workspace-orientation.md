@@ -23,7 +23,7 @@ Supersedes the content, rendering, and warning decisions in [Workspace Overview]
 | Warning channel | Send soft warnings to UI and debug, not model-facing text. |
 | Omitted evidence | Link captured details in the overview only when navigation rows or descriptions are omitted. Explicit workspace/directory Orientation also preserves raw inventory evidence. Captures retain raw collected facts and the complete navigation rendering. Use a concise notice that identifies the file as not a fresh scan; retain explicit recovery guidance when the hard cap removes the inline map. |
 | Instructions | Keep applicable trusted instruction files inline once per context, with branch-aware deduplication and re-delivery after compaction. Their budget is separate from navigation. |
-| Instruction limits | Keep the 200-line per-file limit and the final tool safety limit. Identify unread remainders. Do not record text as supplied when it was not shown. |
+| Instruction limits | All instruction files of one result share the final tool safety limit, deepest file first; there is no per-file limit ([ADR 0013](../../../../docs/adr/0013-instruction-files-in-code-orientation.md), [#690](https://github.com/mrclrchtr/supi/issues/690)). Cut at whole lines and identify unread remainders with their `read` offset. Do not record a file as supplied when it was cut for other files' budget; a file that alone exceeds the limit is recorded after one delivery. |
 | Scope | Keep file- and symbol-focused navigation unchanged. |
 
 ## Collection limits

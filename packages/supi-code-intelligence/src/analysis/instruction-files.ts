@@ -4,8 +4,6 @@ import { readFileSync, realpathSync, statSync } from "node:fs";
 import * as path from "node:path";
 import { isWithinOrEqual } from "@mrclrchtr/supi-core/project";
 
-export const INSTRUCTION_FILE_LINE_LIMIT = 200;
-
 /** Directory-local instruction file selected for orientation output. */
 export interface InstructionFileMatch {
   /** Absolute file path. */
@@ -30,7 +28,15 @@ export interface RenderedInstructionFile {
 
 /** Structured metadata stored in code_orientation details. */
 export interface InstructionFilesMetadata {
-  files: Array<Omit<RenderedInstructionFile, "content">>;
+  files: Array<
+    Omit<RenderedInstructionFile, "content"> & {
+      /**
+       * The file was cut because it alone exceeds the tool output limit. It counts as surfaced
+       * after one delivery, since no later Orientation can show it in full.
+       */
+      exceedsOutputLimit?: boolean;
+    }
+  >;
 }
 
 /**
@@ -182,12 +188,15 @@ function findFirstInstructionFile(
   return null;
 }
 
-/** Read bounded instruction-file facts for session-owned Orientation. */
+/**
+ * Read complete instruction-file facts for session-owned Orientation. Files are not cut here:
+ * the tool output limit is applied once to the whole Orientation result, see
+ * `fitWorkspaceInstructions`.
+ */
 export function collectInstructionFiles(
   files: InstructionFileMatch[],
-  lineLimit = INSTRUCTION_FILE_LINE_LIMIT,
 ): { files: RenderedInstructionFile[]; metadata: InstructionFilesMetadata } | null {
-  const rendered = files.map((file) => renderInstructionFile(file, lineLimit)).filter(isRendered);
+  const rendered = files.map(renderInstructionFile).filter(isRendered);
   if (rendered.length === 0) return null;
   return {
     files: rendered,
@@ -205,23 +214,19 @@ function isFile(candidate: string): boolean {
   }
 }
 
-function renderInstructionFile(
-  file: InstructionFileMatch,
-  lineLimit: number,
-): RenderedInstructionFile | null {
+function renderInstructionFile(file: InstructionFileMatch): RenderedInstructionFile | null {
   try {
     const content = readFileSync(file.absolutePath, "utf-8").trim();
     if (!content) return null;
 
-    const lines = content.split("\n");
-    const shown = lines.slice(0, lineLimit);
+    const totalLines = content.split("\n").length;
     return {
       path: file.relativePath,
       directory: file.relativeDirectory,
-      shownLines: shown.length,
-      totalLines: lines.length,
-      truncated: lines.length > shown.length,
-      content: shown.join("\n"),
+      shownLines: totalLines,
+      totalLines,
+      truncated: false,
+      content,
     };
   } catch {
     return null;

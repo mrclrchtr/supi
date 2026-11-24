@@ -23,9 +23,13 @@ export async function executeOrientationTool(
   );
   const result = finishOrientationResult(outcome, ctx.cwd);
   if (result.details?.type === "context") {
+    // A file cut to make room for other instruction files is not surfaced: later Orientation
+    // supplies it again. A file that alone exceeds the output limit is surfaced once.
     const supplied = result.details.data.instructions?.files ?? [];
     ctx.session.markInstructionDirsSurfaced(
-      supplied.filter((file) => file.shownLines > 0).map((file) => file.directory),
+      supplied
+        .filter((file) => !file.truncated || file.exceedsOutputLimit)
+        .map((file) => file.directory),
     );
   }
   return result;

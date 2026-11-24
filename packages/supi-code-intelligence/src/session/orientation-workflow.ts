@@ -263,14 +263,8 @@ function addInstructionFiles(
     items.push(
       { kind: "subheading", text: file.path },
       { kind: "code", language: null, lines: file.content.split("\n") },
+      { kind: "blank" },
     );
-    if (file.truncated) {
-      items.push({
-        kind: "paragraph",
-        text: `Instruction file truncated to ${file.shownLines} of ${file.totalLines} lines. Read ${file.path} for the full file.`,
-      });
-    }
-    items.push({ kind: "blank" });
   }
   const section: OrientationSectionData = {
     key: "instructions",

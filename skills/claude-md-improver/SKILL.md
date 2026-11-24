@@ -35,7 +35,7 @@ Audit, evaluate, and improve CLAUDE.md files across a codebase to ensure Pi has 
 | `supi-code-intelligence` overview | Complete discovered module graph | Module names, descriptions, entrypoints, dependency relationships, languages | **Root-level / first turn** |
 | `code_orientation` | Workspace facts | Package paths, manifests, dependency relationships, direct root entries | **Root-level / on demand** |
 | `code_orientation` | Directory and file facts | Direct entries, package declarations/dependencies, outlines/imports/exports | **Package-specific / on demand** |
-| `code_orientation` | Instruction-file surfacing | Configured `CLAUDE.md`/`AGENTS.md` files for trusted directory focus, up to 200 lines per file | **Package-specific / on demand** |
+| `code_orientation` | Instruction-file surfacing | Configured `CLAUDE.md`/`AGENTS.md` files for trusted directory focus, in full within the tool output limit (about 50 KB for all files) | **Package-specific / on demand** |
 | `native-pi` | Root instructions | Context files in the cwd/ancestor chain | **Root-level / first turn** |
 
 Add rows for other visible sources. Do not treat an instruction file as redundant merely because `code_orientation` is how its contents reach the model; compare its contents with the other facts Orientation provides.

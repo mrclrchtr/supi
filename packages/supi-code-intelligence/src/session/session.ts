@@ -531,14 +531,27 @@ function extractInstructionDirectories(entry: SessionEntry): string[] {
   if (entry.message.toolName !== "code_orientation") return [];
 
   const details = entry.message.details as
-    | { type?: string; data?: { instructions?: { files?: Array<{ directory?: unknown }> } } }
+    | {
+        type?: string;
+        data?: {
+          instructions?: {
+            files?: Array<{
+              directory?: unknown;
+              truncated?: unknown;
+              exceedsOutputLimit?: unknown;
+            }>;
+          };
+        };
+      }
     | undefined;
   if (details?.type !== "context") return [];
 
   const files = details.data?.instructions?.files;
   if (!Array.isArray(files)) return [];
 
+  // Same rule as the live path in code_orientation/execute.ts.
   return files
+    .filter((file) => file.truncated !== true || file.exceedsOutputLimit === true)
     .map((file) => file.directory)
     .filter((directory): directory is string => typeof directory === "string");
 }

@@ -137,14 +137,71 @@ describe("public workspace output safety", () => {
     put("notes/CLAUDE.md", content);
     const pi = create();
     for (let index = 0; index < 2; index++) {
-      const { result, text, snapshot } = await orient(pi, { focus: { path: "notes" } });
+      const { result, text } = await orient(pi, { focus: { path: "notes" } });
       expect(Buffer.byteLength(text)).toBeLessThan(50 * 1024);
-      expect(text).toContain("Instruction file truncated to 0 of 1 lines");
-      expect(text).toContain("Some instruction text was not supplied");
+      expect(text).toContain(
+        "Instruction file truncated to 0 of 1 lines. Read `notes/CLAUDE.md` with offset 1",
+      );
       expect(result.details).toMatchObject({ data: { instructions: { files: [] } } });
-      expect(snapshot).toBeDefined();
-      expect(readFileSync(snapshot as string, "utf8")).toContain(content.trimEnd());
     }
+  });
+
+  it("cuts a file over the output limit at whole lines and supplies it once", async () => {
+    const lines = Array.from({ length: 2000 }, (_, index) => `rule ${index + 1} ${"x".repeat(40)}`);
+    put("notes/CLAUDE.md", lines.join("\n"));
+    const pi = create();
+    const { result, text } = await orient(pi, { focus: { path: "notes" } });
+    expect(Buffer.byteLength(text)).toBeLessThan(50 * 1024);
+    const shown = (
+      result.details as {
+        data: { instructions: { files: Array<{ shownLines: number; truncated: boolean }> } };
+      }
+    ).data.instructions.files[0];
+    expect(shown).toMatchObject({ truncated: true, exceedsOutputLimit: true });
+    expect(shown.shownLines).toBeGreaterThan(900);
+    expect(text).toContain(`rule ${shown.shownLines} `);
+    expect(text).not.toContain(`rule ${shown.shownLines + 1} `);
+    expect(text).toContain(
+      `Instruction file truncated to ${shown.shownLines} of 2000 lines. Read \`notes/CLAUDE.md\` with offset ${shown.shownLines + 1}`,
+    );
+    const second = await orient(pi, { focus: { path: "notes" } });
+    expect(second.text).not.toContain("### notes/CLAUDE.md");
+    expect(second.text).toContain("not repeated: `notes/CLAUDE.md`");
+  });
+
+  it("supplies a file cut for another instruction file's budget again", async () => {
+    put("notes/CLAUDE.md", `outer ${"o".repeat(30_000)}`);
+    put("notes/inner/CLAUDE.md", `inner ${"i".repeat(30_000)}`);
+    const pi = create();
+    const first = await orient(pi, { focus: { path: "notes/inner" } });
+    expect(first.result.details).toMatchObject({
+      data: {
+        instructions: {
+          files: [expect.objectContaining({ path: "notes/inner/CLAUDE.md", truncated: false })],
+        },
+      },
+    });
+    expect(first.text).toContain("Read `notes/CLAUDE.md` with offset 1");
+    const second = await orient(pi, { focus: { path: "notes/inner" } });
+    expect(second.text).toContain(`outer ${"o".repeat(30_000)}`);
+    expect(second.text).not.toContain("### notes/inner/CLAUDE.md");
+  });
+
+  it("gives the deepest instruction file the budget first", async () => {
+    put("notes/CLAUDE.md", `outer ${"o".repeat(60_000)}`);
+    put("notes/inner/CLAUDE.md", "Inner rule.\n");
+    const { result, text } = await orient(create(), { focus: { path: "notes/inner" } });
+    expect(text).toContain("Inner rule.");
+    expect(text.indexOf("### notes/CLAUDE.md")).toBeLessThan(
+      text.indexOf("### notes/inner/CLAUDE.md"),
+    );
+    expect(result.details).toMatchObject({
+      data: {
+        instructions: {
+          files: [expect.objectContaining({ path: "notes/inner/CLAUDE.md", truncated: false })],
+        },
+      },
+    });
   });
 
   it("captures raw declarations and inventory without refreshing them", async () => {

@@ -79,5 +79,5 @@ A directory-local agent guidance file, such as `CLAUDE.md` or `AGENTS.md`, that 
 _Avoid_: claude-md file, context file
 
 **Instruction-File Surfacing**:
-The mechanism by which `code_orientation` with directory focus surfaces directory-local instruction files into agent context. Surfaced files are guidance chrome, not tool evidence, and have a 200-line per-file display limit. Root instruction files are loaded by pi's system prompt, not by this mechanism.
+The mechanism by which `code_orientation` with directory focus surfaces directory-local instruction files into agent context. Surfaced files are guidance chrome, not tool evidence, and share the tool output limit, deepest file first; a file over the remaining budget is cut at a whole line. Root instruction files are loaded by pi's system prompt, not by this mechanism.
 _Avoid_: instruction-file injection, auto-context, CLAUDE.md injection

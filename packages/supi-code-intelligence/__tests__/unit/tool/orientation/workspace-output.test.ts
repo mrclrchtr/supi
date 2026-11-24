@@ -157,7 +157,7 @@ describe("workspace Orientation output", () => {
     expect(captured).not.toMatch(/service.*node-workspace/);
   });
 
-  it("defers directory metadata while capturing dependency categories and instructions intact", async () => {
+  it("defers directory metadata while capturing dependency categories and an instruction index", async () => {
     put("package.json", JSON.stringify({ name: "root", workspaces: ["units/*"] }));
     put(
       "units/app/package.json",
@@ -188,7 +188,8 @@ describe("workspace Orientation output", () => {
     expect(captured).toContain("devDependencies: workspace:*");
     expect(captured.match(/ -->/g)).toHaveLength(2);
     expect(captured).toContain("example.com/fixture");
-    expect(captured).toContain("Keep caller data private.");
+    expect(captured).toContain("`units/app/CLAUDE.md`: 1 of 1 lines shown in the tool result.");
+    expect(captured).not.toContain("Keep caller data private.");
     expect(captured).toContain('"inventory"');
   });
 

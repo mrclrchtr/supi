@@ -1,5 +1,9 @@
 # Changelog
 
+## [16.0.0]
+
+- `code_orientation` with a directory focus shows instruction files (`CLAUDE.md`, `AGENTS.md`) in full instead of cutting each one after 200 lines. Rules after line 200 were dropped from files that fit easily, such as a 218-line `src/AGENTS.md` of 14 KB; Reviewers rarely read the remainder. All instruction files of one result now share Pi's tool output limit (50 KB / 2000 lines), and the deepest, most specific file gets it first. A file over the remaining budget is cut after the last whole line that fits, with `Read <path> with offset N for the unread remainder.` A file cut to make room for other instruction files no longer counts as already supplied, so a later call shows it again; a file that alone exceeds the limit is supplied once. The captured details file lists instruction files with their shown line counts instead of copying their text ([#690](https://github.com/mrclrchtr/supi/issues/690)).
+
 ## [15.0.0]
 
 - When a caller's time limit fires during file diagnostics, the request now fails as an interruption instead of reporting the file as unavailable (`Diagnostic collection failed closed: Code request deadline exceeded`) ([#660](https://github.com/mrclrchtr/supi/issues/660)).
