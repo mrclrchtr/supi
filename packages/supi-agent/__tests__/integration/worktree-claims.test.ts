@@ -68,8 +68,8 @@ describe("Worktree Claim resolution", () => {
       }),
     ).resolves.toEqual({
       conflicts: [
-        { taskId: "sub", root: linkedA, heldBy: 'task "first" of this batch' },
-        { taskId: "alias", root: linkedA, heldBy: 'task "first" of this batch' },
+        { taskId: "sub", root: linkedA, heldBy: 'task "first" of this batch', session: false },
+        { taskId: "alias", root: linkedA, heldBy: 'task "first" of this batch', session: false },
       ],
     });
   });
@@ -81,7 +81,9 @@ describe("Worktree Claim resolution", () => {
         tasks: [writer("late", join(linkedB, "."))],
         activeClaims: new Map([[linkedB, "an active run"]]),
       }),
-    ).resolves.toEqual({ conflicts: [{ taskId: "late", root: linkedB, heldBy: "an active run" }] });
+    ).resolves.toEqual({
+      conflicts: [{ taskId: "late", root: linkedB, heldBy: "an active run", session: true }],
+    });
   });
 
   it("lets read-only tasks share a claimed worktree", async () => {

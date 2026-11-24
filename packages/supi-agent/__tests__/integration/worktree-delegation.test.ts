@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, realpathSync, symlinkSync } from "node:fs";
 import { join } from "node:path";
+import { configureDebugRegistry, subscribeDebugPersistence } from "@mrclrchtr/supi-core/debug";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { backgroundHarness, task } from "../helpers/background-harness.ts";
 import { deadPid, git, lockReasons, repositoryTemplate } from "../helpers/git-fixture.ts";
@@ -193,6 +194,79 @@ describe("lease lifetime", () => {
     await h.invoke("agent_result", { batchId: start.details.batchId, wait: true });
     await vi.waitFor(() => expect(lockReasons(h.ctx.cwd).size).toBe(0));
     expect(existsSync(wt.a)).toBe(true);
+  });
+
+  describe("while the holder completes its retrospective", () => {
+    let detach: (() => void) | undefined;
+    afterEach(() => {
+      detach?.();
+      configureDebugRegistry({ enabled: false, agentRunRetrospectivesEnabled: false });
+    });
+
+    /** Start a writer in `cwd`, publish its task result, and leave it in its retrospective. */
+    async function retrospecting(h: NonNullable<typeof harness>, cwd: string) {
+      configureDebugRegistry({ enabled: true, agentRunRetrospectivesEnabled: true });
+      detach = subscribeDebugPersistence(vi.fn());
+      const start = await h.invoke("agent_run", { tasks: [writer("done", cwd)] });
+      await vi.waitFor(() => expect(streaming()).toHaveLength(1));
+      h.child("done").finish("Done.");
+      await vi.waitFor(() => expect(h.child("done").session.prompt).toHaveBeenCalledTimes(2));
+      return start;
+    }
+
+    it("admits a waiting writer once the holder releases the worktree", async () => {
+      const { h, wt } = await setup();
+      await retrospecting(h, wt.a);
+      let admitted = false;
+      const next = h.invoke("agent_run", { tasks: [writer("next", wt.a)] }).then((value) => {
+        admitted = true;
+        return value;
+      });
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      expect(admitted).toBe(false);
+      expect(h.children).toHaveLength(1);
+
+      h.child("done").finish("Nothing notable.");
+      expect((await next).details).toMatchObject({ mode: "background" });
+      await vi.waitFor(() => expect(streaming()).toHaveLength(1));
+      expect(h.child("next").session.sessionManager.getCwd()).toBe(wt.a);
+      expect(lockReasons(h.ctx.cwd).get(wt.a)).toMatch(/^supi-agent:delegation:/);
+    });
+
+    it("rejects a waiting writer with the holder's state when the wait times out", async () => {
+      const { h, wt } = await setup();
+      await retrospecting(h, wt.a);
+      // Fake only timeouts; Git child processes and waitFor keep real time.
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"], shouldAdvanceTime: true });
+      const next = h.invoke("agent_run", { tasks: [writer("next", wt.a)] });
+      const rejected = expect(next).rejects.toThrow(
+        /next: Worktree .* is held by task "done", which has finished .*retry in a few seconds/,
+      );
+      let settled = false;
+      void next.catch(() => undefined).finally(() => (settled = true));
+      // Resolution spawns Git, so the wait may start after the first advance.
+      await vi.waitFor(async () => {
+        await vi.advanceTimersByTimeAsync(60_001);
+        expect(settled).toBe(true);
+      });
+      vi.useRealTimers();
+      await rejected;
+      expect(h.children).toHaveLength(1);
+    });
+
+    it("rejects immediately when another conflict is with a running writer", async () => {
+      const { h, wt } = await setup();
+      await retrospecting(h, wt.a);
+      await h.invoke("agent_run", { tasks: [writer("busy", wt.b)] });
+      await vi.waitFor(() => expect(streaming()).toHaveLength(2));
+      const error = await h
+        .invoke("agent_run", { tasks: [writer("x", wt.a), writer("y", wt.b)] })
+        .catch((reason: Error) => reason);
+      expect((error as Error).message).toMatch(
+        /x: Worktree .* held by task "done", which has finished/,
+      );
+      expect((error as Error).message).toMatch(/y: .*already claimed by task "busy"/);
+    });
   });
 
   it("releases the lease after a failure", async () => {

@@ -34,14 +34,16 @@ export interface WorktreeClaimConflict {
   readonly taskId: string;
   readonly root: string;
   readonly heldBy: string;
+  /** True when an active claim of the session holds the root, false for a claim of this batch. */
+  readonly session: boolean;
 }
 
 /** Inputs of {@link resolveWorktreeClaims}. */
 export interface ResolveWorktreeClaimsOptions {
   readonly parentCwd: string;
   readonly tasks: readonly WorktreeClaimTask[];
-  /** Holders of the session's active claims by canonical root. */
-  readonly activeClaims: ReadonlyMap<string, string>;
+  /** Holders of the session's active claims by canonical root, read after worktrees resolve. */
+  readonly activeClaims: Pick<ReadonlyMap<string, string>, "get">;
   readonly signal?: AbortSignal;
 }
 
@@ -65,9 +67,10 @@ export async function resolveWorktreeClaims(
   const batchHolders = new Map<string, string>();
   writers.forEach((task, index) => {
     const { root, linked } = located[index] as WorktreeDescription;
-    const heldBy = options.activeClaims.get(root) ?? batchHolders.get(root);
+    const sessionHolder = options.activeClaims.get(root);
+    const heldBy = sessionHolder ?? batchHolders.get(root);
     if (heldBy !== undefined) {
-      conflicts.push({ taskId: task.taskId, root, heldBy });
+      conflicts.push({ taskId: task.taskId, root, heldBy, session: sessionHolder !== undefined });
       return;
     }
     batchHolders.set(root, `task "${task.taskId}" of this batch`);
@@ -128,37 +131,89 @@ async function locateWorktree(cwd: string, signal?: AbortSignal): Promise<Worktr
   }
 }
 
+/** A reserved set of claims; see {@link WorktreeClaimTable.reserve}. */
+export interface WorktreeClaimReservation {
+  /** Mark the claim of a task whose result is published; it is held only until disposal. */
+  finish(taskId: string): void;
+  /** Release every claim of the reservation. Idempotent. */
+  release(): void;
+}
+
+interface ClaimHolder {
+  readonly taskId: string;
+  finishing: boolean;
+}
+
 /**
  * The session's active Worktree Claims by canonical root. Reservation is synchronous, so two
- * concurrent `agent_run` starts cannot both reserve one root.
+ * concurrent `agent_run` starts cannot both reserve one root. A claim whose task has published
+ * its result stays held until the run has disposed its resources (after any retrospective), but
+ * is marked finishing so a waiting start can tell it will be released soon.
  */
 export class WorktreeClaimTable {
-  readonly #holders = new Map<string, string>();
+  readonly #holders = new Map<string, ClaimHolder>();
+  #releaseWaiters: Array<() => void> = [];
 
-  /** Holder descriptions by canonical root. */
-  holders(): ReadonlyMap<string, string> {
-    return this.#holders;
+  /** Live holder descriptions by canonical root. */
+  holders(): Pick<ReadonlyMap<string, string>, "get"> {
+    return {
+      get: (root) => {
+        const holder = this.#holders.get(root);
+        return holder && `task "${holder.taskId}" of an active batch`;
+      },
+    };
   }
 
-  /**
-   * Reserve every claim or none. Throws when a root became claimed since resolution. Returns an
-   * idempotent release.
-   */
-  reserve(claims: readonly WorktreeClaim[]): () => void {
+  /** Whether a session claim holds the root. */
+  holds(root: string): boolean {
+    return this.#holders.has(root);
+  }
+
+  /** The task ID of the finishing claim that holds the root, if any. */
+  finishingHolder(root: string): string | undefined {
+    const holder = this.#holders.get(root);
+    return holder?.finishing ? holder.taskId : undefined;
+  }
+
+  /** Resolve on the next release of any claim. */
+  nextRelease(): Promise<void> {
+    return new Promise((resolve) => this.#releaseWaiters.push(resolve));
+  }
+
+  /** Reserve every claim or none. Throws when a root became claimed since resolution. */
+  reserve(claims: readonly WorktreeClaim[]): WorktreeClaimReservation {
     const conflict = claims.find((claim) => this.#holders.has(claim.root));
     if (conflict) {
+      const finishing = this.finishingHolder(conflict.root);
       throw new Error(
-        `${conflict.taskId}: ${worktreeConflictMessage(conflict.root, this.#holders.get(conflict.root) ?? "another task")}`,
+        `${conflict.taskId}: ${
+          finishing === undefined
+            ? worktreeConflictMessage(
+                conflict.root,
+                this.holders().get(conflict.root) ?? "another task",
+              )
+            : worktreeFinishingMessage(conflict.root, finishing)
+        }`,
       );
     }
-    for (const claim of claims) {
-      this.#holders.set(claim.root, `task "${claim.taskId}" of an active batch`);
-    }
+    const holders = claims.map((claim) => {
+      const holder: ClaimHolder = { taskId: claim.taskId, finishing: false };
+      this.#holders.set(claim.root, holder);
+      return holder;
+    });
     let released = false;
-    return () => {
-      if (released) return;
-      released = true;
-      for (const claim of claims) this.#holders.delete(claim.root);
+    return {
+      finish: (taskId) => {
+        for (const holder of holders) if (holder.taskId === taskId) holder.finishing = true;
+      },
+      release: () => {
+        if (released) return;
+        released = true;
+        for (const claim of claims) this.#holders.delete(claim.root);
+        const waiters = this.#releaseWaiters;
+        this.#releaseWaiters = [];
+        for (const waiter of waiters) waiter();
+      },
     };
   }
 }
@@ -166,4 +221,9 @@ export class WorktreeClaimTable {
 /** Actionable text for a writer whose worktree another writer already claims. */
 export function worktreeConflictMessage(root: string, heldBy: string): string {
   return `Worktree ${root} is already claimed by ${heldBy}. Give each writer its own linked worktree with new.cwd.`;
+}
+
+/** Actionable text for a writer whose worktree a finished task has not released yet. */
+export function worktreeFinishingMessage(root: string, taskId: string): string {
+  return `Worktree ${root} is held by task "${taskId}", which has finished and is completing its retrospective or cleanup; retry in a few seconds.`;
 }

@@ -15,9 +15,15 @@ import {
   acquireWorktreeClaimLeases,
   resolveWorktreeClaims,
   type WorktreeClaim,
+  type WorktreeClaimConflict,
+  type WorktreeClaimReservation,
   WorktreeClaimTable,
   worktreeConflictMessage,
+  worktreeFinishingMessage,
 } from "./worktree-claims.ts";
+
+/** How long a start waits for finishing writers to release the worktrees it needs. */
+const FINISHING_CLAIM_WAIT_MS = 60_000;
 
 /** Agent data kept with each session-owned Delegation Batch. */
 export interface DelegationBatchData {
@@ -94,9 +100,9 @@ export class DelegationController {
       );
     }
     const releaseStarting = this.#conversationState.reserveStarting(preflight.tasks);
-    let releaseClaims: () => void;
+    let reservation: WorktreeClaimReservation;
     try {
-      releaseClaims = this.#claims.reserve(claims);
+      reservation = this.#claims.reserve(claims);
     } catch (error) {
       releaseStarting();
       throw rejection([(error as Error).message]);
@@ -118,7 +124,7 @@ export class DelegationController {
           begun = true;
           return beginWithLeases(
             claims,
-            releaseClaims,
+            reservation.release,
             control.signal,
             (onDisposed, handOffRelease) =>
               startDelegationBatchWithAuxiliaryModels(
@@ -128,7 +134,10 @@ export class DelegationController {
                   cwd: ctx.cwd,
                   registry: this.registry,
                   ...(mode === "foreground" ? { signal: ctx.signal, onUpdate } : {}),
-                  onTaskResult: (_result, batchId) => control.taskSettled(batchId),
+                  onTaskResult: (result, batchId) => {
+                    reservation.finish(result.taskId);
+                    control.taskSettled(batchId);
+                  },
                   onDisposed,
                 },
                 () => {
@@ -145,7 +154,7 @@ export class DelegationController {
       })
       .catch((error: unknown) => {
         // A start refused before `begin` never reaches the lease owner.
-        if (!begun) releaseClaims();
+        if (!begun) reservation.release();
         throw error;
       })
       .finally(() => {
@@ -154,30 +163,56 @@ export class DelegationController {
       });
   }
 
-  /** Resolve the batch's Worktree Claims; any conflict rejects the whole batch. */
+  /**
+   * Resolve the batch's Worktree Claims; any conflict rejects the whole batch. When every conflict
+   * is with a session claim whose task has already published its result, wait (bounded) for those
+   * claims to be released, then resolve again.
+   */
   async #resolveClaims(
     tasks: readonly ResolvedTask[],
     ctx: ExtensionContext,
   ): Promise<WorktreeClaim[]> {
-    const resolution = await resolveWorktreeClaims({
-      parentCwd: ctx.cwd,
-      tasks: tasks.map((task) => ({
-        taskId: task.taskId,
-        readOnly: isReadOnlyCapabilitySet(task.profile.manifest.tools),
-        cwd: task.inputs.cwd,
-      })),
-      activeClaims: this.#claims.holders(),
-      ...(ctx.signal ? { signal: ctx.signal } : {}),
-    });
-    if ("conflicts" in resolution) {
-      throw rejection(
-        resolution.conflicts.map(
-          (conflict) =>
-            `${conflict.taskId}: ${worktreeConflictMessage(conflict.root, conflict.heldBy)}`,
-        ),
-      );
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let timedOut: Promise<"timeout"> | undefined;
+    let expired = false;
+    try {
+      for (;;) {
+        const resolution = await resolveWorktreeClaims({
+          parentCwd: ctx.cwd,
+          tasks: tasks.map((task) => ({
+            taskId: task.taskId,
+            readOnly: isReadOnlyCapabilitySet(task.profile.manifest.tools),
+            cwd: task.inputs.cwd,
+          })),
+          activeClaims: this.#claims.holders(),
+          ...(ctx.signal ? { signal: ctx.signal } : {}),
+        });
+        if ("claims" in resolution) return resolution.claims;
+        const finishing = (conflict: WorktreeClaimConflict) =>
+          conflict.session ? this.#claims.finishingHolder(conflict.root) : undefined;
+        if (expired || resolution.conflicts.some((conflict) => finishing(conflict) === undefined)) {
+          throw rejection(
+            resolution.conflicts.map((conflict) => {
+              const holder = finishing(conflict);
+              return `${conflict.taskId}: ${
+                holder === undefined
+                  ? worktreeConflictMessage(conflict.root, conflict.heldBy)
+                  : worktreeFinishingMessage(conflict.root, holder)
+              }`;
+            }),
+          );
+        }
+        const roots = resolution.conflicts.map((conflict) => conflict.root);
+        timedOut ??= new Promise((resolve) => {
+          timer = setTimeout(() => resolve("timeout"), FINISHING_CLAIM_WAIT_MS);
+        });
+        // Resolve again on timeout so the rejection names the current holders.
+        expired = (await waitForRelease(this.#claims, roots, timedOut, ctx.signal)) === "timeout";
+        if (ctx.signal?.aborted) throw new Error("Delegation start canceled.");
+      }
+    } finally {
+      clearTimeout(timer);
     }
-    return resolution.claims;
   }
 
   /** Prepare one collection payload, omitting checkpoints already stored or claimed. */
@@ -211,6 +246,34 @@ export class DelegationController {
       ctx.sessionManager.getBranch(),
       (batch) => this.batches.isOnBranch(batch),
     );
+  }
+}
+
+/** Wait until none of the roots is held any more, the wait times out, or the start is aborted. */
+async function waitForRelease(
+  table: WorktreeClaimTable,
+  roots: readonly string[],
+  timedOut: Promise<"timeout">,
+  signal: AbortSignal | undefined,
+): Promise<"released" | "timeout" | "aborted"> {
+  let onAbort: (() => void) | undefined;
+  const aborted = new Promise<"aborted">((resolve) => {
+    onAbort = () => resolve("aborted");
+    if (signal?.aborted) onAbort();
+    else signal?.addEventListener("abort", onAbort, { once: true });
+  });
+  try {
+    while (roots.some((root) => table.holds(root))) {
+      const outcome = await Promise.race([
+        table.nextRelease().then(() => "released" as const),
+        timedOut,
+        aborted,
+      ]);
+      if (outcome !== "released") return outcome;
+    }
+    return "released";
+  } finally {
+    if (onAbort) signal?.removeEventListener("abort", onAbort);
   }
 }
 
