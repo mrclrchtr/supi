@@ -1,7 +1,7 @@
 [tools]
 node = "26.13.1"
 pnpm = "12.21.0"
-hk = "2.13.0"
+hk = "2.14.0"
 pkl = "0.33.1"
 jactionlint = "2.6.0"
 shellcheck = "0.11.0"
