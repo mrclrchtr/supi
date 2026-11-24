@@ -1,6 +1,5 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { AgentRunContext, AgentSessionInputs } from "@mrclrchtr/supi-agent-runtime/api";
-import { createAgentRunProviderAuthority } from "@mrclrchtr/supi-agent-runtime/api";
 import type { ChildWebToolProvision } from "@mrclrchtr/supi-core/session";
 import { isReadOnlyCapabilitySet } from "../../capabilities.ts";
 import type { DelegationCheckpoint } from "../../delegation/checkpoints.ts";
@@ -8,7 +7,7 @@ import {
   type ConversationTargetResult,
   createConversationTargetResolver,
 } from "../../delegation/conversation-state.ts";
-import { resolveAgentProfile } from "../../model-policy.ts";
+import { buildModelContext, resolveAgentProfile } from "../../model-policy.ts";
 import { resolveProfileDefinition } from "../../profile-catalogue.ts";
 import { resolveAgentDirectory } from "../../resources.ts";
 import type { AgentModelContext, AgentProfile, ProfileCatalogue } from "../../types.ts";
@@ -206,17 +205,4 @@ function duplicateTaskErrors(params: AgentRunToolParams): PreflightError[] {
 
 function taskProfile(task: AgentRunTaskInput): string {
   return "new" in task ? task.new.profile : "(continue)";
-}
-
-function buildModelContext(ctx: ExtensionContext): AgentModelContext {
-  return {
-    providerAuthority: createAgentRunProviderAuthority(ctx.modelRegistry),
-    currentModel: ctx.model,
-    currentThinkingLevel: ctx.thinkingLevel,
-    scopedModels: ctx.scopedModels.map((entry) => ({
-      model: entry.model,
-      thinkingLevel: entry.thinkingLevel,
-    })),
-    modelRegistry: ctx.modelRegistry,
-  };
 }

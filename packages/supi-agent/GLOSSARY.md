@@ -111,3 +111,15 @@ _Avoid_: Writer agent, unsafe profile
 **Read-Only Profile**:
 An Agent Profile restricted to tools that cannot intentionally change workspace state.
 _Avoid_: Safe profile, inspection-only reviewer
+
+**Plan Critique**:
+One run of `/supi-plan-critique`, from taking the Plan Author's last answer verbatim to delivering the Plan Critic's closing message inside a fixed frame. Each Plan Critique starts a new Plan Critic; nothing is sent after a failure, cancellation, or an empty closing message.
+_Avoid_: Review, plan review, second opinion
+
+**Plan Critic**:
+The managed child agent that checks one plan with a fresh context in the session's working directory and ends with a free-text closing message. It runs as an Agent Run with a fixed, package-owned policy defined in code. It is neither an Agent Profile nor a Delegation Task: it has no Profile Directory, is absent from the Profile Catalogue and the profile settings, and `agent_run` cannot select it.
+_Avoid_: Reviewer, Planner, critic profile
+
+**Plan Author**:
+The agent of the containing session whose last answer a Plan Critique checks. It receives the framed closing message as a user message, verifies the points itself, revises the plan, and implements nothing.
+_Avoid_: Parent agent, planner, author profile

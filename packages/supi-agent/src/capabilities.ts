@@ -1,3 +1,4 @@
+import type { AgentRunSessionView } from "@mrclrchtr/supi-agent-runtime/api";
 import type { AgentCapabilityId } from "./types.ts";
 
 /** Package-owned capability metadata used for validation and safety classification. */
@@ -133,4 +134,11 @@ export function effectiveCapabilities(
 /** Convert validated capability IDs to Pi's tool allowlist. */
 export function toAgentToolNames(tools: readonly AgentCapabilityId[]): string[] {
   return tools.map((tool) => byId.get(tool)?.toolName ?? tool);
+}
+
+/** Require every tool in the run's effective allowlist; unavailable Conditional Capabilities are already omitted. */
+export function makeReadinessCheck(
+  required: readonly string[],
+): (session: AgentRunSessionView) => boolean {
+  return (session) => required.every((name) => session.getActiveToolNames().includes(name));
 }

@@ -1,4 +1,6 @@
 import { clampThinkingLevel } from "@earendil-works/pi-ai";
+import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { createAgentRunProviderAuthority } from "@mrclrchtr/supi-agent-runtime/api";
 import { makeDiagnostic } from "./profile-validation.ts";
 import { createAgentSessionInputs } from "./resources.ts";
 import type {
@@ -7,6 +9,20 @@ import type {
   ProfileDiagnostic,
   ResolvedAgentProfile,
 } from "./types.ts";
+
+/** Capture the containing session's model, thinking level, scope, and auth boundary. */
+export function buildModelContext(ctx: ExtensionContext): AgentModelContext {
+  return {
+    providerAuthority: createAgentRunProviderAuthority(ctx.modelRegistry),
+    currentModel: ctx.model,
+    currentThinkingLevel: ctx.thinkingLevel,
+    scopedModels: ctx.scopedModels.map((entry) => ({
+      model: entry.model,
+      thinkingLevel: entry.thinkingLevel,
+    })),
+    modelRegistry: ctx.modelRegistry,
+  };
+}
 
 /** Resolve one profile against the containing session's model/auth boundary. */
 export function resolveAgentProfile(

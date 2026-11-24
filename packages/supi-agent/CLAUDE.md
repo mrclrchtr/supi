@@ -2,7 +2,7 @@
 
 ## Scope
 
-`@mrclrchtr/supi-agent` owns Agent Profile discovery, validation, resource policy, and the fixed child capability catalogue. It is an installable Pi extension; Agent Run lifecycle mechanics belong to `@mrclrchtr/supi-agent-runtime`.
+`@mrclrchtr/supi-agent` owns Agent Profile discovery, validation, resource policy, and the fixed child capability catalogue. It also owns user-started Plan Critiques (`src/plan-critique/`): the Plan Critic is an Agent Run with a code-defined policy, never an Agent Profile in the catalogue or a Delegation Task. It is an installable Pi extension; Agent Run lifecycle mechanics belong to `@mrclrchtr/supi-agent-runtime`.
 
 ## Guidelines
 

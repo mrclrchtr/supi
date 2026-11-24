@@ -9,6 +9,7 @@ import {
   getAgentRunDiagnosticErrorRows,
   startRegisteredAgentRun,
 } from "@mrclrchtr/supi-agent-runtime/api";
+import { makeReadinessCheck } from "../../capabilities.ts";
 import { createDelegationCheckpoint } from "../../delegation/checkpoints.ts";
 import type { ResolvedTask } from "./batch-preflight.ts";
 import type { BatchTaskProgress, BatchTaskResult } from "./batch-types.ts";
@@ -388,11 +389,4 @@ function finalizeRejectedTask(context: FinalizeContext): BatchTaskResult {
     failureCode: "unexpected-runner-failure",
   });
   return result;
-}
-
-/** Require every tool in the run's effective allowlist; unavailable Conditional Capabilities are already omitted. */
-function makeReadinessCheck(
-  required: readonly string[],
-): (session: AgentRunSessionView) => boolean {
-  return (session) => required.every((name) => session.getActiveToolNames().includes(name));
 }
