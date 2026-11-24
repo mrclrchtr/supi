@@ -2,12 +2,14 @@ import {
   createIsolatedAgentResources,
   type IsolatedAgentResources,
 } from "@mrclrchtr/supi-agent-runtime/api";
-import headlessInspectionProfile from "@mrclrchtr/supi-code-intelligence/headless";
+import { createHeadlessInspectionProfile } from "@mrclrchtr/supi-code-intelligence/headless";
 import type { ChildWebToolProvision } from "@mrclrchtr/supi-core/session";
 
 /** Optional Reviewer Extension Set settings for one isolated child. */
 export interface IsolatedChildResourceOptions {
   headlessInspection?: boolean;
+  /** Instruction files embedded in the first prompt, seeded into headless Orientation dedup. */
+  knownInstructionPaths?: readonly string[];
   /** Load Pi codemode only for an explicitly opted-in Reviewer. */
   codemode?: boolean;
   /** Session-provided Web tools for Reviewer Web Access; omitted means none. */
@@ -17,7 +19,8 @@ export interface IsolatedChildResourceOptions {
 
 /**
  * Build Reviewer or Planner resources through the shared isolated Agent Run builder, with the
- * package-owned protocol as the complete system prompt and no instruction files.
+ * package-owned protocol as the complete system prompt and no context files. Reviewers receive
+ * repository instruction files in the Reviewer Packet instead.
  */
 export function createIsolatedChildResources(
   cwd: string,
@@ -35,7 +38,16 @@ export function createIsolatedChildResources(
       ? { webTools: { provision: options.webTools, toolNames: options.webTools.toolNames } }
       : {}),
     extensions: options.headlessInspection
-      ? [{ name: "supi-code-intelligence-headless", factory: headlessInspectionProfile }]
+      ? [
+          {
+            name: "supi-code-intelligence-headless",
+            factory: createHeadlessInspectionProfile({
+              ...(options.knownInstructionPaths
+                ? { knownInstructionPaths: options.knownInstructionPaths }
+                : {}),
+            }),
+          },
+        ]
       : [],
   });
 }

@@ -43,7 +43,7 @@ An external operating-system or container boundary around the whole Pi process, 
 _Avoid_: child sandbox, in-process sandbox
 
 **Inspection-only**:
-A behavioral protocol that permits repository inspection, read-only retrieval of identified Review Criteria Sources, Dependency Bootstrap, and, when Reviewer Web Access is enabled, web research that supports but never replaces Target Evidence, but forbids intentional changes to Target Evidence or Git history. Test verification means inspecting test code and requirement coverage; runtime checks are delegated to the containing Agent. It is not an access-control guarantee.
+A behavioral protocol that permits repository inspection, read-only retrieval of named Review Criteria Sources, Dependency Bootstrap, and, when Reviewer Web Access is enabled, web research that supports but never replaces Target Evidence, but forbids intentional changes to Target Evidence or Git history. Test verification means inspecting test code and requirement coverage; runtime checks are delegated to the containing Agent. It is not an access-control guarantee.
 _Avoid_: read-only, sandboxed, write-protected, runtime verification, web-only findings
 
 **Reviewer Extension Set**:
@@ -63,12 +63,16 @@ One independent, caller-defined review objective identified by a stable id, free
 _Avoid_: Reviewer Assignment, Review Track, instruction block
 
 **Review Criteria**:
-Caller-authorized requirements used to evaluate Target Evidence. They may be summarized in a Reviewer Packet but derive from identified authoritative sources, and they never have authority over the Reviewer Protocol or Review Task.
-_Avoid_: repository instructions, ambient context, task summary
+Requirements used to evaluate Target Evidence. They come from the Review Task, from sources it names, and from Repository Instruction Files, and they never have authority over the Reviewer Protocol or Review Task.
+_Avoid_: ambient context, task summary
 
 **Review Criteria Source**:
-A caller-identified authoritative issue or repository document from which Review Criteria derive. A reviewer may retrieve it when the supplied summary is insufficient; unavailable required source content makes Criteria Coverage incomplete.
+An authoritative issue, spec, or repository document named in a Review Task, from which Review Criteria derive. A reviewer may retrieve it when the quoted rules are insufficient; unavailable required source content makes Criteria Coverage incomplete.
 _Avoid_: shared context, Reviewer Packet
+
+**Repository Instruction File**:
+A configured instruction file (`code-intelligence.instructionFileNames`, by default `CLAUDE.md` or `AGENTS.md`) at the workspace root or in an ancestor directory of a changed or Review Scope path. The Review Engine embeds each one in full, with its SHA-256, in every Reviewer Packet as Review Criteria evidence.
+_Avoid_: context file, system prompt, Reviewer instructions
 
 **Criteria Coverage**:
 A required completed Review Task statement that the supplied Review Criteria were sufficient for the audit, or that unavailable source detail left coverage incomplete for a stated reason. Incomplete coverage preserves concrete findings but cannot support a definitive pass.

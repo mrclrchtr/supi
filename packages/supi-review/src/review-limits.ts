@@ -8,9 +8,12 @@ export const REVIEW_LIMITS = {
   findingTitleCharacters: 200,
   findingDescriptionCharacters: 8_000,
   locationPathCharacters: 4_096,
-  criteriaSourcesPerTask: 5,
-  criteriaReferenceCharacters: 256,
-  criteriaSummaryCharacters: 2_000,
+  /**
+   * Combined size of the Repository instruction files one Review embeds in every Reviewer Packet.
+   * About twice this repository's worst case (root plus every package file); a larger set
+   * fails the Review before fan-out instead of being embedded partially.
+   */
+  instructionFileBytes: 200_000,
   criteriaCoverageReasonCharacters: 500,
   recoveryDeclineReasonCharacters: 2_000,
   reviewScopePathsPerTarget: 16,

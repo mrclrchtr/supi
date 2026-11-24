@@ -138,12 +138,7 @@ async function editReviewInteractive(
     if (instructions === undefined) return undefined;
     const mode = await selectTaskMode(ctx, { id, mode: existing?.mode }, options.modes);
     if (!mode) return undefined;
-    tasks.push({
-      id,
-      instructions,
-      mode,
-      ...(existing?.criteriaSources?.length ? { criteriaSources: existing.criteriaSources } : {}),
-    });
+    tasks.push({ id, instructions, mode });
   }
 
   const sharedContext = await ctx.ui.editor(

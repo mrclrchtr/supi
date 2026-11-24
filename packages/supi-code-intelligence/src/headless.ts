@@ -18,30 +18,53 @@ export const HEADLESS_INSPECTION_TOOL_NAMES = [
 
 const inspectionToolNames = new Set<string>(HEADLESS_INSPECTION_TOOL_NAMES);
 
-/**
- * Register the managed-child profile: six inspection tools backed by the shared
- * Workspace provider host and instruction deduplication, without refactors, settings, UI, or
- * overview state.
- */
-export default function headlessInspectionProfile(pi: ExtensionAPI): void {
-  const sessions = createSessionCache();
-  const lspState = createLspAdapterState();
-  const gradle = registerGradleObservations(pi, { interactive: false });
-  registerLspSessionLifecycle(pi, lspState, (ctx) => {
-    const session = sessions.getOrCreate(ctx.cwd);
-    session.attachLspController(lspState.controller);
-    session.seedSentinelSnapshot(lspState.sentinelSnapshot);
-    session.setProjectTrusted(ctx.isProjectTrusted());
-    session.setGradleObserver(gradle.forContext(ctx));
-    session.setAutomaticPathPolicy(lspState.providerLease?.automaticPathPolicy ?? null);
-  });
-  registerInstructionDedup(pi, sessions.getOrCreate);
-  pi.on("session_shutdown", () => sessions.clear());
-
-  registerCodeIntelligenceTools(
-    pi,
-    sessions.getOrCreate,
-    undefined,
-    CODE_INTELLIGENCE_TOOL_SPECS.filter((spec) => inspectionToolNames.has(spec.name)),
-  );
+/** Options for {@link createHeadlessInspectionProfile}. */
+export interface HeadlessInspectionProfileOptions {
+  /**
+   * Workspace-relative instruction files the managed child already received in full, for example
+   * embedded in its first prompt. Directory `code_orientation` names them as already supplied
+   * instead of delivering truncated copies.
+   */
+  readonly knownInstructionPaths?: readonly string[];
 }
+
+/**
+ * Build the managed-child profile: six inspection tools backed by the shared Workspace provider
+ * host and instruction deduplication, without refactors, settings, UI, or overview state.
+ */
+export function createHeadlessInspectionProfile(
+  options: HeadlessInspectionProfileOptions = {},
+): (pi: ExtensionAPI) => void {
+  const knownInstructionFiles = (options.knownInstructionPaths ?? []).map((path) => ({ path }));
+  return (pi) => {
+    const sessions = createSessionCache();
+    const lspState = createLspAdapterState();
+    const gradle = registerGradleObservations(pi, { interactive: false });
+    registerLspSessionLifecycle(pi, lspState, (ctx) => {
+      const session = sessions.getOrCreate(ctx.cwd);
+      session.attachLspController(lspState.controller);
+      session.seedSentinelSnapshot(lspState.sentinelSnapshot);
+      session.setProjectTrusted(ctx.isProjectTrusted());
+      session.setGradleObserver(gradle.forContext(ctx));
+      session.setAutomaticPathPolicy(lspState.providerLease?.automaticPathPolicy ?? null);
+    });
+    registerInstructionDedup(pi, sessions.getOrCreate);
+    if (knownInstructionFiles.length > 0) {
+      pi.on("before_agent_start", (_event, ctx) => {
+        sessions.getOrCreate(ctx.cwd).captureNativeInstructionPaths(knownInstructionFiles);
+      });
+    }
+    pi.on("session_shutdown", () => sessions.clear());
+
+    registerCodeIntelligenceTools(
+      pi,
+      sessions.getOrCreate,
+      undefined,
+      CODE_INTELLIGENCE_TOOL_SPECS.filter((spec) => inspectionToolNames.has(spec.name)),
+    );
+  };
+}
+
+/** Managed-child profile without known instruction files. */
+const headlessInspectionProfile: (pi: ExtensionAPI) => void = createHeadlessInspectionProfile();
+export default headlessInspectionProfile;

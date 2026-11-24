@@ -99,6 +99,7 @@
     "./api": "./src/api.ts",
     "./extension": "./src/extension.ts",
     "./headless": "./src/headless.ts",
+    "./instruction-files": "./src/instruction-files.ts",
     "./package.json": "./package.json"
   }
 }

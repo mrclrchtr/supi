@@ -24,7 +24,7 @@ const scopeAdvisory =
 
 describe("buildReviewPacket", () => {
   it("builds a change packet with exact before and after guidance", () => {
-    expect(REVIEW_PACKET_PROTOCOL_VERSION).toBe("9");
+    expect(REVIEW_PACKET_PROTOCOL_VERSION).toBe("10");
     const task = { id: "spec", instructions: "Check requirement R1.", mode: "change" as const };
     const packet = buildReviewPacket(
       snapshot,
@@ -169,19 +169,34 @@ describe("buildReviewPacket", () => {
   it("reproduces exact packet bytes and hashes for equivalent inputs", () => {
     const task = { id: "standards", instructions: "Check standards.", mode: "change" as const };
     const review = { sharedContext: "Context", tasks: [task] };
-    const packet = buildReviewPacket(snapshot, review, {}, task, model);
+    const workspace = {
+      dependencyBootstrapRan: false,
+      instructionFiles: {
+        files: [
+          {
+            path: "CLAUDE.md",
+            sha256: "d".repeat(64),
+            bytes: 22,
+            changeStatus: "M",
+            content: "# Rules\n```sh\nx\n```\n",
+          },
+        ],
+        deleted: [{ path: "old/AGENTS.md" }],
+      },
+    };
+    const packet = buildReviewPacket(snapshot, review, {}, task, model, workspace);
 
-    expect(packet).toEqual(buildReviewPacket(snapshot, review, {}, task, model));
+    expect(packet).toEqual(buildReviewPacket(snapshot, review, {}, task, model, workspace));
     expect(packet.packetHash).toBe(
       [
-        "33a46c8f",
-        "9a1cfeeb",
-        "fca40cbf",
-        "c64c1f94",
-        "4914af2b",
-        "bde41724",
-        "b6870103",
-        "6a18355b",
+        "522dcb4c",
+        "9c2bbcfa",
+        "095a05f2",
+        "d5713bd9",
+        "44dfa146",
+        "328d4bf9",
+        "da5774f5",
+        "15a2db0a",
       ].join(""),
     );
   });

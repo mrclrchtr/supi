@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import {
   mkdirSync,
   mkdtempSync,
@@ -32,6 +33,7 @@ vi.mock("../../src/tool/review_run/runner.ts", () => ({ runReviewer: mocks.runRe
 
 import type { AgentRunProviderAuthority } from "@mrclrchtr/supi-agent-runtime/api";
 import { isRootCommit, resolveReviewSnapshot } from "../../src/git.ts";
+import { REVIEW_LIMITS } from "../../src/review-limits.ts";
 import { formatReviewBatch } from "../../src/tool/review_run/format.ts";
 import { runReview } from "../../src/tool/review_run/workflow.ts";
 import type { ReviewModelSelection, ReviewTask } from "../../src/types.ts";
@@ -343,8 +345,10 @@ describe("runReview exact Review Target workflow", () => {
       },
       {
         target: {},
-        review: { tasks: [{ ...stateTask, criteriaSources: {} }] },
-        reason: /criteria sources must be an array/i,
+        review: {
+          tasks: [{ ...stateTask, criteriaSources: [{ reference: "#1", summary: "Rule." }] }],
+        },
+        reason: /Review Task field criteriaSources is not supported/i,
       },
     ];
 
@@ -817,5 +821,120 @@ describe("runReview exact Review Target workflow", () => {
     expect(packets.state).not.toContain("## Changed files");
     expect(packets.state).not.toContain("Target diff SHA-256:");
     expect(outcome.details.results.map((result) => result.mode)).toEqual(["change", "state"]);
+  });
+
+  describe("Repository instruction files", () => {
+    function commitAll(message: string): string {
+      git(cwd, "add", "-A");
+      git(cwd, "commit", "-m", message);
+      return git(cwd, "rev-parse", "HEAD");
+    }
+
+    function sha256(content: string): string {
+      return createHash("sha256").update(content, "utf8").digest("hex");
+    }
+
+    it("embeds the root and changed-path instruction files in full and seeds Orientation", async () => {
+      const root = "# Root rules\nUse tabs.\n";
+      const longPackage = Array.from({ length: 250 }, (_, line) => `rule ${line + 1}`).join("\n");
+      mkdirSync(join(cwd, "pkg", "src"), { recursive: true });
+      mkdirSync(join(cwd, "other"));
+      mkdirSync(join(cwd, "old"));
+      writeFileSync(join(cwd, "CLAUDE.md"), root);
+      writeFileSync(join(cwd, "pkg", "CLAUDE.md"), "# Package rules\n");
+      writeFileSync(join(cwd, "pkg", "src", "a.ts"), "export const a = 1;\n");
+      writeFileSync(join(cwd, "other", "CLAUDE.md"), "# Other rules\n");
+      writeFileSync(join(cwd, "old", "CLAUDE.md"), "# Old rules\n");
+      const from = commitAll("instructions");
+      writeFileSync(join(cwd, "pkg", "CLAUDE.md"), longPackage);
+      writeFileSync(join(cwd, "pkg", "src", "a.ts"), "export const a = 2;\n");
+      unlinkSync(join(cwd, "old", "CLAUDE.md"));
+
+      const outcome = await review(cwd, {}, [changeTask]);
+
+      expect(outcome.kind).toBe("completed");
+      const invocation = mocks.runReviewer.mock.calls[0]?.[0];
+      const packet: string = invocation.prompt;
+      expect(packet).toContain("## Repository instructions");
+      expect(packet).toContain(`### CLAUDE.md\nSHA-256: ${sha256(root)}`);
+      expect(packet).toContain(root);
+      expect(packet).toContain(`### pkg/CLAUDE.md\nSHA-256: ${sha256(longPackage)}`);
+      expect(packet).toContain("rule 250");
+      expect(packet).toMatch(/### pkg\/CLAUDE\.md\n[^\n]*changed in target/);
+      expect(packet).toContain(
+        `- old/CLAUDE.md: deleted in target; \`git show ${from}:old/CLAUDE.md\` shows its before version.`,
+      );
+      expect(packet).not.toContain("Other rules");
+      // Shared instructions precede task-specific packet lines.
+      expect(packet.indexOf("## Repository instructions")).toBeLessThan(packet.indexOf("Task id:"));
+      expect(invocation.knownInstructionPaths).toEqual(["CLAUDE.md", "pkg/CLAUDE.md"]);
+    });
+
+    it("selects the root and Review Scope instruction files for a state task", async () => {
+      mkdirSync(join(cwd, "pkg"));
+      mkdirSync(join(cwd, "other"));
+      writeFileSync(join(cwd, "CLAUDE.md"), "# Root rules\n");
+      writeFileSync(join(cwd, "pkg", "AGENTS.md"), "# Package rules\n");
+      writeFileSync(join(cwd, "other", "CLAUDE.md"), "# Other rules\n");
+      commitAll("instructions");
+
+      const outcome = await runReview({
+        cwd,
+        target: {},
+        review: { tasks: [stateTask] },
+        scope: { paths: ["pkg"] },
+        reviewerModel: model,
+      });
+
+      expect(outcome.kind).toBe("completed");
+      const packet: string = mocks.runReviewer.mock.calls[0]?.[0].prompt;
+      expect(packet).toContain("# Root rules");
+      expect(packet).toContain("### pkg/AGENTS.md");
+      expect(packet).not.toContain("Other rules");
+      expect(packet).not.toContain("changed in target");
+    });
+
+    it("reads instruction file names from the caller, not from the reviewed change", async () => {
+      writeFileSync(join(cwd, "CLAUDE.md"), "# Root rules\n");
+      const from = commitAll("instructions");
+      const mainBranch = git(cwd, "branch", "--show-current");
+      git(cwd, "checkout", "-q", "-b", "relax");
+      mkdirSync(join(cwd, ".pi", "supi"), { recursive: true });
+      writeFileSync(
+        join(cwd, ".pi", "supi", "config.json"),
+        JSON.stringify({ "code-intelligence": { instructionFileNames: [] } }),
+      );
+      const to = commitAll("disable instruction files");
+      git(cwd, "checkout", "-q", mainBranch);
+
+      const outcome = await runReview({
+        cwd,
+        target: { committed: { from, to } },
+        review: { tasks: [changeTask] },
+        reviewerModel: model,
+        projectTrusted: true,
+      });
+
+      expect(outcome.kind).toBe("completed");
+      expect(mocks.runReviewer.mock.calls[0]?.[0].prompt).toContain("# Root rules");
+    });
+
+    it("fails before fan-out and removes the workspace when instruction files exceed the cap", async () => {
+      writeFileSync(join(cwd, "CLAUDE.md"), "x".repeat(REVIEW_LIMITS.instructionFileBytes + 1));
+      commitAll("huge instructions");
+      writeFileSync(join(cwd, "tracked.txt"), "changed\n");
+      const before = git(cwd, "worktree", "list", "--porcelain");
+
+      const outcome = await review(cwd, {}, [changeTask]);
+
+      expect(outcome).toMatchObject({
+        kind: "invalid",
+        reason: expect.stringContaining(
+          `CLAUDE.md (${(REVIEW_LIMITS.instructionFileBytes + 1).toLocaleString("en-US")} bytes)`,
+        ),
+      });
+      expect(mocks.runReviewer).not.toHaveBeenCalled();
+      expect(git(cwd, "worktree", "list", "--porcelain")).toBe(before);
+    });
   });
 });

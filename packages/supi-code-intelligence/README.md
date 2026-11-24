@@ -341,12 +341,13 @@ Tool results and the hidden overview enter Pi's model context and can be saved i
 |---|---|
 | `@mrclrchtr/supi-code-intelligence/api` | Type-only provider contracts, architecture models, targets, health observations, and tool results; no runtime functions |
 | `@mrclrchtr/supi-code-intelligence/extension` | Default full Pi extension factory |
-| `@mrclrchtr/supi-code-intelligence/headless` | Default inspection-only extension factory and `HEADLESS_INSPECTION_TOOL_NAMES` |
+| `@mrclrchtr/supi-code-intelligence/headless` | Default inspection-only extension factory, `createHeadlessInspectionProfile({ knownInstructionPaths })`, and `HEADLESS_INSPECTION_TOOL_NAMES` |
+| `@mrclrchtr/supi-code-intelligence/instruction-files` | `resolveInstructionFileNames()` for the effective configured names and `findAncestorInstructionFiles()` for the nearest file per ancestor directory |
 | `@mrclrchtr/supi-code-intelligence/package.json` | Package manifest |
 
 The package-root export also re-exports types; prefer `/api`. See [the type exports](src/api.ts) for the complete list.
 
-The headless factory registers only `code_resolve`, `code_inspect`, `code_orientation`, `code_graph`, `code_find`, and `code_health` for managed child sessions. It adds no refactor tools, settings, commands, UI, or overview. Directory orientation skips instruction files the child session already has, by the same rules as the full extension. It is a tool profile, not a filesystem sandbox.
+The headless factory registers only `code_resolve`, `code_inspect`, `code_orientation`, `code_graph`, `code_find`, and `code_health` for managed child sessions. It adds no refactor tools, settings, commands, UI, or overview. Directory orientation skips instruction files the child session already has, by the same rules as the full extension. `knownInstructionPaths` adds files the child already received in its prompt, such as those a Reviewer Packet embeds. It is a tool profile, not a filesystem sandbox.
 
 ## See it in action
 

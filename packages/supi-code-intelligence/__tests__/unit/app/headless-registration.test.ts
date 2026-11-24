@@ -6,7 +6,9 @@ import { createPiMock, getTool, getTools, makeCtx } from "@mrclrchtr/supi-test-u
 import type { TSchema } from "typebox";
 import { Value } from "typebox/value";
 import { describe, expect, it } from "vitest";
-import headlessInspectionProfile from "../../../src/headless.ts";
+import headlessInspectionProfile, {
+  createHeadlessInspectionProfile,
+} from "../../../src/headless.ts";
 import { CODE_INTELLIGENCE_TOOL_SPECS } from "../../../src/tool/specs.ts";
 import { clearMockRuntime, registerMockProvider } from "../../helpers/register-mock-runtime.ts";
 
@@ -95,6 +97,39 @@ describe("headless inspection profile", () => {
       expect(await orient("read")).toContain("### read/CLAUDE.md");
       expect(await orient("unseen")).toContain("### unseen/CLAUDE.md");
       expect(await orient("loaded")).not.toContain("## Instructions");
+    } finally {
+      clearMockRuntime();
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("names instruction files the child received in its prompt instead of delivering them", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "headless-known-"));
+    writeFileSync(join(cwd, "CLAUDE.md"), "# root\n");
+    mkdirSync(join(cwd, "pkg"));
+    writeFileSync(join(cwd, "pkg", "CLAUDE.md"), "# pkg\n");
+    mkdirSync(join(cwd, "other"));
+    writeFileSync(join(cwd, "other", "CLAUDE.md"), "# other\n");
+    try {
+      const pi = createPiMock();
+      createHeadlessInspectionProfile({ knownInstructionPaths: ["CLAUDE.md", "pkg/CLAUDE.md"] })(
+        pi as unknown as ExtensionAPI,
+      );
+      const ctx = makeCtx({ cwd });
+      await pi.emit("before_agent_start", { systemPromptOptions: { contextFiles: [] } }, ctx);
+      const tool = getTool(pi, "code_orientation") as unknown as {
+        execute: (...args: unknown[]) => Promise<{ content: Array<{ text: string }> }>;
+      };
+      const orient = async (path: string) =>
+        (await tool.execute("headless", { focus: { path } }, undefined, undefined, ctx)).content[0]
+          ?.text ?? "";
+
+      const pkg = await orient("pkg");
+      expect(pkg).not.toContain("## Instructions");
+      expect(pkg).toContain("already supplied in this session, not repeated: `pkg/CLAUDE.md`");
+      const other = await orient("other");
+      expect(other).toContain("### other/CLAUDE.md");
+      expect(other).not.toContain("### CLAUDE.md");
     } finally {
       clearMockRuntime();
       rmSync(cwd, { recursive: true, force: true });

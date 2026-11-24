@@ -95,6 +95,29 @@ export function findInstructionFilesForDirectory(options: {
   return { matches, known };
 }
 
+/**
+ * Find the nearest configured instruction file in each directory from `cwd` down to `directory`,
+ * shallowest first. Unlike {@link findInstructionFilesForDirectory} this applies no trust or
+ * session-dedup policy: the caller supplies an already-authorized name list. Invalid names and
+ * candidates whose real path leaves `cwd` are skipped.
+ */
+export function findAncestorInstructionFiles(options: {
+  directory: string;
+  cwd: string;
+  fileNames: readonly string[];
+}): InstructionFileMatch[] {
+  const cwd = path.resolve(options.cwd);
+  const directory = path.resolve(options.directory);
+  const validNames = options.fileNames.filter(isValidInstructionFileName);
+  if (validNames.length === 0 || !isDirectoryWithinCwd(directory, cwd)) return [];
+  const matches: InstructionFileMatch[] = [];
+  for (const dir of collectDirsShallowestFirst(directory, cwd)) {
+    const match = findFirstInstructionFile(dir, cwd, validNames);
+    if (match) matches.push(match);
+  }
+  return matches;
+}
+
 function isDirectoryWithinCwd(directory: string, cwd: string): boolean {
   try {
     const realCwd = path.resolve(realpathSync(cwd));

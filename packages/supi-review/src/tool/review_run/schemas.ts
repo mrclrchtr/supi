@@ -13,38 +13,13 @@ export const reviewTaskSchema = Type.Object(
       maxLength: REVIEW_LIMITS.taskInstructionCharacters,
       pattern: "\\S",
       description:
-        "Self-contained review objective and criteria. Add known requirement-to-source/test locations as navigation hints, not proof of coverage; omit unknown mappings rather than investigating just to fill them.",
+        "Self-contained review objective and criteria. Repository instruction files (such as CLAUDE.md or AGENTS.md) for the changed paths are embedded automatically. Name any other authoritative source (issue, spec, ADR, or document path) and quote the rules or requirements that apply, each with its section heading; the reviewer retrieves a source only for what the quote lacks. Add known requirement-to-source/test locations as navigation hints, not proof of coverage; omit unknown mappings rather than investigating just to fill them.",
     }),
     mode: Type.Enum(["change", "state"] as const, {
       type: "string",
       description:
         "Evidence view: change uses one non-empty before-and-after change; state uses only the frozen after state.",
     }),
-    criteriaSources: Type.Optional(
-      Type.Array(
-        Type.Object(
-          {
-            reference: Type.String({
-              maxLength: REVIEW_LIMITS.criteriaReferenceCharacters,
-              pattern: "\\S",
-              description: "Issue reference, URL, or repository-relative document path.",
-            }),
-            summary: Type.String({
-              maxLength: REVIEW_LIMITS.criteriaSummaryCharacters,
-              pattern: "\\S",
-              description:
-                "The rules or requirements from this source that apply to this task, quoted or closely paraphrased, each with its section heading. The reviewer retrieves the source only for what the summary lacks.",
-            }),
-          },
-          { additionalProperties: false },
-        ),
-        {
-          minItems: 1,
-          maxItems: REVIEW_LIMITS.criteriaSourcesPerTask,
-          description: "Authoritative sources for this task's Review Criteria.",
-        },
-      ),
-    ),
   },
   { additionalProperties: false },
 );
@@ -167,7 +142,7 @@ export const reviewSubmissionSchema = Type.Object(
   { additionalProperties: false },
 );
 
-/** Provider-visible Planner Draft task. Criteria sources remain caller-authored. */
+/** Provider-visible Planner Draft task. */
 const plannerDraftTaskSchema = Type.Object(
   {
     id: reviewTaskSchema.properties.id,
@@ -177,7 +152,7 @@ const plannerDraftTaskSchema = Type.Object(
   { additionalProperties: false },
 );
 
-/** Provider-visible Planner Draft input without caller-only criteria sources. */
+/** Provider-visible Planner Draft input. */
 export const plannerDraftSchema = Type.Object(
   {
     sharedContext: reviewInputSchema.properties.sharedContext,

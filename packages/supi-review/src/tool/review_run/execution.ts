@@ -8,6 +8,7 @@ import {
 import type { ChildWebToolProvision } from "@mrclrchtr/supi-core/session";
 import { normalizeReviewInput } from "../../review-input.ts";
 import type { ReviewTargetDiffFile } from "../../target/diff.ts";
+import type { ReviewInstructionFiles } from "../../target/instruction-files.ts";
 import { buildReviewPacket, type ReviewPacketWorkspace } from "../../target/packet.ts";
 import {
   clampReviewThinkingLevel,
@@ -155,6 +156,8 @@ export interface ReviewTaskExecution {
   readonly authorizedAuxiliaryModels?: AgentRunAuxiliaryModelSnapshot;
   readonly reviewerWebTools?: ChildWebToolProvision;
   readonly targetDiff?: ReviewTargetDiffFile;
+  /** Repository instruction files selected at the start boundary; omitted means none. */
+  readonly instructionFiles?: ReviewInstructionFiles;
   readonly batch?: ReviewExecutionBatch;
 }
 
@@ -207,6 +210,7 @@ export async function executeReviewTasks(
     onUpdate,
     dependencyBootstrapConfigured = false,
     targetDiff,
+    instructionFiles,
     batch,
   } = execution;
   const review = normalizeReviewInput(reviewInput);
@@ -249,7 +253,9 @@ export async function executeReviewTasks(
   const packetWorkspace: ReviewPacketWorkspace = {
     ...(targetDiff ? { targetDiff } : {}),
     dependencyBootstrapRan: dependencyBootstrapConfigured,
+    ...(instructionFiles ? { instructionFiles } : {}),
   };
+  const knownInstructionPaths = instructionFiles?.files.map((file) => file.path) ?? [];
 
   return Promise.all(
     review.tasks.map(async (task) => {
@@ -282,6 +288,7 @@ export async function executeReviewTasks(
           task,
           prompt: packet.prompt,
           packetHash: packet.packetHash,
+          ...(knownInstructionPaths.length > 0 ? { knownInstructionPaths } : {}),
           ...runKeyFor(batch, task.id),
           onProgress: (progress) => {
             taskStates[task.id] = { status: "running", progress };

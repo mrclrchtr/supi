@@ -45,7 +45,7 @@ describe("runPlanner", () => {
     ).rejects.toThrow("Invalid Planner Draft.");
   });
 
-  it("rejects caller-only criteria sources in the Planner Draft tool schema", async () => {
+  it("rejects unknown task fields in the Planner Draft tool schema", async () => {
     await runPlanner(args);
 
     const config = mocks.runIsolatedChild.mock.calls[0]?.[0] as {

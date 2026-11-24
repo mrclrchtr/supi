@@ -11,12 +11,17 @@ import {
   createUnobservedAgentRunDiagnostics,
   raceAgentRunStartup,
 } from "@mrclrchtr/supi-agent-runtime/api";
+import { resolveInstructionFileNames } from "@mrclrchtr/supi-code-intelligence/instruction-files";
 import type { ChildWebToolProvision } from "@mrclrchtr/supi-core/session";
 import type { LocalReviewAuditStore } from "../../audit/local-review-audit-store.ts";
 import { isRootCommit, resolveReviewSnapshot, summarizeReviewSnapshot } from "../../git.ts";
 import { normalizeReviewInput } from "../../review-input.ts";
 import { normalizeReviewScope, validateReviewScope } from "../../review-scope.ts";
 import { reviewTargetEndpoints } from "../../target/input.ts";
+import {
+  type ReviewInstructionFiles,
+  selectReviewInstructionFiles,
+} from "../../target/instruction-files.ts";
 import { snapshotsMatch } from "../../target/snapshot-match.ts";
 import type { ReviewThinkingLevel } from "../../thinking.ts";
 import type {
@@ -380,6 +385,8 @@ export interface PreparedReview {
   readonly workspace: ReviewWorkspace;
   readonly provenance: ReviewBatchDetails["provenance"];
   readonly dependencyBootstrapConfigured: boolean;
+  /** Repository instruction files embedded in every Reviewer Packet of this Review. */
+  readonly instructionFiles: ReviewInstructionFiles;
   readonly authorizedAuxiliaryModels?: AgentRunAuxiliaryModelSnapshot;
 }
 
@@ -454,6 +461,22 @@ export async function prepareReview(input: RunReviewInput): Promise<PrepareRevie
     return { kind: "invalid" as const, reason: "Configured Dependency Bootstrap failed." };
   }
 
+  const selection = await selectReviewInstructionFiles({
+    workspaceCwd: workspace.cwd,
+    snapshot,
+    review,
+    scope,
+    fileNames: resolveInstructionFileNames(input.cwd, input.projectTrusted ?? false),
+  }).catch((error: unknown) => ({
+    kind: "invalid" as const,
+    reason: `Could not read the repository instruction files: ${error instanceof Error ? error.message : String(error)}`,
+  }));
+  if (selection.kind !== "selected") {
+    await workspace.cleanup();
+    input.signal?.throwIfAborted();
+    return { kind: "invalid" as const, reason: selection.reason };
+  }
+
   const { signal: _signal, onUpdate: _onUpdate, ...request } = input;
   return {
     kind: "prepared",
@@ -465,6 +488,7 @@ export async function prepareReview(input: RunReviewInput): Promise<PrepareRevie
       workspace,
       provenance,
       dependencyBootstrapConfigured,
+      instructionFiles: selection.instructionFiles,
       ...(authorizedAuxiliaryModels ? { authorizedAuxiliaryModels } : {}),
     },
   };
@@ -496,6 +520,7 @@ export async function executePreparedReview(
         ? { store: request.auditStore, workspaceReceipt: workspace.receipt }
         : undefined,
       dependencyBootstrapConfigured: prepared.dependencyBootstrapConfigured,
+      instructionFiles: prepared.instructionFiles,
       providerAuthority: request.providerAuthority,
       recoveryModel: request.recoveryModel,
       recoveryModelId: request.recoveryModelId,

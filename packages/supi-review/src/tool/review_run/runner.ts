@@ -152,10 +152,7 @@ export async function runReviewer(invocation: ReviewerInvocation): Promise<Revie
     };
   }
   const holder: { value?: ReviewSubmission } = {};
-  const recoveryTerminal: {
-    choice?: "submitted" | "declined" | "conflict";
-    reason?: string;
-  } = {};
+  const recoveryTerminal: { choice?: "submitted" | "declined" | "conflict"; reason?: string } = {};
   const submit = createReviewSubmissionTool(holder, recoveryTerminal);
   const decline = createReviewRecoveryDeclineTool(recoveryTerminal);
   const observation: ReviewerSessionObservation = {
@@ -207,6 +204,7 @@ export async function runReviewer(invocation: ReviewerInvocation): Promise<Revie
       : {}),
     ...(invocation.registry ? { registry: invocation.registry } : {}),
     headlessInspection: true,
+    knownInstructionPaths: invocation.knownInstructionPaths,
     codemode: invocation.reviewerCodemodeEnabled ?? false,
     webTools: invocation.reviewerWebTools,
     projectTrusted: invocation.projectTrusted ?? false,

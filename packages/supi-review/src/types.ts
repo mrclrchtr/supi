@@ -105,21 +105,12 @@ export interface ReviewAuditReference {
 /** Required evidence view and finding policy for one Review Task. */
 export type ReviewMode = "change" | "state";
 
-/** Caller-identified authoritative issue or repository document for Review Criteria. */
-export interface CriteriaSource {
-  /** Identifier such as an issue reference, URL, or repository-relative path. */
-  reference: string;
-  /** Caller summary used before the reviewer retrieves the source itself. */
-  summary: string;
-}
-
 /** One independent caller-defined review objective. */
 export interface ReviewTask {
   id: string;
   instructions: string;
   /** Required evidence view and finding policy. */
   mode: ReviewMode;
-  criteriaSources?: CriteriaSource[];
 }
 
 /** Optional batch-level path focus that remains separate from the Review Target. */
@@ -295,6 +286,8 @@ export interface ReviewerInvocation {
   dependencyBootstrapConfigured?: boolean;
   signal?: AbortSignal;
   projectTrusted?: boolean;
+  /** Instruction files embedded in `prompt`; directory Orientation names them instead of repeating them. */
+  knownInstructionPaths?: readonly string[];
   onProgress?: (progress: ReviewProgress) => void;
   /** Shared viewer group for the independent Reviewer Sessions in one Review. */
   runGroupId?: string;

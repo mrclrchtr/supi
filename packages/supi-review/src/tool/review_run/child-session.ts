@@ -47,6 +47,8 @@ export interface IsolatedRunConfig<T> {
   authorizedContinuationModels?: readonly Model<any>[];
   authorizedAuxiliaryModels?: AgentRunAuxiliaryModelSnapshot;
   headlessInspection?: boolean;
+  /** Instruction files embedded in `prompt`; headless Orientation does not repeat them. */
+  knownInstructionPaths?: readonly string[];
   codemode?: boolean;
   /** Session-provided Web tools for Reviewer Web Access. */
   webTools?: ChildWebToolProvision;
@@ -140,6 +142,9 @@ export async function runIsolatedChild<T>(
     agentDir,
     {
       headlessInspection: config.headlessInspection,
+      ...(config.knownInstructionPaths
+        ? { knownInstructionPaths: config.knownInstructionPaths }
+        : {}),
       ...(config.codemode ? { codemode: true } : {}),
       webTools: config.webTools,
       projectTrusted: config.projectTrusted,

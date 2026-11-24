@@ -44,7 +44,6 @@ describe("agent review schemas", () => {
       "id",
       "instructions",
       "mode",
-      "criteriaSources",
     ]);
     const sharedContext = schema.properties.sharedContext.description;
     expect(sharedContext).toMatch(/batch-wide.*exclude task-specific/i);
