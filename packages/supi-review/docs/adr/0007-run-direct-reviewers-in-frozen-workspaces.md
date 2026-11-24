@@ -4,4 +4,8 @@
 
 Reviewer Sessions run inside an externally supplied Sandboxed Pi Environment with Pi's built-in read and shell tools, the headless Code Intelligence inspection profile, and structured `submit_review`; the five package-specific inspection tools are removed. The Review Engine still pins and hashes every target, then verifies and freezes its after-state in one visible linked Review Workspace shared by concurrent tasks—Working-Tree Reviews stage the canonical patch over the baseline. The interactive Planner flow revalidates its transient snapshot before reviewers start.
 
-This trades enforced target-aware reads for ordinary agent inspection and dependency bootstrap. A configured `review.bootstrapCommand` runs once before fan-out; without it, duplicate setup avoidance remains prompt policy rather than access control. The outer sandbox is the security boundary; the source worktree may change after materialization, and workspace cleanup is best-effort with explicit recovery through `/supi-review-cleanup`.
+This trades enforced target-aware reads for ordinary agent inspection and dependency bootstrap. A configured `review.bootstrapCommand` runs once before fan-out; without it, duplicate setup avoidance remains prompt policy rather than access control. The outer sandbox is the security boundary; the source worktree may change after materialization, and workspace cleanup is best-effort with explicit recovery.
+
+## Runtime Agent Workspace mechanics
+
+A Review Workspace is a frozen, disposable Agent Workspace. The runtime owns its creation, freeze and verification, lock marker, Dependency Bootstrap runner, and cleanup ([runtime ADR 0001](../../../supi-agent-runtime/docs/adr/0001-own-session-mechanics-not-resource-policy.md)). Review keeps target resolution, the canonical diff compiler, `target.diff`, its receipt fields, and when to remove the workspace. Recovery runs through the shared `/supi-agent-cleanup` command, which replaced `/supi-review-cleanup`.

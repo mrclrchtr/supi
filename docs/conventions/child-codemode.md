@@ -110,7 +110,7 @@ An empty available catalogue does not prevent tool scripting. Do not substitute 
 - [x] An opted-in Reviewer can use scripts during investigation while direct tools remain available.
 - [x] Discovery and nested calls cannot access excluded tools, including tools with indirect exposure.
 - [x] No parent MCP/ambient extension inheritance occurs.
-- [x] Read-only Agent batch admission remains valid; mutating profiles remain single-task only.
+- [x] Read-only Agent batch admission remains valid; mutating profiles keep the writer admission rules (single-task only outside their own leased linked worktree).
 - [x] Classifier and image-model listing, lookup, and dispatch work through the scoped provider bridge.
 - [x] Unauthorized model IDs are rejected; chat authorization and effective request routing are unchanged.
 - [x] Sibling children share one model snapshot; subsequent invocations refresh it.

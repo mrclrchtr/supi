@@ -4,33 +4,39 @@ Status: Implemented. This document defines the approved behavior.
 
 ## Scope
 
-- Let the parent continue while read-only Delegation Tasks run.
+- Let the parent continue while read-only Delegation Tasks and isolated writers run. An isolated writer is a Mutation-Capable Delegation Task that holds a lease on its own linked worktree ([ADR 0013](adr/0013-admit-parallel-writers-under-worktree-claims.md)).
 - Keep Agent Profile policy, admission, capacity, Delegation Conversations, Delegation Checkpoints, and the result format in `supi-agent`.
 - A Background Delegation Batch is a Background Run Batch owned by `supi-agent-runtime` ([runtime ADR 0014](../../supi-agent-runtime/docs/adr/0014-own-background-run-batches-and-result-collection.md)). The runtime owns session and launch-branch ownership, Completion Notice scheduling and delivery, parent-abort handling, waiting, Usage receipts, spill-file cleanup, and shutdown. `supi-agent` hands it each admitted batch with per-task notice granularity.
 - The runtime registers `agent_result` and `agent_cancel` once per Pi runtime and owns their names, parameters, guidance, handle checks, and collection ordering (wait, revalidate, assemble output, reserve Usage). `supi-agent` supplies the Delegation Batch Result, the cancellation result, Delegation Checkpoints at collection, the rendering, and the model-facing cancellation text. Both tools stay active when the Agent Run tool setting turns `agent_run` off.
 - Reuse Agent Run lifecycle controls, the session registry, and `/agents` from `supi-agent-runtime`.
 - Review is a second owner of Background Run Batches with once-per-batch notice granularity (Review [ADR 0018](../../supi-review/docs/adr/0018-run-reviews-in-the-background-by-default.md)). Its execution and admission policy stay in `supi-review`; this document does not define them.
-- Do not add durable workers, restart recovery, background writers, or workspace isolation.
+- Worktree Claims and admission stay in `supi-agent`. Leases, inventory, and cleanup use the runtime Agent Workspace mechanics ([runtime ADR 0001](../../supi-agent-runtime/docs/adr/0001-own-session-mechanics-not-resource-policy.md)).
+- Do not add durable workers, restart recovery, sandboxing, or mitigations for resources a worktree shares.
 
 ## Execution policy
 
 | Condition | Default | Explicit foreground | Explicit background |
 | --- | --- | --- | --- |
-| Read-only batch in TUI or RPC | Background | Supported | Supported |
-| Mutation-capable single-task batch in TUI or RPC | Foreground | Supported | Reject before starting |
+| Read-only or isolated-writer batch in TUI or RPC | Background | Supported | Supported |
+| Single-task batch with a writer in the main worktree or the parent's worktree, in TUI or RPC | Foreground | Supported | Reject before starting |
 | Valid batch in print or JSON mode | Foreground | Supported | Reject before starting |
 
 - Keep the current maximum of four Delegation Tasks per batch.
-- Keep the current restriction that a mutation-capable profile requires a single-task batch.
-- Validate all profiles, models, instructions, mode, and capacity before starting any task.
+- A writer in the main worktree or the parent's worktree, including a writer without `new.cwd`, takes a session claim and requires a single-task batch. A writer in any other linked worktree takes a lease and can share a batch with other writers and read-only tasks.
+- Reject the whole batch before any task starts when two writers resolve to one worktree, including through a subdirectory or symlink, when an active claim of the session holds it, or when it carries a foreign, live, or orphaned SuPi lock. Name the holder. Point an orphaned SuPi lock to `/supi-agent-cleanup`.
+- Reserve claims and leases with the capacity reservation. Release them only after every started run has disposed its resources. Unlock a caller-provided worktree, but never remove it.
+- A Delegation Follow-Up claims its saved working directory, or the parent's when none was saved, under the same rules.
+- Validate all profiles, models, instructions, mode, Worktree Claims, and capacity before starting any task.
 - A background start returns a batch handle and task identifiers after admission and registration. It does not wait for child setup or results.
 - Report initial task status as starting, not ready or completed.
-- A background run shares the parent's working directory unless `new.cwd` names a worktree of the same Git repository. Read-only does not mean a frozen snapshot. Parent edits can change what a child observes.
+- A background run shares the parent's working directory unless `new.cwd` names a worktree of the same Git repository. Read-only does not mean a frozen snapshot. Parent edits can change what a child observes. A writer's Delegation Task Result names its working directory.
+- A lease is behavioral, not a sandbox: `bash` can leave its worktree. Worktrees of one repository still share Git refs, the stash, Git config and hooks, ports, temporary directories, global config, and the package store.
+- Plain Git worktrees, Worktrunk worktrees, and colocated jj workspaces are linked worktrees and can be leased. GitButler lanes and non-colocated jj workspaces cannot.
 
 ## Capacity
 
 - Default to four active Agent Runs started through `agent_run` per containing session.
-- Count foreground and background runs together. Do not count Reviewer Runs against this limit.
+- Count foreground and background runs together, writers included. Do not count Reviewer Runs against this limit.
 - Expose the positive-integer limit through global and project settings.
 - Count starting and stopping runs until their owned resources are disposed.
 - Reserve capacity for the whole batch before starting any task. Concurrent starts must not overbook slots.
@@ -143,7 +149,12 @@ agent_cancel({ batchId })
 ## Verification requirements
 
 - A background start returns before a controlled child completes; foreground still waits.
-- Invalid input, unavailable background mode, invalid profiles, and insufficient capacity start no task.
+- Invalid input, unavailable background mode, invalid profiles, Worktree Claim conflicts, and insufficient capacity start no task.
+- Isolated writers start in the background, notify, and are collected; a mixed batch of writers and read-only tasks runs.
+- Duplicate worktrees, subdirectory and symlink aliases, cross-batch conflicts, foreign and orphaned locks, several writers in the parent's worktree, and background in the parent's worktree are rejected.
+- A foreground writer in the parent's worktree runs next to an isolated background writer.
+- A lease is held while its run stops and released after every terminal path; the worktree is kept.
+- Follow-ups claim their saved working directory again.
 - Concurrent batch starts cannot exceed the session limit. Reviewer Runs do not count against it.
 - Fast tasks notify and can be collected while siblings remain active.
 - Collection supports partial results, repeated reads, and an explicit full-batch wait.
@@ -155,7 +166,7 @@ agent_cancel({ batchId })
 - Selected-run stop remains selected-run-only; batch cancellation stops its active tasks.
 - Reload, session replacement, branch abandonment, and shutdown cannot leak results into another context.
 - Compaction preserves launch ownership. Switching away and back does not restart canceled tasks.
-- Print and JSON default to foreground and reject explicit background requests.
+- Print and JSON default to foreground and reject explicit background requests, for isolated writers too.
 - Idle Escape, autocomplete, dialogs, and `/agents` retain their existing input behavior.
 - Output remains bounded, and full transcripts remain outside parent model context.
 
@@ -169,5 +180,6 @@ agent_cancel({ batchId })
 - Installed Pi `dist/modes/interactive/interactive-mode.js`: Escape behavior when the parent is idle.
 - [Earlier foreground decision](adr/0008-keep-agent-runs-foreground-and-awaited.md).
 - [Accepted background decision](adr/0010-own-background-delegation-in-the-containing-session.md).
+- [Worktree Claims decision](adr/0013-admit-parallel-writers-under-worktree-claims.md).
 - [Runtime-owned Background Run Batches](../../supi-agent-runtime/docs/adr/0014-own-background-run-batches-and-result-collection.md).
-- `packages/supi-agent-runtime/src/background/`: the Background Run Batch controller and Usage receipts. `packages/supi-agent-runtime/src/tool/`: the `agent_result` and `agent_cancel` tools. `packages/supi-agent/src/delegation/controller.ts`: Agent admission and checkpoints. `packages/supi-agent/src/tool/agent_result/` and `agent_cancel/`: the Delegation result formats and rendering.
+- `packages/supi-agent-runtime/src/background/`: the Background Run Batch controller and Usage receipts. `packages/supi-agent-runtime/src/tool/`: the `agent_result` and `agent_cancel` tools. `packages/supi-agent/src/delegation/controller.ts`: Agent admission and checkpoints. `packages/supi-agent/src/delegation/worktree-claims.ts`: Worktree Claim resolution. `packages/supi-agent-runtime/src/workspace/`: leases and cleanup. `packages/supi-agent/src/tool/agent_result/` and `agent_cancel/`: the Delegation result formats and rendering.

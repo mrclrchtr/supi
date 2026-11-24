@@ -32,6 +32,10 @@ _Avoid_: Terminal outcome, Session Readiness Check, Agent Run Settlement
 An optional self-assessment of an Agent Run's normally completed task, separate from its task result and retained follow-up context. Its observations and untested suggestions support later human-led tooling improvements.
 _Avoid_: Retro facts, self-improvement, Delegation Follow-Up
 
+**Agent Workspace**:
+A Git worktree that an owner package holds for its Agent Runs: either a disposable worktree frozen on an exact, verified state, or an existing caller-provided worktree under a lease. The runtime provides the mechanics; the owner decides what to freeze, what to lease, and when to release it. A lease is respected by SuPi owners in every session and process, but it does not isolate shared repository or machine resources.
+_Avoid_: Sandbox, review isolation, Review Workspace
+
 **Agent Run Registry**:
 The containing-session list of managed Agent and Reviewer runs. The runtime owns neutral display data, transcript access, and selected-run controls. Agent and Review packages keep their own policy.
 _Avoid_: profile catalogue, review audit, process-wide history

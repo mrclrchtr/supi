@@ -60,7 +60,7 @@ agent_run({
 - Do not select a conversation automatically from its profile or task text.
 - Permit batches that mix new conversations and follow-ups to independent conversations.
 - Retain the four-task batch limit and all existing mode, mutation, admission, and capacity rules.
-- Mutation-capable profiles remain single-task and foreground. Read-only profiles retain existing background defaults.
+- A follow-up of a mutation-capable conversation claims its saved working directory, or the parent's when none was saved, under the Worktree Claim rules of the [background delegation design](background-delegation.md). In its own linked worktree it can run in multi-task batches and in the background; in the main worktree or the parent's worktree it stays single-task and foreground. Read-only profiles retain existing background defaults.
 - Validate the complete batch before starting any task.
 - Reject duplicate conversation targets within one batch.
 - Permit only one active Agent Run per conversation in the containing session. Reject conflicts; do not queue or silently create another conversation.

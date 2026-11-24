@@ -65,7 +65,7 @@ The child conversation state associated with a stored Delegation Task Result. It
 _Avoid_: Conversation View, human transcript, memory summary
 
 **Delegation Batch**:
-A Run Batch of independent Delegation Tasks, accepted only when every selected profile and policy resolves successfully. Every task in a valid read-only multi-task batch starts concurrently without a queue; canceling the batch cancels every active Agent Run in it.
+A Run Batch of independent Delegation Tasks, accepted only when every selected profile and policy resolves successfully. Every task in a valid multi-task batch, whose writers all hold leases, starts concurrently without a queue; canceling the batch cancels every active Agent Run in it.
 _Avoid_: Workflow, chain, DAG
 
 **Background Delegation Batch**:
@@ -105,8 +105,12 @@ The runtime-owned temporary JSONL store for Agent and Reviewer runs registered i
 _Avoid_: persistent session history, replay store
 
 **Mutation-Capable Profile**:
-An Agent Profile whose allowed tools can change workspace state. It is eligible only for a single-task Delegation Batch.
+An Agent Profile whose allowed tools can change workspace state. Its Delegation Tasks need a Worktree Claim; only those that hold a lease can share a Delegation Batch or run in the background.
 _Avoid_: Writer agent, unsafe profile
+
+**Worktree Claim**:
+A Mutation-Capable Delegation Task's exclusive hold on the worktree it works in, from admission until its Agent Run has released its resources. In a linked worktree other than the parent's it is a lease that other sessions and processes respect; in the main worktree or the parent's worktree it is only session-local. It is a coordination rule, not a sandbox.
+_Avoid_: Worktree lock, checkout reservation, sandbox
 
 **Read-Only Profile**:
 An Agent Profile restricted to tools that cannot intentionally change workspace state.

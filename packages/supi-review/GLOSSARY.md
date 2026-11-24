@@ -23,7 +23,7 @@ The neutral runtime record for one Reviewer Session in `/agents`. It uses the ru
 _Avoid_: review task result, Local Reviewer Replay
 
 **Review Workspace**:
-A disposable registered Git worktree that freezes one verified Review Target's reviewed state for the concurrent Review Tasks of one Review. It is visible in Git while active and removed best-effort once every task is terminal; later caller edits and reviewer-generated dependency state are not Target Evidence.
+A disposable Agent Workspace that freezes one verified Review Target's reviewed state for the concurrent Review Tasks of one Review. It is visible in Git while active and removed best-effort once every task is terminal; later caller edits and reviewer-generated dependency state are not Target Evidence.
 _Avoid_: live worktree, per-reviewer checkout, child sandbox
 
 **Review Workspace Receipt**:
@@ -31,7 +31,7 @@ The compact post-materialization proof attached to every Review. It records the 
 _Avoid_: workspace path, cleanup receipt, reviewer activity log
 
 **Review Workspace Cleanup**:
-The explicit recovery operation for multi-selecting and removing SuPi-marked Review Workspaces left by interrupted or failed cleanup. Apparently active owners require an extra warning, liveness is advisory, and each selected removal reports its own outcome.
+The explicit recovery operation, shared with other Agent Workspace owners, that removes Review Workspaces left by interrupted or failed cleanup once their owning process has exited. Workspaces of an active or undeterminable owner are left alone, liveness is advisory, and each removal reports its own outcome.
 _Avoid_: automatic pruning, age-based cleanup, transactional cleanup
 
 **Dependency Bootstrap**:
