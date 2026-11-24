@@ -24,8 +24,10 @@ export interface IsolatedChildResourceOptions {
 
 /**
  * Build child-session resources with the package-owned protocol as the complete
- * system prompt and no ambient settings or discovered prompt content. Compaction
- * and retries stay disabled so provider limits apply to the original packet directly.
+ * system prompt and no ambient settings or discovered prompt content. Compaction is
+ * a safety net for Reviewers that outgrow their context window, and retries ride out
+ * transient provider failures; the Agent Run runtime records each compaction as a
+ * Debug event.
  */
 export function createIsolatedChildResources(
   cwd: string,
@@ -34,8 +36,8 @@ export function createIsolatedChildResources(
   options: IsolatedChildResourceOptions = {},
 ): IsolatedChildResources {
   const settingsManager = SettingsManager.inMemory({
-    compaction: { enabled: false },
-    retry: { enabled: false },
+    compaction: { enabled: true },
+    retry: { enabled: true },
   });
   settingsManager.setProjectTrusted(options.projectTrusted ?? false);
   const extensionFactories = [

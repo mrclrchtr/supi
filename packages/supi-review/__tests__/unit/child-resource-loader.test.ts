@@ -29,8 +29,8 @@ describe("createIsolatedResourceLoader", () => {
     );
     await loader.reload();
 
-    expect(settingsManager.getCompactionEnabled()).toBe(false);
-    expect(settingsManager.getRetrySettings().enabled).toBe(false);
+    expect(settingsManager.getCompactionEnabled()).toBe(true);
+    expect(settingsManager.getRetrySettings().enabled).toBe(true);
     expect(loader.getAgentsFiles().agentsFiles).toEqual([]);
     expect(loader.getSystemPrompt()).toBe("owned protocol");
     expect(loader.getAppendSystemPrompt()).toEqual([]);
@@ -77,7 +77,7 @@ describe("createIsolatedResourceLoader", () => {
     ).toEqual([]);
     expect(codemode?.description).toContain("classifiers and image generation");
     expect(codemode?.exposure).toBe("model-only");
-    expect(settingsManager.getCompactionEnabled()).toBe(false);
+    expect(settingsManager.getCompactionEnabled()).toBe(true);
   });
 
   it("does not load codemode without the Reviewer opt-in", async () => {
