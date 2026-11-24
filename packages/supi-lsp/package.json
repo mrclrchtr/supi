@@ -34,7 +34,7 @@
   "dependencies": {
     "@mrclrchtr/supi-code-runtime": "workspace:*",
     "@mrclrchtr/supi-core": "workspace:*",
-    "ignore": "7.0.14",
+    "ignore": "7.0.16",
     "semver": "7.8.6",
     "typescript": "6.0.3",
     "vscode-jsonrpc": "10.0.0",
