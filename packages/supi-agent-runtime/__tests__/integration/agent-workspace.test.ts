@@ -224,6 +224,39 @@ describe("Agent Workspaces", () => {
       await next.release();
     });
 
+    it("leaves no lock when it is aborted while Git writes the lock", async () => {
+      const linked = addLinkedWorktree("linked");
+      // A Git wrapper that keeps running after `worktree lock` wrote the lock.
+      const bin = join(scratch, "bin");
+      mkdirSync(bin);
+      const realGit = execFileSync("which", ["git"], { encoding: "utf8" }).trim();
+      writeFileSync(
+        join(bin, "git"),
+        `#!/bin/sh\n"${realGit}" "$@"\nstatus=$?\n[ "$1 $2" = "worktree lock" ] && sleep 1\nexit $status\n`,
+        { mode: 0o755 },
+      );
+      vi.stubEnv("PATH", `${bin}:${process.env.PATH ?? ""}`);
+      const controller = new AbortController();
+      try {
+        const acquiring = acquireWorktreeLease({
+          cwd: linked,
+          owner: "delegation",
+          signal: controller.signal,
+        });
+        const settled = acquiring.then(
+          () => "resolved",
+          () => "rejected",
+        );
+        await vi.waitFor(() => expect(lockReasons(repo).has(linked)).toBe(true));
+        controller.abort();
+
+        await expect(settled).resolves.toBe("rejected");
+      } finally {
+        vi.unstubAllEnvs();
+      }
+      expect(lockReasons(repo).has(linked)).toBe(false);
+    });
+
     it("refuses the main worktree", async () => {
       await expect(acquireWorktreeLease({ cwd: repo, owner: "delegation" })).rejects.toMatchObject({
         code: "main-worktree",
