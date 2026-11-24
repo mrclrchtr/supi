@@ -22,6 +22,8 @@ export interface SharedRuntimeState {
   background?: BackgroundRunBatches;
   /** Whether an owner already registered `agent_result` and `agent_cancel` for this Pi runtime. */
   collectionToolsRegistered?: boolean;
+  /** Whether an owner already registered `/supi-agent-cleanup` for this Pi runtime. */
+  cleanupCommandRegistered?: boolean;
 }
 
 const sharedStateKey = Symbol.for("@mrclrchtr/supi-agent-runtime/agents-viewer");

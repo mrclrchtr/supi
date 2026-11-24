@@ -131,6 +131,10 @@ If the Ask User tool opens a form while `/agents` is open, the viewer closes so 
 
 `startRegisteredAgentRun()` returns one handle. `stop()` waits for bounded Agent Run disposal, not transcript writes. `result` resolves after final transcript writes finish. A storage failure marks the transcript incomplete and does not change the Agent Run outcome. Without a registry, the runtime does not create a transcript. A closed registry stops the run.
 
+## Shared `/supi-agent-cleanup` command
+
+Agent and Review call `registerAgentCleanupCommand(pi)`. The first caller registers `/supi-agent-cleanup` once per Pi runtime, as `registerAgentsCommand()` does for `/agents`. The command lists SuPi-marked worktrees (`supi-agent:` and legacy `supi-review:` markers) with their owner status. After confirmation, it removes disposable workspaces and their temporary parents whose owner process has exited, and only unlocks caller-provided worktrees. Worktrees whose owner is active or cannot be checked are reported and left alone.
+
 ## Background Run Batches
 
 An owner package that lets its caller continue while runs are active hands each admitted Run Batch to the runtime ([ADR 0014](docs/adr/0014-own-background-run-batches-and-result-collection.md)). Call `registerRunBatchOwner(pi, options)` on every `session_start`; it returns the owner's access to the batches of the containing session. Bundled runtime copies share one set of batches, like the run registry.

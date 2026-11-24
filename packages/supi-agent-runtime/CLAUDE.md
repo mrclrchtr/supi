@@ -17,5 +17,6 @@
 - Keep the package library-only. It may provide `registerAgentsCommand()` for extension callers, but it must not add a Pi extension entry.
 - Keep Agent Profile pages optional and caller-owned. Do not move profile policy or Review audit into the runtime.
 - Background Run Batches hold no admission, Profile, conversation, or checkpoint policy. Owners reconcile their own claims through `RunBatchOwnerOptions.reconcile`. Test them through an artificial owner (`__tests__/helpers/run-batch-owner.ts`).
+- `/supi-agent-cleanup` is registered once per Pi runtime by the first owner that calls `registerAgentCleanupCommand()`, like `/agents`. It never touches a worktree whose owner is active or unknown; for an absent owner it removes disposable workspaces and only unlocks caller-provided worktrees.
 - `agent_result` and `agent_cancel` are registered once per Pi runtime by the first owner that supplies `RunBatchOwnerOptions.collection`, like `/agents`. The runtime owns their names, schemas, guidance, handle checks, and collection ordering; owners supply results, rendering, and model-facing cancellation text. Keep Delegation text unchanged.
 - Test through `startAgentRun()` and its returned Handle; use controlled Pi session factories and fake timers.

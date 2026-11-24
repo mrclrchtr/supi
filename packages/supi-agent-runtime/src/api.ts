@@ -97,6 +97,7 @@ export type {
   StartAgentRunOptions,
   StartRegisteredAgentRunOptions,
 } from "./types.ts";
+export { registerAgentCleanupCommand } from "./ui/agent-cleanup-command.ts";
 export type { RegisterAgentsCommandOptions } from "./ui/agents-command.ts";
 export {
   clearAgentsProfilePages,
