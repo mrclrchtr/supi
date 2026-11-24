@@ -2,21 +2,25 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "config:best-practices",
+    "helpers:pinGitHubActionDigestsToSemver",
     ":automergeDigest",
     ":automergeMinor",
+    ":automergeLockFileMaintenance",
     ":pinAllExceptPeerDependencies",
-    ":semanticCommitTypeAll(fix)"
+    ":semanticCommitTypeAll(fix)",
+    "security:openssf-scorecard"
   ],
+  "timezone": "Europe/Berlin",
   "internalChecksFilter": "strict",
   "minimumReleaseAgeBehaviour": "timestamp-required",
+  "osvVulnerabilityAlerts": true,
   "vulnerabilityAlerts": {
     "automerge": false,
-    "minimumReleaseAge": null
-  },
-  "lockFileMaintenance": {
-    "enabled": true
+    "minimumReleaseAge": null,
+    "addLabels": ["security"]
   },
   "labels": ["dependencies"],
+  "commitBody": "{{#if isGroup}}Updated packages:\n{{#each upgrades}}- {{depName}}: {{#if currentVersion}}{{currentVersion}} → {{/if}}{{newVersion}}\n{{/each}}{{/if}}",
   "gitIgnoredAuthors": ["41898282+github-actions[bot]@users.noreply.github.com"],
   "customManagers": [
     {
@@ -49,6 +53,13 @@
       "description": "Wait one week before proposing npm version updates; pnpm enforces the same cooldown for transitive dependencies.",
       "matchDatasources": ["npm"],
       "matchUpdateTypes": ["major", "minor", "patch"],
+      "minimumReleaseAge": "7 days"
+    },
+    {
+      "description": "Wait one week before tool and release-asset updates; these run in CI with secrets. Upstream skill synchronization is reviewed manually.",
+      "matchDatasources": ["github-releases", "github-release-attachments", "github-tags"],
+      "matchUpdateTypes": ["major", "minor", "patch"],
+      "matchPackageNames": ["!mattpocock/skills"],
       "minimumReleaseAge": "7 days"
     },
     {
