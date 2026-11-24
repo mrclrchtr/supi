@@ -1,16 +1,14 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { expectedGitExitOutput, sanitizedGitEnv } from "@mrclrchtr/supi-core/git";
 
 const execFileAsync = promisify(execFile);
 const GIT_TIMEOUT_MS = 30_000;
 
 function gitOptions(cwd: string, signal?: AbortSignal) {
-  // Inherited GIT_* variables (for example from a hook) would redirect commands to another repository.
-  const env = { ...process.env };
-  for (const key of Object.keys(env)) if (key.startsWith("GIT_")) delete env[key];
   return {
     cwd,
-    env,
+    env: sanitizedGitEnv(),
     timeout: GIT_TIMEOUT_MS,
     maxBuffer: 50 * 1024 * 1024,
     ...(signal ? { signal } : {}),
@@ -31,8 +29,7 @@ export async function runGitAllowFatal(
   try {
     await runGit(cwd, args, signal);
   } catch (error) {
-    const failure = error as { code?: unknown; killed?: unknown; signal?: unknown };
-    if (failure.code === 128 && failure.killed !== true && !failure.signal) return;
+    if (expectedGitExitOutput(error, [128]) !== undefined) return;
     throw error;
   }
 }

@@ -3,6 +3,7 @@ import { readdirSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
+import { sanitizedGitEnv } from "@mrclrchtr/supi-core/git";
 import { realpathOrResolve } from "./path.ts";
 import {
   makeDiagnostic,
@@ -381,9 +382,7 @@ async function findGitRoot(cwd: string): Promise<string | undefined> {
       cwd,
       timeout: 30_000,
       maxBuffer: 1024 * 1024,
-      env: Object.fromEntries(
-        Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_")),
-      ),
+      env: sanitizedGitEnv(),
     });
     const root = result.stdout.trim();
     return root ? realpathOrResolve(root) : undefined;

@@ -2,10 +2,10 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { useRepositoryTemplate } from "@mrclrchtr/supi-test-utils/git";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { resolveReviewSnapshot } from "../../src/git.ts";
 import { materializeReviewWorkspace } from "../../src/workspace/review-workspace.ts";
-import { useRepositoryTemplate } from "../helpers/repository-template.ts";
 
 vi.setConfig({ testTimeout: 20_000 });
 

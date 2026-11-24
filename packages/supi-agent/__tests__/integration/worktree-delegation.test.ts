@@ -1,9 +1,9 @@
 import { existsSync, mkdirSync, realpathSync, symlinkSync } from "node:fs";
 import { join } from "node:path";
 import { configureDebugRegistry, subscribeDebugPersistence } from "@mrclrchtr/supi-core/debug";
+import { deadPid, git, lockReasons, repositoryTemplate } from "@mrclrchtr/supi-test-utils/git";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { backgroundHarness, task } from "../helpers/background-harness.ts";
-import { deadPid, git, lockReasons, repositoryTemplate } from "../helpers/git-fixture.ts";
 
 const sdk = vi.hoisted(() => ({ createAgentSession: vi.fn(), createAgentSessionRuntime: vi.fn() }));
 vi.mock("@earendil-works/pi-coding-agent", async (importOriginal) => ({

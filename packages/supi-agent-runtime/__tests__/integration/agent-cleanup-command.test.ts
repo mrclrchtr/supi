@@ -5,10 +5,10 @@ import { dirname, join } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { createEventBus } from "@earendil-works/pi-coding-agent";
 import { createPiMock, makeCtx } from "@mrclrchtr/supi-test-utils";
+import { deadPid, git, lockReasons, repositoryTemplate } from "@mrclrchtr/supi-test-utils/git";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as runtimeApi from "../../src/api.ts";
 import { acquireWorktreeLease, createDisposableWorkspace } from "../../src/workspace.ts";
-import { deadPid, git, lockReasons, repositoryTemplate } from "../helpers/git-fixture.ts";
 
 // Command tests spawn real Git processes.
 vi.setConfig({ testTimeout: 20_000 });

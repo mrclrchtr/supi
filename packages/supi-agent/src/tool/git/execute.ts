@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import { sanitizedGitEnv } from "@mrclrchtr/supi-core/git";
 import { GIT_READ_SUBCOMMANDS } from "./input.ts";
 
 const GIT_TIMEOUT_MS = 30_000;
@@ -86,11 +87,7 @@ export function buildGitArgv(args: readonly string[]): string[] {
   ];
 }
 
-function gitEnv(): NodeJS.ProcessEnv {
-  const env = { ...process.env };
-  for (const key of Object.keys(env)) if (key.startsWith("GIT_")) delete env[key];
-  return { ...env, GIT_TERMINAL_PROMPT: "0", GIT_PAGER: "cat", GIT_OPTIONAL_LOCKS: "0" };
-}
+const GIT_QUERY_ENV = { GIT_TERMINAL_PROMPT: "0", GIT_PAGER: "cat", GIT_OPTIONAL_LOCKS: "0" };
 
 /** Run an admitted query. Throws with bounded stderr when Git fails. */
 export function runGitQuery(
@@ -104,7 +101,7 @@ export function runGitQuery(
       buildGitArgv(args),
       {
         cwd,
-        env: gitEnv(),
+        env: sanitizedGitEnv(GIT_QUERY_ENV),
         timeout: GIT_TIMEOUT_MS,
         maxBuffer: GIT_MAX_BUFFER_BYTES,
         ...(signal ? { signal } : {}),

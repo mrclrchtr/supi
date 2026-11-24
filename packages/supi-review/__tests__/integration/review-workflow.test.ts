@@ -11,8 +11,8 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { useRepositoryTemplate } from "@mrclrchtr/supi-test-utils/git";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { useRepositoryTemplate } from "../helpers/repository-template.ts";
 
 const mocks = vi.hoisted(() => ({
   afterSnapshotResolution: undefined as (() => void) | undefined,

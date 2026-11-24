@@ -21,6 +21,7 @@ pnpm add @mrclrchtr/supi-core
 ## Package surfaces
 
 - `@mrclrchtr/supi-core/api` — reusable helpers for other packages and extensions
+- `@mrclrchtr/supi-core/git` — sanitized environment and expected-exit helpers for Git child processes
 - `@mrclrchtr/supi-core/llm` — Pi-owned direct model requests and JSON helpers
 - `@mrclrchtr/supi-core/report` — shared text/report rendering helpers for TUI and plain-text summaries
 - `@mrclrchtr/supi-core/tui` — shared terminal UI helpers for list titles, rows, menus, and descriptions

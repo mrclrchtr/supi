@@ -9,6 +9,7 @@ Shared test utilities for SuPi extension tests. Not a pi extension — imported 
 - `getTools(pi)` / `getTool(pi, name)` — typed tool access; `getTool` throws if not found
 - `createMarkedTheme()` — test theme rendering `fg("success", "0")` as `[success]0[/success]`; use it when render tests must assert tone
 - `getHandler(pi, event)` → `handler | undefined` / `getHandlerOrThrow(pi, event)` → `handler`
+- `@mrclrchtr/supi-test-utils/git` — Git fixtures for process-spawning tests: `git()`, `lockReasons()`, `deadPid()`, `useRepositoryTemplate(build)` (build once per test file, copy per test), and `repositoryTemplate()` for the one-commit default. Keep it free of SuPi package dependencies.
 - `@mrclrchtr/supi-test-utils/background` — `backgroundHarness({ sdk, extension, ... })` drives an extension's child SDK sessions, parent turns, and persisted tool results. Keep it free of SuPi package dependencies and owner policy; owner fixtures (profiles, task shapes, registry access) stay in the owner's test helpers.
 
 ## Usage

@@ -1,9 +1,9 @@
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { git, repositoryTemplate } from "@mrclrchtr/supi-test-utils/git";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { resolveWorktreeClaims } from "../../src/delegation/worktree-claims.ts";
-import { git, repositoryTemplate } from "../helpers/git-fixture.ts";
 
 // Every test spawns real Git processes.
 vi.setConfig({ testTimeout: 20_000 });

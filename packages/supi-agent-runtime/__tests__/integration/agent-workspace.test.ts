@@ -12,6 +12,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { deadPid, git, lockReasons, repositoryTemplate } from "@mrclrchtr/supi-test-utils/git";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   acquireWorktreeLease,
@@ -21,7 +22,6 @@ import {
   resolveWorktreeRoot,
   runDependencyBootstrap,
 } from "../../src/workspace.ts";
-import { deadPid, git, lockReasons, repositoryTemplate } from "../helpers/git-fixture.ts";
 
 // Every test spawns real Git processes.
 vi.setConfig({ testTimeout: 20_000 });

@@ -307,6 +307,9 @@ importers:
       '@mrclrchtr/supi-ask-user':
         specifier: workspace:*
         version: link:../supi-ask-user
+      '@mrclrchtr/supi-test-utils':
+        specifier: workspace:*
+        version: link:../supi-test-utils
       '@types/node':
         specifier: 26.6.6
         version: 26.6.6

@@ -3,10 +3,10 @@ import { chmodSync, existsSync, mkdtempSync, rmSync, writeFileSync } from "node:
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { listAgentWorkspaces, removeAgentWorkspace } from "@mrclrchtr/supi-agent-runtime/workspace";
+import { useRepositoryTemplate } from "@mrclrchtr/supi-test-utils/git";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { resolveReviewSnapshot } from "../../src/git.ts";
 import { materializeReviewWorkspace } from "../../src/workspace/review-workspace.ts";
-import { useRepositoryTemplate } from "../helpers/repository-template.ts";
 
 // The global 2s timeout is too tight for tests spawning real git.
 vi.setConfig({ testTimeout: 20000 });

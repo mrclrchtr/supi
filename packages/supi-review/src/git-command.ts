@@ -4,6 +4,7 @@ import { mkdtemp, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { promisify } from "node:util";
+import { expectedGitExitOutput, sanitizedGitEnv } from "@mrclrchtr/supi-core/git";
 
 const execFileAsync = promisify(execFile);
 const GIT_TIMEOUT_MS = 30_000;
@@ -17,13 +18,9 @@ export interface ScratchIndex {
 export type GitIndex = string | ScratchIndex;
 
 function gitOptions(cwd: string, index?: GitIndex, signal?: AbortSignal) {
-  const env = { ...process.env };
-  for (const key of Object.keys(env)) if (key.startsWith("GIT_")) delete env[key];
-  if (typeof index === "string") env.GIT_INDEX_FILE = index;
-  else if (index) Object.assign(env, index.env);
   return {
     cwd,
-    env,
+    env: sanitizedGitEnv(typeof index === "string" ? { GIT_INDEX_FILE: index } : index?.env),
     timeout: GIT_TIMEOUT_MS,
     maxBuffer: 50 * 1024 * 1024,
     ...(signal ? { signal } : {}),
@@ -83,28 +80,6 @@ export async function resolveGitRepositoryRoot(cwd: string, signal?: AbortSignal
   const root = (await runGit(cwd, ["rev-parse", "--show-toplevel"], undefined, signal)).trim();
   if (!root) throw new Error(`No Git worktree contains ${cwd}.`);
   return realpath(root);
-}
-
-/** Return Git standard output only when an execution error has an allowed exit code. */
-export function expectedGitExitOutput(error: unknown, allowedCodes: number[]): string | undefined {
-  if (!error || typeof error !== "object") return undefined;
-  const failure = error as {
-    code?: unknown;
-    killed?: unknown;
-    signal?: unknown;
-    stdout?: unknown;
-  };
-  if (
-    typeof failure.code !== "number" ||
-    !allowedCodes.includes(failure.code) ||
-    failure.killed === true ||
-    failure.signal
-  ) {
-    return undefined;
-  }
-  if (typeof failure.stdout === "string") return failure.stdout;
-  if (Buffer.isBuffer(failure.stdout)) return failure.stdout.toString("utf8");
-  return "";
 }
 
 /** Allow only documented non-zero Git outcomes while preserving operational failures. */

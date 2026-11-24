@@ -2,8 +2,8 @@ import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { useRepositoryTemplate } from "@mrclrchtr/supi-test-utils/git";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { useRepositoryTemplate } from "../helpers/repository-template.ts";
 
 const mocks = vi.hoisted(() => ({ runReviewer: vi.fn() }));
 vi.mock("@earendil-works/pi-coding-agent", async (original) => {

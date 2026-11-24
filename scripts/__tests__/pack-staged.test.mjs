@@ -101,6 +101,7 @@ const CORE_EXPORTS = {
   "./debug": "./src/debug.ts",
   "./evidence-badge": "./src/evidence-badge.ts",
   "./footer-registry": "./src/footer-registry.ts",
+  "./git": "./src/git.ts",
   "./llm": "./src/llm.ts",
   "./model-selection": "./src/model-selection.ts",
   "./package.json": "./package.json",
