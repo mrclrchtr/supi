@@ -20,6 +20,11 @@ vi.mock("@earendil-works/pi-coding-agent", async (original) => ({
   createAgentSessionRuntime: mocks.createAgentSessionRuntime,
 }));
 
+import {
+  configureDebugRegistry,
+  getDebugEvents,
+  resetDebugRegistry,
+} from "@mrclrchtr/supi-core/debug";
 import { AgentRunRegistry, startRegisteredAgentRun } from "../../src/api.ts";
 import { createHarness, inputs } from "../helpers/agent-run-harness.ts";
 
@@ -195,7 +200,8 @@ it("runs caller cleanup and transcript cleanup when caller cleanup throws", asyn
 
   await expect(run.result).resolves.toMatchObject({ kind: "success", value: "done" });
   expect(callerCleanup).toHaveBeenCalledOnce();
-  expect(unsubscribe).toHaveBeenCalledTimes(2);
+  // Runtime events, transcript, and compaction Debug observation.
+  expect(unsubscribe).toHaveBeenCalledTimes(3);
   expect(registry.snapshot().runs[0]?.transcriptSource?.getStatus().status).toBe("complete");
 });
 
@@ -235,7 +241,72 @@ it("detaches transcript observation when caller observer setup throws", async ()
     failureCode: "session-not-ready",
   });
   expect(session.prompt).not.toHaveBeenCalled();
-  expect(unsubscribes).toHaveLength(2);
+  expect(unsubscribes).toHaveLength(3);
   expect(unsubscribes.every((unsubscribe) => unsubscribe.mock.calls.length === 1)).toBe(true);
   expect(registry.snapshot().runs[0]?.transcriptSource?.getStatus().status).toBe("complete");
+});
+
+it("records a Debug event without summary content when a registered run compacts", async () => {
+  configureDebugRegistry({ enabled: true });
+  const { session } = createHarness(mocks);
+  session.prompt.mockImplementationOnce(async (_prompt, options) => {
+    session.isStreaming = true;
+    options?.preflightResult?.("started");
+    session.emit({
+      type: "compaction_end",
+      reason: "threshold",
+      result: {
+        summary: "PRIVATE_SUMMARY",
+        firstKeptEntryId: "e1",
+        tokensBefore: 180_000,
+        estimatedTokensAfter: 40_000,
+      },
+      aborted: false,
+      willRetry: false,
+    });
+    session.emit({ type: "agent_settled" });
+    session.isStreaming = false;
+  });
+
+  try {
+    const run = startRegisteredAgentRun({
+      inputs: inputs(),
+      prompt: "inspect the package",
+      completionResolver: () => "done",
+      registry,
+      registration: {
+        metadata: {
+          runKey: "run-1",
+          batchId: "batch-1",
+          taskId: "task-1",
+          kind: "Reviewer",
+          label: "change review",
+          cwd: "/repo",
+          modelId: "test-provider/test-model",
+          thinkingLevel: "low",
+          tools: ["read"],
+          startedAt: 1,
+        },
+      },
+    });
+    await run.result;
+
+    const { events } = getDebugEvents({ category: "agent-run-compaction" });
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      source: "supi-agent-runtime",
+      level: "info",
+      data: {
+        runKey: "run-1",
+        taskId: "task-1",
+        kind: "Reviewer",
+        reason: "threshold",
+        contextBefore: 180_000,
+        contextAfterEstimate: 40_000,
+      },
+    });
+    expect(JSON.stringify(events)).not.toContain("PRIVATE_SUMMARY");
+  } finally {
+    resetDebugRegistry();
+  }
 });

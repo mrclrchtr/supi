@@ -94,6 +94,10 @@ Enable **Debug → Enabled** and **Debug → Agent Run Retrospectives** in `/sup
 
 Runtime consumers opt in explicitly through `createDebugAgentRunRetrospective()` or a caller-owned `retrospective` policy. A retained Handle remains stoppable until disposal; `retrospecting` is active but cannot be steered. See the [retrospective contract](../../docs/conventions/agent-run-retrospectives.md).
 
+## Compaction Debug events
+
+When **Debug → Enabled** is on, every finished compaction of a registered Agent Run (Delegation or Reviewer) records one Debug event with category `agent-run-compaction`. Its `data` holds the run correlation (`runKey`, `batchId`, `taskId`, `kind`, `label`, `modelId`), the compaction `reason`, `aborted`, `willRetry`, the context size before and the estimate after (`contextBefore`, `contextAfterEstimate`), and a sanitized error text. It never contains the summary or conversation content. Failed or aborted compactions use level `warning`.
+
 ## Shared `/agents` viewer
 
 Agent and Review call `registerAgentsCommand(pi)` from the public API. The helper finds one shared registry for the containing Pi runtime through `pi.events`. Bundled runtime copies use the same registry and register one `/agents` command for that runtime. The runtime package does not register itself as a Pi extension.

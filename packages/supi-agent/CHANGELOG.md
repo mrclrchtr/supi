@@ -1,5 +1,9 @@
 # Changelog
 
+## [15.0.0]
+
+- With **Debug → Enabled**, each context compaction of an Agent Run records an `agent-run-compaction` Debug event with the run, the reason, and the context size before and after, without conversation content.
+
 ## [14.3.0]
 
 - Agent Run retrospective Debug events record which tools the run started with (`metrics.availableTools`), so a tool the task did not use can be told apart from one it did not have. The retrospective prompt (revision 3) no longer asks every run to comment on Code Intelligence: a run mentions `code_*` tools only for a faulty result or when it answered a symbol question with another tool.

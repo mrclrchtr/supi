@@ -19,6 +19,7 @@ import {
   cloneAgentRunContext,
   createAgentRunSessionManager,
 } from "./context.ts";
+import { observeAgentRunCompaction } from "./debug-compaction.ts";
 import { buildAgentRunDiagnostics } from "./diagnostics.ts";
 import { AgentRunLifecycleTraceCollector, getRegisteredToolNames } from "./lifecycle-trace.ts";
 import { createAgentRunModelRuntime } from "./provider-authority.ts";
@@ -1281,14 +1282,17 @@ export function startRegisteredAgentRun<T>(
   };
   const transcript = registry?.createTranscriptCapture(metadata, transcriptSystemPrompt ?? "");
   let detachTranscript: (() => void) | undefined;
+  let detachCompactionDebug: (() => void) | undefined;
   const observer = async (session: AgentRunSessionView): Promise<(() => void) | undefined> => {
     detachTranscript = registry?.attachSession(runKey, session);
+    detachCompactionDebug = observeAgentRunCompaction(session, metadata);
     try {
       const detachCallerObserver = await options.observer?.(session);
       return detachCallerObserver;
     } catch (error) {
       try {
         detachTranscript?.();
+        detachCompactionDebug?.();
       } catch {
         // Transcript observer cleanup cannot replace the caller observer error.
       }
@@ -1298,6 +1302,7 @@ export function startRegisteredAgentRun<T>(
   const handle = startAgentRun({ ...runOptions, observer });
   const result = handle.result.then(async (outcome) => {
     try {
+      detachCompactionDebug?.();
       detachTranscript?.();
       await transcript?.finish();
     } catch {
