@@ -264,6 +264,123 @@ describe("lease lifetime", () => {
   });
 });
 
+describe("Delegation Follow-Ups under Worktree Claims", () => {
+  /** Finish a foreground writer conversation and return its conversation ID. */
+  async function savedWriter(id: string, cwd?: string): Promise<string> {
+    const h = harness as NonNullable<typeof harness>;
+    const running = h.invoke("agent_run", { mode: "foreground", tasks: [writer(id, cwd)] });
+    await vi.waitFor(() => expect(streaming()).toHaveLength(1));
+    h.child(id).finish(`${id} done.`);
+    const result = await running;
+    // The lease is released once the run has disposed its resources.
+    await vi.waitFor(() => expect(locks(h.ctx.cwd).size).toBe(0));
+    return (result.details as { tasks: Array<{ conversationId: string }> }).tasks[0]
+      ?.conversationId as string;
+  }
+
+  const followUp = (id: string, conversationId: string) => ({
+    id,
+    continue: { conversationId },
+    instructions: `Inspect ${id} module.`,
+  });
+
+  it.each(["tui", "rpc"])(
+    "%s runs a follow-up in its saved sibling worktree in the background under a lease",
+    async (mode) => {
+      const { h, wt } = await setup();
+      Object.assign(h.ctx, { mode });
+      const conversationId = await savedWriter("first", wt.a);
+
+      const started = await h.invoke("agent_run", { tasks: [followUp("again", conversationId)] });
+      expect(started.details).toMatchObject({ mode: "background" });
+      await vi.waitFor(() => expect(streaming()).toHaveLength(1));
+      expect(h.child("again").session.sessionManager.getCwd()).toBe(wt.a);
+      expect(locks(h.ctx.cwd).get(wt.a)).toMatch(/^supi-agent:delegation:/);
+
+      h.child("again").finish("Again done.");
+      const result = await h.invoke("agent_result", {
+        batchId: started.details.batchId,
+        wait: true,
+      });
+      expect(JSON.stringify(result.content)).toContain(`Working directory: ${wt.a}`);
+      await vi.waitFor(() => expect(locks(h.ctx.cwd).size).toBe(0));
+    },
+  );
+
+  it("rejects a follow-up while an active run holds its saved worktree and admits it after release", async () => {
+    const { h, wt } = await setup();
+    const conversationId = await savedWriter("first", wt.a);
+    const holder = await h.invoke("agent_run", { tasks: [writer("holder", join(wt.a, "."))] });
+    await vi.waitFor(() => expect(streaming()).toHaveLength(1));
+    await expect(
+      h.invoke("agent_run", { tasks: [followUp("again", conversationId)] }),
+    ).rejects.toThrow(/again: .*already claimed by task "holder"/);
+    expect(h.children).toHaveLength(2);
+
+    h.child("holder").finish("Holder done.");
+    await h.invoke("agent_result", { batchId: holder.details.batchId, wait: true });
+    await vi.waitFor(() => expect(locks(h.ctx.cwd).size).toBe(0));
+    await h.invoke("agent_run", { tasks: [followUp("again", conversationId)] });
+    await vi.waitFor(() => expect(streaming()).toHaveLength(1));
+    expect(locks(h.ctx.cwd).get(wt.a)).toMatch(/^supi-agent:delegation:/);
+  });
+
+  it("rejects a follow-up while a foreign lock holds its saved worktree and admits it after unlock", async () => {
+    const { h, wt } = await setup();
+    const conversationId = await savedWriter("first", wt.a);
+    git(h.ctx.cwd, "worktree", "lock", "--reason", "held by a human", wt.a);
+    await expect(
+      h.invoke("agent_run", { tasks: [followUp("again", conversationId)] }),
+    ).rejects.toThrow(/again: .*locked by another tool \(held by a human\)/);
+    expect(h.children).toHaveLength(1);
+
+    git(h.ctx.cwd, "worktree", "unlock", wt.a);
+    await h.invoke("agent_run", { tasks: [followUp("again", conversationId)] });
+    await vi.waitFor(() => expect(streaming()).toHaveLength(1));
+    expect(locks(h.ctx.cwd).get(wt.a)).toMatch(/^supi-agent:delegation:/);
+  });
+
+  it("keeps a follow-up without a saved cwd to one foreground task in the parent's worktree", async () => {
+    const { h } = await setup();
+    const conversationId = await savedWriter("first");
+    await expect(
+      h.invoke("agent_run", { tasks: [followUp("again", conversationId)], mode: "background" }),
+    ).rejects.toThrow(/again: .*background.*new\.cwd/);
+    await expect(
+      h.invoke("agent_run", { tasks: [followUp("again", conversationId), task("reader")] }),
+    ).rejects.toThrow(/again: .*single-task foreground/);
+    await expect(
+      h.invoke("agent_run", { tasks: [followUp("again", conversationId), writer("local")] }),
+    ).rejects.toThrow(/local: .*already claimed by task "again"/);
+    expect(h.children).toHaveLength(1);
+
+    let returned = false;
+    const running = h
+      .invoke("agent_run", { tasks: [followUp("again", conversationId)] })
+      .then((value) => {
+        returned = true;
+        return value;
+      });
+    await vi.waitFor(() => expect(streaming()).toHaveLength(1));
+    expect(h.child("again").session.sessionManager.getCwd()).toBe(h.ctx.cwd);
+    expect(returned).toBe(false);
+    h.child("again").finish("Again done.");
+    expect(JSON.stringify((await running).content)).toContain(`Working directory: ${h.ctx.cwd}`);
+  });
+
+  it("rejects a follow-up and a new task that target the same worktree in one batch", async () => {
+    const { h, wt } = await setup();
+    const conversationId = await savedWriter("first", wt.a);
+    await expect(
+      h.invoke("agent_run", {
+        tasks: [followUp("again", conversationId), writer("fresh", join(wt.a, "."))],
+      }),
+    ).rejects.toThrow(/fresh: .*already claimed by task "again"/);
+    expect(h.children).toHaveLength(1);
+    expect(locks(h.ctx.cwd).size).toBe(0);
+  });
+});
+
 describe("writer batches in print and JSON modes", () => {
   it.each(["print", "json"])("%s keeps isolated writers foreground", async (mode) => {
     const { h, wt } = await setup();
