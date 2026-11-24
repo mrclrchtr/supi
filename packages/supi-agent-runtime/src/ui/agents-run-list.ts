@@ -1,4 +1,5 @@
-import type { SelectItem } from "@earendil-works/pi-tui";
+import type { Theme } from "@earendil-works/pi-coding-agent";
+import { type SelectItem, SelectList } from "@earendil-works/pi-tui";
 import type { AgentsOverlayRun } from "./agents-overlay-data.ts";
 import { formatRunUsageStatus } from "./agents-run-usage.ts";
 
@@ -21,6 +22,32 @@ export function orderedRuns(
   return [...groups.values()]
     .sort((left, right) => latestStarted(right) - latestStarted(left))
     .flat();
+}
+
+/**
+ * Fit the run name column to the longest name, up to 64 columns, instead of SelectList's fixed
+ * 32. SelectList still narrows it on small terminals and keeps room for the status column.
+ */
+const RUN_LIST_LAYOUT = { minPrimaryColumnWidth: 24, maxPrimaryColumnWidth: 64 } as const;
+
+/** Create the themed run list with a name column sized for long run names. */
+export function createRunSelectList(
+  items: SelectItem[],
+  maxVisible: number,
+  theme: Pick<Theme, "fg">,
+): SelectList {
+  return new SelectList(
+    items,
+    maxVisible,
+    {
+      selectedPrefix: (text) => theme.fg("accent", text),
+      selectedText: (text) => theme.fg("accent", text),
+      description: (text) => theme.fg("dim", text),
+      scrollInfo: (text) => theme.fg("dim", text),
+      noMatch: (text) => theme.fg("warning", text),
+    },
+    RUN_LIST_LAYOUT,
+  );
 }
 
 export function runListItem(run: AgentsOverlayRun, now = Date.now()): SelectItem {

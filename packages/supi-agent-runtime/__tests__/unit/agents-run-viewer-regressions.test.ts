@@ -168,6 +168,18 @@ describe("Agent Run viewer regressions", () => {
     expect(dialog.render(100).join("\n")).toContain("cat");
   });
 
+  it("shows a run name longer than SelectList's default column on a wide terminal", () => {
+    const run = makeAgentsRun({
+      taskId: "Plan Critique",
+      label: "Rename the shared loader helper in runtime",
+    });
+    const text = stripTerminalSequences(
+      new AgentsDialog({ runs: [run] }, dependencies()).render(120).join("\n"),
+    );
+    expect(text).toContain("Plan Critique — Rename the shared loader helper in runtime");
+    expect(text).toContain("running");
+  });
+
   it("shows active run elapsed time in the list", () => {
     const run = makeAgentsRun({ startedAt: Date.now() - 120_000 });
     const text = new AgentsDialog({ runs: [run] }, dependencies()).render(100).join("\n");

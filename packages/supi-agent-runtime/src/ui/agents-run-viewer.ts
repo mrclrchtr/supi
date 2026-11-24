@@ -5,13 +5,18 @@ import {
   type KeyId,
   matchesKey,
   type SelectItem,
-  SelectList,
+  type SelectList,
   type TuiMouseEvent,
   type TuiMouseEventResult,
   truncateToWidth,
 } from "@earendil-works/pi-tui";
 import type { AgentsOverlayData, AgentsOverlayRun } from "./agents-overlay-data.ts";
-import { orderedRuns, type RunSection, runListItem } from "./agents-run-list.ts";
+import {
+  createRunSelectList,
+  orderedRuns,
+  type RunSection,
+  runListItem,
+} from "./agents-run-list.ts";
 import { nextRunSelection } from "./agents-run-switcher.ts";
 import { handleRunViewerPageInput, handleTranscriptNavigation } from "./agents-run-viewer-input.ts";
 import {
@@ -321,13 +326,7 @@ export class AgentsRunViewer {
   }
 
   #createSelectList(items: SelectItem[], maxVisible = this.#listMaxVisible): SelectList {
-    const list = new SelectList(items, maxVisible, {
-      selectedPrefix: (text) => this.theme.fg("accent", text),
-      selectedText: (text) => this.theme.fg("accent", text),
-      description: (text) => this.theme.fg("dim", text),
-      scrollInfo: (text) => this.theme.fg("dim", text),
-      noMatch: (text) => this.theme.fg("warning", text),
-    });
+    const list = createRunSelectList(items, maxVisible, this.theme);
     list.onSelectionChange = (item) => this.#selectRun(item.value);
     list.onSelect = (item) => {
       this.#selectRun(item.value);
