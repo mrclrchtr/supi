@@ -65,6 +65,8 @@ export interface BatchTaskResult {
   usage?: Usage;
   /** Failure stage for a non-success outcome. */
   failureCode?: string;
+  /** Working directory of a mutation-capable task, reported so the parent can inspect its changes. */
+  workingDirectory?: string;
   /** Canonical provider-error summary; never raw errors or provider response content. */
   failureSummary?: string;
   turns: number;
@@ -95,6 +97,11 @@ export interface StartDelegationBatchOptions {
   authorizedAuxiliaryModels?: AgentRunAuxiliaryModelSnapshot;
   onUpdate?: (progress: BatchProgressState) => void;
   onTaskResult?: (result: BatchTaskResult, batchId: string) => void;
+  /**
+   * Called once after every started Agent Run released its session resources, or when the batch
+   * never starts. `stop()` waits for the returned promise, so owners release Worktree Claims here.
+   */
+  onDisposed?: () => Promise<void> | void;
 }
 
 /** Session-owned control surface for one running Delegation Batch. */
@@ -106,6 +113,6 @@ export interface DelegationBatchHandle {
   snapshot(): DelegationBatchOutcome;
   /** Return progress for every task in input order. */
   progress(): BatchProgressState;
-  /** Stop all active child runs and wait for their bounded disposal. */
+  /** Stop all active child runs and wait for their bounded disposal and `onDisposed`. */
   stop(): Promise<void>;
 }

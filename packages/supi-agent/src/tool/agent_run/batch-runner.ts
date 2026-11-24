@@ -10,7 +10,7 @@ import {
 } from "@mrclrchtr/supi-agent-runtime/api";
 import type { ProfileCatalogue } from "../../types.ts";
 import type { ResolvedTask } from "./batch-preflight.ts";
-import { preflightDelegationBatch } from "./batch-preflight.ts";
+import { preflightDelegationBatch, singleWriterBatchError } from "./batch-preflight.ts";
 import type {
   BatchProgressState,
   BatchTaskProgress,
@@ -81,8 +81,14 @@ export async function runDelegationBatch(
   registry?: AgentRunRegistry,
 ): Promise<DelegationBatchOutcome> {
   const preflightResult = preflightDelegationBatch(params, catalogue, ctx);
-  if ("errors" in preflightResult) {
-    const message = preflightResult.errors
+  const errors =
+    "errors" in preflightResult
+      ? preflightResult.errors
+      : [singleWriterBatchError(preflightResult.tasks, params.tasks.length)].filter(
+          (error) => error !== undefined,
+        );
+  if ("errors" in preflightResult || errors.length > 0) {
+    const message = errors
       .map((err) => `${err.taskId ? `${err.taskId}: ` : ""}${err.message}`)
       .join("\n");
     throw new Error(`Delegation Batch preflight failed:\n${message}`);
@@ -162,6 +168,14 @@ export function startDelegationBatch(options: StartDelegationBatchOptions): Dele
   const completions: Array<Promise<BatchTaskResult>> = [];
   let startFailed = false;
   let stopPromise: Promise<void> | undefined;
+  let disposal: Promise<void> | undefined;
+  // Every started run releases its session resources before `handle.result` settles.
+  const disposed = (): Promise<void> => {
+    disposal ??= Promise.allSettled(startedTasks.map((task) => task.handle.result))
+      .then(() => options.onDisposed?.())
+      .catch(() => undefined);
+    return disposal;
+  };
 
   for (const task of tasks) {
     runKeys.set(task.taskId, randomUUID());
@@ -248,16 +262,17 @@ export function startDelegationBatch(options: StartDelegationBatchOptions): Dele
   } catch (error) {
     startFailed = true;
     for (const completion of completions) void completion.catch(() => undefined);
-    void requestStops(startedTasks);
+    void requestStops(startedTasks).then(disposed);
     throw error;
   }
+  void disposed();
 
   const result = Promise.allSettled(completions).then(() => buildOutcome());
   const stop = (): Promise<void> => {
     if (stopPromise !== undefined) return stopPromise;
     // Task results can be ready while their child still owns a retrospective.
     // Terminal handles make stop idempotent, so do not infer liveness from task status.
-    stopPromise = requestStops(startedTasks);
+    stopPromise = requestStops(startedTasks).then(disposed);
     return stopPromise;
   };
 

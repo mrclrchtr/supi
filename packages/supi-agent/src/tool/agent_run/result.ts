@@ -24,7 +24,8 @@ export function formatModelResult(
   fullOutputPath?: string;
 } {
   const sections: AggregateSection[] = results.map((task) => {
-    const header = `## ${task.taskId} (profile: ${task.profileId}) — ${task.status}\nConversation: ${task.conversationId}`;
+    const directory = task.workingDirectory ? `\nWorking directory: ${task.workingDirectory}` : "";
+    const header = `## ${task.taskId} (profile: ${task.profileId}) — ${task.status}\nConversation: ${task.conversationId}${directory}`;
     if (task.status === "completed") {
       return { overhead: header, body: task.finalText ?? "(no output)" };
     }

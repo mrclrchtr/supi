@@ -22,7 +22,7 @@ export const usage = controlledUsage;
 /** The shared background harness loaded with the Agent extension and Agent Profile fixtures. */
 export async function backgroundHarness(
   sdk: ControlledSdk,
-  options: { timeoutMinutes?: number; persistentParent?: boolean } = {},
+  options: { timeoutMinutes?: number; timeoutProfile?: string; persistentParent?: boolean } = {},
 ) {
   const harness = await sharedBackgroundHarness({
     sdk,
@@ -31,9 +31,10 @@ export async function backgroundHarness(
     childPrompt: (id) => `Inspect ${id} module.`,
     prepare: async ({ agentDir }) => {
       if (!options.timeoutMinutes) return;
-      await mkdir(join(agentDir, "supi/agents/explore"), { recursive: true });
+      const profile = options.timeoutProfile ?? "explore";
+      await mkdir(join(agentDir, `supi/agents/${profile}`), { recursive: true });
       await writeFile(
-        join(agentDir, "supi/agents/explore/profile.json"),
+        join(agentDir, `supi/agents/${profile}/profile.json`),
         JSON.stringify({ timeoutMinutes: options.timeoutMinutes }),
       );
     },

@@ -40,7 +40,7 @@ describe("delegation execution modes", () => {
     harness = await backgroundHarness(sdk);
     await expect(
       harness.invoke("agent_run", { tasks: [task("writer", "general")], mode: "background" }),
-    ).rejects.toThrow(/read-only/);
+    ).rejects.toThrow(/cannot run in the background.*new\.cwd/);
     const running = harness.invoke("agent_run", { tasks: [task("writer", "general")] });
     await vi.waitFor(() => expect(harness?.children[0]?.session.isStreaming).toBe(true));
     harness.child("writer").finish();

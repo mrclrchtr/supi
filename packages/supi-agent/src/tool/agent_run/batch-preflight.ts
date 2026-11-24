@@ -49,6 +49,13 @@ export interface ResolvedTask {
   inputs: AgentSessionInputs;
 }
 
+/** A writer reports its working directory so the parent knows which checkout holds its changes. */
+export function writerDirectory(task: ResolvedTask): { workingDirectory?: string } {
+  return isReadOnlyCapabilitySet(task.profile.manifest.tools)
+    ? {}
+    : { workingDirectory: task.inputs.cwd };
+}
+
 /**
  * Validate one Delegation Batch atomically before any Agent Run starts. `webTools` is the
  * invocation's snapshot of session-provided Web tools, shared by every task in the batch.
@@ -76,8 +83,6 @@ export function preflightDelegationBatch(
     if ("message" in result) errors.push(result);
     else resolved.push(result);
   }
-  const mutationError = mutationBatchError(resolved, params.tasks.length);
-  if (mutationError) errors.push(mutationError);
   return errors.length > 0 ? { errors } : { tasks: resolved };
 }
 
@@ -172,7 +177,11 @@ function resolveCurrentProfile(
   return { profile, effective };
 }
 
-function mutationBatchError(
+/**
+ * The conservative writer rule of the claim-free `runDelegationBatch()` interface: a batch with a
+ * mutation-capable profile must be a single task. `agent_run` admits writers through Worktree Claims.
+ */
+export function singleWriterBatchError(
   tasks: readonly ResolvedTask[],
   taskCount: number,
 ): PreflightError | undefined {

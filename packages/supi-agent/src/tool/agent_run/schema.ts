@@ -60,7 +60,7 @@ export function buildAgentRunSchema(catalogue: ProfileCatalogue): TSchema {
                 minLength: 1,
                 maxLength: 4096,
                 description:
-                  "Absolute working directory for this conversation, such as a sibling Git worktree of the same repository. Default: the parent's cwd. Follow-ups keep it.",
+                  "Absolute working directory for this conversation, such as a sibling Git worktree of the same repository. Default: the parent's cwd. Follow-ups keep it. A mutation-capable profile leases a linked worktree other than the parent's and the main worktree; that allows parallel and background runs. Rejected while another writer or lock holds the worktree.",
               }),
             ),
           },
@@ -99,7 +99,7 @@ export function buildAgentRunSchema(catalogue: ProfileCatalogue): TSchema {
         Type.Enum(["background", "foreground"], {
           type: "string",
           description:
-            "Default: background for read-only tasks in TUI/RPC; foreground otherwise. Background rejects mutation-capable profiles and print/JSON modes.",
+            "Default: background in TUI/RPC when every mutation-capable task runs in its own linked worktree (new.cwd); foreground otherwise. Background rejects a mutation-capable task in the parent's or the main worktree, and print/JSON modes.",
         }),
       ),
       sharedContext: Type.Optional(

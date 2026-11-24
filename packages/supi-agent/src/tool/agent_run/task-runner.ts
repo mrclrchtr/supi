@@ -11,7 +11,7 @@ import {
 } from "@mrclrchtr/supi-agent-runtime/api";
 import { makeReadinessCheck } from "../../capabilities.ts";
 import { createDelegationCheckpoint } from "../../delegation/checkpoints.ts";
-import type { ResolvedTask } from "./batch-preflight.ts";
+import { type ResolvedTask, writerDirectory } from "./batch-preflight.ts";
 import type { BatchTaskProgress, BatchTaskResult } from "./batch-types.ts";
 import type { AgentConversationView, ConversationTaskMetadata } from "./conversation-view.ts";
 import { buildConversationView } from "./conversation-view.ts";
@@ -323,6 +323,7 @@ function finalizeTaskOutcome(
     modelTruncated,
     usage,
     failureCode,
+    ...writerDirectory(context.task),
     failureSummary:
       outcome.kind === "failed" && outcome.failureCode !== "session-creation-failed"
         ? getAgentRunDiagnosticErrorRows(outcome.diagnostics)
@@ -364,6 +365,7 @@ function finalizeRejectedTask(context: FinalizeContext): BatchTaskResult {
     conversationLabel: context.task.conversationLabel,
     status: "failed",
     failureCode: "unexpected-runner-failure",
+    ...writerDirectory(context.task),
     turns: 0,
     toolUses: 0,
     humanTruncated: false,
