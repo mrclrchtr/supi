@@ -14,7 +14,7 @@ The packet uses a hybrid before the task-specific lines:
 
 - The **root file is embedded in full** with its SHA-256 and line count. It holds the repository-wide rules and is what every Pi session loads natively. A root file above `REVIEW_LIMITS.instructionFileBytes` fails the Review before fan-out.
 - **Deeper files are indexed**: path, SHA-256, line count, change status, and the changed or Review Scope paths they cover, all computed mechanically. The Reviewer Protocol asks the Reviewer to get those rules before judging code in a covered path, through `code_orientation` on the directory or a full `read`. Headless `code_orientation` is seeded only with the embedded root file, so it still delivers indexed files.
-- A change task also learns which files the target changes or deletes.
+- A change task also learns which files the target changes or deletes. A state task carries only the root file and files covering Review Scope paths, not files selected for a sibling change task.
 
 The Reviewer Protocol frames instruction files as Review Criteria evidence that cannot override the protocol or the Review Task. Rules addressed to an executing agent, such as landing or running checks, are not Review Criteria.
 

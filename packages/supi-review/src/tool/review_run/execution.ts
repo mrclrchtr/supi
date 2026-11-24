@@ -8,7 +8,10 @@ import {
 import type { ChildWebToolProvision } from "@mrclrchtr/supi-core/session";
 import { normalizeReviewInput } from "../../review-input.ts";
 import type { ReviewTargetDiffFile } from "../../target/diff.ts";
-import type { ReviewInstructionFiles } from "../../target/instruction-files.ts";
+import {
+  instructionFilesForMode,
+  type ReviewInstructionFiles,
+} from "../../target/instruction-files.ts";
 import { buildReviewPacket, type ReviewPacketWorkspace } from "../../target/packet.ts";
 import {
   clampReviewThinkingLevel,
@@ -197,6 +200,23 @@ function sharedReviewerOptions(
   };
 }
 
+/** Workspace facts for one task's packet, with the instruction files its Review Mode carries. */
+function taskPacketWorkspace(
+  execution: ReviewTaskExecution,
+  task: ReviewTask,
+): { packetWorkspace: ReviewPacketWorkspace; indexedInstructionPaths: string[] } {
+  const { targetDiff, instructionFiles } = execution;
+  const files = instructionFiles ? instructionFilesForMode(instructionFiles, task.mode) : undefined;
+  return {
+    packetWorkspace: {
+      ...(targetDiff ? { targetDiff } : {}),
+      dependencyBootstrapRan: execution.dependencyBootstrapConfigured ?? false,
+      ...(files ? { instructionFiles: files } : {}),
+    },
+    indexedInstructionPaths: files?.indexed.map((file) => file.path) ?? [],
+  };
+}
+
 /** Run all caller-defined tasks concurrently against one already-frozen Review Workspace. */
 export async function executeReviewTasks(
   execution: ReviewTaskExecution,
@@ -209,8 +229,6 @@ export async function executeReviewTasks(
     model,
     reviewerThinkingLevel = REVIEWER_DEFAULT_THINKING_LEVEL,
     onUpdate,
-    dependencyBootstrapConfigured = false,
-    targetDiff,
     instructionFiles,
     batch,
   } = execution;
@@ -251,17 +269,12 @@ export async function executeReviewTasks(
     details: progressDetails(),
   });
   const reviewerOptions = sharedReviewerOptions(execution, reviewerThinkingLevel, runGroupId);
-  const packetWorkspace: ReviewPacketWorkspace = {
-    ...(targetDiff ? { targetDiff } : {}),
-    dependencyBootstrapRan: dependencyBootstrapConfigured,
-    ...(instructionFiles ? { instructionFiles } : {}),
-  };
   // Only the embedded root file is known; headless Orientation still delivers indexed files.
   const knownInstructionPaths = instructionFiles?.root ? [instructionFiles.root.path] : [];
-  const indexedInstructionPaths = instructionFiles?.indexed.map((file) => file.path) ?? [];
 
   return Promise.all(
     review.tasks.map(async (task) => {
+      const { packetWorkspace, indexedInstructionPaths } = taskPacketWorkspace(execution, task);
       const packet = buildReviewPacket(snapshot, review, scope, task, model, packetWorkspace);
       const packetBytes = Buffer.byteLength(packet.prompt, "utf8");
       const startedAt = Date.now();

@@ -2,7 +2,13 @@ import { readFile, stat } from "node:fs/promises";
 import { join, posix } from "node:path";
 import { findAncestorInstructionFiles } from "@mrclrchtr/supi-code-intelligence/instruction-files";
 import { REVIEW_LIMITS } from "../review-limits.ts";
-import type { ReviewChange, ReviewInput, ReviewScope, ReviewSnapshot } from "../types.ts";
+import type {
+  ReviewChange,
+  ReviewInput,
+  ReviewMode,
+  ReviewScope,
+  ReviewSnapshot,
+} from "../types.ts";
 import { sha256 } from "./hash.ts";
 
 /** Facts shared by embedded and indexed instruction files. */
@@ -158,5 +164,22 @@ export async function selectReviewInstructionFiles(input: {
   return {
     kind: "selected",
     instructionFiles: { ...(root ? { root } : {}), indexed, deleted },
+  };
+}
+
+/**
+ * The instruction files one task's packet carries. A state task evaluates only the after state, so
+ * it keeps the root file and files covering Review Scope paths, and drops files selected only for a
+ * sibling change task's changed paths, along with deletions.
+ */
+export function instructionFilesForMode(
+  instructionFiles: ReviewInstructionFiles,
+  mode: ReviewMode,
+): ReviewInstructionFiles {
+  if (mode === "change") return instructionFiles;
+  return {
+    ...(instructionFiles.root ? { root: instructionFiles.root } : {}),
+    indexed: instructionFiles.indexed.filter((file) => file.coveredScopePaths.length > 0),
+    deleted: [],
   };
 }

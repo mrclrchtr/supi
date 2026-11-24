@@ -901,6 +901,38 @@ describe("runReview exact Review Target workflow", () => {
       expect(packet).not.toContain("changed in target");
     });
 
+    it("gives a state task in a mixed batch only the Review Scope instruction files", async () => {
+      mkdirSync(join(cwd, "pkg"));
+      mkdirSync(join(cwd, "scoped"));
+      writeFileSync(join(cwd, "CLAUDE.md"), "# Root rules\n");
+      writeFileSync(join(cwd, "pkg", "CLAUDE.md"), "# Package rules\n");
+      writeFileSync(join(cwd, "pkg", "a.ts"), "export const a = 1;\n");
+      writeFileSync(join(cwd, "scoped", "CLAUDE.md"), "# Scoped rules\n");
+      commitAll("instructions");
+      writeFileSync(join(cwd, "pkg", "a.ts"), "export const a = 2;\n");
+
+      const outcome = await runReview({
+        cwd,
+        target: {},
+        review: { tasks: [changeTask, stateTask] },
+        scope: { paths: ["scoped"] },
+        reviewerModel: model,
+      });
+
+      expect(outcome.kind).toBe("completed");
+      const invocations = Object.fromEntries(
+        mocks.runReviewer.mock.calls.map(([invocation]) => [invocation.task.id, invocation]),
+      );
+      expect(invocations.change.prompt).toContain("`pkg/CLAUDE.md`");
+      expect(invocations.change.indexedInstructionPaths).toEqual([
+        "pkg/CLAUDE.md",
+        "scoped/CLAUDE.md",
+      ]);
+      expect(invocations.state.prompt).not.toContain("pkg/CLAUDE.md");
+      expect(invocations.state.prompt).toContain("`scoped/CLAUDE.md`");
+      expect(invocations.state.indexedInstructionPaths).toEqual(["scoped/CLAUDE.md"]);
+    });
+
     it("reads instruction file names from the caller, not from the reviewed change", async () => {
       writeFileSync(join(cwd, "CLAUDE.md"), "# Root rules\n");
       const from = commitAll("instructions");
