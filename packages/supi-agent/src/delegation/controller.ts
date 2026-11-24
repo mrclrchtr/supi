@@ -1,6 +1,5 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { AgentRunRegistry, RunBatch, RunBatchOwner } from "@mrclrchtr/supi-agent-runtime/api";
-import type { WorktreeLease } from "@mrclrchtr/supi-agent-runtime/workspace";
 import { loadAgentConfig } from "../config.ts";
 import { preflightDelegationBatch, type ResolvedTask } from "../tool/agent_run/batch-preflight.ts";
 import { startDelegationBatchWithAuxiliaryModels } from "../tool/agent_run/batch-runner.ts";
@@ -9,9 +8,21 @@ import type {
   DelegationBatchHandle,
   DelegationStartOptions,
 } from "../tool/agent_run/batch-types.ts";
+import type { AgentRunToolParams } from "../tool/agent_run/schema.ts";
+import {
+  admitMode,
+  assertWorktreeRequestsAdmissible,
+  beginWithLeases,
+  rejection,
+  waitForRelease,
+} from "./admission.ts";
 import { DelegationConversationState } from "./conversation-state.ts";
 import {
-  acquireWorktreeClaimLeases,
+  type CreatedWorktreeSet,
+  createRequestedWorktrees,
+  worktreeRequestIds,
+} from "./created-worktrees.ts";
+import {
   resolveWorktreeClaims,
   type WorktreeClaim,
   type WorktreeClaimConflict,
@@ -52,7 +63,7 @@ export class DelegationController {
 
   /** Validate all tasks before starting a session-owned batch. */
   async start(options: DelegationStartOptions): Promise<ManagedBatch> {
-    const { params, catalogue, ctx, callId, onUpdate } = options;
+    const { params, ctx } = options;
     if (!this.batches.open(ctx)) throw new Error("The delegation session is closed.");
     if (ctx.signal?.aborted) throw new Error("Delegation start canceled.");
     const activeBranch = ctx.sessionManager.getBranch();
@@ -66,12 +77,99 @@ export class DelegationController {
       activeBranch,
       onBranch,
     );
-    const preflight = preflightDelegationBatch(params, catalogue, ctx, options.webTools);
+    const validated = this.#preflight(params, options);
+    if (worktreeRequestIds(params).size === 0) {
+      return this.#admit({ options, params, tasks: validated, activeBranch });
+    }
+    // Validate profiles and capacity before creating worktrees, then preflight again in them.
+    assertWorktreeRequestsAdmissible(params, validated);
+    this.#assertCapacity(validated.length, ctx);
+    // Reject what creation cannot change before paying for checkout and bootstrap: the claims and
+    // mode of the other tasks. Each created worktree will be leased.
+    const requested = worktreeRequestIds(params);
+    const otherClaims = await this.#resolveClaims(
+      validated.filter((task) => !requested.has(task.taskId)),
+      ctx,
+    );
+    admitMode(
+      params.mode,
+      [
+        ...otherClaims,
+        ...[...requested].map((taskId) => ({ taskId, root: "", kind: "lease" as const })),
+      ],
+      validated.length,
+      ctx,
+    );
+    if (ctx.signal?.aborted) throw new Error("Delegation start canceled.");
+    const created = await createRequestedWorktrees({
+      params,
+      parentCwd: ctx.cwd,
+      bootstrapCommand: loadAgentConfig(ctx.cwd).bootstrapCommand,
+      ...(ctx.signal ? { signal: ctx.signal } : {}),
+    }).catch((error: unknown) => {
+      if (ctx.signal?.aborted) throw new Error("Delegation start canceled.");
+      throw rejection([(error as Error).message]);
+    });
+    try {
+      const tasks = this.#preflight(created.params, options).map((task) => {
+        const entry = created.byTask.get(task.taskId);
+        return entry ? { ...task, createdWorktree: entry.summary } : task;
+      });
+      return await this.#admit({ options, params: created.params, tasks, activeBranch, created });
+    } catch (error) {
+      await created.discard();
+      throw error;
+    }
+  }
+
+  #preflight(params: AgentRunToolParams, options: DelegationStartOptions): ResolvedTask[] {
+    const preflight = preflightDelegationBatch(
+      params,
+      options.catalogue,
+      options.ctx,
+      options.webTools,
+    );
     if ("errors" in preflight) {
       throw new Error(
         `Delegation Batch preflight failed:\n${preflight.errors.map((error) => error.message).join("\n")}`,
       );
     }
+    return preflight.tasks;
+  }
+
+  #assertCapacity(taskCount: number, ctx: ExtensionContext): void {
+    const active = this.registry
+      .snapshot()
+      .runs.filter(
+        (run) => run.kind === "Agent Run" && run.active && run.status !== "retrospecting",
+      );
+    const limit = loadAgentConfig(ctx.cwd).maxConcurrentRuns;
+    if (active.length + this.#reserved + taskCount > limit) {
+      const batches = [...new Set(active.map((run) => run.batchId))].slice(0, 4);
+      throw new Error(
+        `Agent Run capacity exceeded: ${active.length + this.#reserved}/${limit} active. No tasks started. Active batches: ${batches.join(", ") || "none"}.`,
+      );
+    }
+  }
+
+  /**
+   * Claim, reserve, and start preflighted tasks. `created` holds the worktrees created for this
+   * batch: their leases are already held, and they are discarded when no run starts.
+   */
+  async #admit(admission: {
+    options: DelegationStartOptions;
+    params: AgentRunToolParams;
+    tasks: readonly ResolvedTask[];
+    activeBranch: ReturnType<ExtensionContext["sessionManager"]["getBranch"]>;
+    created?: CreatedWorktreeSet;
+  }): Promise<ManagedBatch> {
+    const { options, params, tasks, activeBranch, created } = admission;
+    const { ctx, callId, onUpdate } = options;
+    const onBranch = (batch: ManagedBatch) => this.batches.isOnBranch(batch);
+    const preflight = { tasks: [...tasks] };
+    const heldLeases = new Map(
+      [...(created?.byTask.values() ?? [])].map((entry) => [entry.taskId, entry.workspace.lease]),
+    );
     const claims = await this.#resolveClaims(preflight.tasks, ctx);
     if (ctx.signal?.aborted) throw new Error("Delegation start canceled.");
     const mode = admitMode(params.mode, claims, preflight.tasks.length, ctx);
@@ -84,18 +182,7 @@ export class DelegationController {
     );
     // The runtime rejects a background batch whose launch is not on the active branch.
     const launchId = this.batches.findLaunch(callId, ctx);
-    const active = this.registry
-      .snapshot()
-      .runs.filter(
-        (run) => run.kind === "Agent Run" && run.active && run.status !== "retrospecting",
-      );
-    const limit = loadAgentConfig(ctx.cwd).maxConcurrentRuns;
-    if (active.length + this.#reserved + preflight.tasks.length > limit) {
-      const batches = [...new Set(active.map((run) => run.batchId))].slice(0, 4);
-      throw new Error(
-        `Agent Run capacity exceeded: ${active.length + this.#reserved}/${limit} active. No tasks started. Active batches: ${batches.join(", ") || "none"}.`,
-      );
-    }
+    this.#assertCapacity(preflight.tasks.length, ctx);
     const releaseStarting = this.#conversationState.reserveStarting(preflight.tasks);
     let reservation: WorktreeClaimReservation;
     try {
@@ -119,11 +206,12 @@ export class DelegationController {
         signal: ctx.signal,
         begin: (control) => {
           begun = true;
-          return beginWithLeases(
+          return beginWithLeases({
             claims,
             reservation,
-            control.signal,
-            ({ onTaskDisposed, onDisposed }, handOffRelease) =>
+            heldLeases,
+            signal: control.signal,
+            start: ({ onTaskDisposed, onDisposed }, handOffRelease) =>
               startDelegationBatchWithAuxiliaryModels(
                 {
                   params,
@@ -142,12 +230,14 @@ export class DelegationController {
                   if (!control.isOpen() || ctx.signal?.aborted) return false;
                   const branch = ctx.sessionManager.getBranch();
                   this.#conversationState.assertCurrentBranch(preflight.tasks, launchId, branch);
+                  // From here runs may work in created worktrees; never remove them.
+                  created?.keep();
                   handOffRelease();
                   return true;
                 },
                 control.signal,
               ),
-          );
+          });
         },
       })
       .catch((error: unknown) => {
@@ -241,125 +331,4 @@ export class DelegationController {
       (batch) => this.batches.isOnBranch(batch),
     );
   }
-}
-
-/** Wait until none of the roots is held any more, the wait times out, or the start is aborted. */
-async function waitForRelease(
-  table: WorktreeClaimTable,
-  roots: readonly string[],
-  timedOut: Promise<"timeout">,
-  signal: AbortSignal | undefined,
-): Promise<"released" | "timeout" | "aborted"> {
-  let onAbort: (() => void) | undefined;
-  const aborted = new Promise<"aborted">((resolve) => {
-    onAbort = () => resolve("aborted");
-    if (signal?.aborted) onAbort();
-    else signal?.addEventListener("abort", onAbort, { once: true });
-  });
-  try {
-    while (roots.some((root) => table.holds(root))) {
-      const outcome = await Promise.race([
-        table.nextRelease().then(() => "released" as const),
-        timedOut,
-        aborted,
-      ]);
-      if (outcome !== "released") return outcome;
-    }
-    return "released";
-  } finally {
-    if (onAbort) signal?.removeEventListener("abort", onAbort);
-  }
-}
-
-function rejection(lines: readonly string[]): Error {
-  return new Error(`Delegation Batch rejected; no tasks started:\n${lines.join("\n")}`);
-}
-
-/**
- * Admit the execution mode. A batch whose writers all hold leases runs like a read-only batch:
- * background by default in TUI and RPC. A writer with only a session claim keeps the single-task
- * foreground rule.
- */
-function admitMode(
-  requested: "background" | "foreground" | undefined,
-  claims: readonly WorktreeClaim[],
-  taskCount: number,
-  ctx: ExtensionContext,
-): "background" | "foreground" {
-  const sessionWriter = claims.find((claim) => claim.kind === "session");
-  if (sessionWriter && taskCount > 1) {
-    throw rejection([
-      `${sessionWriter.taskId}: A writer in the main worktree or the parent's worktree requires a single-task foreground batch. Give it its own linked worktree with new.cwd to run it next to other tasks.`,
-    ]);
-  }
-  const interactive = ctx.mode === "tui" || ctx.mode === "rpc";
-  const backgroundAllowed = !sessionWriter && interactive;
-  const mode = requested ?? (backgroundAllowed ? "background" : "foreground");
-  if (mode === "background" && !interactive) {
-    throw new Error("Background delegation requires TUI or RPC mode.");
-  }
-  if (mode === "background" && sessionWriter) {
-    throw rejection([
-      `${sessionWriter.taskId}: A writer in the main worktree or the parent's worktree cannot run in the background. Give it its own linked worktree with new.cwd.`,
-    ]);
-  }
-  return mode;
-}
-
-/**
- * Acquire the batch's leases, then start it. Until `start` hands release ownership to the runner
- * (`handOffRelease()`), any failure releases the leases and the session claims here; afterwards
- * the runner calls `onTaskDisposed` as each started run releases its resources, which releases
- * that task's lease and claim, and `onDisposed` once all have, which releases the rest.
- */
-function beginWithLeases(
-  claims: readonly WorktreeClaim[],
-  reservation: WorktreeClaimReservation,
-  signal: AbortSignal,
-  start: (
-    release: { onTaskDisposed: (taskId: string) => Promise<void>; onDisposed: () => Promise<void> },
-    handOffRelease: () => void,
-  ) => { result: Promise<DelegationBatchHandle>; settled: Promise<void> },
-): { result: Promise<DelegationBatchHandle>; settled: Promise<void> } {
-  let leases = new Map<string, WorktreeLease>();
-  let runnerOwnsRelease = false;
-  const releases = new Map<string, Promise<void>>();
-  // The lease is released before the claim, so a start admitted on the claim finds Git unlocked.
-  const releaseTask = (taskId: string): Promise<void> => {
-    let release = releases.get(taskId);
-    if (!release) {
-      release = Promise.resolve(leases.get(taskId)?.release())
-        .catch(() => undefined)
-        .then(() => reservation.releaseTask(taskId));
-      releases.set(taskId, release);
-    }
-    return release;
-  };
-  let release: Promise<void> | undefined;
-  const releaseAll = (): Promise<void> => {
-    release ??= Promise.allSettled(claims.map((claim) => releaseTask(claim.taskId))).then(
-      reservation.release,
-    );
-    return release;
-  };
-  const acquired = acquireWorktreeClaimLeases(claims, signal).then((acquisition) => {
-    if ("failure" in acquisition) {
-      const { taskId, message } = acquisition.failure;
-      throw rejection([`${taskId}: ${message}`]);
-    }
-    leases = acquisition.leases;
-    return start({ onTaskDisposed: releaseTask, onDisposed: releaseAll }, () => {
-      runnerOwnsRelease = true;
-    });
-  });
-  const result = acquired
-    .then((startup) => startup.result)
-    .catch(async (error: unknown) => {
-      if (!runnerOwnsRelease) await releaseAll();
-      throw error;
-    });
-  const settled = Promise.allSettled([acquired.then((startup) => startup.settled), result]).then(
-    () => undefined,
-  );
-  return { result, settled };
 }

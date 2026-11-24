@@ -36,6 +36,7 @@ describe("Agent Run config", () => {
       expect(loadAgentConfig(path.join(homeDir, "repo"), homeDir)).toEqual({
         agentToolEnabled: true,
         maxConcurrentRuns: 4,
+        bootstrapCommand: "",
       });
     } finally {
       fs.rmSync(homeDir, { recursive: true, force: true });
@@ -69,6 +70,7 @@ describe("Agent Run config", () => {
         fields: [
           expect.objectContaining({ kind: "boolean", key: "agentToolEnabled" }),
           expect.objectContaining({ kind: "number", key: "maxConcurrentRuns" }),
+          expect.objectContaining({ kind: "string", key: "bootstrapCommand" }),
         ],
       }),
     );

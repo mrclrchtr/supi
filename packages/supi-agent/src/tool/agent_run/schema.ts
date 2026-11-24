@@ -63,6 +63,33 @@ export function buildAgentRunSchema(catalogue: ProfileCatalogue): TSchema {
                   "Absolute working directory for this conversation, such as a sibling Git worktree of the same repository. Default: the parent's cwd. Follow-ups keep it. A mutation-capable profile leases a linked worktree other than the parent's and the main worktree; that allows parallel and background runs. Rejected while another writer or lock holds the worktree.",
               }),
             ),
+            worktree: Type.Optional(
+              Type.Object(
+                {
+                  base: Type.Optional(
+                    Type.String({
+                      minLength: 1,
+                      maxLength: 256,
+                      description:
+                        "Commit-ish the new branch starts at, resolved in the parent's cwd. Default: HEAD. Uncommitted changes are not copied.",
+                    }),
+                  ),
+                  branch: Type.Optional(
+                    Type.String({
+                      minLength: 1,
+                      maxLength: 200,
+                      description:
+                        "New branch name; must not exist. Default: supi/<task id>-<random suffix>.",
+                    }),
+                  ),
+                },
+                {
+                  additionalProperties: false,
+                  description:
+                    "Mutation-capable profiles only; excludes cwd. Create a linked worktree on a new branch next to the main worktree and run there like with new.cwd. The worktree and branch are kept after the run, and the result names them.",
+                },
+              ),
+            ),
           },
           { additionalProperties: false },
         ),
@@ -126,8 +153,18 @@ function summarizeCapabilities(tools: readonly AgentCapabilityId[]): string {
 }
 
 export type AgentRunTaskInput =
-  | { id: string; new: { profile: string; cwd?: string }; instructions: string }
+  | {
+      id: string;
+      new: { profile: string; cwd?: string; worktree?: AgentRunWorktreeRequest };
+      instructions: string;
+    }
   | { id: string; continue: { conversationId: string }; instructions: string };
+
+/** Request to create an Agent Workspace for one new writer conversation. */
+export interface AgentRunWorktreeRequest {
+  base?: string;
+  branch?: string;
+}
 
 export type AgentRunToolParams = {
   tasks: AgentRunTaskInput[];

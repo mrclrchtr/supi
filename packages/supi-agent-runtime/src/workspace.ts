@@ -14,6 +14,8 @@ export type { AgentWorkspaceEntry, AgentWorkspaceRemoval } from "./workspace/inv
 export { listAgentWorkspaces, removeAgentWorkspace } from "./workspace/inventory.ts";
 export type { AcquireWorktreeLeaseOptions, WorktreeLease } from "./workspace/lease.ts";
 export { acquireWorktreeLease } from "./workspace/lease.ts";
+export type { CreateLinkedWorktreeOptions, LinkedAgentWorkspace } from "./workspace/linked.ts";
+export { createLinkedWorktree } from "./workspace/linked.ts";
 export type {
   AgentWorkspaceErrorCode,
   AgentWorkspaceOwner,
@@ -21,4 +23,10 @@ export type {
 } from "./workspace/types.ts";
 export { AgentWorkspaceError } from "./workspace/types.ts";
 export type { WorktreeDescription } from "./workspace/worktrees.ts";
-export { describeWorktree, resolveWorktreeRoot } from "./workspace/worktrees.ts";
+export {
+  describeWorktree,
+  hasUncommittedChanges,
+  mainWorktreeRoot,
+  resolveCommit,
+  resolveWorktreeRoot,
+} from "./workspace/worktrees.ts";

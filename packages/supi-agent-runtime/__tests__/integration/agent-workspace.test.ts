@@ -17,6 +17,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   acquireWorktreeLease,
   createDisposableWorkspace,
+  createLinkedWorktree,
   listAgentWorkspaces,
   removeAgentWorkspace,
   resolveWorktreeRoot,
@@ -374,6 +375,123 @@ describe("Agent Workspaces", () => {
         reason: "not-marked",
       });
       expect(existsSync(linked)).toBe(true);
+    });
+  });
+
+  describe("created linked worktrees", () => {
+    const branchTip = (branch: string) => git(repo, "rev-parse", `refs/heads/${branch}`);
+    const branches = () => git(repo, "branch", "--format=%(refname:short)").split("\n");
+
+    it("creates a locked worktree on a new branch without upstream and keeps it after release", async () => {
+      const base = git(repo, "rev-parse", "HEAD");
+      const path = join(scratch, "created");
+
+      const workspace = await createLinkedWorktree({
+        repositoryRoot: repo,
+        baseCommit: base,
+        branch: "supi/task-1",
+        path,
+        owner: "delegation",
+      });
+
+      expect(workspace.root).toBe(realpathSync(path));
+      expect(git(workspace.root, "branch", "--show-current")).toBe("supi/task-1");
+      expect(branchTip("supi/task-1")).toBe(base);
+      expect(git(repo, "config", "--get-regexp", "^branch\\.").includes("supi/task-1")).toBe(false);
+      expect(lockReasons(repo).get(workspace.root)).toMatch(
+        new RegExp(`^supi-agent:delegation:[^;]+;pid=${process.pid};started=[^;]+$`),
+      );
+
+      await workspace.lease.release();
+      expect(lockReasons(repo).has(workspace.root)).toBe(false);
+      expect(existsSync(join(workspace.root, "tracked.txt"))).toBe(true);
+      // Cleanup of an orphaned owner would only unlock it: it is not disposable.
+      expect(await listAgentWorkspaces(repo)).toEqual([]);
+    });
+
+    it("refuses an existing branch, an existing path, and an invalid name before creating anything", async () => {
+      const base = git(repo, "rev-parse", "HEAD");
+      git(repo, "branch", "taken");
+      mkdirSync(join(scratch, "occupied"));
+      const before = git(repo, "worktree", "list", "--porcelain");
+      const create = (branch: string, name: string) =>
+        createLinkedWorktree({
+          repositoryRoot: repo,
+          baseCommit: base,
+          branch,
+          path: join(scratch, name),
+          owner: "delegation",
+        });
+
+      await expect(create("taken", "fresh")).rejects.toMatchObject({ code: "branch-exists" });
+      await expect(create("new", "occupied")).rejects.toMatchObject({ code: "path-exists" });
+      await expect(create("bad..name", "fresh")).rejects.toMatchObject({
+        code: "invalid-branch",
+      });
+      expect(git(repo, "worktree", "list", "--porcelain")).toBe(before);
+      expect(branches()).not.toContain("new");
+    });
+
+    it("creates several worktrees of one repository concurrently", async () => {
+      const base = git(repo, "rev-parse", "HEAD");
+      const created = await Promise.all(
+        [1, 2, 3, 4].map((index) =>
+          createLinkedWorktree({
+            repositoryRoot: repo,
+            baseCommit: base,
+            branch: `supi/parallel-${index}`,
+            path: join(scratch, `parallel-${index}`),
+            owner: "delegation",
+          }),
+        ),
+      );
+      expect(new Set(created.map((workspace) => workspace.root)).size).toBe(4);
+      for (const workspace of created) {
+        expect(lockReasons(repo).get(workspace.root)).toMatch(/^supi-agent:delegation:/);
+      }
+    });
+
+    it("discards the worktree and its unmoved branch, but keeps a branch with commits", async () => {
+      const base = git(repo, "rev-parse", "HEAD");
+      const create = (name: string) =>
+        createLinkedWorktree({
+          repositoryRoot: repo,
+          baseCommit: base,
+          branch: name,
+          path: join(scratch, name),
+          owner: "delegation",
+        });
+      const untouched = await create("untouched");
+      const worked = await create("worked");
+      git(worked.root, "-c", "commit.gpgsign=false", "commit", "-q", "--allow-empty", "-m", "work");
+
+      await untouched.discard();
+      await worked.discard();
+
+      expect(existsSync(untouched.root) || existsSync(worked.root)).toBe(false);
+      expect(branches()).not.toContain("untouched");
+      expect(branches()).toContain("worked");
+    });
+
+    it("removes a worktree whose post-checkout hook fails", async () => {
+      const base = git(repo, "rev-parse", "HEAD");
+      const hooks = join(scratch, "hooks");
+      mkdirSync(hooks);
+      writeFileSync(join(hooks, "post-checkout"), "#!/bin/sh\nexit 1\n", { mode: 0o755 });
+      git(repo, "config", "core.hooksPath", hooks);
+      const path = join(scratch, "hooked");
+
+      await expect(
+        createLinkedWorktree({
+          repositoryRoot: repo,
+          baseCommit: base,
+          branch: "hooked",
+          path,
+          owner: "delegation",
+        }),
+      ).rejects.toThrow();
+      expect(existsSync(path)).toBe(false);
+      expect(branches()).not.toContain("hooked");
     });
   });
 

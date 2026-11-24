@@ -25,7 +25,15 @@ export function formatModelResult(
 } {
   const sections: AggregateSection[] = results.map((task) => {
     const directory = task.workingDirectory ? `\nWorking directory: ${task.workingDirectory}` : "";
-    const header = `## ${task.taskId} (profile: ${task.profileId}) — ${task.status}\nConversation: ${task.conversationId}${directory}`;
+    const created = task.createdWorktree;
+    const worktree = created
+      ? `\nBranch: ${created.branch} (created from ${created.baseCommit}; worktree and branch are kept)${
+          created.parentUncommitted
+            ? "\nThe parent's uncommitted changes were not copied into this worktree."
+            : ""
+        }`
+      : "";
+    const header = `## ${task.taskId} (profile: ${task.profileId}) — ${task.status}\nConversation: ${task.conversationId}${directory}${worktree}`;
     if (task.status === "completed") {
       return { overhead: header, body: task.finalText ?? "(no output)" };
     }

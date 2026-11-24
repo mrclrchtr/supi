@@ -5,6 +5,8 @@ import { runGit } from "./git.ts";
 export interface WorktreeRecord {
   path: string;
   lockReason?: string;
+  /** Checked-out branch ref, such as `refs/heads/main`; absent for a detached HEAD. */
+  branch?: string;
 }
 
 function parseWorktreeRecords(text: string): WorktreeRecord[] {
@@ -21,6 +23,7 @@ function parseWorktreeRecords(text: string): WorktreeRecord[] {
     }
     if (line.startsWith("worktree ")) current.path = line.slice("worktree ".length);
     if (line.startsWith("locked")) current.lockReason = line.slice("locked ".length);
+    if (line.startsWith("branch ")) current.branch = line.slice("branch ".length);
   }
   flush();
   return records;
@@ -71,4 +74,37 @@ export async function describeWorktree(
   const root = await resolveWorktreeRoot(cwd, signal);
   const [main] = await listWorktrees(root, signal);
   return { root, linked: main !== undefined && main.path !== root };
+}
+
+/** Canonical root of the repository's main worktree, the first entry of `git worktree list`. */
+export async function mainWorktreeRoot(cwd: string, signal?: AbortSignal): Promise<string> {
+  const [main] = await listWorktrees(cwd, signal);
+  if (!main) throw new Error(`No Git worktree contains ${cwd}.`);
+  return main.path;
+}
+
+/** Resolve a commit-ish to a full commit id in the repository containing `cwd`; undefined when it names no commit. */
+export async function resolveCommit(
+  cwd: string,
+  ref: string,
+  signal?: AbortSignal,
+): Promise<string | undefined> {
+  try {
+    const commit = (
+      await runGit(
+        cwd,
+        ["rev-parse", "--verify", "--quiet", "--end-of-options", `${ref}^{commit}`],
+        signal,
+      )
+    ).trim();
+    return commit || undefined;
+  } catch {
+    signal?.throwIfAborted();
+    return undefined;
+  }
+}
+
+/** Whether the worktree containing `cwd` has staged, unstaged, or untracked (non-ignored) changes. */
+export async function hasUncommittedChanges(cwd: string, signal?: AbortSignal): Promise<boolean> {
+  return (await runGit(cwd, ["status", "--porcelain"], signal)) !== "";
 }

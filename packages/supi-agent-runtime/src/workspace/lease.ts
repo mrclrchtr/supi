@@ -75,10 +75,7 @@ export async function acquireWorktreeLease(
   }
   refuseUnavailable(root, await findRecord(root, signal));
   const marker = createAgentWorkspaceMarker(options.owner);
-  const unlockOwn = async (): Promise<void> => {
-    const record = await findRecord(root);
-    if (record?.lockReason === marker) await runGitAllowFatal(root, ["worktree", "unlock", root]);
-  };
+  const unlockOwn = (): Promise<void> => unlockIfOwned(root, marker);
   signal?.throwIfAborted();
   // Lock and compensate without the signal: an abort must not leave a lock no lease object owns.
   try {
@@ -94,6 +91,17 @@ export async function acquireWorktreeLease(
     await unlockOwn();
     signal.throwIfAborted();
   }
+  return ownedLease(root, marker);
+}
+
+/** Unlock the worktree at `root` only when it still carries `marker`. */
+export async function unlockIfOwned(root: string, marker: string): Promise<void> {
+  const record = await findRecord(root);
+  if (record?.lockReason === marker) await runGitAllowFatal(root, ["worktree", "unlock", root]);
+}
+
+/** A lease object for a lock this process wrote with `marker`. */
+export function ownedLease(root: string, marker: string): WorktreeLease {
   let released = false;
   return {
     root,
@@ -101,7 +109,7 @@ export async function acquireWorktreeLease(
     async release() {
       if (released) return;
       released = true;
-      await unlockOwn();
+      await unlockIfOwned(root, marker);
     },
   };
 }

@@ -48,6 +48,14 @@ export interface BatchProgressState {
   totalCount: number;
 }
 
+/** Facts about a worktree `agent_run` created for a writer; it is kept after the run. */
+export interface CreatedWorktreeSummary {
+  branch: string;
+  baseCommit: string;
+  /** True when the parent's worktree had uncommitted changes the new worktree does not contain. */
+  parentUncommitted: boolean;
+}
+
 /** Public view of one Delegation Task outcome. */
 export interface BatchTaskResult {
   taskId: string;
@@ -67,6 +75,8 @@ export interface BatchTaskResult {
   failureCode?: string;
   /** Working directory of a mutation-capable task, reported so the parent can inspect its changes. */
   workingDirectory?: string;
+  /** The Agent Workspace `agent_run` created for this task, when it requested `new.worktree`. */
+  createdWorktree?: CreatedWorktreeSummary;
   /** Canonical provider-error summary; never raw errors or provider response content. */
   failureSummary?: string;
   turns: number;

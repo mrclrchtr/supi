@@ -29,7 +29,7 @@ Status: Implemented. This document defines the approved behavior.
 - Validate all profiles, models, instructions, mode, Worktree Claims, and capacity before starting any task.
 - A background start returns a batch handle and task identifiers after admission and registration. It does not wait for child setup or results.
 - Report initial task status as starting, not ready or completed.
-- A background run shares the parent's working directory unless `new.cwd` names a worktree of the same Git repository. Read-only does not mean a frozen snapshot. Parent edits can change what a child observes. A writer's Delegation Task Result names its working directory.
+- A background run shares the parent's working directory unless `new.cwd` names a worktree of the same Git repository, or `new.worktree` lets `agent_run` create one for a writer ([ADR 0014](adr/0014-create-kept-agent-workspaces-for-writers.md)). Read-only does not mean a frozen snapshot. Parent edits can change what a child observes. A writer's Delegation Task Result names its working directory.
 - A lease is behavioral, not a sandbox: `bash` can leave its worktree. Worktrees of one repository still share Git refs, the stash, Git config and hooks, ports, temporary directories, global config, and the package store.
 - Plain Git worktrees, Worktrunk worktrees, and colocated jj workspaces are linked worktrees and can be leased. GitButler lanes and non-colocated jj workspaces cannot.
 

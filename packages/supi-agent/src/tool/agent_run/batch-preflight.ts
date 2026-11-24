@@ -11,6 +11,7 @@ import { buildModelContext, resolveAgentProfile } from "../../model-policy.ts";
 import { resolveProfileDefinition } from "../../profile-catalogue.ts";
 import { resolveAgentDirectory } from "../../resources.ts";
 import type { AgentModelContext, AgentProfile, ProfileCatalogue } from "../../types.ts";
+import type { CreatedWorktreeSummary } from "./batch-types.ts";
 import type { AgentRunTaskInput, AgentRunToolParams } from "./schema.ts";
 import { resolveTaskCwd } from "./task-cwd.ts";
 
@@ -46,14 +47,26 @@ export interface ResolvedTask {
   previousFailureCode?: string;
   /** Requested task cwd stored with checkpoints; undefined means the parent's cwd. */
   requestedCwd?: string;
+  /** The Agent Workspace `agent_run` created for this task (`new.worktree`). */
+  createdWorktree?: CreatedWorktreeSummary;
   timeoutMs?: number;
   model: AgentSessionInputs["model"];
   inputs: AgentSessionInputs;
 }
 
-/** A writer reports its working directory so the parent knows which checkout holds its changes. */
-export function writerDirectory(task: ResolvedTask): { workingDirectory?: string } {
-  return task.readOnly ? {} : { workingDirectory: task.inputs.cwd };
+/**
+ * A writer reports its working directory so the parent knows which checkout holds its changes,
+ * and, for a worktree `agent_run` created, its branch and base.
+ */
+export function writerDirectory(task: ResolvedTask): {
+  workingDirectory?: string;
+  createdWorktree?: CreatedWorktreeSummary;
+} {
+  if (task.readOnly) return {};
+  return {
+    workingDirectory: task.inputs.cwd,
+    ...(task.createdWorktree ? { createdWorktree: task.createdWorktree } : {}),
+  };
 }
 
 /**

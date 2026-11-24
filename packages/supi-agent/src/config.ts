@@ -10,6 +10,11 @@ export interface AgentConfig extends Record<string, unknown> {
   agentToolEnabled: boolean;
   /** Maximum active foreground and background Agent Runs in one session. */
   maxConcurrentRuns: number;
+  /**
+   * Dependency Bootstrap shell command run once in each worktree `agent_run` creates
+   * (`new.worktree`) before its run starts. Empty runs none.
+   */
+  bootstrapCommand: string;
 }
 
 /** Shared SuPi configuration section owned by this package. */
@@ -18,6 +23,7 @@ export const AGENT_CONFIG_SECTION = "agent";
 export const AGENT_DEFAULTS: AgentConfig = {
   agentToolEnabled: true,
   maxConcurrentRuns: 4,
+  bootstrapCommand: "",
 };
 
 /** Load merged and normalized Agent Run settings. */
@@ -33,7 +39,9 @@ export function loadAgentConfig(cwd: string, homeDir?: string): AgentConfig {
     raw.maxConcurrentRuns > 0
       ? raw.maxConcurrentRuns
       : AGENT_DEFAULTS.maxConcurrentRuns;
-  return { agentToolEnabled, maxConcurrentRuns };
+  const bootstrapCommand =
+    typeof raw.bootstrapCommand === "string" ? raw.bootstrapCommand.trim() : "";
+  return { agentToolEnabled, maxConcurrentRuns, bootstrapCommand };
 }
 
 /** Activate Agent Run only when its setting is on and the current catalogue has usable profiles. */
@@ -71,6 +79,13 @@ export function registerAgentSettings(pi: ExtensionAPI, homeDir?: string): void 
           description:
             "Positive integer. Count foreground and background Agent Runs together; exclude Reviews. Lowering the limit does not stop active runs.",
           values: ["1", "2", "4", "8", "16"],
+        },
+        {
+          kind: "string",
+          key: "bootstrapCommand",
+          label: "Worktree bootstrap command",
+          description:
+            "Run once in each worktree agent_run creates (new.worktree) before its task starts, for example pnpm install. Empty runs none.",
         },
       ],
       afterPersist: ({ cwd }) => syncAgentRunTool(pi, cwd, homeDir),

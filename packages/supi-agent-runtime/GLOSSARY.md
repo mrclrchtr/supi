@@ -33,7 +33,7 @@ An optional self-assessment of an Agent Run's normally completed task, separate 
 _Avoid_: Retro facts, self-improvement, Delegation Follow-Up
 
 **Agent Workspace**:
-A Git worktree that an owner package holds for its Agent Runs: either a disposable worktree frozen on an exact, verified state, or an existing caller-provided worktree under a lease. The runtime provides the mechanics; the owner decides what to freeze, what to lease, and when to release it. A lease is respected by SuPi owners in every session and process, but it does not isolate shared repository or machine resources.
+A Git worktree that an owner package holds for its Agent Runs: a disposable worktree frozen on an exact, verified state, an existing caller-provided worktree under a lease, or a worktree the owner created on a new branch, leased from creation and kept after its runs. The runtime provides the mechanics; the owner decides what to freeze, what to lease, and when to release it. A lease is respected by SuPi owners in every session and process, but it does not isolate shared repository or machine resources.
 _Avoid_: Sandbox, review isolation, Review Workspace
 
 **Agent Run Registry**:

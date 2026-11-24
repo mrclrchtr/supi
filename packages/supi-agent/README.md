@@ -61,7 +61,7 @@ Profiles can allow `web_fetch_md`, `web_search`, `web_docs_search`, and `web_doc
 
 Children follow the parent's Web behavior. For example, Context7 tools without `CONTEXT7_API_KEY` remain present and fail when called, and Firecrawl uses the existing Web settings. Web tools count as read-only for batch admission, so read-only profiles can still run in parallel and in the background. Queries and URLs reach external services. Web content is untrusted. Direct calls and codemode scripts see the same Web tools.
 
-Changes to **Agent Run tool**, **Active Agent Run limit**, and each profile's **Model** and **Thinking** settings apply immediately. `/agents`, `agent_list`, `agent_result`, and `agent_cancel` stay available when new starts through `agent_run` are off.
+Changes to **Agent Run tool**, **Active Agent Run limit**, **Worktree bootstrap command**, and each profile's **Model** and **Thinking** settings apply immediately. `/agents`, `agent_list`, `agent_result`, and `agent_cancel` stay available when new starts through `agent_run` are off.
 
 ## Background delegation
 
@@ -105,6 +105,27 @@ agent_run({
 - `agent.maxConcurrentRuns` counts writers too.
 
 A lease coordinates SuPi writers; it is not a sandbox. `bash` can still leave its worktree. Worktrees of one repository also share Git refs (branches and tags), the stash, Git config and hooks, and the machine's ports, temporary directories, global config, and package store. Give parallel tasks separate branches and ports, and avoid the stash.
+
+### Let `agent_run` create the worktree
+
+Set `new: { profile, worktree: { base?, branch? } }` instead of `cwd` to have `agent_run` create an Agent Workspace for the writer:
+
+```ts
+agent_run({
+  tasks: [
+    { id: "ticket-643", new: { profile: "general", worktree: {} }, instructions: "Implement #643." },
+    { id: "ticket-644", new: { profile: "general", worktree: { base: "main", branch: "fix/644" } }, instructions: "Implement #644." },
+  ],
+});
+```
+
+- The worktree is a sibling of the main worktree named `<main worktree>.<branch>` (with `/` replaced by `-`), for example `/repo.supi-ticket-643-1a2b3c`, on a new branch that starts at `base`.
+- `base` is any commit-ish, resolved in the parent's working directory; the default is the parent's `HEAD`. Uncommitted changes of the parent are not copied, and the result says so when there are any.
+- `branch` must not exist yet; the default is `supi/<task id>-<6 hex characters>`. The branch gets no upstream.
+- The worktree is locked from creation, so the writer holds a lease and runs like a writer with `new.cwd`: in multi-task batches and in the background. Git runs the repository's `post-checkout` hooks during creation.
+- Set `agent.bootstrapCommand`, or **Worktree bootstrap command** in `/supi-settings`, to run a Dependency Bootstrap such as `pnpm install` once in each created worktree before its task starts. Empty runs none.
+- When the batch is rejected before any task starts, including a failed bootstrap, every worktree and branch it created is removed. Once a task has started, the worktree and branch are kept whatever the outcome, and the result names the working directory, the branch, and the base commit. Follow-ups reuse the worktree. Remove it yourself with `git worktree remove` and `git branch -d` after merging. `/supi-agent-cleanup` only unlocks such a worktree after a crash; it never deletes it.
+- Only mutation-capable profiles can request `worktree`, and not together with `cwd`.
 
 Plain `git worktree` worktrees, [Worktrunk](https://worktrunk.dev) worktrees, and colocated jj workspaces are linked Git worktrees and work without configuration. GitButler lanes share one checkout, and non-colocated jj workspaces are not Git worktrees; a writer there gets only a session-local claim and the single-task foreground rule.
 

@@ -21,7 +21,13 @@ export type AgentWorkspaceErrorCode =
   /** The worktree is locked by a SuPi owner whose process is alive or cannot be checked. */
   | "locked-active"
   /** The worktree is locked by a SuPi owner whose process has exited. */
-  | "locked-orphaned";
+  | "locked-orphaned"
+  /** A branch name for a new worktree is not a valid Git branch name. */
+  | "invalid-branch"
+  /** The branch for a new worktree already exists. */
+  | "branch-exists"
+  /** The path for a new worktree already exists. */
+  | "path-exists";
 
 /** A refused Agent Workspace operation; `heldBy` carries the existing lock reason. */
 export class AgentWorkspaceError extends Error {
