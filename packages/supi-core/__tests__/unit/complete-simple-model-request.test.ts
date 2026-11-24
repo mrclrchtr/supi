@@ -76,6 +76,26 @@ describe("completeSimpleModelRequest", () => {
     expect(ids[0]).not.toBe(ids[2]);
   });
 
+  it("marks requests one-shot on both paths unless the caller opts into continuation", async () => {
+    const { ctx, streamSimple, complete } = makeFixture();
+    await completeSimpleModelRequest(ctx, MODEL, CONTEXT, { affinityScope: "test" });
+    await completeModelRequest(ctx, MODEL, CONTEXT, { affinityScope: "test" });
+    await completeSimpleModelRequest(ctx, MODEL, CONTEXT, {
+      affinityScope: "test",
+      disableContinuation: false,
+    });
+    await completeModelRequest(ctx, MODEL, CONTEXT, {
+      affinityScope: "test",
+      disableContinuation: false,
+    });
+
+    expect(streamSimple.mock.calls.map((call) => call[2].disableContinuation)).toEqual([
+      true,
+      false,
+    ]);
+    expect(complete.mock.calls.map((call) => call[2].disableContinuation)).toEqual([true, false]);
+  });
+
   it("owns auth and identity while preserving simple options and explicit cancellation", async () => {
     const fallbackSignal = new AbortController().signal;
     const signal = new AbortController().signal;

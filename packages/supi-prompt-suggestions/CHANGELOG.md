@@ -1,5 +1,9 @@
 # Changelog
 
+## [15.0.1]
+
+- Suggestion requests are now one-shot requests: the model provider keeps no conversation state for them. With `claude-code` models, an idle `claude` process (about 235 MB) no longer remains for up to five minutes after each suggestion ([#692](https://github.com/mrclrchtr/supi/issues/692)).
+
 ## [15.0.0]
 
 - When suggestion generation ends, its status entry is removed instead of being set to empty text, so no blank status line remains in the footer ([#663](https://github.com/mrclrchtr/supi/issues/663)).

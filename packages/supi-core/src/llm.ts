@@ -86,7 +86,7 @@ function addOpenCodeDefaultHeaders(
 
 /** Keep request identity and header policy identical for both completion paths. */
 function prepareModelRequestOptions<
-  T extends Pick<ModelsSimpleStreamOptions, "signal" | "transformHeaders">,
+  T extends Pick<ModelsSimpleStreamOptions, "signal" | "transformHeaders" | "disableContinuation">,
 >(ctx: ExtensionContext, model: Model<Api>, options: ModelRequestOptions<T>): T {
   const { affinityScope, transformHeaders: callerTransformHeaders, ...requestOptions } = options;
   const safeRequestOptions = { ...requestOptions };
@@ -109,6 +109,9 @@ function prepareModelRequestOptions<
     ...safeRequestOptions,
     signal: safeRequestOptions.signal ?? ctx.signal,
     sessionId: affinityId,
+    // Direct requests are one-shot: never continue or retain provider-side
+    // continuation state (Anthropic message threads, warm provider processes).
+    disableContinuation: safeRequestOptions.disableContinuation ?? true,
     transformHeaders,
   } as unknown as T;
 }
@@ -117,9 +120,11 @@ function prepareModelRequestOptions<
  * Complete an API-specific request through Pi's model registry.
  *
  * Pi resolves auth, headers, environment, and the effective endpoint. SuPi adds
- * a stable opaque feature identity and OpenCode header defaults. This helper
- * does not retry, validate output, or present errors. It supplies no output cap
- * when `maxTokens` is omitted; use {@link completeSimpleModelRequest} for Pi's
+ * a stable opaque feature identity and OpenCode header defaults. Requests are
+ * one-shot: `disableContinuation` defaults to `true`, so providers neither use
+ * nor retain continuation state; pass `false` only for a real follow-up
+ * conversation. This helper does not retry, validate output, or present
+ * errors. It supplies no output cap when `maxTokens` is omitted; use {@link completeSimpleModelRequest} for Pi's
  * model-derived defaults and context-aware limits.
  */
 export async function completeModelRequest<TApi extends Api>(
@@ -140,7 +145,8 @@ export async function completeModelRequest<TApi extends Api>(
  *
  * Requires Pi 0.86.0 or later. Pi's provider handles simple options, including
  * model-derived output limits and context estimates. Request identity, header
- * policy, and error behavior match {@link completeModelRequest}.
+ * policy, one-shot continuation default, and error behavior match
+ * {@link completeModelRequest}.
  */
 export async function completeSimpleModelRequest(
   ctx: ExtensionContext,

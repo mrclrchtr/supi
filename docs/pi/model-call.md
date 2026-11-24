@@ -58,13 +58,15 @@ const response = await completeModelRequest(ctx, model, context, {
 | Owner | Responsibility |
 | --- | --- |
 | Pi model registry | Provider dispatch, request auth, OAuth refresh, effective endpoint, auth headers, environment |
-| Both SuPi completion helpers | Stable separate request identity and OpenCode header defaults |
+| Both SuPi completion helpers | Stable separate request identity, one-shot continuation default, and OpenCode header defaults |
 | Pi simple path | Model-derived output limits and context guards for provider-neutral requests |
 | Calling feature | Model selection, prompt, explicit limit overrides, cancellation, retries, validation, error presentation |
 
 Choose a stable scope for each distinct feature prompt stream. Do not put prompt text, turn numbers, retry counts, credentials, or project paths into that scope. The helper derives an opaque identity from the scope, Pi session, provider, and model. Repeated calls in the same stream retain that identity without using the primary agent's identity.
 
 The helper does not change provider cache retention defaults or guarantee a cache hit rate. Explicit configured session headers retain precedence and can remove the default separation.
+
+Each direct request builds a fresh context, so it can never continue the previous call in its stream. Both helpers therefore default `disableContinuation` to `true`: providers neither use nor retain continuation state for the request, such as Anthropic message threads or a warm `claude-code` process per session ID. The session ID stays, so cache and routing affinity are unchanged; providers without continuation state ignore the option. Pass `disableContinuation: false` only for a feature that sends real follow-up turns ([issue #692](https://github.com/mrclrchtr/supi/issues/692)).
 
 ## OpenCode compatibility on Pi 0.85.1
 
@@ -94,5 +96,6 @@ Request handling was verified against Pi and pi-ai 0.85.1. Registry simple compl
 - Pi `dist/core/model-runtime.js`: auth and endpoint preparation.
 - Pi `dist/core/sdk.js` and `provider-attribution.js`: session ID and OpenCode headers.
 - pi-ai `README.md`: auth ownership, request header ordering, and compat migration.
+- pi-ai `dist/types.d.ts` (`StreamOptions.disableContinuation`), `README.md` (Anthropic message threads), and [pi#11545](https://github.com/earendil-works/pi/pull/11545): one-shot requests opt out of continuation state; verified with Pi 1.5.1.
 
 Related: [request decision](../adr/0023-pi-owned-model-requests.md), [issue #402](https://github.com/mrclrchtr/supi/issues/402), and [context architecture](context-architecture.md).

@@ -1,5 +1,9 @@
 # Changelog
 
+## [15.0.1]
+
+- `/supi-improve` requests are now one-shot requests: the model provider keeps no conversation state for them. With `claude-code` models, no idle `claude` process remains after an improvement ([#692](https://github.com/mrclrchtr/supi/issues/692)).
+
 ## [15.0.0]
 
 - **Breaking:** the package no longer loads the `ask_user` tool. `/supi-improve` still opens its clarification form, which ships inside the package. Migration: to keep the `ask_user` tool, install it separately with `pi install npm:@mrclrchtr/supi-ask-user` ([#665](https://github.com/mrclrchtr/supi/issues/665)).

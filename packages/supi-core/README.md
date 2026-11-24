@@ -56,7 +56,7 @@ Config file locations:
 - `completeSimpleModelRequest(ctx, model, context, options)` — send provider-neutral options through `streamSimple().result()` on Pi 0.86.0 or later. Pi supplies model-derived output limits and context guards.
 - `callWithJsonResponse()` — retry a registry request, extract JSON, and validate it with TypeBox.
 
-Both completion helpers require a stable `affinityScope`. Pi owns auth and endpoint resolution. The helpers keep cache retention defaults, exclude prompt content from the affinity ID, and add OpenCode headers only when the provider or exact model endpoint matches OpenCode. Use the simple helper when Pi should manage output limits; the API-specific helper forwards the caller's limit unchanged.
+Both completion helpers require a stable `affinityScope`. Pi owns auth and endpoint resolution. Requests are one-shot: `disableContinuation` defaults to `true`, so providers keep no continuation state for them; pass `false` only for real follow-up turns. The helpers keep cache retention defaults, exclude prompt content from the affinity ID, and add OpenCode headers only when the provider or exact model endpoint matches OpenCode. Use the simple helper when Pi should manage output limits; the API-specific helper forwards the caller's limit unchanged.
 
 ### Shared registries
 
