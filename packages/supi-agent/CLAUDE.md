@@ -15,6 +15,7 @@
 - Resolve explicit profile models against the containing session's authenticated scoped-model policy before any Agent Run starts.
 - Use the existing headless Code Intelligence profile only; do not load the full interactive extension into children.
 - Keep diagnostics bounded and omit profile prompt contents, credentials, and raw filesystem errors.
+- Admit writers through Worktree Claims (`src/delegation/worktree-claims.ts`, [ADR 0013](docs/adr/0013-admit-parallel-writers-under-worktree-claims.md)): only writers that hold a lease on their own linked worktree may share a batch or run in the background. Leases come from the runtime Agent Workspace module; never describe them as a sandbox.
 - Keep background batches session-owned and branch-owned. Parent abort cancels active background work; normal settlement does not. Never detach startup or cleanup from the shared registry.
 - Commit background Usage receipts only from stored tool results. Do not infer accounting from a prepared or delivered notice.
 - `agent_result` and `agent_cancel` belong to `supi-agent-runtime`. This package serves them through `RunBatchOwnerOptions.collection` in `src/extension.ts`: the Delegation result formats, checkpoints at collection, rendering, and the model-facing cancellation text (`Delegation wait canceled.`) stay here.

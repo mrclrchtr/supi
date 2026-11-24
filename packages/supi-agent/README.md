@@ -51,7 +51,7 @@ A Profile can opt into Pi codemode by adding `codemode` to its fixed `tools` lis
 }
 ```
 
-The built-in `explore` and `general` profiles include codemode by default. To disable it for a profile, override its `tools` list without `codemode`. An opted-in child loads codemode with classifier and image-model APIs enabled and `mode: "on"`; its permitted direct tools remain available alongside scripts. Script discovery and nested calls are restricted to that Profile's permitted tools. No parent extensions or MCP servers are inherited. Codemode itself is non-mutating for batch classification; `bash`, `edit`, and `write` remain mutation-capable, so any Profile containing them is still single-task only.
+The built-in `explore` and `general` profiles include codemode by default. To disable it for a profile, override its `tools` list without `codemode`. An opted-in child loads codemode with classifier and image-model APIs enabled and `mode: "on"`; its permitted direct tools remain available alongside scripts. Script discovery and nested calls are restricted to that Profile's permitted tools. No parent extensions or MCP servers are inherited. Codemode itself is non-mutating for batch classification; `bash`, `edit`, and `write` remain mutation-capable, so any Profile containing them follows the [writer rules](#parallel-writers-in-linked-worktrees).
 
 Each top-level batch with opted-in tasks captures one snapshot of the containing session's currently available classifier and image models. The same snapshot is shared by opted-in siblings only; follow-up batches capture a fresh snapshot, and additions during a batch do not expand its authority. An empty catalogue leaves scripting available but authorizes no classifier or image models. Using these APIs may send supplied inputs—including repository evidence—to external providers and may incur provider costs. Availability does not guarantee provider entitlement or a successful request. Codemode and Profile isolation are not filesystem or operating-system sandboxes.
 
@@ -65,7 +65,7 @@ Changes to **Agent Run tool**, **Active Agent Run limit**, and each profile's **
 
 ## Background delegation
 
-In TUI and RPC, `agent_run` defaults to background execution for read-only profiles such as `explore`. It returns a batch handle so the parent can continue independent work. Use `mode: "foreground"` to wait in the starting call. Mutation-capable profiles such as `general` default to foreground and reject explicit background requests. Print and JSON modes also default to foreground and reject explicit background requests.
+In TUI and RPC, `agent_run` defaults to background execution for read-only profiles such as `explore`, and for mutation-capable profiles such as `general` that run in their own linked worktree. It returns a batch handle so the parent can continue independent work. Use `mode: "foreground"` to wait in the starting call. A mutation-capable task in the parent's worktree or the main worktree defaults to foreground and rejects explicit background requests; see [Parallel writers in linked worktrees](#parallel-writers-in-linked-worktrees). Print and JSON modes also default to foreground and reject explicit background requests.
 
 - `agent_result({ batchId })` returns completed task results and pending status. Results are repeatable. When all available results, checkpoints, and Usage are already stored, it shows `Already collected; no new Usage.` Pending tasks can still remain. Do not poll.
 - `agent_result({ batchId, wait: true })` waits for all tasks to finish.
@@ -79,6 +79,34 @@ In TUI and RPC, `agent_run` defaults to background execution for read-only profi
 - Runs share the parent's working directory. They do not read a frozen snapshot. Set `new: { profile, cwd }` to start a conversation in another worktree of the same Git repository, for example the worktree a task brief names. The child then loads that worktree's instruction files and inherits the parent's project trust; follow-ups keep the directory.
 
 See the [background delegation design](docs/background-delegation.md) for the full contract.
+
+## Parallel writers in linked worktrees
+
+A task with a mutation-capable profile takes a Worktree Claim on the worktree it works in. Where it works decides how it can run:
+
+| Writer's working directory | Claim | Runs |
+| --- | --- | --- |
+| A linked worktree other than the parent's, set with `new: { profile, cwd }` | Lease, visible to other Pi sessions and processes | In multi-task batches next to other writers and read-only tasks; background by default in TUI and RPC |
+| The parent's worktree (no `cwd`) or the main worktree | Session-local claim | Only as the single task of a foreground batch |
+
+```ts
+agent_run({
+  tasks: [
+    { id: "ticket-643", new: { profile: "general", cwd: "/repo/.worktrees/ticket-643" }, instructions: "Implement #643." },
+    { id: "ticket-644", new: { profile: "general", cwd: "/repo/.worktrees/ticket-644" }, instructions: "Implement #644." },
+  ],
+});
+```
+
+- Each writer needs a different worktree. A batch is rejected before any task starts when two writers resolve to one worktree (also through a subdirectory or a symlink), when an active batch of this session already holds it, or when it is locked: by another tool, by another running SuPi session, or by a SuPi owner that has exited. The rejection names the holder. For an orphaned SuPi lock, run `/supi-agent-cleanup`; locks are never taken over silently.
+- The lease is a `git worktree lock` with a SuPi owner marker, so `git worktree list` shows which owner and process holds it. It is released after the run has stopped and disposed its resources. Your worktree is unlocked but kept, whatever the outcome, and the task result names its working directory.
+- A follow-up of a writer conversation claims its saved working directory again under the same rules.
+- Read-only tasks take no claim and can run in a leased worktree, for example to inspect an implementer's progress.
+- `agent.maxConcurrentRuns` counts writers too.
+
+A lease coordinates SuPi writers; it is not a sandbox. `bash` can still leave its worktree. Worktrees of one repository also share Git refs (branches and tags), the stash, Git config and hooks, and the machine's ports, temporary directories, global config, and package store. Give parallel tasks separate branches and ports, and avoid the stash.
+
+Plain `git worktree` worktrees, [Worktrunk](https://worktrunk.dev) worktrees, and colocated jj workspaces are linked Git worktrees and work without configuration. GitButler lanes share one checkout, and non-colocated jj workspaces are not Git worktrees; a writer there gets only a session-local claim and the single-task foreground rule.
 
 ## Choosing handoff context
 

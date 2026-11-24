@@ -131,6 +131,18 @@ If the Ask User tool opens a form while `/agents` is open, the viewer closes so 
 
 `startRegisteredAgentRun()` returns one handle. `stop()` waits for bounded Agent Run disposal, not transcript writes. `result` resolves after final transcript writes finish. A storage failure marks the transcript incomplete and does not change the Agent Run outcome. Without a registry, the runtime does not create a transcript. A closed registry stops the run.
 
+## Agent Workspaces
+
+`@mrclrchtr/supi-agent-runtime/workspace` provides neutral Git worktree mechanics for owner packages. Owners decide what to freeze, which worktree to lease, and when to release it ([ADR 0001](docs/adr/0001-own-session-mechanics-not-resource-policy.md)):
+
+- `resolveWorktreeRoot()` returns the canonical worktree root (Git top level plus `realpath`), so subdirectories and symlink aliases resolve to one root.
+- `createDisposableWorkspace()` creates a linked worktree in a temporary parent directory at a detached base commit, optionally applies a patch to the index, verifies the head, the clean tree, and the patch SHA-256, and returns a receipt. Review uses it for Review Workspaces.
+- `acquireWorktreeLease()` locks an existing linked worktree with `git worktree lock --reason supi-agent:<owner>:<uuid>;pid=<pid>;started=<iso>`. It fails for the main worktree, which Git cannot lock, and for a worktree that is already locked by another tool, by an active SuPi owner, or by an orphaned SuPi owner. Releasing unlocks the worktree and never removes it. Agent uses it for Worktree Claims.
+- `listAgentWorkspaces()` and `removeAgentWorkspace()` list SuPi-marked worktrees with their owner status (`active`, `absent`, `unknown`) and clean them up.
+- `runDependencyBootstrap()` runs a one-shot dependency command in a workspace.
+
+A lease is behavioral and not a sandbox ([ADR 0007](docs/adr/0007-treat-agent-isolation-as-context-only.md)): it does not stop a run's `bash` from writing outside its worktree. Worktrees of one repository also share Git refs, the stash, Git config and hooks, ports, temporary directories, global config, and the package store. Leases work with any linked Git worktree, including Worktrunk worktrees and colocated jj workspaces; GitButler lanes and non-colocated jj workspaces are not linked worktrees.
+
 ## Shared `/supi-agent-cleanup` command
 
 Agent and Review call `registerAgentCleanupCommand(pi)`. The first caller registers `/supi-agent-cleanup` once per Pi runtime, as `registerAgentsCommand()` does for `/agents`. The command lists SuPi-marked worktrees (`supi-agent:` and legacy `supi-review:` markers) with their owner status. After confirmation, it removes disposable workspaces and their temporary parents whose owner process has exited, and only unlocks caller-provided worktrees. Worktrees whose owner is active or cannot be checked are reported and left alone.

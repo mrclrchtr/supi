@@ -1,5 +1,10 @@
 # Changelog
 
+## [16.0.0]
+
+- Writers can run in parallel. A task with a mutation-capable profile such as `general` that runs in its own linked worktree (`new: { profile, cwd }`) now leases that worktree and runs like a read-only task: in multi-task batches next to other writers and read-only tasks, and in the background by default in TUI and RPC. A writer in the parent's worktree or the main worktree keeps the single-task foreground rule. A batch is rejected before any task starts when two writers target one worktree, or when another session, another tool, or an orphaned SuPi lock holds it; run `/supi-agent-cleanup` for orphaned locks. `git worktree list` shows the SuPi owner of a leased worktree, which is unlocked but kept when the run ends, and the task result names the writer's working directory. A lease is not a sandbox: worktrees still share Git refs, the stash, Git config and hooks, ports, and temporary directories ([#672](https://github.com/mrclrchtr/supi/issues/672)).
+- `/supi-agent-cleanup` lists SuPi-marked worktrees with their owner status. For a worktree whose owner process has exited, it removes disposable workspaces and only unlocks worktrees it did not create ([#677](https://github.com/mrclrchtr/supi/issues/677)).
+
 ## [15.0.0]
 
 - Agent Run retrospectives keep the run's tools declared and block calls instead of removing them. The system prompt and tool list stay unchanged, so models without mid-conversation system messages, such as DeepSeek, read the run from the prompt cache instead of re-reading it uncached.
