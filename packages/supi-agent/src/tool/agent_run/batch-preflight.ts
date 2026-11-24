@@ -35,6 +35,8 @@ export interface ResolvedTask {
   taskId: string;
   profileId: string;
   profile: AgentProfile;
+  /** Whether the profile's capability set is read-only; writers take Worktree Claims. */
+  readOnly: boolean;
   instructions: string;
   conversationId: string;
   conversationLabel: string;
@@ -51,9 +53,7 @@ export interface ResolvedTask {
 
 /** A writer reports its working directory so the parent knows which checkout holds its changes. */
 export function writerDirectory(task: ResolvedTask): { workingDirectory?: string } {
-  return isReadOnlyCapabilitySet(task.profile.manifest.tools)
-    ? {}
-    : { workingDirectory: task.inputs.cwd };
+  return task.readOnly ? {} : { workingDirectory: task.inputs.cwd };
 }
 
 /**
@@ -135,6 +135,7 @@ function resolvePreflightTask(
     taskId: task.id,
     profileId: target.profileId,
     profile: policy.profile,
+    readOnly: isReadOnlyCapabilitySet(policy.profile.manifest.tools),
     instructions: task.instructions,
     conversationId: target.conversationId,
     conversationLabel: target.label,
@@ -185,9 +186,7 @@ export function singleWriterBatchError(
   tasks: readonly ResolvedTask[],
   taskCount: number,
 ): PreflightError | undefined {
-  const hasMutationProfile = tasks.some(
-    (task) => !isReadOnlyCapabilitySet(task.profile.manifest.tools),
-  );
+  const hasMutationProfile = tasks.some((task) => !task.readOnly);
   if (!hasMutationProfile || taskCount <= 1) return undefined;
   return {
     profileId: "(batch)",

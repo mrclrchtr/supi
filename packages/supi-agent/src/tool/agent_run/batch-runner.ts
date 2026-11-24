@@ -166,12 +166,13 @@ export function startDelegationBatch(options: StartDelegationBatchOptions): Dele
   const results: Array<BatchTaskResult | undefined> = Array(tasks.length).fill(undefined);
   const startedTasks: StartedBatchTask[] = [];
   const completions: Array<Promise<BatchTaskResult>> = [];
+  // Every started run releases its session resources before `handle.result` settles.
+  const taskDisposals: Array<Promise<void>> = [];
   let startFailed = false;
   let stopPromise: Promise<void> | undefined;
   let disposal: Promise<void> | undefined;
-  // Every started run releases its session resources before `handle.result` settles.
   const disposed = (): Promise<void> => {
-    disposal ??= Promise.allSettled(startedTasks.map((task) => task.handle.result))
+    disposal ??= Promise.allSettled(taskDisposals)
       .then(() => options.onDisposed?.())
       .catch(() => undefined);
     return disposal;
@@ -245,6 +246,12 @@ export function startDelegationBatch(options: StartDelegationBatchOptions): Dele
         onProgress: setProgress,
       });
       startedTasks.push(started);
+      taskDisposals.push(
+        started.handle.result
+          .catch(() => undefined)
+          .then(() => options.onTaskDisposed?.(task.taskId))
+          .catch(() => undefined),
+      );
       completions.push(
         started.completion.then((result) => {
           results[index] = result;

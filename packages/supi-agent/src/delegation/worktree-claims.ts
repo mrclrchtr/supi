@@ -34,8 +34,8 @@ export interface WorktreeClaimConflict {
   readonly taskId: string;
   readonly root: string;
   readonly heldBy: string;
-  /** True when an active claim of the session holds the root, false for a claim of this batch. */
-  readonly session: boolean;
+  /** True when a claim of an active batch of the session holds the root, false for one of this batch. */
+  readonly heldByActiveBatch: boolean;
 }
 
 /** Inputs of {@link resolveWorktreeClaims}. */
@@ -70,7 +70,12 @@ export async function resolveWorktreeClaims(
     const sessionHolder = options.activeClaims.get(root);
     const heldBy = sessionHolder ?? batchHolders.get(root);
     if (heldBy !== undefined) {
-      conflicts.push({ taskId: task.taskId, root, heldBy, session: sessionHolder !== undefined });
+      conflicts.push({
+        taskId: task.taskId,
+        root,
+        heldBy,
+        heldByActiveBatch: sessionHolder !== undefined,
+      });
       return;
     }
     batchHolders.set(root, `task "${task.taskId}" of this batch`);
@@ -89,20 +94,23 @@ export interface WorktreeLeaseFailure {
 }
 
 /**
- * Acquire the `delegation` leases of the given claims one after another. On the first failure,
- * release the leases already acquired and return the failure; nothing stays locked.
+ * Acquire the `delegation` leases of the given claims one after another, keyed by task ID. On the
+ * first failure, release the leases already acquired and return the failure; nothing stays locked.
  */
 export async function acquireWorktreeClaimLeases(
   claims: readonly WorktreeClaim[],
   signal?: AbortSignal,
-): Promise<{ leases: WorktreeLease[] } | { failure: WorktreeLeaseFailure }> {
-  const leases: WorktreeLease[] = [];
+): Promise<{ leases: Map<string, WorktreeLease> } | { failure: WorktreeLeaseFailure }> {
+  const leases = new Map<string, WorktreeLease>();
   for (const claim of claims) {
     if (claim.kind !== "lease") continue;
     try {
-      leases.push(await acquireWorktreeLease({ cwd: claim.root, owner: "delegation", signal }));
+      leases.set(
+        claim.taskId,
+        await acquireWorktreeLease({ cwd: claim.root, owner: "delegation", signal }),
+      );
     } catch (error) {
-      await Promise.allSettled(leases.map((lease) => lease.release()));
+      await Promise.allSettled([...leases.values()].map((lease) => lease.release()));
       return {
         failure: {
           taskId: claim.taskId,
@@ -135,7 +143,9 @@ async function locateWorktree(cwd: string, signal?: AbortSignal): Promise<Worktr
 export interface WorktreeClaimReservation {
   /** Mark the claim of a task whose result is published; it is held only until disposal. */
   finish(taskId: string): void;
-  /** Release every claim of the reservation. Idempotent. */
+  /** Release the claim of one task once its run has disposed its resources. Idempotent. */
+  releaseTask(taskId: string): void;
+  /** Release every claim of the reservation not released yet. Idempotent. */
   release(): void;
 }
 
@@ -175,6 +185,17 @@ export class WorktreeClaimTable {
     return holder?.finishing ? holder.taskId : undefined;
   }
 
+  /**
+   * Actionable text for a writer whose worktree is claimed: the finishing message when a finishing
+   * claim of the session holds the root, otherwise the conflict message naming `heldBy`.
+   */
+  conflictMessage(root: string, heldBy: string): string {
+    const finishing = this.finishingHolder(root);
+    return finishing === undefined
+      ? worktreeConflictMessage(root, heldBy)
+      : worktreeFinishingMessage(root, finishing);
+  }
+
   /** Resolve on the next release of any claim. */
   nextRelease(): Promise<void> {
     return new Promise((resolve) => this.#releaseWaiters.push(resolve));
@@ -184,46 +205,45 @@ export class WorktreeClaimTable {
   reserve(claims: readonly WorktreeClaim[]): WorktreeClaimReservation {
     const conflict = claims.find((claim) => this.#holders.has(claim.root));
     if (conflict) {
-      const finishing = this.finishingHolder(conflict.root);
-      throw new Error(
-        `${conflict.taskId}: ${
-          finishing === undefined
-            ? worktreeConflictMessage(
-                conflict.root,
-                this.holders().get(conflict.root) ?? "another task",
-              )
-            : worktreeFinishingMessage(conflict.root, finishing)
-        }`,
-      );
+      const heldBy = this.holders().get(conflict.root) ?? "another task";
+      throw new Error(`${conflict.taskId}: ${this.conflictMessage(conflict.root, heldBy)}`);
     }
     const holders = claims.map((claim) => {
       const holder: ClaimHolder = { taskId: claim.taskId, finishing: false };
       this.#holders.set(claim.root, holder);
       return holder;
     });
-    let released = false;
+    const pending = new Set(claims.map((_claim, index) => index));
+    const releaseWhere = (matches: (claim: WorktreeClaim) => boolean) => {
+      let changed = false;
+      for (const index of pending) {
+        const claim = claims[index] as WorktreeClaim;
+        if (!matches(claim)) continue;
+        pending.delete(index);
+        if (this.#holders.get(claim.root) === holders[index]) this.#holders.delete(claim.root);
+        changed = true;
+      }
+      if (!changed) return;
+      const waiters = this.#releaseWaiters;
+      this.#releaseWaiters = [];
+      for (const waiter of waiters) waiter();
+    };
     return {
       finish: (taskId) => {
         for (const holder of holders) if (holder.taskId === taskId) holder.finishing = true;
       },
-      release: () => {
-        if (released) return;
-        released = true;
-        for (const claim of claims) this.#holders.delete(claim.root);
-        const waiters = this.#releaseWaiters;
-        this.#releaseWaiters = [];
-        for (const waiter of waiters) waiter();
-      },
+      releaseTask: (taskId) => releaseWhere((claim) => claim.taskId === taskId),
+      release: () => releaseWhere(() => true),
     };
   }
 }
 
 /** Actionable text for a writer whose worktree another writer already claims. */
-export function worktreeConflictMessage(root: string, heldBy: string): string {
+function worktreeConflictMessage(root: string, heldBy: string): string {
   return `Worktree ${root} is already claimed by ${heldBy}. Give each writer its own linked worktree with new.cwd.`;
 }
 
 /** Actionable text for a writer whose worktree a finished task has not released yet. */
-export function worktreeFinishingMessage(root: string, taskId: string): string {
+function worktreeFinishingMessage(root: string, taskId: string): string {
   return `Worktree ${root} is held by task "${taskId}", which has finished and is completing its retrospective or cleanup; retry in a few seconds.`;
 }

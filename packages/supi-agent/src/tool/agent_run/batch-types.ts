@@ -98,8 +98,15 @@ export interface StartDelegationBatchOptions {
   onUpdate?: (progress: BatchProgressState) => void;
   onTaskResult?: (result: BatchTaskResult, batchId: string) => void;
   /**
-   * Called once after every started Agent Run released its session resources, or when the batch
-   * never starts. `stop()` waits for the returned promise, so owners release Worktree Claims here.
+   * Called once per started Agent Run after that run released its session resources, so owners
+   * release the task's Worktree Claim while its siblings keep running. `stop()` and `onDisposed`
+   * wait for the returned promise.
+   */
+  onTaskDisposed?: (taskId: string) => Promise<void> | void;
+  /**
+   * Called once after every started Agent Run released its session resources and every
+   * `onTaskDisposed` settled, or when the batch never starts. `stop()` waits for the returned
+   * promise, so owners release what no started run released here.
    */
   onDisposed?: () => Promise<void> | void;
 }

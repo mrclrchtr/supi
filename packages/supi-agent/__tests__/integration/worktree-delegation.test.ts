@@ -196,6 +196,20 @@ describe("lease lifetime", () => {
     expect(existsSync(wt.a)).toBe(true);
   });
 
+  it("releases a finished writer's worktree while a sibling of its batch still runs", async () => {
+    const { h, wt } = await setup();
+    await h.invoke("agent_run", { tasks: [writer("fast", wt.a), writer("slow", wt.b)] });
+    await vi.waitFor(() => expect(streaming()).toHaveLength(2));
+    h.child("fast").finish("Fast done.");
+    await vi.waitFor(() => expect(lockReasons(h.ctx.cwd).has(wt.a)).toBe(false));
+    expect(lockReasons(h.ctx.cwd).get(wt.b)).toMatch(/^supi-agent:delegation:/);
+
+    const next = await h.invoke("agent_run", { tasks: [writer("next", wt.a)] });
+    expect(next.details).toMatchObject({ mode: "background" });
+    await vi.waitFor(() => expect(h.child("next").session.isStreaming).toBe(true));
+    expect(h.child("slow").session.isStreaming).toBe(true);
+  });
+
   describe("while the holder completes its retrospective", () => {
     let detach: (() => void) | undefined;
     afterEach(() => {

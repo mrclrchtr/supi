@@ -1,7 +1,6 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { AgentRunRegistry, RunBatch, RunBatchOwner } from "@mrclrchtr/supi-agent-runtime/api";
 import type { WorktreeLease } from "@mrclrchtr/supi-agent-runtime/workspace";
-import { isReadOnlyCapabilitySet } from "../capabilities.ts";
 import { loadAgentConfig } from "../config.ts";
 import { preflightDelegationBatch, type ResolvedTask } from "../tool/agent_run/batch-preflight.ts";
 import { startDelegationBatchWithAuxiliaryModels } from "../tool/agent_run/batch-runner.ts";
@@ -18,8 +17,6 @@ import {
   type WorktreeClaimConflict,
   type WorktreeClaimReservation,
   WorktreeClaimTable,
-  worktreeConflictMessage,
-  worktreeFinishingMessage,
 } from "./worktree-claims.ts";
 
 /** How long a start waits for finishing writers to release the worktrees it needs. */
@@ -124,9 +121,9 @@ export class DelegationController {
           begun = true;
           return beginWithLeases(
             claims,
-            reservation.release,
+            reservation,
             control.signal,
-            (onDisposed, handOffRelease) =>
+            ({ onTaskDisposed, onDisposed }, handOffRelease) =>
               startDelegationBatchWithAuxiliaryModels(
                 {
                   params,
@@ -138,6 +135,7 @@ export class DelegationController {
                     reservation.finish(result.taskId);
                     control.taskSettled(batchId);
                   },
+                  onTaskDisposed,
                   onDisposed,
                 },
                 () => {
@@ -181,7 +179,7 @@ export class DelegationController {
           parentCwd: ctx.cwd,
           tasks: tasks.map((task) => ({
             taskId: task.taskId,
-            readOnly: isReadOnlyCapabilitySet(task.profile.manifest.tools),
+            readOnly: task.readOnly,
             cwd: task.inputs.cwd,
           })),
           activeClaims: this.#claims.holders(),
@@ -189,17 +187,13 @@ export class DelegationController {
         });
         if ("claims" in resolution) return resolution.claims;
         const finishing = (conflict: WorktreeClaimConflict) =>
-          conflict.session ? this.#claims.finishingHolder(conflict.root) : undefined;
-        if (expired || resolution.conflicts.some((conflict) => finishing(conflict) === undefined)) {
+          conflict.heldByActiveBatch && this.#claims.finishingHolder(conflict.root) !== undefined;
+        if (expired || !resolution.conflicts.every(finishing)) {
           throw rejection(
-            resolution.conflicts.map((conflict) => {
-              const holder = finishing(conflict);
-              return `${conflict.taskId}: ${
-                holder === undefined
-                  ? worktreeConflictMessage(conflict.root, conflict.heldBy)
-                  : worktreeFinishingMessage(conflict.root, holder)
-              }`;
-            }),
+            resolution.conflicts.map(
+              (conflict) =>
+                `${conflict.taskId}: ${this.#claims.conflictMessage(conflict.root, conflict.heldBy)}`,
+            ),
           );
         }
         const roots = resolution.conflicts.map((conflict) => conflict.root);
@@ -315,22 +309,37 @@ function admitMode(
 /**
  * Acquire the batch's leases, then start it. Until `start` hands release ownership to the runner
  * (`handOffRelease()`), any failure releases the leases and the session claims here; afterwards
- * the runner calls `onDisposed` once every started run has released its resources.
+ * the runner calls `onTaskDisposed` as each started run releases its resources, which releases
+ * that task's lease and claim, and `onDisposed` once all have, which releases the rest.
  */
 function beginWithLeases(
   claims: readonly WorktreeClaim[],
-  releaseClaims: () => void,
+  reservation: WorktreeClaimReservation,
   signal: AbortSignal,
   start: (
-    onDisposed: () => Promise<void>,
+    release: { onTaskDisposed: (taskId: string) => Promise<void>; onDisposed: () => Promise<void> },
     handOffRelease: () => void,
   ) => { result: Promise<DelegationBatchHandle>; settled: Promise<void> },
 ): { result: Promise<DelegationBatchHandle>; settled: Promise<void> } {
-  let leases: WorktreeLease[] = [];
+  let leases = new Map<string, WorktreeLease>();
   let runnerOwnsRelease = false;
+  const releases = new Map<string, Promise<void>>();
+  // The lease is released before the claim, so a start admitted on the claim finds Git unlocked.
+  const releaseTask = (taskId: string): Promise<void> => {
+    let release = releases.get(taskId);
+    if (!release) {
+      release = Promise.resolve(leases.get(taskId)?.release())
+        .catch(() => undefined)
+        .then(() => reservation.releaseTask(taskId));
+      releases.set(taskId, release);
+    }
+    return release;
+  };
   let release: Promise<void> | undefined;
   const releaseAll = (): Promise<void> => {
-    release ??= Promise.allSettled(leases.map((lease) => lease.release())).then(releaseClaims);
+    release ??= Promise.allSettled(claims.map((claim) => releaseTask(claim.taskId))).then(
+      reservation.release,
+    );
     return release;
   };
   const acquired = acquireWorktreeClaimLeases(claims, signal).then((acquisition) => {
@@ -339,7 +348,7 @@ function beginWithLeases(
       throw rejection([`${taskId}: ${message}`]);
     }
     leases = acquisition.leases;
-    return start(releaseAll, () => {
+    return start({ onTaskDisposed: releaseTask, onDisposed: releaseAll }, () => {
       runnerOwnsRelease = true;
     });
   });

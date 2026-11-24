@@ -68,8 +68,18 @@ describe("Worktree Claim resolution", () => {
       }),
     ).resolves.toEqual({
       conflicts: [
-        { taskId: "sub", root: linkedA, heldBy: 'task "first" of this batch', session: false },
-        { taskId: "alias", root: linkedA, heldBy: 'task "first" of this batch', session: false },
+        {
+          taskId: "sub",
+          root: linkedA,
+          heldBy: 'task "first" of this batch',
+          heldByActiveBatch: false,
+        },
+        {
+          taskId: "alias",
+          root: linkedA,
+          heldBy: 'task "first" of this batch',
+          heldByActiveBatch: false,
+        },
       ],
     });
   });
@@ -82,7 +92,9 @@ describe("Worktree Claim resolution", () => {
         activeClaims: new Map([[linkedB, "an active run"]]),
       }),
     ).resolves.toEqual({
-      conflicts: [{ taskId: "late", root: linkedB, heldBy: "an active run", session: true }],
+      conflicts: [
+        { taskId: "late", root: linkedB, heldBy: "an active run", heldByActiveBatch: true },
+      ],
     });
   });
 
