@@ -19,7 +19,10 @@ export interface AgentWorkspaceEntry {
   /** True for a legacy `supi-review:` marker. */
   legacy: boolean;
   ownerStatus: AgentWorkspaceOwnerStatus;
-  /** True when removal deletes the worktree; false when it only unlocks a caller-provided one. */
+  /**
+   * True when removal deletes the worktree: the marker records a disposable workspace and the path
+   * has the disposable layout. False when removal only unlocks a caller-provided worktree.
+   */
   disposable: boolean;
   lockReason: string;
 }
@@ -60,12 +63,14 @@ export async function listAgentWorkspaces(
     if (record.lockReason === undefined) continue;
     const marker = parseAgentWorkspaceMarker(record.lockReason);
     if (!marker) continue;
+    // A marker alone never makes a worktree deletable; it must also sit in a disposable parent.
+    const disposable = marker.disposable && (await disposableParent(record.path)) !== undefined;
     entries.push({
       path: record.path,
       ...(marker.owner ? { owner: marker.owner } : {}),
       legacy: marker.legacy,
       ownerStatus: markerOwnerStatus(marker),
-      disposable: marker.disposable,
+      disposable,
       lockReason: record.lockReason,
     });
   }
@@ -73,8 +78,9 @@ export async function listAgentWorkspaces(
 }
 
 /**
- * Clean up one SuPi-marked worktree after re-reading the inventory. A disposable workspace is
- * unlocked and removed with its temporary parent; a caller-provided worktree is only unlocked.
+ * Clean up one SuPi-marked worktree after re-reading the inventory. A disposable workspace (its
+ * marker records one and it sits in a disposable temporary parent) is unlocked and removed with
+ * that parent; any other worktree, including a caller-provided one, is only unlocked.
  * Owner status is not checked: deciding whether an active owner may be cleaned up is caller policy.
  */
 export async function removeAgentWorkspace(
@@ -85,10 +91,10 @@ export async function removeAgentWorkspace(
   if (!entry) return { path, outcome: "failed", reason: "not-marked" };
   try {
     await runGitAllowFatal(cwd, ["worktree", "unlock", path]);
-    if (!entry.disposable) return { path, outcome: "unlocked" };
-    const parent = await disposableParent(path);
+    const parent = entry.disposable ? await disposableParent(path) : undefined;
+    if (!parent) return { path, outcome: "unlocked" };
     await runGit(cwd, ["worktree", "remove", "--force", path]);
-    if (parent) await rm(parent, { recursive: true, force: true });
+    await rm(parent, { recursive: true, force: true });
     return { path, outcome: "removed" };
   } catch {
     return { path, outcome: "failed", reason: "git-failed" };

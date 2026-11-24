@@ -335,15 +335,34 @@ describe("Agent Workspaces", () => {
       expect(existsSync(disposable.parentDirectory)).toBe(false);
     });
 
-    it("removes a worktree with a legacy Review marker", async () => {
-      const legacy = addLinkedWorktree("legacy");
+    it("removes a legacy Review workspace", async () => {
+      mkdirSync(join(scratch, "supi-review-workspace-x"));
+      const legacy = addLinkedWorktree("supi-review-workspace-x/workspace");
       git(repo, "worktree", "lock", "--reason", `supi-review:x;pid=${deadPid()};started=t`, legacy);
 
       await expect(removeAgentWorkspace(repo, legacy)).resolves.toEqual({
         path: legacy,
         outcome: "removed",
       });
-      expect(existsSync(legacy)).toBe(false);
+      expect(existsSync(dirname(legacy))).toBe(false);
+    });
+
+    it.each([
+      ["a disposable marker", `supi-agent:delegation:x;pid=${deadPid()};started=t;disposable`],
+      ["a legacy Review marker", `supi-review:x;pid=${deadPid()};started=t`],
+    ])("only unlocks a normal linked worktree with %s", async (_name, reason) => {
+      const linked = addLinkedWorktree("linked");
+      git(repo, "worktree", "lock", "--reason", reason, linked);
+
+      expect(await listAgentWorkspaces(repo)).toEqual([
+        expect.objectContaining({ path: linked, disposable: false }),
+      ]);
+      await expect(removeAgentWorkspace(repo, linked)).resolves.toEqual({
+        path: linked,
+        outcome: "unlocked",
+      });
+      expect(existsSync(linked)).toBe(true);
+      expect(lockReasons(repo).has(linked)).toBe(false);
     });
 
     it("refuses a worktree that is not SuPi-marked", async () => {
