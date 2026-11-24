@@ -1,7 +1,6 @@
-import { execFileSync, spawnSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
-  cpSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -13,7 +12,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   acquireWorktreeLease,
   createDisposableWorkspace,
@@ -22,13 +21,10 @@ import {
   resolveWorktreeRoot,
   runDependencyBootstrap,
 } from "../../src/workspace.ts";
+import { deadPid, git, lockReasons, repositoryTemplate } from "../helpers/git-fixture.ts";
 
 // Every test spawns real Git processes.
 vi.setConfig({ testTimeout: 20_000 });
-
-function git(cwd: string, ...args: string[]): string {
-  return execFileSync("git", args, { cwd, encoding: "utf8", stdio: "pipe" }).trim();
-}
 
 function gitBuffer(cwd: string, ...args: string[]): Buffer {
   return execFileSync("git", args, { cwd, stdio: "pipe" });
@@ -38,42 +34,7 @@ function sha256(value: Buffer): string {
   return createHash("sha256").update(value).digest("hex");
 }
 
-/** A PID that belonged to a process that has already exited. */
-function deadPid(): number {
-  const child = spawnSync(process.execPath, ["-e", "process.exit(0)"]);
-  if (!child.pid) throw new Error("Could not spawn a short-lived process.");
-  return child.pid;
-}
-
-let template: string | undefined;
-afterAll(() => {
-  if (template) rmSync(template, { recursive: true, force: true });
-});
-
-function copyRepository(cwd: string): void {
-  if (!template) {
-    template = mkdtempSync(join(tmpdir(), "supi-agent-workspace-template-"));
-    git(template, "init");
-    git(template, "config", "user.email", "test@example.com");
-    git(template, "config", "user.name", "Test");
-    git(template, "config", "commit.gpgsign", "false");
-    git(template, "config", "core.hooksPath", "/dev/null");
-    writeFileSync(join(template, "tracked.txt"), "base\n");
-    git(template, "add", ".");
-    git(template, "commit", "-m", "base");
-  }
-  cpSync(template, cwd, { recursive: true });
-}
-
-function lockReasons(cwd: string): Map<string, string> {
-  const reasons = new Map<string, string>();
-  let path: string | undefined;
-  for (const line of git(cwd, "worktree", "list", "--porcelain").split("\n")) {
-    if (line.startsWith("worktree ")) path = line.slice("worktree ".length);
-    if (line.startsWith("locked ") && path) reasons.set(path, line.slice("locked ".length));
-  }
-  return reasons;
-}
+const copyRepository = repositoryTemplate();
 
 describe("Agent Workspaces", () => {
   let repo: string;

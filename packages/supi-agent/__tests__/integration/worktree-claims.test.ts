@@ -1,16 +1,14 @@
-import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { resolveWorktreeClaims } from "../../src/delegation/worktree-claims.ts";
+import { git, repositoryTemplate } from "../helpers/git-fixture.ts";
 
 // Every test spawns real Git processes.
 vi.setConfig({ testTimeout: 20_000 });
 
-function git(cwd: string, ...args: string[]): void {
-  execFileSync("git", args, { cwd, stdio: "ignore" });
-}
+const copyRepository = repositoryTemplate();
 
 describe("Worktree Claim resolution", () => {
   let scratch: string;
@@ -22,22 +20,7 @@ describe("Worktree Claim resolution", () => {
     scratch = realpathSync(mkdtempSync(join(tmpdir(), "supi-worktree-claims-")));
     main = join(scratch, "main");
     mkdirSync(main);
-    git(main, "init", "-q");
-    writeFileSync(join(main, "README.md"), "main\n");
-    git(main, "add", ".");
-    git(
-      main,
-      "-c",
-      "user.name=t",
-      "-c",
-      "user.email=t@t",
-      "-c",
-      "commit.gpgsign=false",
-      "commit",
-      "-q",
-      "-m",
-      "init",
-    );
+    copyRepository(main);
     linkedA = join(scratch, "a");
     linkedB = join(scratch, "b");
     git(main, "worktree", "add", "-q", "-b", "a", linkedA);

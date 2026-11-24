@@ -1,4 +1,3 @@
-import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -8,53 +7,25 @@ import { createEventBus } from "@earendil-works/pi-coding-agent";
 import { createPiMock, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as runtimeApi from "../../src/api.ts";
+import { acquireWorktreeLease, createDisposableWorkspace } from "../../src/workspace.ts";
+import { deadPid, git, lockReasons, repositoryTemplate } from "../helpers/git-fixture.ts";
 
 // Command tests spawn real Git processes.
 vi.setConfig({ testTimeout: 20_000 });
 
 type CommandHandler = (args: string, ctx: unknown) => Promise<void>;
 
-function git(cwd: string, ...args: string[]): string {
-  return execFileSync("git", args, { cwd, encoding: "utf8", stdio: "pipe" }).trim();
-}
+const copyRepository = repositoryTemplate();
 
-/** A PID that belonged to a process that has already exited. */
-function deadPid(): number {
-  const child = spawnSync(process.execPath, ["-e", "process.exit(0)"]);
-  if (!child.pid) throw new Error("Could not spawn a short-lived process.");
-  return child.pid;
-}
-
-function lockReasons(cwd: string): Map<string, string> {
-  const reasons = new Map<string, string>();
-  let path: string | undefined;
-  for (const line of git(cwd, "worktree", "list", "--porcelain").split("\n")) {
-    if (line.startsWith("worktree ")) path = realpathSync(line.slice("worktree ".length));
-    if (line.startsWith("locked ") && path) reasons.set(path, line.slice("locked ".length));
-  }
-  return reasons;
-}
-
-function extensionApi(eventBus: ReturnType<typeof createEventBus>) {
-  const handlers = new Map<string, Array<(...args: unknown[]) => unknown>>();
-  const commands: string[] = [];
-  const api = {
-    on(event: string, handler: (...args: unknown[]) => unknown) {
-      handlers.set(event, [...(handlers.get(event) ?? []), handler]);
-    },
-    registerCommand: (name: string) => commands.push(name),
-    registerMessageRenderer: vi.fn(),
-    events: {
-      on: (channel: string, listener: (data: unknown) => void) => eventBus.on(channel, listener),
-      emit: (channel: string, data: unknown) => eventBus.emit(channel, data),
-    },
-  } as unknown as ExtensionAPI;
+/** A Pi mock whose `pi.events` is the given bus, so several APIs can share one Pi runtime. */
+function piOnBus(eventBus: ReturnType<typeof createEventBus>) {
+  const pi = createPiMock();
+  pi.events.on = (channel, listener) => eventBus.on(channel, listener);
+  pi.events.emit = (channel, data) => eventBus.emit(channel, data);
   return {
-    api,
-    commands,
-    async shutdown() {
-      for (const handler of handlers.get("session_shutdown") ?? []) await handler({}, {});
-    },
+    pi,
+    api: pi as unknown as ExtensionAPI,
+    shutdown: () => pi.emit("session_shutdown", {}, {}),
   };
 }
 
@@ -67,8 +38,8 @@ describe("/supi-agent-cleanup registration", () => {
 
   it("registers one command per Pi runtime across owners and bundled runtime copies", async () => {
     const eventBus = createEventBus();
-    const agent = extensionApi(eventBus);
-    const review = extensionApi(eventBus);
+    const agent = piOnBus(eventBus);
+    const review = piOnBus(eventBus);
     shutdowns.push(agent.shutdown);
     vi.resetModules();
     const bundledCopy = (await import("../../src/api.ts")) as typeof runtimeApi;
@@ -77,15 +48,17 @@ describe("/supi-agent-cleanup registration", () => {
     bundledCopy.registerAgentCleanupCommand(review.api);
     runtimeApi.registerAgentCleanupCommand(agent.api);
 
-    expect([...agent.commands, ...review.commands]).toEqual(["supi-agent-cleanup"]);
+    expect([...agent.pi.commands.keys(), ...review.pi.commands.keys()]).toEqual([
+      "supi-agent-cleanup",
+    ]);
 
     // A reload replaces the runtime state, so the next owner registers the command again.
     await agent.shutdown();
     shutdowns.pop();
-    const reloaded = extensionApi(eventBus);
+    const reloaded = piOnBus(eventBus);
     shutdowns.push(reloaded.shutdown);
     bundledCopy.registerAgentCleanupCommand(reloaded.api);
-    expect(reloaded.commands).toEqual(["supi-agent-cleanup"]);
+    expect([...reloaded.pi.commands.keys()]).toEqual(["supi-agent-cleanup"]);
   });
 });
 
@@ -98,14 +71,7 @@ describe("/supi-agent-cleanup", () => {
     scratch = realpathSync(mkdtempSync(join(tmpdir(), "supi-agent-cleanup-test-")));
     repo = join(scratch, "repo");
     mkdirSync(repo);
-    git(repo, "init");
-    git(repo, "config", "user.email", "test@example.com");
-    git(repo, "config", "user.name", "Test");
-    git(repo, "config", "commit.gpgsign", "false");
-    git(repo, "config", "core.hooksPath", "/dev/null");
-    writeFileSync(join(repo, "tracked.txt"), "base\n");
-    git(repo, "add", ".");
-    git(repo, "commit", "-m", "base");
+    copyRepository(repo);
   });
 
   afterEach(() => {
@@ -123,7 +89,7 @@ describe("/supi-agent-cleanup", () => {
 
   async function orphanedDisposableWorkspace(): Promise<string> {
     const empty = Buffer.alloc(0);
-    const workspace = await runtimeApi.createDisposableWorkspace({
+    const workspace = await createDisposableWorkspace({
       owner: "review",
       state: {
         repositoryRoot: repo,
@@ -168,7 +134,7 @@ describe("/supi-agent-cleanup", () => {
     git(repo, "worktree", "add", "--detach", legacy, "HEAD");
     git(repo, "worktree", "lock", "--reason", `supi-review:x;pid=${deadPid()};started=t`, legacy);
     const active = linkedWorktree("active");
-    const lease = await runtimeApi.acquireWorktreeLease({ cwd: active, owner: "delegation" });
+    const lease = await acquireWorktreeLease({ cwd: active, owner: "delegation" });
 
     const { pi } = await runCleanup(async () => true);
 
