@@ -1,7 +1,10 @@
 import { realpath, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
 import { basename, dirname } from "node:path";
-import { DISPOSABLE_PARENT_PREFIX, LEGACY_DISPOSABLE_PARENT_PREFIX } from "./disposable.ts";
+import {
+  DISPOSABLE_PARENT_PREFIX,
+  DISPOSABLE_WORKSPACE_NAME,
+  LEGACY_DISPOSABLE_PARENT_PREFIX,
+} from "./disposable.ts";
 import { runGit, runGitAllowFatal } from "./git.ts";
 import { markerOwnerStatus, parseAgentWorkspaceMarker } from "./marker.ts";
 import type { AgentWorkspaceOwnerStatus } from "./types.ts";
@@ -27,15 +30,18 @@ export type AgentWorkspaceRemoval =
   | { path: string; outcome: "unlocked" }
   | { path: string; outcome: "failed"; reason: "not-marked" | "git-failed" };
 
+/**
+ * Temporary parent of a disposable workspace, recognized by its `mkdtemp` prefix and the fixed
+ * worktree name so cleanup never deletes an unrelated directory. It does not depend on the current
+ * temporary directory, which may differ from the one the workspace was created under.
+ */
 async function disposableParent(path: string): Promise<string | undefined> {
+  if (basename(path) !== DISPOSABLE_WORKSPACE_NAME) return undefined;
   const parent = dirname(path);
-  const [tempRoot, canonicalParent] = await Promise.all([
-    realpath(tmpdir()).catch(() => tmpdir()),
-    realpath(parent).catch(() => parent),
-  ]);
+  const canonicalParent = await realpath(parent).catch(() => parent);
   const name = basename(canonicalParent);
-  return dirname(canonicalParent) === tempRoot &&
-    (name.startsWith(DISPOSABLE_PARENT_PREFIX) || name.startsWith(LEGACY_DISPOSABLE_PARENT_PREFIX))
+  return name.startsWith(DISPOSABLE_PARENT_PREFIX) ||
+    name.startsWith(LEGACY_DISPOSABLE_PARENT_PREFIX)
     ? canonicalParent
     : undefined;
 }
@@ -54,14 +60,12 @@ export async function listAgentWorkspaces(
     if (record.lockReason === undefined) continue;
     const marker = parseAgentWorkspaceMarker(record.lockReason);
     if (!marker) continue;
-    // Review created only disposable workspaces before markers named their owner.
-    const disposable = marker.legacy || (await disposableParent(record.path)) !== undefined;
     entries.push({
       path: record.path,
       ...(marker.owner ? { owner: marker.owner } : {}),
       legacy: marker.legacy,
       ownerStatus: markerOwnerStatus(marker),
-      disposable,
+      disposable: marker.disposable,
       lockReason: record.lockReason,
     });
   }

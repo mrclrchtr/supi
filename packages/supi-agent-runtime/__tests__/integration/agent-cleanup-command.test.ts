@@ -140,7 +140,7 @@ describe("/supi-agent-cleanup", () => {
       "worktree",
       "lock",
       "--reason",
-      `supi-agent:review:x;pid=${deadPid()};started=t`,
+      `supi-agent:review:x;pid=${deadPid()};started=t;disposable`,
       workspace.cwd,
     );
     return workspace.cwd;

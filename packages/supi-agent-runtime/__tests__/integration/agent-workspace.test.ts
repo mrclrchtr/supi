@@ -316,6 +316,31 @@ describe("Agent Workspaces", () => {
       expect(await listAgentWorkspaces(repo)).toEqual([]);
     });
 
+    it("removes a disposable workspace created under a different temporary directory", async () => {
+      const otherTemp = join(scratch, "other-tmp");
+      mkdirSync(otherTemp);
+      const empty = Buffer.alloc(0);
+      vi.stubEnv("TMPDIR", otherTemp);
+      const disposable = await createDisposableWorkspace({
+        owner: "review",
+        state: {
+          repositoryRoot: repo,
+          baseCommit: git(repo, "rev-parse", "HEAD"),
+          expectedHash: sha256(empty),
+        },
+        readPatch: async () => empty,
+      }).finally(() => vi.unstubAllEnvs());
+
+      expect(await listAgentWorkspaces(repo)).toEqual([
+        expect.objectContaining({ path: disposable.cwd, disposable: true }),
+      ]);
+      await expect(removeAgentWorkspace(repo, disposable.cwd)).resolves.toEqual({
+        path: disposable.cwd,
+        outcome: "removed",
+      });
+      expect(existsSync(disposable.parentDirectory)).toBe(false);
+    });
+
     it("removes a worktree with a legacy Review marker", async () => {
       const legacy = addLinkedWorktree("legacy");
       git(repo, "worktree", "lock", "--reason", `supi-review:x;pid=${deadPid()};started=t`, legacy);

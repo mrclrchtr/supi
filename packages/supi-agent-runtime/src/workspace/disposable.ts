@@ -10,6 +10,8 @@ import { AgentWorkspaceError, type AgentWorkspaceOwner } from "./types.ts";
 export const DISPOSABLE_PARENT_PREFIX = "supi-agent-workspace-";
 /** Parent prefix used by Review before Agent Workspaces existed. */
 export const LEGACY_DISPOSABLE_PARENT_PREFIX = "supi-review-workspace-";
+/** Name of the worktree directory inside its disposable parent. */
+export const DISPOSABLE_WORKSPACE_NAME = "workspace";
 
 /**
  * Neutral description of the Git state an Agent Workspace must reproduce.
@@ -134,7 +136,7 @@ export async function createDisposableWorkspace(
     throw new AgentWorkspaceError("patch-mismatch", "The patch does not match its expected hash.");
   }
   const parentDirectory = await realpath(await mkdtemp(join(tmpdir(), DISPOSABLE_PARENT_PREFIX)));
-  let cwd = join(parentDirectory, "workspace");
+  let cwd = join(parentDirectory, DISPOSABLE_WORKSPACE_NAME);
   let created = false;
   let receipt: AgentWorkspaceReceipt;
   try {
@@ -147,7 +149,13 @@ export async function createDisposableWorkspace(
     cwd = await realpath(cwd);
     await runGit(
       state.repositoryRoot,
-      ["worktree", "lock", "--reason", createAgentWorkspaceMarker(options.owner), cwd],
+      [
+        "worktree",
+        "lock",
+        "--reason",
+        createAgentWorkspaceMarker(options.owner, { disposable: true }),
+        cwd,
+      ],
       signal,
     );
     if (state.patch && state.patch.length > 0) {
