@@ -1,6 +1,5 @@
 import type { clampThinkingLevel, Model } from "@earendil-works/pi-ai";
 import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
-import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import {
   type AgentRunAuxiliaryModelSnapshot,
   type AgentRunContinuation,
@@ -12,6 +11,7 @@ import {
   type AgentRunRegistry,
   type AgentRunRetrospective,
   type AgentRunSessionView,
+  resolveAgentRunAgentDir,
   type StartAgentRunOptions,
   startAgentRun,
   startRegisteredAgentRun,
@@ -133,8 +133,8 @@ export async function runIsolatedChild<T>(
   if (!config.providerAuthority) {
     return { kind: "failed", failureCode: "session-creation-failed" };
   }
-  const agentDir = process.env.PI_CODING_AGENT_DIR || getAgentDir();
-  const { loader, settingsManager } = createIsolatedChildResources(
+  const agentDir = resolveAgentRunAgentDir();
+  const { resourceLoader, settingsManager } = createIsolatedChildResources(
     config.cwd,
     config.protocolPrompt,
     agentDir,
@@ -158,7 +158,7 @@ export async function runIsolatedChild<T>(
         ? { authorizedContinuationModels: [...config.authorizedContinuationModels] }
         : {}),
       ...authorizedAuxiliaryModelInputs(config),
-      resourceLoader: loader,
+      resourceLoader,
       settingsManager,
       agentDir,
     },

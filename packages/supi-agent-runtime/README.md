@@ -34,6 +34,27 @@ const outcome = await run.result;
 
 Agent Runs share the containing process's permissions and external sandbox; context isolation is not filesystem or security isolation.
 
+## Isolated resources
+
+`createIsolatedAgentResources()` builds `resourceLoader` and `settingsManager` for a context-isolated child. Delegation and Review both use it:
+
+```ts
+const { resourceLoader, settingsManager, agentDir } = createIsolatedAgentResources({
+  cwd,
+  projectTrusted,
+  systemPrompt, // undefined keeps Pi's native prompt
+  instructionFiles, // default: none
+  codemode: true,
+  webTools: { provision, toolNames },
+  extensions: [{ name: "supi-code-intelligence-headless", factory: headlessInspectionProfile }],
+});
+```
+
+- The child loads no ambient extensions, skills, prompt templates, themes, context files, `SYSTEM.md`, or `APPEND_SYSTEM.md`.
+- Every child gets shell hints and a `<tool_rules>` section with its active tools' `promptGuidelines`. Pi builds that section only for its native prompt.
+- Compaction and retries are on. Compaction is a safety net for a full context window; each compaction of a registered run records a Debug event.
+- Callers own the prompt, the instruction files, and capability-bearing extensions such as headless Code Intelligence.
+
 ## Auxiliary model authority
 
 Only callers that explicitly enable Pi codemode for an invocation should grant its classifier and image-model access. Capture the containing session's available catalogue once per top-level invocation, then pass the same frozen snapshot to each child run in that invocation:

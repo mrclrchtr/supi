@@ -55,7 +55,7 @@ describe("runIsolatedChild", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     registry = new AgentRunRegistry();
-    mocks.createResources.mockReturnValue({ loader: {}, settingsManager: {} });
+    mocks.createResources.mockReturnValue({ resourceLoader: {}, settingsManager: {} });
   });
 
   afterEach(async () => {

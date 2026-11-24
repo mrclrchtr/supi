@@ -33,6 +33,12 @@ export {
   formatAgentRunDiagnostics,
   getAgentRunDiagnosticErrorRows,
 } from "./diagnostics.ts";
+export type {
+  AgentRunInstructionFile,
+  IsolatedAgentResourceOptions,
+  IsolatedAgentResources,
+} from "./isolated-resources.ts";
+export { createIsolatedAgentResources, resolveAgentRunAgentDir } from "./isolated-resources.ts";
 export type { AgentRunProviderAuthority, AgentRunRequestAuth } from "./provider-authority.ts";
 export { createAgentRunProviderAuthority } from "./provider-authority.ts";
 export { startAgentRun, startRegisteredAgentRun } from "./run.ts";

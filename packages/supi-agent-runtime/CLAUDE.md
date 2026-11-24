@@ -2,9 +2,11 @@
 
 ## Scope
 
-`@mrclrchtr/supi-agent-runtime` is a library-only package. It owns Agent Run session mechanics, the shared session-local run registry, temporary transcripts, Background Run Batches (`src/background/`), and the `agent_result` and `agent_cancel` tools (`src/tool/`). Callers own resources, capabilities, completion, and evidence policy.
+`@mrclrchtr/supi-agent-runtime` is a library-only package. It owns Agent Run session mechanics, the shared session-local run registry, temporary transcripts, Background Run Batches (`src/background/`), and the `agent_result` and `agent_cancel` tools (`src/tool/`). It also owns the isolation mechanics of child resources (`createIsolatedAgentResources()` in `src/isolated-resources.ts`): ambient-resource suppression, shell hints, tool rules, codemode and Web tool loading, and the retry/compaction defaults. Callers own the prompt, instruction files, capabilities, completion, and evidence policy.
 
 ## Guidelines
+
+- Fix child isolation in `createIsolatedAgentResources()`, not in a caller. Keep capability-bearing extensions (such as headless Code Intelligence) injected by the caller; do not add a dependency on `supi-code-intelligence`.
 
 - Keep Agent Runs context-isolated but permission-shared; this package is not a sandbox.
 - Never expose the owned `AgentSession` or its lifecycle controls through callback views.

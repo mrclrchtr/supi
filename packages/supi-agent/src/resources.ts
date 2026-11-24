@@ -1,16 +1,13 @@
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { loadProjectContextFiles } from "@earendil-works/pi-coding-agent";
 import {
-  createCodemodeExtension,
-  DefaultResourceLoader,
-  getAgentDir,
-  loadProjectContextFiles,
-  SettingsManager,
-} from "@earendil-works/pi-coding-agent";
-import type { AgentSessionInputs } from "@mrclrchtr/supi-agent-runtime/api";
+  type AgentSessionInputs,
+  createIsolatedAgentResources,
+  resolveAgentRunAgentDir,
+} from "@mrclrchtr/supi-agent-runtime/api";
 import headlessInspectionProfile from "@mrclrchtr/supi-code-intelligence/headless";
-import { registerShellHints } from "@mrclrchtr/supi-core/session";
 import {
   effectiveCapabilities,
   selectedWebCapabilities,
@@ -19,7 +16,6 @@ import {
 } from "./capabilities.ts";
 import { realpathOrResolve } from "./path.ts";
 import { registerGitTool } from "./tool/git/register.ts";
-import { registerToolRules } from "./tool-rules.ts";
 import type { AgentProfile, AgentSessionInputOptions, AgentSystemPrompt } from "./types.ts";
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -27,51 +23,27 @@ const packageProfilesRoot = resolve(packageRoot, "profiles");
 
 /** Build an in-memory, ambient-resource-free session policy for one profile. */
 export function createAgentSessionInputs(options: AgentSessionInputOptions): AgentSessionInputs {
-  const settingsManager = SettingsManager.inMemory(
-    {
-      compaction: { enabled: true },
-      retry: { enabled: true },
-    },
-    { projectTrusted: options.projectTrusted },
-  );
-  const contextFiles = selectInstructionFiles(options.profile, options.cwd, options.agentDir);
-  const systemPrompt = resolveSystemPrompt(options.profile);
-  const webTools = selectedWebCapabilities(options.profile.manifest.tools).filter((tool) =>
+  const profileTools = options.profile.manifest.tools;
+  const webTools = selectedWebCapabilities(profileTools).filter((tool) =>
     options.webTools?.toolNames.includes(tool),
   );
-  const tools = effectiveCapabilities(options.profile.manifest.tools, webTools);
-  const extensionFactories = [
-    { name: "supi-shell-hints", factory: registerShellHints },
-    { name: "supi-agent-tool-rules", factory: registerToolRules },
-    ...(usesHeadlessInspection(options.profile.manifest.tools)
-      ? [{ name: "supi-code-intelligence-headless", factory: headlessInspectionProfile }]
-      : []),
-    ...(options.profile.manifest.tools.includes("git")
-      ? [{ name: "supi-agent-git", factory: registerGitTool }]
-      : []),
-    ...(options.profile.manifest.tools.includes("codemode")
-      ? [createCodemodeExtension({ models: true, mode: "on" })]
-      : []),
-    ...(options.webTools && webTools.length > 0
-      ? [{ name: "supi-web-child", factory: options.webTools.createFactory(webTools) }]
-      : []),
-  ];
-  const loader = new DefaultResourceLoader({
+  const tools = effectiveCapabilities(profileTools, webTools);
+  const { resourceLoader, settingsManager } = createIsolatedAgentResources({
     cwd: options.cwd,
     agentDir: options.agentDir,
-    settingsManager,
-    noExtensions: true,
-    ...(extensionFactories.length > 0 ? { extensionFactories } : {}),
-    noSkills: true,
-    noPromptTemplates: true,
-    noThemes: true,
-    noContextFiles: true,
-    agentsFilesOverride: () => ({ agentsFiles: contextFiles }),
-    // Supply a literal sentinel source so Pi does not discover ambient SYSTEM.md files.
-    systemPrompt: systemPrompt ?? "",
-    appendSystemPrompt: [],
-    systemPromptOverride: () => systemPrompt,
-    appendSystemPromptOverride: () => [],
+    projectTrusted: options.projectTrusted,
+    systemPrompt: resolveSystemPrompt(options.profile),
+    instructionFiles: selectInstructionFiles(options.profile, options.cwd, options.agentDir),
+    codemode: profileTools.includes("codemode"),
+    ...(options.webTools ? { webTools: { provision: options.webTools, toolNames: webTools } } : {}),
+    extensions: [
+      ...(usesHeadlessInspection(profileTools)
+        ? [{ name: "supi-code-intelligence-headless", factory: headlessInspectionProfile }]
+        : []),
+      ...(profileTools.includes("git")
+        ? [{ name: "supi-agent-git", factory: registerGitTool }]
+        : []),
+    ],
   });
 
   return {
@@ -80,7 +52,7 @@ export function createAgentSessionInputs(options: AgentSessionInputOptions): Age
     providerAuthority: options.providerAuthority,
     thinkingLevel: options.thinkingLevel,
     tools: Object.freeze(toAgentToolNames(tools)),
-    resourceLoader: loader,
+    resourceLoader,
     settingsManager,
     agentDir: options.agentDir,
   };
@@ -88,7 +60,7 @@ export function createAgentSessionInputs(options: AgentSessionInputOptions): Age
 
 /** Return the agent directory used by the current Pi installation. */
 export function resolveAgentDirectory(): string {
-  return process.env.PI_CODING_AGENT_DIR || getAgentDir();
+  return resolveAgentRunAgentDir();
 }
 
 /** Select only the explicitly requested global/project instruction files. */

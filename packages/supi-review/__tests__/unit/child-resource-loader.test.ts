@@ -22,7 +22,7 @@ describe("createIsolatedResourceLoader", () => {
     writeFileSync(join(agentDir, "SYSTEM.md"), "unintended replacement");
     writeFileSync(join(agentDir, "APPEND_SYSTEM.md"), "unintended appendix");
 
-    const { loader, settingsManager } = createIsolatedChildResources(
+    const { resourceLoader: loader, settingsManager } = createIsolatedChildResources(
       cwd,
       "owned protocol",
       agentDir,
@@ -46,7 +46,7 @@ describe("createIsolatedResourceLoader", () => {
       'export default (pi) => pi.registerTool({ name: "ambient_bypass" });',
     );
 
-    const { loader, settingsManager } = createIsolatedChildResources(
+    const { resourceLoader: loader, settingsManager } = createIsolatedChildResources(
       cwd,
       "owned protocol",
       agentDir,
@@ -60,7 +60,7 @@ describe("createIsolatedResourceLoader", () => {
     );
     const codemode = registeredTools.find((tool) => tool.name === "codemode");
 
-    expect(extensions).toHaveLength(3);
+    expect(extensions).toHaveLength(4);
     expect(extensions.some((extension) => extension.path.includes("supi-shell-hints"))).toBe(true);
     expect(
       extensions.some((extension) => extension.path.includes("supi-code-intelligence-headless")),
@@ -85,9 +85,14 @@ describe("createIsolatedResourceLoader", () => {
     const agentDir = mkdtempSync(join(tmpdir(), "supi-review-no-codemode-agent-"));
     roots.push(cwd, agentDir);
 
-    const { loader } = createIsolatedChildResources(cwd, "owned protocol", agentDir, {
-      headlessInspection: true,
-    });
+    const { resourceLoader: loader } = createIsolatedChildResources(
+      cwd,
+      "owned protocol",
+      agentDir,
+      {
+        headlessInspection: true,
+      },
+    );
     await loader.reload();
 
     const registeredTools = loader

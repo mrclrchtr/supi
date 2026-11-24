@@ -1,16 +1,9 @@
 import {
-  createCodemodeExtension,
-  DefaultResourceLoader,
-  SettingsManager,
-} from "@earendil-works/pi-coding-agent";
+  createIsolatedAgentResources,
+  type IsolatedAgentResources,
+} from "@mrclrchtr/supi-agent-runtime/api";
 import headlessInspectionProfile from "@mrclrchtr/supi-code-intelligence/headless";
-import { type ChildWebToolProvision, registerShellHints } from "@mrclrchtr/supi-core/session";
-
-/** Loader and settings manager preconfigured for an isolated child session. */
-export interface IsolatedChildResources {
-  loader: DefaultResourceLoader;
-  settingsManager: SettingsManager;
-}
+import type { ChildWebToolProvision } from "@mrclrchtr/supi-core/session";
 
 /** Optional Reviewer Extension Set settings for one isolated child. */
 export interface IsolatedChildResourceOptions {
@@ -23,50 +16,26 @@ export interface IsolatedChildResourceOptions {
 }
 
 /**
- * Build child-session resources with the package-owned protocol as the complete
- * system prompt and no ambient settings or discovered prompt content. Compaction is
- * a safety net for Reviewers that outgrow their context window, and retries ride out
- * transient provider failures; the Agent Run runtime records each compaction as a
- * Debug event.
+ * Build Reviewer or Planner resources through the shared isolated Agent Run builder, with the
+ * package-owned protocol as the complete system prompt and no instruction files.
  */
 export function createIsolatedChildResources(
   cwd: string,
   protocolPrompt: string,
-  agentDir = process.env.PI_CODING_AGENT_DIR || "",
+  agentDir: string,
   options: IsolatedChildResourceOptions = {},
-): IsolatedChildResources {
-  const settingsManager = SettingsManager.inMemory({
-    compaction: { enabled: true },
-    retry: { enabled: true },
-  });
-  settingsManager.setProjectTrusted(options.projectTrusted ?? false);
-  const extensionFactories = [
-    { name: "supi-shell-hints", factory: registerShellHints },
-    ...(options.headlessInspection
-      ? [{ name: "supi-code-intelligence-headless", factory: headlessInspectionProfile }]
-      : []),
-    ...(options.codemode ? [createCodemodeExtension({ models: true, mode: "on" })] : []),
-    ...(options.webTools && options.webTools.toolNames.length > 0
-      ? [
-          {
-            name: "supi-web-child",
-            factory: options.webTools.createFactory(options.webTools.toolNames),
-          },
-        ]
-      : []),
-  ];
-  const loader = new DefaultResourceLoader({
+): IsolatedAgentResources {
+  return createIsolatedAgentResources({
     cwd,
     agentDir,
-    settingsManager,
-    noExtensions: true,
-    ...(extensionFactories.length > 0 ? { extensionFactories } : {}),
-    noSkills: true,
-    noPromptTemplates: true,
-    noThemes: true,
-    noContextFiles: true,
-    systemPromptOverride: () => protocolPrompt,
-    appendSystemPromptOverride: () => [],
+    projectTrusted: options.projectTrusted ?? false,
+    systemPrompt: protocolPrompt,
+    ...(options.codemode ? { codemode: true } : {}),
+    ...(options.webTools
+      ? { webTools: { provision: options.webTools, toolNames: options.webTools.toolNames } }
+      : {}),
+    extensions: options.headlessInspection
+      ? [{ name: "supi-code-intelligence-headless", factory: headlessInspectionProfile }]
+      : [],
   });
-  return { loader, settingsManager };
 }
