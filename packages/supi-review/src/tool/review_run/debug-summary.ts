@@ -5,6 +5,7 @@ import type {
   ReviewProgress,
   ReviewTaskResult,
 } from "../../types.ts";
+import type { InstructionFileUsage } from "./instruction-usage.ts";
 
 /** Lifecycle facts observed for one finished review task. */
 export interface ReviewTaskDebugSummaryInput {
@@ -17,6 +18,8 @@ export interface ReviewTaskDebugSummaryInput {
   /** Final observed child progress, when any was reported. */
   progress?: ReviewProgress;
   result: ReviewTaskResult;
+  /** Engine-observed counts for indexed package instruction files. */
+  instructionFileUsage?: InstructionFileUsage;
 }
 
 type ReviewDebugTokens = NonNullable<ReviewProgress["tokens"]>;
@@ -58,8 +61,9 @@ function cacheHitRate(tokens: ReviewProgress["tokens"]): number | undefined {
 /**
  * Record one compact per-task Review Debug Summary event.
  *
- * Contains only trustworthy lifecycle, usage, outcome, and capability metrics:
- * no repository evidence, tool arguments, or inspected-resource claims.
+ * Contains only trustworthy lifecycle, usage, outcome, and capability metrics, plus engine-observed
+ * counts for indexed instruction files: no repository evidence, paths, tool arguments, or
+ * inspected-resource claims.
  */
 export function recordReviewTaskDebugSummary(input: ReviewTaskDebugSummaryInput): void {
   const { result } = input;
@@ -86,6 +90,7 @@ export function recordReviewTaskDebugSummary(input: ReviewTaskDebugSummaryInput)
     toolErrors: input.progress?.toolErrors ?? 0,
     ...(tokens ? { usage: tokens } : {}),
     ...(hitRate !== undefined ? { cacheHitRate: hitRate } : {}),
+    ...(input.instructionFileUsage ? { instructionFileUsage: input.instructionFileUsage } : {}),
     ...(result.capabilityWarnings
       ? { capabilityWarnings: result.capabilityWarnings.map((warning) => warning.message) }
       : {}),

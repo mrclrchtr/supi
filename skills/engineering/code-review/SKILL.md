@@ -59,7 +59,7 @@ Each smell reads *what it is* → *how to fix*; match it against the diff:
 
 Issue both sub-agent calls together, in the foreground, and aggregate the reports they return.
 
-Use `review_run` when available: one Review with `standards` and `spec` tasks, both with `mode: "change"`, using the pinned comparison. The Review embeds the repository instruction files for the changed paths; in each task's `instructions`, name any other standards source or the spec and quote the rules or spec lines that apply.
+Use `review_run` when available: one Review with `standards` and `spec` tasks, both with `mode: "change"`, using the pinned comparison. The Review supplies the repository instruction files for the changed paths; in each task's `instructions`, name any other standards source or the spec and quote the rules or spec lines that apply.
 
 `review_run` runs in one of two modes:
 

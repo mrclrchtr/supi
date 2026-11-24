@@ -8,6 +8,7 @@ import type {
 import type { ChildWebToolProvision } from "@mrclrchtr/supi-core/session";
 import type { LocalReviewAuditStore } from "./audit/local-review-audit-store.ts";
 import type { ReviewThinkingLevel } from "./thinking.ts";
+import type { InstructionFileUsage } from "./tool/review_run/instruction-usage.ts";
 import type { ReviewWorkspaceCleanupWarning } from "./workspace/review-workspace.ts";
 
 /** A full Git commit id after target resolution. */
@@ -288,6 +289,8 @@ export interface ReviewerInvocation {
   projectTrusted?: boolean;
   /** Instruction files embedded in `prompt`; directory Orientation names them instead of repeating them. */
   knownInstructionPaths?: readonly string[];
+  /** Package instruction files the packet indexes without embedding; their use is counted. */
+  indexedInstructionPaths?: readonly string[];
   onProgress?: (progress: ReviewProgress) => void;
   /** Shared viewer group for the independent Reviewer Sessions in one Review. */
   runGroupId?: string;
@@ -307,6 +310,8 @@ export type ReviewerRunResult = ChildRunOutcome<ReviewSubmission> & {
   capabilityWarnings?: ReviewerCapabilityWarning[];
   audit?: ReviewAuditReference;
   submissionRecovery?: SubmissionRecovery;
+  /** How the Reviewer reached indexed package instruction files; omitted when none were indexed. */
+  instructionFileUsage?: InstructionFileUsage;
 };
 
 interface ReviewTaskResultIdentity {

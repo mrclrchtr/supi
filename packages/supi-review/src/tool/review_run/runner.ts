@@ -18,6 +18,7 @@ import type {
 } from "../../types.ts";
 import { runIsolatedChild } from "./child-session.ts";
 import { createReviewRecoveryDeclineTool, createReviewSubmissionTool } from "./child-tools.ts";
+import { InstructionFileUsageObserver } from "./instruction-usage.ts";
 import { ReviewRecoveryPolicy } from "./recovery.ts";
 import { normalizeReviewSubmission } from "./submission.ts";
 import { buildReviewerSystemPrompt } from "./system-prompt.ts";
@@ -82,6 +83,37 @@ interface ReviewerSessionObservation {
   trace?: ReviewAuditTraceCollector;
   capturedReplay?: ReturnType<ReviewAuditTraceCollector["snapshot"]>;
   unsubscribe?: () => void;
+  /** Counts use of indexed package instruction files for the Review Debug Summary. */
+  instructionUsage?: InstructionFileUsageObserver;
+}
+
+/** Result fields the session observation contributes. */
+function observedResultFields(
+  observation: ReviewerSessionObservation,
+): Pick<
+  ReviewerRunResult,
+  "reviewerExtensionSetStatus" | "capabilityWarnings" | "instructionFileUsage"
+> {
+  return {
+    reviewerExtensionSetStatus: observation.reviewerExtensionSetStatus,
+    ...(observation.warnings.length > 0 ? { capabilityWarnings: observation.warnings } : {}),
+    ...(observation.instructionUsage
+      ? { instructionFileUsage: observation.instructionUsage.snapshot() }
+      : {}),
+  };
+}
+
+/** Count how the Reviewer reaches indexed instruction files; returns the unsubscribe. */
+function observeInstructionUsage(
+  created: AgentRunSessionView,
+  invocation: ReviewerInvocation,
+  observation: ReviewerSessionObservation,
+): (() => void) | undefined {
+  const indexed = invocation.indexedInstructionPaths ?? [];
+  if (indexed.length === 0) return undefined;
+  const usage = new InstructionFileUsageObserver(indexed, invocation.cwd);
+  observation.instructionUsage = usage;
+  return created.subscribe((event) => usage.observe(event));
 }
 
 function observeReviewerSession(
@@ -108,11 +140,13 @@ function observeReviewerSession(
       message: `${missingCapabilities.join(" and ")} unavailable; the Reviewer continued with its other permitted tools.`,
     });
   }
-  if (!invocation.audit || !observation.trace) return undefined;
+  const stopUsage = observeInstructionUsage(created, invocation, observation);
+  if (!invocation.audit || !observation.trace) return stopUsage;
   return () => {
     observation.capturedReplay ??= observation.trace?.snapshot(created);
     observation.unsubscribe?.();
     observation.unsubscribe = undefined;
+    stopUsage?.();
   };
 }
 
@@ -236,8 +270,7 @@ export async function runReviewer(invocation: ReviewerInvocation): Promise<Revie
     modelId: invocation.model.canonicalId,
     requestedThinkingLevel,
     effectiveThinkingLevel,
-    reviewerExtensionSetStatus: observation.reviewerExtensionSetStatus,
-    ...(observation.warnings.length > 0 ? { capabilityWarnings: observation.warnings } : {}),
+    ...observedResultFields(observation),
     ...(submissionRecovery ? { submissionRecovery } : {}),
   };
   if (!invocation.audit || !session || !observation.trace) return result;

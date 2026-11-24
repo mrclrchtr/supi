@@ -27,6 +27,7 @@ import type {
   ReviewTaskResult,
 } from "../../types.ts";
 import { recordReviewTaskDebugSummary } from "./debug-summary.ts";
+import type { InstructionFileUsage } from "./instruction-usage.ts";
 import { runReviewer } from "./runner.ts";
 import { normalizeReviewSubmission } from "./submission.ts";
 
@@ -255,7 +256,9 @@ export async function executeReviewTasks(
     dependencyBootstrapRan: dependencyBootstrapConfigured,
     ...(instructionFiles ? { instructionFiles } : {}),
   };
-  const knownInstructionPaths = instructionFiles?.files.map((file) => file.path) ?? [];
+  // Only the embedded root file is known; headless Orientation still delivers indexed files.
+  const knownInstructionPaths = instructionFiles?.root ? [instructionFiles.root.path] : [];
+  const indexedInstructionPaths = instructionFiles?.indexed.map((file) => file.path) ?? [];
 
   return Promise.all(
     review.tasks.map(async (task) => {
@@ -265,6 +268,7 @@ export async function executeReviewTasks(
       const debugSummary = (
         taskResult: ReviewTaskResult,
         reviewerExtensionSetStatus: ReviewerExtensionSetStatus,
+        instructionFileUsage?: InstructionFileUsage,
       ): void => {
         recordReviewTaskDebugSummary({
           taskId: task.id,
@@ -275,6 +279,7 @@ export async function executeReviewTasks(
           reviewerExtensionSetStatus,
           progress: taskStates[task.id].progress,
           result: taskResult,
+          ...(instructionFileUsage ? { instructionFileUsage } : {}),
         });
       };
       taskStates[task.id] = { status: "running" };
@@ -289,6 +294,7 @@ export async function executeReviewTasks(
           prompt: packet.prompt,
           packetHash: packet.packetHash,
           ...(knownInstructionPaths.length > 0 ? { knownInstructionPaths } : {}),
+          ...(indexedInstructionPaths.length > 0 ? { indexedInstructionPaths } : {}),
           ...runKeyFor(batch, task.id),
           onProgress: (progress) => {
             taskStates[task.id] = { status: "running", progress };
@@ -304,7 +310,7 @@ export async function executeReviewTasks(
           },
         });
         const taskResult = toTaskResult(task, packet.packetHash, result);
-        debugSummary(taskResult, result.reviewerExtensionSetStatus);
+        debugSummary(taskResult, result.reviewerExtensionSetStatus, result.instructionFileUsage);
         taskStates[task.id] = { status: taskResult.status };
         completedCount++;
         const verb = taskResult.status === "completed" ? "complete" : taskResult.status;

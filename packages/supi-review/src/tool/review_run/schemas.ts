@@ -13,7 +13,7 @@ export const reviewTaskSchema = Type.Object(
       maxLength: REVIEW_LIMITS.taskInstructionCharacters,
       pattern: "\\S",
       description:
-        "Self-contained review objective and criteria. Repository instruction files (such as CLAUDE.md or AGENTS.md) for the changed paths are embedded automatically. Name any other authoritative source (issue, spec, ADR, or document path) and quote the rules or requirements that apply, each with its section heading; the reviewer retrieves a source only for what the quote lacks. Add known requirement-to-source/test locations as navigation hints, not proof of coverage; omit unknown mappings rather than investigating just to fill them.",
+        "Self-contained review objective and criteria. Repository instruction files (such as CLAUDE.md or AGENTS.md) for the changed paths are supplied automatically. Name any other authoritative source (issue, spec, ADR, or document path) and quote the rules or requirements that apply, each with its section heading; the reviewer retrieves a source only for what the quote lacks. Add known requirement-to-source/test locations as navigation hints, not proof of coverage; omit unknown mappings rather than investigating just to fill them.",
     }),
     mode: Type.Enum(["change", "state"] as const, {
       type: "string",

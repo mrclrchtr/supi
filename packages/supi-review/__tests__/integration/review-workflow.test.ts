@@ -834,20 +834,22 @@ describe("runReview exact Review Target workflow", () => {
       return createHash("sha256").update(content, "utf8").digest("hex");
     }
 
-    it("embeds the root and changed-path instruction files in full and seeds Orientation", async () => {
+    it("embeds the root file in full and indexes package files with their coverage", async () => {
       const root = "# Root rules\nUse tabs.\n";
-      const longPackage = Array.from({ length: 250 }, (_, line) => `rule ${line + 1}`).join("\n");
+      const pkg = "# Package rules\nNo default exports.\nKeep JSDoc.\n";
       mkdirSync(join(cwd, "pkg", "src"), { recursive: true });
       mkdirSync(join(cwd, "other"));
       mkdirSync(join(cwd, "old"));
       writeFileSync(join(cwd, "CLAUDE.md"), root);
-      writeFileSync(join(cwd, "pkg", "CLAUDE.md"), "# Package rules\n");
+      writeFileSync(join(cwd, "pkg", "CLAUDE.md"), "# Before\n");
       writeFileSync(join(cwd, "pkg", "src", "a.ts"), "export const a = 1;\n");
+      writeFileSync(join(cwd, "pkg", "src", "b.ts"), "export const b = 1;\n");
       writeFileSync(join(cwd, "other", "CLAUDE.md"), "# Other rules\n");
       writeFileSync(join(cwd, "old", "CLAUDE.md"), "# Old rules\n");
       const from = commitAll("instructions");
-      writeFileSync(join(cwd, "pkg", "CLAUDE.md"), longPackage);
+      writeFileSync(join(cwd, "pkg", "CLAUDE.md"), pkg);
       writeFileSync(join(cwd, "pkg", "src", "a.ts"), "export const a = 2;\n");
+      writeFileSync(join(cwd, "pkg", "src", "b.ts"), "export const b = 2;\n");
       unlinkSync(join(cwd, "old", "CLAUDE.md"));
 
       const outcome = await review(cwd, {}, [changeTask]);
@@ -855,28 +857,31 @@ describe("runReview exact Review Target workflow", () => {
       expect(outcome.kind).toBe("completed");
       const invocation = mocks.runReviewer.mock.calls[0]?.[0];
       const packet: string = invocation.prompt;
-      expect(packet).toContain("## Repository instructions");
-      expect(packet).toContain(`### CLAUDE.md\nSHA-256: ${sha256(root)}`);
+      expect(packet).toContain(`### CLAUDE.md\nSHA-256: ${sha256(root)} · 2 lines`);
       expect(packet).toContain(root);
-      expect(packet).toContain(`### pkg/CLAUDE.md\nSHA-256: ${sha256(longPackage)}`);
-      expect(packet).toContain("rule 250");
-      expect(packet).toMatch(/### pkg\/CLAUDE\.md\n[^\n]*changed in target/);
+      // Package files are indexed, not embedded.
+      expect(packet).not.toContain("No default exports.");
       expect(packet).toContain(
-        `- old/CLAUDE.md: deleted in target; \`git show ${from}:old/CLAUDE.md\` shows its before version.`,
+        `- \`pkg/CLAUDE.md\` · SHA-256 ${sha256(pkg)} · 3 lines · changed in target (M) · covers 3 changed paths`,
       );
-      expect(packet).not.toContain("Other rules");
-      // Shared instructions precede task-specific packet lines.
+      expect(packet).toContain(
+        `- \`old/CLAUDE.md\`: deleted in target; \`git show ${from}:old/CLAUDE.md\` shows its before version.`,
+      );
+      expect(packet).not.toContain("other/CLAUDE.md");
       expect(packet.indexOf("## Repository instructions")).toBeLessThan(packet.indexOf("Task id:"));
-      expect(invocation.knownInstructionPaths).toEqual(["CLAUDE.md", "pkg/CLAUDE.md"]);
+      // Only the embedded root file is known to headless Orientation, so it still delivers pkg/.
+      expect(invocation.knownInstructionPaths).toEqual(["CLAUDE.md"]);
+      expect(invocation.indexedInstructionPaths).toEqual(["pkg/CLAUDE.md"]);
     });
 
-    it("selects the root and Review Scope instruction files for a state task", async () => {
+    it("indexes Review Scope instruction files for a state task without change attribution", async () => {
       mkdirSync(join(cwd, "pkg"));
       mkdirSync(join(cwd, "other"));
       writeFileSync(join(cwd, "CLAUDE.md"), "# Root rules\n");
       writeFileSync(join(cwd, "pkg", "AGENTS.md"), "# Package rules\n");
       writeFileSync(join(cwd, "other", "CLAUDE.md"), "# Other rules\n");
       commitAll("instructions");
+      writeFileSync(join(cwd, "pkg", "AGENTS.md"), "# Changed package rules\n");
 
       const outcome = await runReview({
         cwd,
@@ -889,8 +894,10 @@ describe("runReview exact Review Target workflow", () => {
       expect(outcome.kind).toBe("completed");
       const packet: string = mocks.runReviewer.mock.calls[0]?.[0].prompt;
       expect(packet).toContain("# Root rules");
-      expect(packet).toContain("### pkg/AGENTS.md");
-      expect(packet).not.toContain("Other rules");
+      expect(packet).toMatch(
+        /- `pkg\/AGENTS\.md` · SHA-256 [0-9a-f]{64} · 1 line · covers Review Scope `pkg`\n/,
+      );
+      expect(packet).not.toContain("other/CLAUDE.md");
       expect(packet).not.toContain("changed in target");
     });
 
@@ -919,7 +926,7 @@ describe("runReview exact Review Target workflow", () => {
       expect(mocks.runReviewer.mock.calls[0]?.[0].prompt).toContain("# Root rules");
     });
 
-    it("fails before fan-out and removes the workspace when instruction files exceed the cap", async () => {
+    it("fails before fan-out and removes the workspace when the root instruction file exceeds the cap", async () => {
       writeFileSync(join(cwd, "CLAUDE.md"), "x".repeat(REVIEW_LIMITS.instructionFileBytes + 1));
       commitAll("huge instructions");
       writeFileSync(join(cwd, "tracked.txt"), "changed\n");
@@ -930,7 +937,7 @@ describe("runReview exact Review Target workflow", () => {
       expect(outcome).toMatchObject({
         kind: "invalid",
         reason: expect.stringContaining(
-          `CLAUDE.md (${(REVIEW_LIMITS.instructionFileBytes + 1).toLocaleString("en-US")} bytes)`,
+          `Root instruction file CLAUDE.md has ${(REVIEW_LIMITS.instructionFileBytes + 1).toLocaleString("en-US")} bytes`,
         ),
       });
       expect(mocks.runReviewer).not.toHaveBeenCalled();

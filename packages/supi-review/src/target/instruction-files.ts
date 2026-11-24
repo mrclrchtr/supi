@@ -5,15 +5,28 @@ import { REVIEW_LIMITS } from "../review-limits.ts";
 import type { ReviewChange, ReviewInput, ReviewScope, ReviewSnapshot } from "../types.ts";
 import { sha256 } from "./hash.ts";
 
-/** One instruction file embedded in full in every Reviewer Packet of a Review. */
-export interface EmbeddedInstructionFile {
+/** Facts shared by embedded and indexed instruction files. */
+interface InstructionFileFacts {
   /** Repository-relative POSIX path in the frozen after state. */
   readonly path: string;
   readonly sha256: string;
-  readonly bytes: number;
+  readonly lines: number;
   /** Git name-status token when the target changes this file. */
   readonly changeStatus?: string;
+}
+
+/** The workspace-root instruction file, embedded in full in every Reviewer Packet. */
+export interface EmbeddedInstructionFile extends InstructionFileFacts {
+  readonly bytes: number;
   readonly content: string;
+}
+
+/** A package instruction file named in the packet index but not embedded. */
+export interface IndexedInstructionFile extends InstructionFileFacts {
+  /** Changed paths inside this file's directory. */
+  readonly coveredChangedPaths: number;
+  /** Review Scope paths inside this file's directory. */
+  readonly coveredScopePaths: readonly string[];
 }
 
 /** An instruction file the target deletes; its before version is reachable through Git. */
@@ -23,7 +36,10 @@ export interface DeletedInstructionFile {
 
 /** Repository instruction files selected once per Review from the frozen after state. */
 export interface ReviewInstructionFiles {
-  readonly files: readonly EmbeddedInstructionFile[];
+  /** The workspace-root file, when one exists. */
+  readonly root?: EmbeddedInstructionFile;
+  /** Deeper files on changed or Review Scope paths, shallowest first. */
+  readonly indexed: readonly IndexedInstructionFile[];
   readonly deleted: readonly DeletedInstructionFile[];
 }
 
@@ -64,13 +80,21 @@ async function existingDirectory(workspaceCwd: string, path: string): Promise<st
   }
 }
 
+function lineCount(content: string): number {
+  const trimmed = content.endsWith("\n") ? content.slice(0, -1) : content;
+  return trimmed ? trimmed.split("\n").length : 0;
+}
+
+function isWithin(directory: string, path: string): boolean {
+  return directory === "." || path === directory || path.startsWith(`${directory}/`);
+}
+
 /**
  * Select the workspace-root instruction file plus the nearest configured instruction file in each
  * ancestor directory of every changed path (when the batch has a change task) and every Review
- * Scope path. One selection serves every task of the Review, so their packets share it.
- * Files are read in full from the frozen Review Workspace and returned shallowest first. The
- * combined size must stay within `REVIEW_LIMITS.instructionFileBytes`; otherwise the Review fails
- * before fan-out rather than embedding a partial set.
+ * Scope path. One selection serves every task of the Review. Only the root file is embedded; it
+ * must stay within `REVIEW_LIMITS.instructionFileBytes`, otherwise the Review fails before fan-out.
+ * Deeper files are indexed with the changed and Review Scope paths they cover.
  */
 export async function selectReviewInstructionFiles(input: {
   workspaceCwd: string;
@@ -82,6 +106,8 @@ export async function selectReviewInstructionFiles(input: {
 }): Promise<ReviewInstructionFilesOutcome> {
   const { workspaceCwd, snapshot, fileNames } = input;
   const changeStatus = new Map(snapshot.changes.map((change) => [change.path, change.status]));
+  const hasChangeTask = input.review.tasks.some((task) => task.mode === "change");
+  const changedPaths = hasChangeTask ? snapshot.changes.map((change) => change.path) : [];
   const paths = new Set<string>();
   for (const directory of selectionDirectories(snapshot, input.review, input.scope)) {
     const existing = await existingDirectory(workspaceCwd, directory);
@@ -97,31 +123,40 @@ export async function selectReviewInstructionFiles(input: {
     (left, right) =>
       left.split("/").length - right.split("/").length || left.localeCompare(right, "en"),
   );
-  const files: EmbeddedInstructionFile[] = [];
+  let root: EmbeddedInstructionFile | undefined;
+  const indexed: IndexedInstructionFile[] = [];
   for (const path of ordered) {
     const content = await readFile(join(workspaceCwd, path), "utf8");
     const status = changeStatus.get(path);
-    files.push({
+    const facts = {
       path,
       sha256: sha256(content),
-      bytes: Buffer.byteLength(content, "utf8"),
+      lines: lineCount(content),
       ...(status ? { changeStatus: status } : {}),
-      content,
+    };
+    const directory = posix.dirname(path);
+    if (directory === ".") {
+      root = { ...facts, bytes: Buffer.byteLength(content, "utf8"), content };
+      continue;
+    }
+    indexed.push({
+      ...facts,
+      coveredChangedPaths: changedPaths.filter((changed) => isWithin(directory, changed)).length,
+      coveredScopePaths: (input.scope.paths ?? []).filter((scoped) => isWithin(directory, scoped)),
     });
   }
-  const total = files.reduce((sum, file) => sum + file.bytes, 0);
-  if (total > REVIEW_LIMITS.instructionFileBytes) {
-    const listed = files
-      .map((file) => `${file.path} (${file.bytes.toLocaleString("en-US")} bytes)`)
-      .join(", ");
+  if (root && root.bytes > REVIEW_LIMITS.instructionFileBytes) {
     return {
       kind: "invalid",
-      reason: `Repository instruction files total ${total.toLocaleString("en-US")} bytes, above the ${REVIEW_LIMITS.instructionFileBytes.toLocaleString("en-US")}-byte limit for one Review: ${listed}. Narrow the change or the Review Scope, or shorten these files.`,
+      reason: `Root instruction file ${root.path} has ${root.bytes.toLocaleString("en-US")} bytes, above the ${REVIEW_LIMITS.instructionFileBytes.toLocaleString("en-US")}-byte limit for embedding it in a Reviewer Packet. Shorten it, or move package-specific rules into package instruction files.`,
     };
   }
   const names = new Set(fileNames);
   const deleted = snapshot.changes
     .filter((change) => isDeletion(change) && names.has(posix.basename(change.path)))
     .map((change) => ({ path: change.path }));
-  return { kind: "selected", instructionFiles: { files, deleted } };
+  return {
+    kind: "selected",
+    instructionFiles: { ...(root ? { root } : {}), indexed, deleted },
+  };
 }

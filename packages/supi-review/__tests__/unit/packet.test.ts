@@ -172,13 +172,21 @@ describe("buildReviewPacket", () => {
     const workspace = {
       dependencyBootstrapRan: false,
       instructionFiles: {
-        files: [
+        root: {
+          path: "CLAUDE.md",
+          sha256: "d".repeat(64),
+          lines: 4,
+          bytes: 22,
+          changeStatus: "M",
+          content: "# Rules\n```sh\nx\n```\n",
+        },
+        indexed: [
           {
-            path: "CLAUDE.md",
-            sha256: "d".repeat(64),
-            bytes: 22,
-            changeStatus: "M",
-            content: "# Rules\n```sh\nx\n```\n",
+            path: "pkg/CLAUDE.md",
+            sha256: "e".repeat(64),
+            lines: 1,
+            coveredChangedPaths: 1,
+            coveredScopePaths: [],
           },
         ],
         deleted: [{ path: "old/AGENTS.md" }],
@@ -189,14 +197,14 @@ describe("buildReviewPacket", () => {
     expect(packet).toEqual(buildReviewPacket(snapshot, review, {}, task, model, workspace));
     expect(packet.packetHash).toBe(
       [
-        "522dcb4c",
-        "9c2bbcfa",
-        "095a05f2",
-        "d5713bd9",
-        "44dfa146",
-        "328d4bf9",
-        "da5774f5",
-        "15a2db0a",
+        "16f6e10a",
+        "fd17616d",
+        "17e34d06",
+        "71c30769",
+        "9f13c3b5",
+        "c6dc7621",
+        "f6d16e99",
+        "cfde0e7f",
       ].join(""),
     );
   });

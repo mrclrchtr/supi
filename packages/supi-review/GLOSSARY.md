@@ -71,7 +71,7 @@ An authoritative issue, spec, or repository document named in a Review Task, fro
 _Avoid_: shared context, Reviewer Packet
 
 **Repository Instruction File**:
-A configured instruction file (`code-intelligence.instructionFileNames`, by default `CLAUDE.md` or `AGENTS.md`) at the workspace root or in an ancestor directory of a changed or Review Scope path. The Review Engine embeds each one in full, with its SHA-256, in every Reviewer Packet as Review Criteria evidence.
+A configured instruction file (`code-intelligence.instructionFileNames`, by default `CLAUDE.md` or `AGENTS.md`) at the workspace root or in an ancestor directory of a changed or Review Scope path. Every Reviewer Packet carries them as Review Criteria evidence: the root file embedded in full, deeper files as an index with SHA-256 and coverage.
 _Avoid_: context file, system prompt, Reviewer instructions
 
 **Criteria Coverage**:
