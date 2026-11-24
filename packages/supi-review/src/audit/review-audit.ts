@@ -40,6 +40,11 @@ export interface ReviewAuditTimelineEntry {
 /** Bounded metadata that helps diagnose review direction and resource use. */
 export interface ReviewAuditTrace {
   startedAt: string;
+  /**
+   * Distinct effective system prompts sent during agent runs, in order. Pi adds sections such as
+   * `<tool_rules>` to the Reviewer Protocol; absent in older records.
+   */
+  systemPrompts?: string[];
   durationMs: number;
   timeline: ReviewAuditTimelineEntry[];
   droppedTimelineEntries: number;
@@ -115,12 +120,24 @@ export class ReviewAuditTraceCollector {
   readonly #startedAt: number;
   readonly #timeline: ReviewAuditTimelineEntry[] = [];
   #droppedTimelineEntries = 0;
+  readonly #systemPrompts: string[] = [];
+  #agentActive = false;
 
-  constructor(private readonly now: () => number = Date.now) {
+  /**
+   * @param readSystemPrompt Returns the session's current effective system prompt. It is read only
+   *   from `agent_start` through `agent_end`, when `before_agent_start` changes apply.
+   */
+  constructor(
+    private readonly now: () => number = Date.now,
+    private readonly readSystemPrompt?: () => string,
+  ) {
     this.#startedAt = now();
   }
 
   observe(event: AgentSessionEvent): void {
+    if (event.type === "agent_start") this.#agentActive = true;
+    if (this.#agentActive) this.#recordSystemPrompt();
+    if (event.type === "agent_end") this.#agentActive = false;
     const atMs = Math.max(0, this.now() - this.#startedAt);
     switch (event.type) {
       case "agent_start":
@@ -157,6 +174,17 @@ export class ReviewAuditTraceCollector {
     this.#push({ atMs: Math.max(0, this.now() - this.#startedAt), ...entry });
   }
 
+  #recordSystemPrompt(): void {
+    let prompt: string | undefined;
+    try {
+      prompt = this.readSystemPrompt?.();
+    } catch {
+      // Capturing is optional and never changes the review outcome.
+    }
+    if (prompt === undefined || prompt === this.#systemPrompts.at(-1)) return;
+    this.#systemPrompts.push(prompt);
+  }
+
   #push(entry: ReviewAuditTimelineEntry): void {
     this.#timeline.push(entry);
     if (this.#timeline.length <= REVIEW_AUDIT_TIMELINE_MAX) return;
@@ -185,6 +213,7 @@ export class ReviewAuditTraceCollector {
     return {
       trace: {
         startedAt: new Date(this.#startedAt).toISOString(),
+        ...(this.#systemPrompts.length > 0 ? { systemPrompts: [...this.#systemPrompts] } : {}),
         durationMs: Math.max(0, finishedAt - this.#startedAt),
         timeline: this.#timeline.map((entry) => ({ ...entry })),
         droppedTimelineEntries: this.#droppedTimelineEntries,

@@ -90,7 +90,7 @@ function observeReviewerSession(
   observation: ReviewerSessionObservation,
 ): (() => void) | undefined {
   if (invocation.audit) {
-    observation.trace = new ReviewAuditTraceCollector();
+    observation.trace = new ReviewAuditTraceCollector(Date.now, () => created.systemPrompt);
     observation.unsubscribe = created.subscribe((event) => observation.trace?.observe(event));
   }
   const active = new Set(created.getActiveToolNames());

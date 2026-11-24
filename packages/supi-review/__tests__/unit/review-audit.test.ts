@@ -100,6 +100,24 @@ describe("review audit capture", () => {
     expect(captured.trace.droppedTimelineEntries).toBe(1);
   });
 
+  it("records each distinct effective system prompt sent during agent runs", () => {
+    let prompt = "BASE PROTOCOL";
+    const trace = new ReviewAuditTraceCollector(Date.now, () => prompt);
+    // Outside an agent run the session reports its base prompt; no request uses it.
+    trace.observe({ type: "turn_start" });
+    prompt = "PROTOCOL\n<tool_rules>";
+    trace.observe({ type: "agent_start" });
+    trace.observe({ type: "turn_start" });
+    trace.observe({ type: "agent_end", messages: [] } as never);
+    prompt = "PROTOCOL";
+    trace.observe({ type: "agent_start" });
+
+    expect(trace.snapshot({ messages: [] } as never).trace.systemPrompts).toEqual([
+      "PROTOCOL\n<tool_rules>",
+      "PROTOCOL",
+    ]);
+  });
+
   it("records a compact session timeline beside final messages", () => {
     let now = 1_000;
     const trace = new ReviewAuditTraceCollector(() => now);
