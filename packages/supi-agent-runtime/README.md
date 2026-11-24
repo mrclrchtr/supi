@@ -109,7 +109,7 @@ Enable **Debug → Enabled** and **Debug → Agent Run Retrospectives** in `/sup
 
 - `handle.taskResult` returns the frozen task outcome, task-only Usage, and optional follow-up context before the retrospective.
 - `handle.result` remains terminal: it waits for disposal and includes Usage from both phases. For registered runs it also waits for transcript writes.
-- The same child performs one tool-free assessment with no retry, repair, or custom token/time budget. The task timeout ends at readiness; normal cancellation and session ownership remain in force.
+- The same child performs one tool-free assessment with no retry, repair, or custom token/time budget. Its tools stay declared, so the prompt and tool list keep their cached prefix on every provider; the runtime blocks any tool call and records the assessment as failed. The task timeout ends at readiness; normal cancellation and session ownership remain in force.
 - The Debug event uses category `agent-run-retrospective`, with assessment prose and separately measured Usage in sanitized `data`. Its `metrics` field measures the assessed task: duration, turns, tool executions and errors, executions per tool name, the names of the tools active when the task started (`availableTools`), and task-only Usage. Retrospective costs are not retroactively added to the parent tool's task Usage.
 - Retrospective messages never enter saved follow-up context or task-only Review audit evidence. Failures or cancellation after result readiness cannot invalidate task success.
 

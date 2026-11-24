@@ -6,6 +6,7 @@ import { join } from "node:path";
 import {
   type AssistantMessage,
   createAssistantMessageEventStream,
+  getCurrentSystemPrompt,
   getCurrentTools,
   type Model,
   type Provider,
@@ -50,7 +51,7 @@ afterEach(async () => {
   if (cwd) await rm(cwd, { recursive: true, force: true });
 });
 
-it("returns a Review and task-only audit while its tool-free retrospective remains registry-owned", async () => {
+it("returns a Review and task-only audit while its retrospective keeps the cached prefix and remains registry-owned", async () => {
   cwd = await mkdtemp(join(tmpdir(), "supi-review-retro-"));
   vi.stubEnv("PI_CODING_AGENT_DIR", join(cwd, "agent"));
   const git = (...args: string[]) => execFileSync("git", args, { cwd, stdio: "pipe" });
@@ -80,6 +81,8 @@ it("returns a Review and task-only audit while its tool-free retrospective remai
     timestamp: Date.now(),
   });
   let requests = 0;
+  let taskTools: string[] = [];
+  let taskSystemPrompt: string | undefined;
   const provider: Provider = {
     id: model.provider,
     name: "Test",
@@ -90,6 +93,8 @@ it("returns a Review and task-only audit while its tool-free retrospective remai
       requests++;
       const stream = createAssistantMessageEventStream();
       if (requests === 1) {
+        taskTools = getCurrentTools(context.messages).map((tool) => tool.name);
+        taskSystemPrompt = getCurrentSystemPrompt(context.messages);
         const message = send(
           [
             {
@@ -107,7 +112,9 @@ it("returns a Review and task-only audit while its tool-free retrospective remai
         );
         queueMicrotask(() => stream.push({ type: "done", reason: "toolUse", message }));
       } else {
-        expect(getCurrentTools(context.messages)).toHaveLength(0);
+        // The prompt and tool list stay unchanged so the cached prefix survives the assessment.
+        expect(getCurrentTools(context.messages).map((tool) => tool.name)).toEqual(taskTools);
+        expect(getCurrentSystemPrompt(context.messages)).toBe(taskSystemPrompt);
         releaseRetrospective = () =>
           stream.push({
             type: "done",

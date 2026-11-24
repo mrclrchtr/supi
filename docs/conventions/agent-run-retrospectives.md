@@ -18,7 +18,7 @@ Status: implemented.
 | Eligibility | Normally completed tasks only. Skip failed, canceled, timed-out, and failed-startup runs. Recovered tool failures within successful tasks remain useful evidence. |
 | Trigger | Freeze and publish the task result before starting the retrospective. For background delegation, do not wait for `agent_result` collection. |
 | Session | Use the same live child session and its available conversation context, not a new diagnostic run. |
-| Authority | No active tools. Do not continue the task, perform new investigation, or execute another structured-completion protocol. |
+| Authority | No tool execution. Tools stay declared so the system prompt and tool list keep their cached prefix; the runtime blocks every call, ends the turn, and records the assessment as failed. Do not continue the task, perform new investigation, or execute another structured-completion protocol. |
 | Budget | No retrospective-specific token or wall-clock limit. Normal cancellation, ownership, and shutdown rules still apply. |
 | Attempts | One assessment turn, with no retry or repair, including automatic retry paths. |
 | Output | Free-form assessment text in the existing Debug log; no new report schema or storage system. |

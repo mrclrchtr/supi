@@ -725,27 +725,27 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
     let dispositionSeen = false;
     let requested = false;
     let exceededRequestLimit = false;
+    let toolCallAttempted = false;
     try {
       activeSession.settingsManager.applyOverrides({
         retry: { enabled: false, maxRetries: 0, provider: { maxRetries: 0 } },
         compaction: { enabled: false },
         cacheWarming: "off",
       });
-      activeSession.setActiveToolsByName([]);
-      activeSession.agent.beforeToolCall = async () => ({
-        block: true,
-        terminate: true,
-        reason: "Agent Run retrospectives cannot execute tools",
-      });
+      // Tools stay declared: removing them would patch the system prompt and tool list, which
+      // breaks the cached prefix on providers without mid-conversation system messages.
+      // Every call is blocked instead, ends the turn, and fails the assessment.
+      activeSession.agent.beforeToolCall = async () => {
+        toolCallAttempted = true;
+        return {
+          block: true,
+          terminate: true,
+          reason: "Agent Run retrospectives cannot execute tools",
+        };
+      };
       const stream = activeSession.agent.streamFunction;
       activeSession.agent.streamFunction = (...args) => {
-        if (
-          requested ||
-          aborting ||
-          terminal ||
-          finalizing ||
-          activeSession.getActiveToolNames().length > 0
-        ) {
+        if (requested || aborting || terminal || finalizing) {
           exceededRequestLimit = true;
           beginAbort();
           throw new Error("Agent Run retrospective allows one request only");
@@ -778,6 +778,7 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
       accepted &&
       !failed &&
       !exceededRequestLimit &&
+      !toolCallAttempted &&
       latestAssistant(activeSession) !== previousAssistant &&
       !isProviderError(activeSession);
     try {

@@ -171,7 +171,7 @@ it("reports task metrics frozen before the assessment turn", async () => {
   });
 });
 
-it("restricts the assessment to one tool-free request without changing caller settings", async () => {
+it("restricts the assessment to one request that cannot execute tools without changing caller settings", async () => {
   const harness = createHarness(mocks);
   const settings = SettingsManager.inMemory({
     retry: { enabled: true, provider: { maxRetries: 4 } },
@@ -207,8 +207,35 @@ it("restricts the assessment to one tool-free request without changing caller se
 
   expect(checked).toBe(true);
   expect(settings.getSettings()).toEqual(original);
-  expect(harness.session.setActiveToolsByName).toHaveBeenCalledWith([]);
+  // Tools stay declared so the prompt and tool list keep their cached prefix.
+  expect(harness.session.setActiveToolsByName).not.toHaveBeenCalled();
   expect(completionResolver).toHaveBeenCalledOnce();
+});
+
+it("fails the assessment when the model attempts a tool call", async () => {
+  const harness = createHarness(mocks);
+  harness.session.prompt.mockImplementationOnce(async (_prompt, options) => {
+    options?.preflightResult?.("started");
+  });
+  harness.session.prompt.mockImplementationOnce(async (_prompt, options) => {
+    options?.preflightResult?.("started");
+    await harness.session.agent.beforeToolCall?.({} as never);
+    harness.session.messages.push({
+      role: "assistant",
+      stopReason: "toolUse",
+      content: [{ type: "text", text: "Let me check one more file." }],
+    });
+  });
+  const onResult = vi.fn();
+  const run = startAgentRun({
+    inputs: inputs(),
+    prompt: "Task",
+    completionResolver: () => "answer",
+    retrospective: { prompt: "Assess", onResult },
+  });
+
+  await expect(run.result).resolves.toMatchObject({ kind: "success", value: "answer" });
+  expect(onResult).toHaveBeenCalledWith({ status: "failed", metrics: expect.any(Object) });
 });
 
 it("keeps a published task stoppable in the registry during its retrospective", async () => {

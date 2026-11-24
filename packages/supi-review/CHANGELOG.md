@@ -2,6 +2,7 @@
 
 ## [15.0.0]
 
+- Reviewer retrospectives keep the Reviewer's tools declared and block calls instead of removing them, so the system prompt and tool list stay unchanged and the run is read from the prompt cache on every model.
 - **Breaking:** in TUI and RPC, `review_run` now starts a Background Review by default. The call returns once the Review Target is frozen and any Dependency Bootstrap has finished, with a `batchId`, the task ids, and the Workspace Receipt instead of the report, so the Agent and the user can continue. One Completion Notice arrives when every Review Task is finished; the report, its Post-Review Policy, and the Reviewer Usage come from `agent_result`. `agent_cancel` stops a running Review, and the status line shows active Background Reviews. Print and JSON modes still wait for the report and reject `mode: "background"`. `/supi-review` is unchanged. Migration: pass `mode: "foreground"` to `review_run` to keep waiting for the report in the call ([#636](https://github.com/mrclrchtr/supi/issues/636)).
 - The **Agent tools** setting also turns `agent_result` and `agent_cancel` off, unless the Agent extension still needs them.
 - Reviewers now see the usage rules of their tools, such as when to use `code_resolve` instead of `rg`. The Reviewer Protocol replaced Pi's prompt, and with it the rules section Pi builds only for its own prompt ([#667](https://github.com/mrclrchtr/supi/issues/667)).
