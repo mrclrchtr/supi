@@ -113,3 +113,26 @@ export type {
 export type { CancellableLoaderOptions } from "./ui/run-loader.ts";
 export { withCancellableLoader } from "./ui/run-loader.ts";
 export { combineAgentRunUsage } from "./usage.ts";
+export type {
+  AcquireWorktreeLeaseOptions,
+  AgentWorkspaceEntry,
+  AgentWorkspaceErrorCode,
+  AgentWorkspaceOwner,
+  AgentWorkspaceOwnerStatus,
+  AgentWorkspaceReceipt,
+  AgentWorkspaceReleaseFailure,
+  AgentWorkspaceRemoval,
+  AgentWorkspaceState,
+  CreateDisposableWorkspaceOptions,
+  DisposableAgentWorkspace,
+  WorktreeLease,
+} from "./workspace.ts";
+export {
+  AgentWorkspaceError,
+  acquireWorktreeLease,
+  createDisposableWorkspace,
+  listAgentWorkspaces,
+  removeAgentWorkspace,
+  resolveWorktreeRoot,
+  runDependencyBootstrap,
+} from "./workspace.ts";

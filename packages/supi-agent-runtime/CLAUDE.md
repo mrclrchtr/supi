@@ -2,7 +2,7 @@
 
 ## Scope
 
-`@mrclrchtr/supi-agent-runtime` is a library-only package. It owns Agent Run session mechanics, the shared session-local run registry, temporary transcripts, Background Run Batches (`src/background/`), and the `agent_result` and `agent_cancel` tools (`src/tool/`). It also owns the isolation mechanics of child resources (`createIsolatedAgentResources()` in `src/isolated-resources.ts`): ambient-resource suppression, shell hints, tool rules, codemode and Web tool loading, and the retry/compaction defaults. Callers own the prompt, instruction files, capabilities, completion, and evidence policy.
+`@mrclrchtr/supi-agent-runtime` is a library-only package. It owns Agent Run session mechanics, the shared session-local run registry, temporary transcripts, Background Run Batches (`src/background/`), and the `agent_result` and `agent_cancel` tools (`src/tool/`). It also owns the isolation mechanics of child resources (`createIsolatedAgentResources()` in `src/isolated-resources.ts`): ambient-resource suppression, shell hints, tool rules, codemode and Web tool loading, and the retry/compaction defaults. Callers own the prompt, instruction files, capabilities, completion, and evidence policy. It also owns the Agent Workspace mechanics (`src/workspace/`, exported through `./workspace`): canonical worktree roots, disposable verified worktrees, `git worktree lock` leases with `supi-agent:<owner>:` markers, inventory, cleanup primitives, and the Dependency Bootstrap runner. Callers own which state to freeze and when to lease or clean up; the module knows no Review Targets, Agent Profiles, or Delegation policy.
 
 ## Guidelines
 

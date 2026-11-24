@@ -58,6 +58,7 @@
   "main": "src/api.ts",
   "exports": {
     "./api": "./src/api.ts",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./workspace": "./src/workspace.ts"
   }
 }

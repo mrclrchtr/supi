@@ -1,6 +1,10 @@
 import { spawn } from "node:child_process";
 
-/** Run the configured shell command once without retaining its output. */
+/**
+ * Run a Dependency Bootstrap shell command once in `cwd` without retaining its output.
+ * Rejects with `Dependency Bootstrap failed.` for an empty command, a non-zero exit, a spawn
+ * error, or an abort (which kills the command).
+ */
 export async function runDependencyBootstrap(
   cwd: string,
   command: string,
