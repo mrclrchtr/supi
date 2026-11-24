@@ -109,4 +109,6 @@ export type {
   AgentsProfilePages,
   AgentsProfilePagesData,
 } from "./ui/agents-overlay-data.ts";
+export type { CancellableLoaderOptions } from "./ui/run-loader.ts";
+export { withCancellableLoader } from "./ui/run-loader.ts";
 export { combineAgentRunUsage } from "./usage.ts";
