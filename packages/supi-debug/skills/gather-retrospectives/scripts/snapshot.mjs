@@ -1,23 +1,30 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { isAbsolute, relative } from "node:path";
-import { isProducer, PRODUCER_NAMES } from "./producers.mjs";
+import { FAILURE_REASONS, isProducer, PRODUCER_NAMES } from "./producers.mjs";
 
 // Snapshots written before projects were resolved carry only the session working directory.
 const projectOf = (record) => record.project ?? record.cwd ?? "unknown";
 
 /**
  * Count deduplicated reports, not independent experiments or all sessions scanned. `byProject`
- * lists report counts per project, largest first.
+ * lists report counts per project, largest first. `byFailureReason` splits failed reports by
+ * their recorded reason; reports from before reasons were recorded count as `unknown`.
  */
 export function summarize(records) {
   const bySource = Object.fromEntries(PRODUCER_NAMES.map((name) => [name, 0]));
   const byStatus = { completed: 0, failed: 0 };
+  const byFailureReason = Object.fromEntries([...FAILURE_REASONS, "unknown"].map((r) => [r, 0]));
   const projects = new Map();
   let earliest = Infinity;
   let latest = -Infinity;
   for (const record of records) {
     bySource[record.source]++;
     byStatus[record.status]++;
+    if (record.status === "failed") {
+      byFailureReason[
+        FAILURE_REASONS.includes(record.failureReason) ? record.failureReason : "unknown"
+      ]++;
+    }
     projects.set(projectOf(record), (projects.get(projectOf(record)) ?? 0) + 1);
     earliest = Math.min(earliest, record.timestamp);
     latest = Math.max(latest, record.timestamp);
@@ -27,6 +34,7 @@ export function summarize(records) {
     containingSessions: new Set(records.map((record) => record.sessionFile)).size,
     bySource,
     byStatus,
+    byFailureReason,
     byProject: Object.fromEntries(
       [...projects].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])),
     ),
@@ -105,6 +113,7 @@ function displayRecord(record, filters) {
     source: record.source,
     date: new Date(record.timestamp).toISOString(),
     status: record.status,
+    ...(record.failureReason === undefined ? {} : { failureReason: record.failureReason }),
     ...(record.promptRevision === undefined ? {} : { promptRevision: record.promptRevision }),
     ...(record.provenance?.commit
       ? { commit: record.provenance.commit.slice(0, 12), dirty: record.provenance.dirty === true }

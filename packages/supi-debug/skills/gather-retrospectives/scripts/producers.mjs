@@ -27,3 +27,15 @@ export function isProducerEvent(source, category) {
 export function isProducer(source) {
   return Object.hasOwn(PRODUCERS, source);
 }
+
+/**
+ * Failure reasons an Agent Run retrospective records (`AgentRunRetrospectiveFailureReason` in
+ * supi-agent-runtime). Failed reports without a known reason count as `unknown`.
+ */
+export const FAILURE_REASONS = Object.freeze([
+  "tool-call",
+  "request-limit",
+  "prompt-rejected",
+  "provider-error",
+  "no-response",
+]);

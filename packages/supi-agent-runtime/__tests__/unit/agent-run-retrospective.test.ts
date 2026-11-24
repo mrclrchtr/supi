@@ -235,7 +235,38 @@ it("fails the assessment when the model attempts a tool call", async () => {
   });
 
   await expect(run.result).resolves.toMatchObject({ kind: "success", value: "answer" });
-  expect(onResult).toHaveBeenCalledWith({ status: "failed", metrics: expect.any(Object) });
+  expect(onResult).toHaveBeenCalledWith({
+    status: "failed",
+    failureReason: "tool-call",
+    metrics: expect.any(Object),
+  });
+});
+
+it("names an assessment that needs a second model request", async () => {
+  const harness = createHarness(mocks);
+  harness.session.prompt.mockImplementationOnce(async (_prompt, options) => {
+    options?.preflightResult?.("started");
+  });
+  harness.session.prompt.mockImplementationOnce(async (_prompt, options) => {
+    options?.preflightResult?.("started");
+    await harness.session.agent.streamFunction({} as never, {} as never);
+    harness.session.messages.push({ role: "assistant", content: [{ type: "text", text: "a" }] });
+    await Promise.resolve()
+      .then(() => harness.session.agent.streamFunction({} as never, {} as never))
+      .catch(() => undefined);
+  });
+  const onResult = vi.fn();
+  const run = startAgentRun({
+    inputs: inputs(),
+    prompt: "Task",
+    completionResolver: () => "answer",
+    retrospective: { prompt: "Assess", onResult },
+  });
+
+  await expect(run.result).resolves.toMatchObject({ kind: "success", value: "answer" });
+  expect(onResult).toHaveBeenCalledWith(
+    expect.objectContaining({ status: "failed", failureReason: "request-limit" }),
+  );
 });
 
 it("keeps a published task stoppable in the registry during its retrospective", async () => {
@@ -354,6 +385,10 @@ it("never logs the old task answer as the assessment after a provider failure", 
     retrospective: { prompt: "Assess", onResult },
   });
   await expect(run.result).resolves.toMatchObject({ kind: "success", value: "answer" });
-  expect(onResult).toHaveBeenCalledWith({ status: "failed", metrics: expect.any(Object) });
+  expect(onResult).toHaveBeenCalledWith({
+    status: "failed",
+    failureReason: "provider-error",
+    metrics: expect.any(Object),
+  });
   expect(harness.session.prompt).toHaveBeenCalledTimes(2);
 });

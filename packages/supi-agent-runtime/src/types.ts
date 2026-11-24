@@ -213,12 +213,29 @@ export interface AgentRunTaskMetrics {
 /** Result of the optional, tool-free assessment phase; never changes task completion. */
 export interface AgentRunRetrospectiveResult {
   readonly status: "completed" | "failed";
+  /** Why a failed assessment produced no text; absent when completed. */
+  readonly failureReason?: AgentRunRetrospectiveFailureReason;
   readonly text?: string;
   /** Task measurements, so self-reported friction can be compared with measured cost. */
   readonly metrics: AgentRunTaskMetrics;
   /** Newly billed retrospective Usage, excluding the completed task. */
   readonly usage?: Usage;
 }
+
+/**
+ * Why an assessment failed, checked in this order:
+ * - `tool-call`: the model called a tool, which the runtime blocked.
+ * - `request-limit`: the turn needed a second model request.
+ * - `prompt-rejected`: Pi did not start the assessment prompt.
+ * - `provider-error`: the provider returned an error.
+ * - `no-response`: the turn ended without a new assistant message, or the prompt threw.
+ */
+export type AgentRunRetrospectiveFailureReason =
+  | "tool-call"
+  | "request-limit"
+  | "prompt-rejected"
+  | "provider-error"
+  | "no-response";
 
 /** Caller-owned assessment prompt and evidence policy. */
 export interface AgentRunRetrospective {

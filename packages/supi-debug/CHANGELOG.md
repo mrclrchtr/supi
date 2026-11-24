@@ -1,5 +1,9 @@
 # Changelog
 
+## [15.0.0]
+
+- Failed Agent Run retrospectives record why they failed (`failureReason`: `tool-call`, `request-limit`, `prompt-rejected`, `provider-error`, or `no-response`). `gather-retrospectives` carries the reason into the evidence file and `--export` lines, and its summary counts failed reports per reason (`byFailureReason`). Failed reports recorded before this version count as `unknown`.
+
 ## [14.3.0]
 
 - `gather-retrospectives` attributes each report to a project: the main working tree of the Git repository its session ran in, so sibling worktrees count as one project. The collector summary lists reports per project (`byProject`), and `--export` lines carry `project` and `session`. Evidence files written by earlier versions show each working directory as its own project.

@@ -82,6 +82,7 @@ export type {
   AgentRunProgress,
   AgentRunProgressListener,
   AgentRunRetrospective,
+  AgentRunRetrospectiveFailureReason,
   AgentRunRetrospectiveResult,
   AgentRunSessionView,
   AgentRunStatus,

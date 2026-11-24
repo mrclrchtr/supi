@@ -128,6 +128,14 @@ describe("retrospective collector CLI", () => {
       containingSessions: 1,
       bySource: { "supi-agent": 1, "supi-review": 1, "supi-debug": 0 },
       byStatus: { completed: 2, failed: 0 },
+      byFailureReason: {
+        "tool-call": 0,
+        "request-limit": 0,
+        "prompt-rejected": 0,
+        "provider-error": 0,
+        "no-response": 0,
+        unknown: 0,
+      },
       byProject: { [workspace]: 2 },
       earliest: "1970-01-01T00:00:00.500Z",
       latest: "1970-01-01T00:00:01.000Z",
@@ -350,6 +358,14 @@ describe("retrospective collector CLI", () => {
       containingSessions: 0,
       bySource: { "supi-agent": 0, "supi-review": 0, "supi-debug": 0 },
       byStatus: { completed: 0, failed: 0 },
+      byFailureReason: {
+        "tool-call": 0,
+        "request-limit": 0,
+        "prompt-rejected": 0,
+        "provider-error": 0,
+        "no-response": 0,
+        unknown: 0,
+      },
       byProject: {},
       earliest: null,
       latest: null,
@@ -609,6 +625,36 @@ describe("retrospective collector CLI", () => {
     expect(evidence.records[1]).toMatchObject({ status: "failed" });
     expect(evidence.records[1].text).toBeUndefined();
     expect(evidence.summary.byStatus).toEqual({ completed: 1, failed: 1 });
+    expect(evidence.records[1]).not.toHaveProperty("failureReason");
+    expect(evidence.summary.byFailureReason).toMatchObject({ unknown: 1 });
+  });
+
+  it("carries known failure reasons into the evidence, export, and summary", async () => {
+    const failed = (runKey: string, timestamp: number, failureReason: unknown) =>
+      withData(retrospective(runKey, "", "supi-review", timestamp), {
+        status: "failed",
+        text: undefined,
+        failureReason,
+      });
+    await session("a/session.jsonl", workspace, [
+      failed("blocked", 3000, "tool-call"),
+      failed("provider", 2000, "provider-error"),
+      failed("invented", 1000, "made-up"),
+    ]);
+
+    const { evidence, preview } = await collect();
+    expect(
+      evidence.records.map((record: { failureReason?: string }) => record.failureReason),
+    ).toEqual(["tool-call", "provider-error", undefined]);
+    expect(preview.records[0]).toMatchObject({ failureReason: "tool-call" });
+    expect(evidence.summary.byFailureReason).toEqual({
+      "tool-call": 1,
+      "request-limit": 0,
+      "prompt-rejected": 0,
+      "provider-error": 1,
+      "no-response": 0,
+      unknown: 1,
+    });
   });
 
   it("reports incomplete coverage for malformed events and session scan limits", async () => {

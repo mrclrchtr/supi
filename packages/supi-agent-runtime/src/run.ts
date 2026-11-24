@@ -35,6 +35,7 @@ import type {
   AgentRunOutcome,
   AgentRunProgress,
   AgentRunProgressListener,
+  AgentRunRetrospectiveFailureReason,
   AgentRunSessionView,
   AgentRunStatus,
   AgentRunSteerResult,
@@ -774,17 +775,21 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
       promptClosed = true;
     }
     if (aborting || terminal || finalizing) return;
-    const completed =
-      accepted &&
-      !failed &&
-      !exceededRequestLimit &&
-      !toolCallAttempted &&
-      latestAssistant(activeSession) !== previousAssistant &&
-      !isProviderError(activeSession);
+    const failureReason: AgentRunRetrospectiveFailureReason | undefined = toolCallAttempted
+      ? "tool-call"
+      : exceededRequestLimit
+        ? "request-limit"
+        : !accepted
+          ? "prompt-rejected"
+          : isProviderError(activeSession)
+            ? "provider-error"
+            : failed || latestAssistant(activeSession) === previousAssistant
+              ? "no-response"
+              : undefined;
     try {
       policy.onResult({
-        status: completed ? "completed" : "failed",
-        ...(completed ? { text: activeSession.getLastAssistantText() } : {}),
+        status: failureReason ? "failed" : "completed",
+        ...(failureReason ? { failureReason } : { text: activeSession.getLastAssistantText() }),
         metrics,
         ...usageDeltaFields(before, refreshUsage()),
       });

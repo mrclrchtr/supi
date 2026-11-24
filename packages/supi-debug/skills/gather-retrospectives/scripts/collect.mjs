@@ -12,6 +12,7 @@ import {
   sessionDirectory,
 } from "./paths.mjs";
 import {
+  FAILURE_REASONS,
   isProducer,
   isProducerEvent,
   isRetrospectiveCategory,
@@ -202,6 +203,9 @@ function report(entry, context) {
     if (typeof data[key] === "string") report[key] = data[key];
   }
   if (Number.isSafeInteger(data.promptRevision)) report.promptRevision = data.promptRevision;
+  if (report.status === "failed" && FAILURE_REASONS.includes(data.failureReason)) {
+    report.failureReason = data.failureReason;
+  }
   const metrics = taskMetrics(data.metrics);
   if (metrics) report.metrics = metrics;
   const identity = report.runKey
