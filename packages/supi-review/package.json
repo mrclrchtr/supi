@@ -65,7 +65,7 @@
   "devDependencies": {
     "@mrclrchtr/supi-agent": "workspace:*",
     "@mrclrchtr/supi-test-utils": "workspace:*",
-    "vitest": "5.1.0"
+    "vitest": "5.1.1"
   },
   "pi": {
     "extensions": [
