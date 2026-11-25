@@ -19,6 +19,7 @@ vi.mock("@earendil-works/pi-coding-agent", async (original) => ({
 
 import { SessionManager, SettingsManager } from "@earendil-works/pi-coding-agent";
 import { AgentRunRegistry, startAgentRun, startRegisteredAgentRun } from "../../src/api.ts";
+import { buildRetrospectivePrompt } from "../../src/debug-retrospective.ts";
 import { createHarness, inputs } from "../helpers/agent-run-harness.ts";
 
 beforeEach(() => vi.clearAllMocks());
@@ -391,4 +392,33 @@ it("never logs the old task answer as the assessment after a provider failure", 
     metrics: expect.any(Object),
   });
   expect(harness.session.prompt).toHaveBeenCalledTimes(2);
+});
+
+it("passes the run's available tools to a prompt function and sends its text", async () => {
+  const harness = createHarness(mocks);
+  harness.session.getActiveToolNames.mockReturnValue(["read", "code_graph"]);
+  harness.session.prompt.mockImplementation(async (_prompt, options) => {
+    options?.preflightResult?.("started");
+    harness.session.messages.push({ role: "assistant", content: [{ type: "text", text: "x" }] });
+  });
+  const prompt = vi.fn(({ availableTools }) => `Assess ${availableTools.join(",")}`);
+  const run = startAgentRun({
+    inputs: inputs(),
+    prompt: "Task",
+    completionResolver: () => "answer",
+    retrospective: { prompt, onResult: vi.fn() },
+  });
+  await run.result;
+
+  expect(prompt).toHaveBeenCalledWith({ availableTools: ["code_graph", "read"] });
+  expect(harness.session.prompt.mock.calls[1]?.[0]).toBe("Assess code_graph,read");
+});
+
+it("asks the shared Tool Selection question only for the families the run had", () => {
+  const families = (prompt: string) =>
+    ["- `code_*` (Code Intelligence)", "- `codemode`:"].map((line) => prompt.includes(line));
+
+  expect(buildRetrospectivePrompt(["read", "bash"])).not.toContain("Tool selection:");
+  expect(families(buildRetrospectivePrompt(["read", "code_resolve"]))).toEqual([true, false]);
+  expect(families(buildRetrospectivePrompt(["codemode", "code_graph"]))).toEqual([true, true]);
 });

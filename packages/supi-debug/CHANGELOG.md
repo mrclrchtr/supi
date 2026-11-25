@@ -1,5 +1,10 @@
 # Changelog
 
+## [16.0.0]
+
+- `/supi-tooling-retro` now asks why the task used or did not use Code Intelligence (`code_*`) and `codemode`, for the families among the session's active tools. A **Tool selection** section lists one line per moment where such a tool fit, `- <family> | <question> | <tool> | <code> | <note>`, or `- <family> | No such moment.`, with the same codes and wording as Agent and Reviewer Run retrospectives. Reports from this prompt carry `promptRevision` 5 ([#687](https://github.com/mrclrchtr/supi/issues/687)).
+- `gather-retrospectives` parses these Tool Selection lines from every producer. Each report in the evidence file and `--export` lines carries `toolSelection` (`status`, `moments`, `noMoment`, `invalidLines`), and the summary counts the codes per producer, prompt revision, and family (`toolSelection`), so the skill reads them from fields instead of classifying prose.
+
 ## [15.0.0]
 
 - Failed Agent Run retrospectives record why they failed (`failureReason`: `tool-call`, `request-limit`, `prompt-rejected`, `provider-error`, or `no-response`). `gather-retrospectives` carries the reason into the evidence file and `--export` lines, and its summary counts failed reports per reason (`byFailureReason`). Failed reports recorded before this version count as `unknown`.

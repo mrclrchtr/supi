@@ -8,7 +8,10 @@ import {
 import { SIDE_RUN_END_EVENT, SIDE_RUN_START_EVENT } from "@mrclrchtr/supi-core/session";
 import { createPiMock, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { TOOLING_RETRO_PROMPT } from "../../src/tooling-retro/prompt.ts";
+import {
+  buildToolingRetroPrompt,
+  TOOLING_RETRO_PROMPT_REVISION,
+} from "../../src/tooling-retro/prompt.ts";
 import {
   registerToolingRetroCommand,
   TOOLING_RETRO_ANCHOR_TYPE,
@@ -89,6 +92,19 @@ describe("/supi-tooling-retro", () => {
     branch = [message("t1", "user", "Fix the bug"), message("t2", "assistant", "Fixed.", "stop")];
   });
 
+  it("asks the Tool Selection question only for the session's active tool families", async () => {
+    const { pi, ctx, command } = setup(report("## Retro\nHelpful."));
+    pi.setActiveTools(["read", "code_graph"]);
+
+    await command.handler("", ctx);
+
+    const prompt = vi.mocked(pi.sendMessage).mock.calls[0]?.[0].content as string;
+    expect(prompt).toContain("### Tool selection");
+    expect(prompt).toContain("- `code_*` (Code Intelligence)");
+    expect(prompt).not.toContain("- `codemode`:");
+    expect(buildToolingRetroPrompt(["read"])).not.toContain("Tool selection");
+  });
+
   it("runs on a side branch, returns to the anchor, and records one event", async () => {
     enablePersistence();
     const { pi, ctx, command, appended, navigateTree } = setup(report("## Retro\nHelpful."));
@@ -96,7 +112,11 @@ describe("/supi-tooling-retro", () => {
     await command.handler("", ctx);
 
     expect(pi.sendMessage).toHaveBeenCalledWith(
-      { customType: TOOLING_RETRO_PROMPT_TYPE, content: TOOLING_RETRO_PROMPT, display: true },
+      {
+        customType: TOOLING_RETRO_PROMPT_TYPE,
+        content: buildToolingRetroPrompt([]),
+        display: true,
+      },
       { triggerTurn: true },
     );
     expect(navigateTree).toHaveBeenCalledWith("custom-1", { summarize: false });
@@ -115,7 +135,7 @@ describe("/supi-tooling-retro", () => {
       level: "info",
       data: {
         status: "completed",
-        promptRevision: 2,
+        promptRevision: TOOLING_RETRO_PROMPT_REVISION,
         text: "## Retro\nHelpful.",
         runKey: `a1:${Date.parse(TIMESTAMP)}`,
       },

@@ -6,8 +6,8 @@ import type {
 import { canPersistDebugEvent, recordDebugEvent } from "@mrclrchtr/supi-core/debug";
 import { runSideRun } from "@mrclrchtr/supi-core/session";
 import {
+  buildToolingRetroPrompt,
   TOOLING_RETRO_DESCRIPTION,
-  TOOLING_RETRO_PROMPT,
   TOOLING_RETRO_PROMPT_REVISION,
 } from "./prompt.ts";
 import {
@@ -131,7 +131,11 @@ async function runRetroPrompt(
   sessionFile: string | undefined,
 ): Promise<RetroRun> {
   pi.sendMessage(
-    { customType: TOOLING_RETRO_PROMPT_TYPE, content: TOOLING_RETRO_PROMPT, display: true },
+    {
+      customType: TOOLING_RETRO_PROMPT_TYPE,
+      content: buildToolingRetroPrompt(pi.getActiveTools()),
+      display: true,
+    },
     { triggerTurn: true },
   );
   // Pi marks the triggered run active synchronously, so this waits for the whole run,

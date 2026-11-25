@@ -197,7 +197,7 @@ With retrospective collection enabled, completed Delegation and Reviewer Runs pu
 
 ### Tooling Retrospectives
 
-After a task, run `/supi-tooling-retro`. It asks the agent for a compact retrospective of the SuPi surfaces used in the preceding task: what helped, what fell short, what was missing, and what was noisy, including slow navigation, unreachable information, and instructions that changed nothing. Each proposal names its mechanism and prefers a deterministic check or a tool change over new guidance text. If the agent is still working, the command waits until it is idle.
+After a task, run `/supi-tooling-retro`. It asks the agent for a compact retrospective of the SuPi surfaces used in the preceding task: what helped, what fell short, what was missing, and what was noisy, including slow navigation, unreachable information, and instructions that changed nothing. When the session has Code Intelligence (`code_*`) or `codemode` tools, a **Tool selection** section lists, one line per moment, where they would have fit but another tool was used, or where their result did not settle the question, with a reason code. Agent and Reviewer Run retrospectives ask the same question, and `gather-retrospectives` counts the codes. Each proposal names its mechanism and prefers a deterministic check or a tool change over new guidance text. If the agent is still working, the command waits until it is idle.
 
 Before it starts, the command asks where the retrospective runs. **Side branch** is preselected; it is also used without dialog support, such as in print mode. **Main path** runs it as a normal turn: the prompt and report stay in the agent's context, so you can discuss the report or act on it directly. Dismissing the dialog cancels the command.
 

@@ -754,7 +754,9 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
         requested = true;
         return stream(...args);
       };
-      await activeSession.prompt(policy.prompt, {
+      const prompt =
+        typeof policy.prompt === "function" ? policy.prompt({ availableTools }) : policy.prompt;
+      await activeSession.prompt(prompt, {
         preflightResult: (disposition) => {
           if (
             disposition === "started" &&

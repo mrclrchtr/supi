@@ -21,7 +21,7 @@ Status: implemented.
 | Authority | No tool execution. Tools stay declared so the system prompt and tool list keep their cached prefix; the runtime blocks every call, ends the turn, and records the assessment as failed. Do not continue the task, perform new investigation, or execute another structured-completion protocol. |
 | Budget | No retrospective-specific token or wall-clock limit. Normal cancellation, ownership, and shutdown rules still apply. |
 | Attempts | One assessment turn, with no retry or repair, including automatic retry paths. |
-| Output | Free-form assessment text in the existing Debug log; no new report schema or storage system. |
+| Output | Free-form assessment text in the existing Debug log, ending with the shared Tool Selection lines when the run had `code_*` or `codemode` tools. The event stores text only; the `gather-retrospectives` collector parses those lines when reading. No new report schema or storage system. |
 | Failure | A failed, interrupted, or unloggable retrospective cannot change the published task result. No guarantee of a report after cancellation or shutdown. |
 
 ## Lifecycle boundary
@@ -52,15 +52,17 @@ Constraints:
 
 ## Assessment prompt
 
-Starting wording; not a new structured-output protocol:
+Starting wording; free text except the Tool Selection lines:
 
 > Reflect briefly on the task you just completed. Based only on the context available from this run, what would have made it more token/time efficient or more effective?
 >
 > Focus on missing or unnecessary context from the parent, unclear tool guidance, suboptimal tool results, and tool failures or misuse. For each useful finding, name the observed friction and the specific change that might help. Clearly distinguish observations from untested suggestions. Do not invent savings estimates or generic recommendations. If nothing notable occurred, say so.
 >
-> Mention Code Intelligence (`code_*`) tools only in these two cases. For each `code_*` call whose result was incomplete, oversized, ambiguous, or failed, report the tool, the problem, and the follow-up call it forced. If these tools were available and you answered a question about a code symbol (its definition, references, callers, or type) with another tool, name the question and say briefly why. Tool availability and call counts are recorded separately, so a statement that you made no such calls adds nothing.
+> *(Tool Selection question, only for the available families; see below)*
 >
 > Do not continue the task, use tools, or repeat sensitive task content unnecessarily.
+
+The Tool Selection question comes from `buildToolSelectionPrompt()` in `@mrclrchtr/supi-core/debug`, which `/supi-tooling-retro` uses as well, so both ask it word for word ([#687](https://github.com/mrclrchtr/supi/issues/687)). It asks, per available family (`code_*`, `codemode`), for one line per moment where the family fit: `- <family> | <question> | <tool> | <code> | <note>`, or `- <family> | No such moment.`. Codes for another tool answering are `not-considered`, `rule-not-followed`, `guidance-mismatch`, `other-tool-preferred`, `prior-result`, and `unknown`; for a call of the family, `faulty-result` and `rechecked`. Keep the collector's `tool-selection.mjs` parser in sync; a test compares their families and codes.
 
 Adapt the existing [`/supi-tooling-retro` prompt](../../packages/supi-debug/src/tooling-retro/prompt.ts) rather than introducing a reporting framework. Its interactive evidence queries and lengthy output template are not required here.
 

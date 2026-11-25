@@ -26,6 +26,7 @@ import {
 } from "./provenance.mjs";
 import { integer, scanComplete, scanCoverage, scanSessions, sinceTimestamp } from "./sessions.mjs";
 import { displayPage, exportReports, readEvidence, summarize } from "./snapshot.mjs";
+import { parseToolSelection } from "./tool-selection.mjs";
 
 const help = `Collect stored retrospectives without modifying sessions.
 Usage: node collect.mjs --output <new-file.json> [collection options]
@@ -208,6 +209,7 @@ function report(entry, context) {
   }
   const metrics = taskMetrics(data.metrics);
   if (metrics) report.metrics = metrics;
+  if (typeof data.text === "string") report.toolSelection = parseToolSelection(data.text);
   const identity = report.runKey
     ? [report.source, report.runKey]
     : [report.source, report.timestamp, report.status, report.text, report.entryId];

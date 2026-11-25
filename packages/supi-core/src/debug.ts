@@ -12,3 +12,9 @@ export {
 export * from "./debug-registry.ts";
 // biome-ignore lint/performance/noReExportAll: preserve the stable debug domain entry point
 export * from "./debug-timing.ts";
+export {
+  buildToolSelectionPrompt,
+  TOOL_SELECTION_CALL_CODES,
+  TOOL_SELECTION_FAMILIES,
+  TOOL_SELECTION_NON_USE_CODES,
+} from "./debug-tool-selection.ts";

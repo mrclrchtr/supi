@@ -25,7 +25,7 @@ import {
   subscribeDebugPersistence,
 } from "@mrclrchtr/supi-core/debug";
 import { afterEach, beforeEach, expect, it } from "vitest";
-import { TOOLING_RETRO_PROMPT } from "../../src/tooling-retro/prompt.ts";
+import { buildToolingRetroPrompt } from "../../src/tooling-retro/prompt.ts";
 import { registerToolingRetroCommand } from "../../src/tooling-retro/register.ts";
 import { TOOLING_RETRO_REPORT_TYPE } from "../../src/tooling-retro/render.ts";
 
@@ -150,7 +150,7 @@ it("continues the task without the retrospective in the next request's context",
     });
     // The side branch stays in the session file.
     expect(JSON.stringify(session.sessionManager.getEntries())).toContain(
-      TOOLING_RETRO_PROMPT.slice(0, 40),
+      buildToolingRetroPrompt([]).slice(0, 40),
     );
   } finally {
     session.dispose();

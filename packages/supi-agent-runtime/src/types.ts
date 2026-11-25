@@ -239,7 +239,11 @@ export type AgentRunRetrospectiveFailureReason =
 
 /** Caller-owned assessment prompt and evidence policy. */
 export interface AgentRunRetrospective {
-  readonly prompt: string;
+  /**
+   * Assessment prompt. A function receives the tools the run started with, the same list
+   * recorded as `metrics.availableTools`, so it can ask only about available tools.
+   */
+  readonly prompt: string | ((context: { readonly availableTools: readonly string[] }) => string);
   /** Recheck opt-in and logging availability immediately before the assessment. */
   readonly isEnabled?: () => boolean;
   /** Synchronous evidence sink; failures cannot invalidate the task result. */

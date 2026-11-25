@@ -3,6 +3,11 @@ import { mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from "node
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { promisify } from "node:util";
+import {
+  TOOL_SELECTION_CALL_CODES,
+  TOOL_SELECTION_FAMILIES,
+  TOOL_SELECTION_NON_USE_CODES,
+} from "@mrclrchtr/supi-core/debug";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const execute = promisify(execFile);
@@ -549,6 +554,90 @@ describe("retrospective collector CLI", () => {
       cost: 0.5,
     });
     expect(evidence.records[1]).not.toHaveProperty("metrics");
+  });
+
+  it("parses Tool Selection lines into the evidence, export, and summary", async () => {
+    const answer = [
+      "Findings in prose.",
+      "- code_* | Who calls `f`? | grep | rule-not-followed | quote: call code_graph",
+      "- `code_*` | Where is `g` declared? | code_find | rechecked | grep in the same batch",
+      "- codemode | No such moment.",
+      "- code_* | Bad line without a code | grep",
+      "- code_* | Unknown code | grep | habit",
+    ].join("\n");
+    await session("a.jsonl", workspace, [
+      withData(retrospective("answered", answer, "supi-review", 2000), { promptRevision: 6 }),
+      withData(retrospective("earlier", "- code_* | No such moment.", "supi-review", 1500), {
+        promptRevision: 5,
+      }),
+      retrospective("older", "Prose only.", "supi-agent", 1000),
+    ]);
+
+    const { evidence } = await collect();
+    expect(evidence.records[0].toolSelection).toEqual({
+      status: "parsed",
+      moments: [
+        {
+          family: "code_*",
+          question: "Who calls `f`?",
+          tool: "grep",
+          code: "rule-not-followed",
+          note: "quote: call code_graph",
+        },
+        {
+          family: "code_*",
+          question: "Where is `g` declared?",
+          tool: "code_find",
+          code: "rechecked",
+          note: "grep in the same batch",
+        },
+      ],
+      noMoment: ["codemode"],
+      invalidLines: 2,
+    });
+    expect(evidence.records[2].toolSelection.status).toBe("missing");
+    // Revisions are counted apart; producers without any answered report stay out.
+    expect(evidence.summary.toolSelection).toEqual({
+      "supi-review": {
+        "6": {
+          reports: { parsed: 1, invalid: 0, missing: 0 },
+          invalidLines: 2,
+          families: {
+            "code_*": { codes: { "rule-not-followed": 1, rechecked: 1 }, noMoment: 0 },
+            codemode: { codes: {}, noMoment: 1 },
+          },
+        },
+        "5": {
+          reports: { parsed: 1, invalid: 0, missing: 0 },
+          invalidLines: 0,
+          families: {
+            "code_*": { codes: {}, noMoment: 1 },
+            codemode: { codes: {}, noMoment: 0 },
+          },
+        },
+      },
+    });
+
+    const exportFile = join(root, "tool-selection.jsonl");
+    await execute(process.execPath, [script.pathname, "--read", output, "--export", exportFile]);
+    const lines = (await readFile(exportFile, "utf8"))
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line));
+    expect(lines[0].toolSelection.moments).toHaveLength(2);
+  });
+
+  it("parses the families and codes that the shared prompt asks for", async () => {
+    const parser = new URL(
+      "../../skills/gather-retrospectives/scripts/tool-selection.mjs",
+      import.meta.url,
+    );
+    const { TOOL_SELECTION_FAMILIES: FAMILIES, TOOL_SELECTION_CODES } = await import(parser.href);
+    expect(FAMILIES).toEqual([...TOOL_SELECTION_FAMILIES]);
+    expect(TOOL_SELECTION_CODES).toEqual([
+      ...TOOL_SELECTION_NON_USE_CODES,
+      ...TOOL_SELECTION_CALL_CODES,
+    ]);
   });
 
   // Several real Git processes; the default timeout is too tight under full parallel load.

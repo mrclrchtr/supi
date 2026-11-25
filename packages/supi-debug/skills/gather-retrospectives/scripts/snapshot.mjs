@@ -1,6 +1,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { isAbsolute, relative } from "node:path";
 import { FAILURE_REASONS, isProducer, PRODUCER_NAMES } from "./producers.mjs";
+import { TOOL_SELECTION_FAMILIES } from "./tool-selection.mjs";
 
 // Snapshots written before projects were resolved carry only the session working directory.
 const projectOf = (record) => record.project ?? record.cwd ?? "unknown";
@@ -15,6 +16,7 @@ export function summarize(records) {
   const byStatus = { completed: 0, failed: 0 };
   const byFailureReason = Object.fromEntries([...FAILURE_REASONS, "unknown"].map((r) => [r, 0]));
   const projects = new Map();
+  const toolSelection = {};
   let earliest = Infinity;
   let latest = -Infinity;
   for (const record of records) {
@@ -26,6 +28,7 @@ export function summarize(records) {
       ]++;
     }
     projects.set(projectOf(record), (projects.get(projectOf(record)) ?? 0) + 1);
+    countToolSelection(toolSelection, record);
     earliest = Math.min(earliest, record.timestamp);
     latest = Math.max(latest, record.timestamp);
   }
@@ -40,7 +43,52 @@ export function summarize(records) {
     ),
     earliest: records.length ? new Date(earliest).toISOString() : null,
     latest: records.length ? new Date(latest).toISOString() : null,
+    ...answeredToolSelection(toolSelection),
   };
+}
+
+// Omit revisions, and then producers, whose reports never answered with Tool Selection lines.
+function answeredToolSelection(summary) {
+  const answered = Object.entries(summary)
+    .map(([source, revisions]) => [
+      source,
+      Object.fromEntries(
+        Object.entries(revisions).filter(
+          ([, entry]) => entry.reports.parsed + entry.reports.invalid > 0,
+        ),
+      ),
+    ])
+    .filter(([, revisions]) => Object.keys(revisions).length > 0);
+  return answered.length > 0 ? { toolSelection: Object.fromEntries(answered) } : {};
+}
+
+/**
+ * Count parsed Tool Selection answers per producer and `promptRevision` (`unknown` when none was
+ * recorded), since revisions may define codes differently: reports by parse status, and per
+ * family the moments by code plus the reports that answered "No such moment.". `missing`
+ * includes reports from prompts without the question and runs without these tools.
+ */
+function countToolSelection(summary, record) {
+  const parsed = record.toolSelection;
+  if (!parsed) return;
+  summary[record.source] ??= {};
+  const revisions = summary[record.source];
+  const revision = String(record.promptRevision ?? "unknown");
+  revisions[revision] ??= {
+    reports: { parsed: 0, invalid: 0, missing: 0 },
+    invalidLines: 0,
+    families: Object.fromEntries(
+      TOOL_SELECTION_FAMILIES.map((family) => [family, { codes: {}, noMoment: 0 }]),
+    ),
+  };
+  const entry = revisions[revision];
+  entry.reports[parsed.status]++;
+  entry.invalidLines += parsed.invalidLines;
+  for (const moment of parsed.moments) {
+    const codes = entry.families[moment.family].codes;
+    codes[moment.code] = (codes[moment.code] ?? 0) + 1;
+  }
+  for (const family of new Set(parsed.noMoment)) entry.families[family].noMoment++;
 }
 
 /** Snapshot reads never discover storage or open original session files. */
@@ -136,6 +184,7 @@ export async function exportReports(evidence, evidenceFile, exportFile, refs) {
       ...displayRecord(record, evidence.filters),
       ...(record.label === undefined ? {} : { label: record.label }),
       ...(record.metrics === undefined ? {} : { metrics: record.metrics }),
+      ...(record.toolSelection === undefined ? {} : { toolSelection: record.toolSelection }),
       text: record.text ?? null,
     }),
   );
