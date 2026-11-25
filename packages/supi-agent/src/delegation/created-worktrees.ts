@@ -70,11 +70,16 @@ export function siblingWorktreePath(mainRoot: string, branch: string): string {
   return `${mainRoot}.${safeName(branch)}`;
 }
 
-async function resolveBase(cwd: string, base: string, signal?: AbortSignal): Promise<string> {
+async function resolveBase(
+  taskId: string,
+  cwd: string,
+  base: string,
+  signal?: AbortSignal,
+): Promise<string> {
   const commit = await resolveCommit(cwd, base, signal);
   if (commit === undefined) {
     throw new Error(
-      `new.worktree.base "${base}" does not name a commit in the parent's repository.`,
+      `${taskId}: new.worktree.base "${base}" does not name a commit in the parent's repository.`,
     );
   }
   return commit;
@@ -119,7 +124,7 @@ export async function createRequestedWorktrees(
       const baseRef = request.base ?? "HEAD";
       let baseCommit = bases.get(baseRef);
       if (baseCommit === undefined) {
-        baseCommit = await resolveBase(parentCwd, baseRef, signal);
+        baseCommit = await resolveBase(task.id, parentCwd, baseRef, signal);
         bases.set(baseRef, baseCommit);
       }
       const branch = request.branch ?? defaultWorktreeBranch(task.id);

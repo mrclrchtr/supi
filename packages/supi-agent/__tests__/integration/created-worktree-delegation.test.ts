@@ -165,7 +165,7 @@ describe("rejected worktree requests leave nothing behind", () => {
     );
     await expectRejected(
       [creator("lost", { base: "no-such-ref" })],
-      /new\.worktree\.base "no-such-ref" does not name a commit/,
+      /lost: new\.worktree\.base "no-such-ref" does not name a commit/,
     );
     await expectRejected(
       [creator("ok", { branch: "ok" }), creator("taken", { branch: "taken" })],
