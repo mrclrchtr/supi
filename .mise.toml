@@ -1,6 +1,6 @@
 [tools]
 node = "26.13.1"
-pnpm = "12.21.0"
+pnpm = "12.22.0"
 hk = "2.14.0"
 pkl = "0.33.1"
 jactionlint = "2.6.0"
