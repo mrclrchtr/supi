@@ -1,5 +1,37 @@
 # Changelog
 
+## [16.0.0](https://github.com/mrclrchtr/supi/compare/v15.0.0...v16.0.0) (2026-11-25)
+
+This release lets `agent_run` writers run in parallel and in the background in their own worktrees, gives Reviewers the repository's instruction files, and asks retrospectives why Code Intelligence and `codemode` were or were not used.
+
+### ⚠ BREAKING CHANGES
+
+* **Review:** `review_run` tasks no longer accept `criteriaSources`. Migration: move each entry into the task's `instructions`, naming the source and quoting the rules that apply ([#668](https://github.com/mrclrchtr/supi/issues/668)).
+* **Review:** `/supi-review-cleanup` is removed. Migration: run `/supi-agent-cleanup` instead, and update scripts or notes that name the old command ([#677](https://github.com/mrclrchtr/supi/issues/677)).
+
+### Agents & Review
+
+* Parallel writers: an `agent_run` task with a mutation-capable profile such as `general` that runs in its own linked worktree (`new.cwd`) now leases that worktree and runs like a read-only task, next to other tasks in one batch and in the background by default in TUI and RPC. Writers in the parent's or the main worktree keep the single-task foreground rule. A batch is rejected before it starts when two writers target one worktree or another session holds it; a start blocked only by tasks finishing their retrospective waits up to 60 seconds ([#672](https://github.com/mrclrchtr/supi/issues/672), [#678](https://github.com/mrclrchtr/supi/issues/678)).
+* `agent_run` can create the worktree for a writer: `new.worktree: { base?, branch? }` creates a linked worktree on a new branch (default `supi/<task id>-<suffix>`) and keeps it after the run. The new **Worktree bootstrap command** setting (`agent.bootstrapCommand`) runs a command such as `pnpm install` in each created worktree first ([#681](https://github.com/mrclrchtr/supi/issues/681)).
+* `/supi-agent-cleanup`, shared by the Agent and Review extensions, lists SuPi-marked worktrees with their owner status. For worktrees whose owner has exited, it removes disposable workspaces, including Review Workspaces, and only unlocks worktrees it did not create ([#677](https://github.com/mrclrchtr/supi/issues/677)).
+* Reviewer Packets now carry the repository's instruction files: the root `CLAUDE.md` or `AGENTS.md` in full, and the nearest instruction file above each changed or `paths` entry as an indexed reference that Reviewers read before judging code there. A root instruction file above 100,000 bytes fails the Review before it starts ([#668](https://github.com/mrclrchtr/supi/issues/668)).
+
+### Debug & Retrospectives
+
+* Agent Run, Reviewer Run, and `/supi-tooling-retro` retrospectives end with a Tool Selection answer that says, per moment, why a Code Intelligence (`code_*`) or `codemode` tool was or was not used, with fixed reason codes. `gather-retrospectives` parses and counts these codes ([#687](https://github.com/mrclrchtr/supi/issues/687)).
+
+### Code Intelligence
+
+* `code_orientation` with a directory focus shows instruction files in full instead of cutting them after 200 lines. All instruction files of one result share Pi's tool output limit, most specific file first; a cut file names the offset to read the remainder ([#690](https://github.com/mrclrchtr/supi/issues/690)).
+
+### Insights & Prompts
+
+* `/supi-insights`, `/supi-improve`, and prompt suggestions send one-shot model requests. With `claude-code` models, no idle `claude` process (about 235 MB) remains after each request ([#692](https://github.com/mrclrchtr/supi/issues/692)).
+
+### Dependencies
+
+* Routine dependency and tooling updates.
+
 ## [15.0.0](https://github.com/mrclrchtr/supi/compare/v14.3.0...v15.0.0) (2026-11-24)
 
 This release runs `review_run` in the background by default, makes Reviewer and Agent Runs more robust and cache-friendly, and stops spinners from flooding RPC clients.

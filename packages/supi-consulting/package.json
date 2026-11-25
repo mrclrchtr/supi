@@ -1,6 +1,6 @@
 {
   "name": "@mrclrchtr/supi-consulting",
-  "version": "15.0.0",
+  "version": "16.0.0",
   "description": "Bounded consultations with external agents for the Pi coding agent, with explicit workspace selection and observed evidence",
   "license": "MIT",
   "repository": {

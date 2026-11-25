@@ -1,6 +1,6 @@
 # Changelog
 
-## [15.0.1]
+## [16.0.0]
 
 - `/supi-improve` requests are now one-shot requests: the model provider keeps no conversation state for them. With `claude-code` models, no idle `claude` process remains after an improvement ([#692](https://github.com/mrclrchtr/supi/issues/692)).
 

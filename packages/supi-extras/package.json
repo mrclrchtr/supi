@@ -1,6 +1,6 @@
 {
   "name": "@mrclrchtr/supi-extras",
-  "version": "15.0.0",
+  "version": "16.0.0",
   "description": "Quality-of-life extras for the Pi coding agent: compact codemode rows, session capability controls, prompt stash, shortcuts, and activity indicators",
   "license": "MIT",
   "repository": {
