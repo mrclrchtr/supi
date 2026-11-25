@@ -397,7 +397,8 @@ describe("Agent Workspaces", () => {
       expect(workspace.root).toBe(realpathSync(path));
       expect(git(workspace.root, "branch", "--show-current")).toBe("supi/task-1");
       expect(branchTip("supi/task-1")).toBe(base);
-      expect(git(repo, "config", "--get-regexp", "^branch\\.").includes("supi/task-1")).toBe(false);
+      // `--get-regexp` exits 1 without a match; `--list` always succeeds.
+      expect(git(repo, "config", "--list")).not.toContain("branch.supi/task-1.");
       expect(lockReasons(repo).get(workspace.root)).toMatch(
         new RegExp(`^supi-agent:delegation:[^;]+;pid=${process.pid};started=[^;]+$`),
       );
